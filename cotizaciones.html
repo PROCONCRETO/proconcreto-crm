@@ -1,0 +1,3004 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROCONCRETO — Sistema de Cotizaciones</title>
+<style>
+  :root {
+    --azul: #003F7F;
+    --azul-claro: #1565C0;
+    --azul-medio: #1976D2;
+    --azul-suave: #E3F0FB;
+    --gris-oscuro: #1C2333;
+    --gris-medio: #4A5568;
+    --gris-claro: #EDF2F7;
+    --gris-borde: #CBD5E0;
+    --blanco: #FFFFFF;
+    --verde: #2E7D32;
+    --rojo: #C62828;
+    --naranja: #E65100;
+    --sombra: 0 1px 4px rgba(0,0,0,0.10);
+    --sombra-md: 0 4px 16px rgba(0,0,0,0.12);
+    --radio: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #F0F4F8; color: var(--gris-oscuro); font-size: 14px; }
+
+  /* ── NAV PRINCIPAL (módulos) ── */
+  .nav-top { background: #001F3F; color: white; display: flex; align-items: center; padding: 0 24px; height: 50px; gap: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .nav-logo { margin-right: 20px; display: flex; align-items: center; }
+  .nav-logo img { height: 42px; width: auto; object-fit: contain; filter: brightness(0) invert(1); }
+  .nav-modulo { background: none; border: none; color: rgba(255,255,255,0.65); cursor: pointer; padding: 6px 16px; border-radius: var(--radio); font-size: 12px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; transition: all .15s; display: flex; align-items: center; gap: 6px; }
+  .nav-modulo:hover { background: rgba(255,255,255,0.1); color: white; }
+  .nav-modulo.activo { background: var(--azul); color: white; }
+
+  /* ── SUB-NAV (vistas del módulo activo) ── */
+  .nav { background: var(--azul); color: white; display: flex; align-items: center; padding: 0 24px; height: 44px; gap: 4px; border-top: 1px solid rgba(255,255,255,0.1); }
+  .nav-btn { background: none; border: none; color: rgba(255,255,255,0.7); cursor: pointer; padding: 5px 14px; border-radius: var(--radio); font-size: 13px; transition: all .15s; }
+  .nav-btn:hover, .nav-btn.activo { background: rgba(255,255,255,0.18); color: white; font-weight: 600; }
+
+  /* ── PANTALLAS ── */
+  .pantalla { display: none; padding: 24px; max-width: 1200px; margin: 0 auto; }
+  .pantalla.activa { display: block; }
+
+  /* ── TARJETAS ── */
+  .card { background: white; border-radius: var(--radio); box-shadow: var(--sombra); padding: 20px; margin-bottom: 16px; }
+  .card-titulo { font-size: 15px; font-weight: 600; color: var(--azul); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .card-titulo::before { content: ''; display: inline-block; width: 3px; height: 18px; background: var(--azul); border-radius: 2px; }
+
+  /* ── FORMULARIO ── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .form-grupo { display: flex; flex-direction: column; gap: 4px; }
+  .form-grupo label { font-size: 11px; font-weight: 600; color: var(--gris-medio); text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-grupo input, .form-grupo select, .form-grupo textarea {
+    border: 1px solid var(--gris-borde); border-radius: var(--radio); padding: 8px 10px;
+    font-size: 13px; color: var(--gris-oscuro); background: white; transition: border .15s;
+  }
+  .form-grupo input:focus, .form-grupo select:focus, .form-grupo textarea:focus {
+    outline: none; border-color: var(--azul-medio); box-shadow: 0 0 0 2px rgba(25,118,210,0.15);
+  }
+  .form-grupo textarea { resize: vertical; min-height: 60px; }
+
+  /* ── BOTONES ── */
+  .btn { padding: 9px 18px; border: none; border-radius: var(--radio); cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primario { background: var(--azul); color: white; }
+  .btn-primario:hover { background: var(--azul-claro); }
+  .btn-secundario { background: var(--gris-claro); color: var(--gris-medio); border: 1px solid var(--gris-borde); }
+  .btn-secundario:hover { background: #e2e8f0; }
+  .btn-verde { background: var(--verde); color: white; }
+  .btn-verde:hover { background: #1B5E20; }
+  .btn-rojo { background: var(--rojo); color: white; }
+  .btn-naranja { background: var(--naranja); color: white; }
+  .btn-naranja:hover { background: #BF360C; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-xs { padding: 3px 7px; font-size: 11px; }
+  .btn-toggle-ver { background: none; border: 1px dashed var(--gris-borde); border-radius: 3px; font-size: 10px; color: var(--gris-medio); cursor: pointer; padding: 2px 7px; }
+  .btn-toggle-ver:hover { background: var(--gris-fondo); }
+
+  /* ── TABLA ÍTEMS ── */
+  .tabla-items { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tabla-items th { background: var(--azul); color: white; padding: 8px 10px; text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
+  .tabla-items td { padding: 8px 10px; border-bottom: 1px solid #EDF2F7; vertical-align: middle; }
+  .tabla-items tr:hover td { background: var(--azul-suave); }
+  .tabla-items input { border: 1px solid var(--gris-borde); border-radius: 4px; padding: 5px 7px; font-size: 13px; width: 100%; }
+  .tabla-items select { border: 1px solid var(--gris-borde); border-radius: 4px; padding: 5px 7px; font-size: 12px; width: 100%; }
+
+  /* ── TOTALES ── */
+  .totales-box { background: var(--azul-suave); border: 1px solid #90CAF9; border-radius: var(--radio); padding: 14px 18px; min-width: 300px; }
+  .totales-box .fila { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+  .totales-box .fila-total { border-top: 2px solid var(--azul); margin-top: 6px; padding-top: 8px; font-weight: 700; font-size: 16px; color: var(--azul); }
+  .totales-bottom { display: flex; justify-content: flex-end; margin-top: 12px; }
+
+  /* ── BUSCADOR PRODUCTO ── */
+  .buscador-container { position: relative; }
+  .buscador-resultado { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--gris-borde); border-radius: var(--radio); box-shadow: var(--sombra-md); z-index: 100; max-height: 280px; overflow-y: auto; }
+  .buscador-item { padding: 9px 12px; cursor: pointer; border-bottom: 1px solid #F7FAFC; }
+  .buscador-item:hover { background: var(--azul-suave); }
+  .buscador-item .nombre { font-weight: 600; font-size: 13px; }
+  .buscador-item .detalle { font-size: 11px; color: var(--gris-medio); }
+
+  /* ── LISTA COTIZACIONES ── */
+  .tabla-cots { width: 100%; border-collapse: collapse; }
+  .tabla-cots th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 700; color: var(--gris-medio); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid var(--gris-borde); }
+  .tabla-cots td { padding: 11px 12px; border-bottom: 1px solid #EDF2F7; font-size: 13px; }
+  .tabla-cots tr:hover td { background: var(--azul-suave); }
+
+  /* ── BADGES ── */
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .badge-prospecto { background: #F3E5F5; color: #6A1B9A; }
+  .badge-borrador { background: #FFF3E0; color: #E65100; }
+  .badge-enviada { background: #E3F2FD; color: #1565C0; }
+  .badge-negociación { background: #FFF8E1; color: #F57F17; }
+  .badge-aceptada { background: #E8F5E9; color: #2E7D32; }
+  .badge-rechazada { background: #FFEBEE; color: #C62828; }
+
+  /* ── KANBAN ── */
+  .kanban-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 16px; align-items: flex-start; }
+  .kanban-col { background: #F0F4F8; border-radius: 8px; min-width: 230px; max-width: 230px; display: flex; flex-direction: column; }
+  .kanban-col-header { padding: 12px 14px; border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: space-between; }
+  .kanban-col-header .col-titulo { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kanban-col-header .col-count { font-size: 11px; font-weight: 700; background: rgba(255,255,255,0.35); padding: 2px 7px; border-radius: 10px; }
+  .kanban-col-body { padding: 8px; display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
+  .kanban-card { background: white; border-radius: 6px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.10); cursor: grab; border-left: 3px solid transparent; transition: box-shadow .15s, transform .15s; user-select: none; }
+  .kanban-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: translateY(-1px); }
+  .kanban-card.dragging { opacity: 0.5; cursor: grabbing; }
+  .kanban-col-body.drag-over { background: rgba(25,118,210,0.08); border-radius: 6px; outline: 2px dashed var(--azul-medio); }
+  .kanban-card .kc-num { font-size: 10px; color: var(--gris-medio); margin-bottom: 4px; }
+  .kanban-card .kc-cliente { font-weight: 700; font-size: 13px; color: var(--gris-oscuro); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kanban-card .kc-proyecto { font-size: 11px; color: var(--gris-medio); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kanban-card .kc-total { font-size: 13px; font-weight: 700; color: var(--azul); }
+  .kanban-card .kc-fecha { font-size: 10px; color: #90A4AE; margin-top: 4px; }
+  .kanban-drop-hint { text-align: center; font-size: 11px; color: #90A4AE; padding: 16px 8px; border: 2px dashed #CBD5E0; border-radius: 6px; }
+
+  /* ── STATS ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .stat-card { background: white; border-radius: var(--radio); padding: 18px; box-shadow: var(--sombra); border-left: 4px solid var(--azul); }
+  .stat-card .valor { font-size: 26px; font-weight: 700; color: var(--azul); }
+  .stat-card .etiqueta { font-size: 12px; color: var(--gris-medio); margin-top: 2px; }
+
+  /* ── CLIENTES ── */
+  .clientes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .cliente-card { background: white; border-radius: var(--radio); padding: 16px; box-shadow: var(--sombra); border-top: 3px solid var(--azul); }
+  .cliente-card .nombre { font-weight: 700; font-size: 14px; color: var(--azul); margin-bottom: 6px; }
+  .cliente-card .dato { font-size: 12px; color: var(--gris-medio); margin: 2px 0; }
+
+  /* ── ACCIONES ROW ── */
+  .acciones-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 10px; flex-wrap: wrap; }
+  .buscador-input { padding: 8px 12px; border: 1px solid var(--gris-borde); border-radius: var(--radio); font-size: 13px; width: 260px; }
+
+  /* ── MODAL ── */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; }
+  .modal-overlay.abierto { display: flex; }
+  .modal { background: white; border-radius: 8px; padding: 24px; width: 480px; max-width: 95vw; box-shadow: var(--sombra-md); }
+  .modal-titulo { font-size: 16px; font-weight: 700; color: var(--azul); margin-bottom: 16px; }
+  .modal-acciones { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+  /* ── VISTA PREVIA PDF ── */
+  #vista-previa { display: none; }
+
+  .preview-doc {
+    background: white;
+    max-width: 794px; margin: 0 auto;
+    box-shadow: var(--sombra-md);
+    font-family: Arial, sans-serif; color: #1a1a1a;
+    position: relative;
+  }
+
+  .preview-membrete-header {
+    width: 100%;
+    display: block;
+    line-height: 0;
+  }
+  .preview-membrete-header img { width: 100%; height: auto; display: block; }
+
+  .preview-content {
+    padding: 12px 52px 16px 52px;
+  }
+  .preview-aclaraciones li { margin-left: 14px; margin-bottom: 2px; }
+  .preview-tabla th { padding: 5px 7px; }
+  .preview-tabla td { padding: 5px 7px; }
+
+  .preview-header { display: flex; justify-content: flex-end; align-items: flex-start; margin-bottom: 20px; }
+  .preview-cod { text-align: right; font-size: 12px; color: var(--azul-medio); }
+  .preview-cliente-box { margin-bottom: 20px; }
+  .preview-intro { font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+  .preview-tabla { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
+  .preview-tabla th { background: var(--azul); color: white; padding: 7px 8px; text-align: left; font-size: 11px; }
+  .preview-tabla td { padding: 7px 8px; border-bottom: 1px solid #E2E8F0; }
+  .preview-tabla .total-row td { font-weight: 700; font-size: 14px; background: #EBF5FF; color: var(--azul); }
+  .preview-aclaraciones { font-size: 11px; line-height: 1.7; color: #333; margin-bottom: 16px; }
+  .preview-aclaraciones h4 { color: var(--azul); font-size: 12px; margin-bottom: 8px; text-align: center; }
+  .preview-aclaraciones li { margin-left: 16px; margin-bottom: 4px; }
+  .preview-firma { margin-top: 28px; margin-bottom: 24px; }
+
+  .preview-membrete-footer {
+    width: 100%;
+    margin-top: 24px;
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+  .preview-membrete-footer .pf-arco {
+    position: absolute;
+    left: -20px; bottom: -20px;
+    width: 140px; height: 140px;
+    border-radius: 50%;
+    border: 18px solid #003F7F;
+    background: transparent;
+    pointer-events: none;
+    flex-shrink: 0;
+  }
+  .preview-membrete-footer .pf-datos {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0;
+    font-family: Arial, sans-serif;
+    font-size: 10px;
+    color: #003F7F;
+    padding: 14px 0 14px 140px;
+  }
+  .preview-membrete-footer .pf-col {
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 22px;
+    border-right: 1px solid #7aabd4;
+    line-height: 1.6;
+  }
+  .preview-membrete-footer .pf-col:last-child { border-right: none; }
+  .preview-membrete-footer .pf-icon { font-size: 14px; flex-shrink: 0; color: #003F7F; }
+
+  @media print {
+    .preview-doc { box-shadow: none; margin: 0; max-width: 100%; }
+    .preview-membrete-header img, .preview-membrete-footer img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  /* ── NÚMERO COTIZACIÓN ── */
+  .num-cotizacion { font-size: 22px; font-weight: 700; color: var(--azul); background: var(--azul-suave); padding: 6px 14px; border-radius: var(--radio); display: inline-block; }
+
+  .flex-gap { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .spacer { flex: 1; }
+  hr { border: none; border-top: 1px solid var(--gris-borde); margin: 16px 0; }
+  .texto-muted { color: var(--gris-medio); font-size: 12px; }
+  .texto-verde { color: var(--verde); font-weight: 600; }
+  .empty-state { text-align: center; padding: 48px; color: var(--gris-medio); }
+  .empty-state .icono { font-size: 40px; margin-bottom: 10px; }
+
+  @media print {
+    body > *:not(#vista-previa) { display: none !important; }
+    #vista-previa { display: block !important; }
+    .preview-doc { box-shadow: none; margin: 0; max-width: 100%; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .no-print { display: none !important; }
+  }
+
+  /* ── LOGIN ── */
+  #login-overlay { position: fixed; inset: 0; background: linear-gradient(135deg, #001F3F 0%, #003F7F 100%); z-index: 9999; display: none; align-items: center; justify-content: center; }
+  .login-box { background: white; border-radius: 12px; padding: 40px; width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+  .login-logo { text-align: center; margin-bottom: 24px; }
+  .login-logo img { height: 56px; filter: none; }
+  .login-titulo { font-size: 18px; font-weight: 700; color: var(--azul); text-align: center; margin-bottom: 4px; }
+  .login-sub { font-size: 13px; color: var(--gris-medio); text-align: center; margin-bottom: 28px; }
+  .login-error { color: #C62828; font-size: 12px; margin-top: 10px; text-align: center; min-height: 18px; }
+  #nav-usuario { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  #usuario-email { font-size: 12px; color: rgba(255,255,255,0.65); }
+</style>
+</head>
+<body>
+
+<!-- PANTALLA DE LOGIN -->
+<div id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo"><img src="logo.png" alt="Proconcreto"></div>
+    <div class="login-titulo">Proconcreto CRM</div>
+    <div class="login-sub">Ingresa con tu cuenta de empresa</div>
+    <div class="form-grupo" style="margin-bottom:12px">
+      <label>Correo electrónico</label>
+      <input type="email" id="login-email" placeholder="usuario@proconcreto.com.co" autocomplete="email">
+    </div>
+    <div class="form-grupo" style="margin-bottom:20px">
+      <label>Contraseña</label>
+      <input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')iniciarSesion()">
+    </div>
+    <button class="btn btn-primario" style="width:100%;justify-content:center;padding:11px" onclick="iniciarSesion()" id="btn-login">Ingresar</button>
+    <div class="login-error" id="login-error"></div>
+    <div style="text-align:center;margin-top:14px">
+      <a href="#" onclick="mostrarRecuperacion();return false" style="font-size:12px;color:var(--azul-medio);text-decoration:none">¿Olvidaste tu contraseña?</a>
+    </div>
+  </div>
+
+  <!-- Panel recuperar contraseña -->
+  <div id="panel-recuperacion" style="display:none">
+    <div class="login-logo"><img src="logo.png" alt="Proconcreto"></div>
+    <div class="login-titulo">Recuperar contraseña</div>
+    <div class="login-sub">Te enviaremos un enlace a tu correo para restablecer tu contraseña.</div>
+    <div class="form-grupo" style="margin-bottom:20px">
+      <label>Correo electrónico</label>
+      <input type="email" id="recuperar-email" placeholder="usuario@proconcreto.com.co">
+    </div>
+    <button class="btn btn-primario" style="width:100%;justify-content:center;padding:11px" onclick="enviarRecuperacion()" id="btn-recuperar">Enviar enlace</button>
+    <div class="login-error" id="recuperar-msg" style="color:var(--verde)"></div>
+    <div style="text-align:center;margin-top:14px">
+      <a href="#" onclick="mostrarLogin();return false" style="font-size:12px;color:var(--azul-medio);text-decoration:none">← Volver al inicio de sesión</a>
+    </div>
+  </div>
+
+  <!-- Panel crear / establecer nueva contraseña (invitación o recuperación) -->
+  <div id="panel-nueva-contrasena" style="display:none">
+    <div class="login-logo"><img src="logo.png" alt="Proconcreto"></div>
+    <div class="login-titulo" id="nueva-pass-titulo">Crea tu contraseña</div>
+    <div class="login-sub" id="nueva-pass-sub">Elige una contraseña para acceder al CRM de Proconcreto.</div>
+    <div class="form-grupo" style="margin-bottom:12px">
+      <label>Nueva contraseña</label>
+      <input type="password" id="nueva-pass-1" placeholder="Mínimo 8 caracteres">
+    </div>
+    <div class="form-grupo" style="margin-bottom:20px">
+      <label>Confirmar contraseña</label>
+      <input type="password" id="nueva-pass-2" placeholder="Repite la contraseña" onkeydown="if(event.key==='Enter')guardarNuevaContrasena()">
+    </div>
+    <button class="btn btn-primario" style="width:100%;justify-content:center;padding:11px" onclick="guardarNuevaContrasena()" id="btn-nueva-pass">Guardar contraseña</button>
+    <div class="login-error" id="nueva-pass-msg"></div>
+  </div>
+</div>
+
+<!-- NAV PRINCIPAL -->
+<nav class="nav-top">
+  <div class="nav-logo"><img src="logo.png" alt="Proconcreto Prefabricados"></div>
+  <button class="nav-modulo activo" onclick="activarModulo('cotizaciones')">📋 Cotizaciones y Ventas</button>
+  <button class="nav-modulo" onclick="activarModulo('produccion')">🏭 Producción</button>
+  <button class="nav-modulo" onclick="activarModulo('logistica')" style="opacity:0.4;cursor:default" disabled title="Próximamente">🚛 Logística</button>
+  <button class="nav-modulo" onclick="activarModulo('cartera')" style="opacity:0.4;cursor:default" disabled title="Próximamente">💰 Cartera</button>
+  <div id="nav-usuario">
+    <span id="usuario-email"></span>
+    <button class="btn btn-secundario btn-sm" onclick="cerrarSesion()" style="font-size:11px;padding:4px 10px">Salir</button>
+  </div>
+</nav>
+
+<!-- SUB-NAV: COTIZACIONES Y VENTAS -->
+<nav class="nav" id="subnav-cotizaciones">
+  <button class="nav-btn activo" onclick="ir('nueva-cotizacion')">➕ Nueva Cotización</button>
+  <button class="nav-btn" onclick="ir('pipeline')">🗂️ Pipeline</button>
+  <button class="nav-btn" onclick="ir('historico')">📋 Histórico</button>
+  <button class="nav-btn" onclick="ir('clientes')">👥 Clientes</button>
+  <button class="nav-btn" onclick="ir('estadisticas')">📊 Estadísticas</button>
+</nav>
+
+<nav class="nav" id="subnav-produccion" style="display:none">
+  <button class="nav-btn" onclick="ir('pipeline-produccion')">🗂️ Pipeline</button>
+  <button class="nav-btn activo" onclick="ir('ordenes-servicio')">📝 Órdenes de Servicio</button>
+</nav>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: NUEVA COTIZACIÓN
+═══════════════════════════════════════ -->
+<div id="pantalla-nueva-cotizacion" class="pantalla activa">
+
+  <!-- Cabecera -->
+  <div class="card">
+    <div class="flex-gap" style="margin-bottom:12px">
+      <div class="card-titulo" style="margin:0">Nueva Cotización</div>
+      <div class="spacer"></div>
+      <div class="num-cotizacion" id="display-num-cot">—</div>
+    </div>
+    <div class="form-grid-3">
+      <div class="form-grupo">
+        <label>Número <span style="color:var(--rojo)">*</span> <span id="sugerencia-num" style="font-size:10px;color:var(--gris-medio);font-weight:400;text-transform:none"></span></label>
+        <input type="text" id="num-cot" value="" placeholder="Ej: C0085" oninput="this.value=this.value.toUpperCase();document.getElementById('display-num-cot').textContent=this.value||'—'" style="font-weight:700;border-color:var(--azul-medio)">
+      </div>
+      <div class="form-grupo">
+        <label>Versión</label>
+        <input type="text" id="version-cot" value="V1">
+      </div>
+      <div class="form-grupo">
+        <label>Fecha</label>
+        <input type="date" id="fecha-cot" value="">
+      </div>
+    </div>
+  </div>
+
+  <!-- Cliente -->
+  <div class="card">
+    <div class="card-titulo">Información del cliente</div>
+    <div class="flex-gap" style="margin-bottom:12px">
+      <input type="text" id="buscar-cliente-cot" placeholder="🔍 Buscar cliente existente..." class="buscador-input" oninput="buscarClienteEnCot(this.value)" style="width:300px">
+      <button class="btn btn-secundario btn-sm" onclick="abrirModalCliente()">+ Nuevo cliente</button>
+    </div>
+    <div id="lista-clientes-cot" class="buscador-resultado" style="position:relative;display:none;max-height:160px"></div>
+    <div class="form-grid">
+      <div class="form-grupo">
+        <label>Razón social / Nombre</label>
+        <input type="text" id="cliente-nombre" placeholder="Ej: CONSTRUCTORA ABC S.A.S.">
+      </div>
+      <div class="form-grupo">
+        <label>Atención (contacto)</label>
+        <input type="text" id="cliente-contacto" placeholder="Ej: Ing. Carlos Pérez">
+      </div>
+      <div class="form-grupo">
+        <label>Celular / Teléfono</label>
+        <input type="text" id="cliente-cel" placeholder="3101234567">
+      </div>
+      <div class="form-grupo">
+        <label>Ciudad / Proyecto <span style="color:var(--rojo)">*</span></label>
+        <input type="text" id="cliente-proyecto" placeholder="Ej: Proyecto Villa 86 – Pereira">
+      </div>
+    </div>
+  </div>
+
+  <!-- Productos -->
+  <div class="card">
+    <div class="card-titulo">Productos cotizados</div>
+
+    <!-- Buscador de producto -->
+    <div id="buscador-wrap" style="margin-bottom:16px">
+
+      <!-- Fila 1: grupo + texto -->
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="filtro-grupo"
+          style="padding:9px 10px;border:1.5px solid #93C5FD;border-radius:8px;font-size:13px;background:#fff;cursor:pointer;min-width:160px"
+          onchange="filtrarProductos()">
+          <option value="">Todos los grupos</option>
+        </select>
+        <input id="buscar-producto" type="text"
+          placeholder="Buscar por nombre o código..."
+          style="flex:1;padding:9px 12px;border:1.5px solid #93C5FD;border-radius:8px;font-size:13px"
+          oninput="filtrarProductos()">
+      </div>
+
+      <!-- Fila 2: resultados (visible solo cuando hay búsqueda) -->
+      <div id="resultado-busqueda" style="display:none;margin-top:6px;border:1.5px solid #93C5FD;border-radius:8px;background:#fff;max-height:280px;overflow-y:auto"></div>
+
+    </div>
+
+    <!-- Tabla ítems -->
+    <div style="overflow-x:auto">
+      <table class="tabla-items" id="tabla-items">
+        <thead>
+          <tr>
+            <th style="width:60px">CANT.</th>
+            <th style="width:55px">UNID.</th>
+            <th>PRODUCTO</th>
+            <th style="width:55px">IVA</th>
+            <th style="width:90px">V/UNIT</th>
+            <th style="width:70px">DESC. %</th>
+            <th style="width:100px">V/UNIT AJUST.</th>
+            <th style="width:100px">V/R TOTAL</th>
+            <th style="width:36px"></th>
+          </tr>
+        </thead>
+        <tbody id="items-body">
+          <!-- filas dinámicas -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Transporte y servicios -->
+    <div style="margin-top:14px;padding-top:14px;border-top:1px dashed var(--gris-borde)">
+      <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin-bottom:8px">LOGÍSTICA Y SERVICIOS</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+
+        <div style="background:#F8FBFF;border:1px solid #BFDBFE;border-radius:var(--radio);padding:10px">
+          <div style="font-size:11px;font-weight:700;color:var(--azul);margin-bottom:6px">🚚 TRANSPORTE</div>
+          <div class="form-grupo" style="margin-bottom:6px">
+            <label>Destino</label>
+            <select id="destino-transporte" onchange="aplicarTarifaTransporte();actualizarCargue()">
+              <option value="">Seleccionar destino...</option>
+            </select>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <div class="form-grupo">
+              <label>Peso total (kg)</label>
+              <input type="number" id="peso-transporte" placeholder="Auto" readonly style="background:#F7FAFC;font-weight:600;color:var(--azul)">
+            </div>
+            <div class="form-grupo">
+              <label>Descuento %</label>
+              <input type="number" id="desc-transporte" value="0" min="0" max="100" oninput="recalcular()" style="font-weight:600">
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#F8FBFF;border:1px solid #BFDBFE;border-radius:var(--radio);padding:10px">
+          <div style="font-size:11px;font-weight:700;color:var(--azul);margin-bottom:6px">⚙️ CARGUE / DESCARGUE</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+            <div class="form-grupo">
+              <label>Cargue a mano</label>
+              <select id="cargue-mano" onchange="actualizarCargue()" title="Solo disponible cuando no hay transporte">
+                <option value="no">No</option>
+                <option value="si">Sí ($11/kg)</option>
+              </select>
+            </div>
+            <div class="form-grupo">
+              <label>Descuento %</label>
+              <input type="number" id="desc-cargue" value="0" min="0" max="100" oninput="recalcular()" style="font-weight:600">
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <div class="form-grupo">
+              <label>Descargue mecánico</label>
+              <select id="descargue-mecanico" onchange="recalcular()">
+                <option value="no">No</option>
+                <option value="si">Sí ($11/kg)</option>
+              </select>
+            </div>
+            <div class="form-grupo">
+              <label>Descuento %</label>
+              <input type="number" id="desc-descargue" value="0" min="0" max="100" oninput="recalcular()" style="font-weight:600">
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#F8FBFF;border:1px solid #BFDBFE;border-radius:var(--radio);padding:10px">
+          <div style="font-size:11px;font-weight:700;color:var(--azul);margin-bottom:6px">📄 CONDICIONES</div>
+          <div class="form-grupo" style="margin-bottom:6px">
+            <label>Forma de pago</label>
+            <input type="text" id="forma-pago" value="Crédito. Factura con vencimiento a 15 días.">
+          </div>
+          <div class="form-grupo" style="margin-bottom:6px">
+            <label>Tiempo de entrega</label>
+            <input type="text" id="tiempo-entrega" value="A convenir.">
+          </div>
+          <div class="form-grupo">
+            <label>Validez de la oferta</label>
+            <input type="text" id="validez" value="15 DÍAS">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Totales -->
+    <div class="totales-bottom" style="margin-top:16px">
+      <div class="totales-box">
+        <div class="fila"><span>Subtotal productos</span><span id="tot-subtotal">$0</span></div>
+        <div class="fila"><span>IVA (19%)</span><span id="tot-iva">$0</span></div>
+        <div class="fila"><span>Transporte</span><span id="tot-transporte">$0</span></div>
+        <div class="fila"><span>Cargue/Descargue</span><span id="tot-logistica">$0</span></div>
+        <div class="fila fila-total"><span>TOTAL</span><span id="tot-total">$0</span></div>
+      </div>
+    </div>
+
+    <div style="font-size:11px;color:var(--gris-medio);margin-top:6px;text-align:right">
+      * El precio unitario ajustado se calcula automáticamente según el descuento aplicado
+    </div>
+  </div>
+
+  <!-- Vendedor -->
+  <div class="card">
+    <div class="card-titulo">Vendedor / Responsable</div>
+    <div class="form-grid">
+      <div class="form-grupo">
+        <label>Nombre</label>
+        <input type="text" id="vendedor-nombre" value="">
+      </div>
+      <div class="form-grupo">
+        <label>Cargo</label>
+        <input type="text" id="vendedor-cargo" value="">
+      </div>
+    </div>
+  </div>
+
+  <!-- Acciones -->
+  <div class="flex-gap">
+    <button class="btn btn-primario" onclick="guardarCotizacion()">💾 Guardar cotización</button>
+    <button class="btn btn-verde" onclick="previsualizarCotizacion()">👁️ Previsualizar / Imprimir PDF</button>
+    <button class="btn btn-secundario" onclick="limpiarFormulario()">🗑️ Limpiar</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: PIPELINE KANBAN
+═══════════════════════════════════════ -->
+<div id="pantalla-pipeline" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Pipeline de Ventas</div>
+    <div class="flex-gap">
+      <button class="btn btn-primario btn-sm" onclick="ir('nueva-cotizacion')">➕ Nueva Cotización</button>
+    </div>
+  </div>
+  <!-- Totales por columna -->
+  <div id="pipeline-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
+  <!-- Tablero -->
+  <div class="kanban-board" id="kanban-board"></div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: HISTÓRICO
+═══════════════════════════════════════ -->
+<div id="pantalla-historico" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Histórico de Cotizaciones</div>
+    <div class="flex-gap">
+      <input type="text" class="buscador-input" placeholder="🔍 Buscar por cliente, nº, proyecto..." oninput="filtrarHistorico(this.value)">
+      <select class="buscador-input" style="width:auto" onchange="filtrarHistoricoEstado(this.value)">
+        <option value="">Todos los estados</option>
+        <option value="Borrador">Borrador</option>
+        <option value="Enviada">Enviada</option>
+        <option value="Aceptada">Aceptada</option>
+        <option value="Rechazada">Rechazada</option>
+      </select>
+    </div>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" id="tabla-historico">
+      <thead>
+        <tr>
+          <th>N° COT.</th>
+          <th>FECHA</th>
+          <th>CLIENTE</th>
+          <th>PROYECTO</th>
+          <th>TOTAL</th>
+          <th>ESTADO</th>
+          <th>ACCIONES</th>
+        </tr>
+      </thead>
+      <tbody id="historico-body">
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: CLIENTES
+═══════════════════════════════════════ -->
+<div id="pantalla-clientes" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Base de Clientes</div>
+    <div class="flex-gap">
+      <input type="text" class="buscador-input" placeholder="🔍 Buscar cliente..." oninput="filtrarClientes(this.value)">
+      <button class="btn btn-primario" onclick="abrirModalCliente()">+ Nuevo Cliente</button>
+    </div>
+  </div>
+  <div id="grid-clientes" class="clientes-grid"></div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: ESTADÍSTICAS
+═══════════════════════════════════════ -->
+<div id="pantalla-estadisticas" class="pantalla">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Estadísticas</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <!-- Período -->
+      <div style="display:flex;border:1px solid var(--gris-borde);border-radius:var(--radio);overflow:hidden">
+        <button id="btn-anual" onclick="setPeriodo('anual')" style="padding:6px 14px;border:none;background:var(--azul);color:white;font-size:12px;font-weight:600;cursor:pointer">Anual</button>
+        <button id="btn-mensual" onclick="setPeriodo('mensual')" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">Mensual</button>
+      </div>
+      <!-- Año -->
+      <select id="filtro-anio" onchange="renderEstadisticas()" style="padding:6px 10px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      <!-- Mes (solo en mensual) -->
+      <select id="filtro-mes" onchange="renderEstadisticas()" style="padding:6px 10px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;display:none">
+        <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+        <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+        <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+        <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+      </select>
+      <!-- Vendedor -->
+      <select id="filtro-vendedor" onchange="renderEstadisticas()" style="padding:6px 10px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;min-width:160px">
+        <option value="">Todos los vendedores</option>
+      </select>
+    </div>
+  </div>
+  <div class="stats-grid" id="stats-cards"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card">
+      <div class="card-titulo">Cotizaciones por estado</div>
+      <canvas id="chart-estados" height="200"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-titulo">Top 5 clientes (por valor)</div>
+      <div id="top-clientes"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MODAL: NUEVO CLIENTE
+═══════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════
+     PANTALLA: PIPELINE PRODUCCIÓN
+═══════════════════════════════════════ -->
+<div id="pantalla-pipeline-produccion" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Pipeline de Producción</div>
+  </div>
+  <div id="pipeline-prod-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
+  <div class="kanban-board" id="kanban-board-prod"></div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: ÓRDENES DE SERVICIO (PRODUCCIÓN)
+═══════════════════════════════════════ -->
+<div id="pantalla-ordenes-servicio" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Órdenes de Servicio</div>
+    <div class="flex-gap">
+      <input type="text" class="buscador-input" placeholder="🔍 Buscar orden..." oninput="filtrarOrdenes(this.value)">
+      <button class="btn btn-primario" onclick="abrirModalOrden()">+ Nueva Orden</button>
+    </div>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="tabla-historico" style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:var(--azul-oscuro);color:white;font-size:12px">
+          <th style="padding:10px 12px;text-align:left">N° Orden</th>
+          <th style="padding:10px 12px;text-align:left">Cotización</th>
+          <th style="padding:10px 12px;text-align:left">Cliente</th>
+          <th style="padding:10px 12px;text-align:left">Producto / Descripción</th>
+          <th style="padding:10px 12px;text-align:left">Cantidad</th>
+          <th style="padding:10px 12px;text-align:left">Fecha entrega</th>
+          <th style="padding:10px 12px;text-align:left">Estado</th>
+          <th style="padding:10px 12px;text-align:left">Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="ordenes-body">
+        <tr><td colspan="8" class="empty-state"><div class="icono">📝</div><div>No hay órdenes de servicio registradas.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-orden">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-titulo" id="modal-orden-titulo">📝 Nueva Orden de Servicio</div>
+    <input type="hidden" id="m-orden-id">
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo">
+        <label>N° Orden *</label>
+        <input type="text" id="m-orden-num" placeholder="OS-001">
+      </div>
+      <div class="form-grupo">
+        <label>Cotización asociada</label>
+        <input type="text" id="m-orden-cot" placeholder="C0085">
+      </div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px">
+      <label>Cliente *</label>
+      <input type="text" id="m-orden-cliente" placeholder="Nombre del cliente">
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px">
+      <label>Producto / Descripción *</label>
+      <textarea id="m-orden-descripcion" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical" placeholder="Descripción del producto o servicio"></textarea>
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo">
+        <label>Cantidad</label>
+        <input type="number" id="m-orden-cantidad" placeholder="0" min="0">
+      </div>
+      <div class="form-grupo">
+        <label>Fecha de entrega</label>
+        <input type="date" id="m-orden-fecha">
+      </div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px">
+      <label>Estado</label>
+      <select id="m-orden-estado" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <option value="Pendiente">Pendiente</option>
+        <option value="En producción">En producción</option>
+        <option value="Listo">Listo</option>
+        <option value="Despachado">Despachado</option>
+        <option value="Cancelado">Cancelado</option>
+      </select>
+    </div>
+    <div class="form-grupo" style="margin-bottom:16px">
+      <label>Observaciones</label>
+      <textarea id="m-orden-obs" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical" placeholder="Notas adicionales..."></textarea>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-orden')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarOrden()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-cliente">
+  <div class="modal">
+    <div class="modal-titulo" id="modal-cliente-titulo">➕ Nuevo Cliente</div>
+    <input type="hidden" id="m-cliente-id" value="">
+    <div class="form-grupo" style="margin-bottom:10px">
+      <label>Razón social / Nombre *</label>
+      <input type="text" id="m-cliente-nombre" placeholder="CONSTRUCTORA ABC S.A.S.">
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px">
+      <label>Contacto</label>
+      <input type="text" id="m-cliente-contacto" placeholder="Ing. Carlos Pérez">
+    </div>
+    <div class="form-grid">
+      <div class="form-grupo">
+        <label>Celular</label>
+        <input type="text" id="m-cliente-cel">
+      </div>
+      <div class="form-grupo">
+        <label>Email</label>
+        <input type="email" id="m-cliente-email">
+      </div>
+      <div class="form-grupo">
+        <label>Ciudad</label>
+        <input type="text" id="m-cliente-ciudad">
+      </div>
+      <div class="form-grupo">
+        <label>NIT</label>
+        <input type="text" id="m-cliente-nit">
+      </div>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-cliente')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarCliente()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CAMBIAR ESTADO -->
+<div class="modal-overlay" id="modal-estado">
+  <div class="modal" style="width:340px">
+    <div class="modal-titulo">Cambiar estado</div>
+    <input type="hidden" id="estado-cot-id">
+    <div style="display:grid;gap:8px">
+      <button class="btn" style="background:#7B1FA2;color:white;justify-content:center" onclick="cambiarEstado('Prospecto')">🔍 Prospecto</button>
+      <button class="btn btn-secundario" onclick="cambiarEstado('Borrador')" style="justify-content:center">📝 Cotizado</button>
+      <button class="btn" style="background:#1565C0;color:white;justify-content:center" onclick="cambiarEstado('Enviada')">📤 Enviada</button>
+      <button class="btn" style="background:#F57F17;color:white;justify-content:center" onclick="cambiarEstado('Negociación')">🤝 Negociación</button>
+      <button class="btn btn-verde" style="justify-content:center" onclick="cambiarEstado('Aceptada')">✅ Aceptada</button>
+      <button class="btn btn-rojo" style="justify-content:center" onclick="cambiarEstado('Rechazada')">❌ Rechazada</button>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-estado')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-estado-os">
+  <div class="modal" style="width:340px">
+    <div class="modal-titulo">Cambiar estado</div>
+    <input type="hidden" id="estado-os-id">
+    <div style="display:grid;gap:8px">
+      <button class="btn" style="background:#E65100;color:white;justify-content:center" onclick="aplicarEstadoOrden('Pendiente')">⏳ Pendiente</button>
+      <button class="btn" style="background:#1565C0;color:white;justify-content:center" onclick="aplicarEstadoOrden('En producción')">🏭 En producción</button>
+      <button class="btn btn-verde" style="justify-content:center" onclick="aplicarEstadoOrden('Listo')">✅ Listo</button>
+      <button class="btn" style="background:#00695C;color:white;justify-content:center" onclick="aplicarEstadoOrden('Despachado')">🚛 Despachado</button>
+      <button class="btn btn-rojo" style="justify-content:center" onclick="aplicarEstadoOrden('Cancelado')">❌ Cancelado</button>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-estado-os')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     VISTA PREVIA IMPRIMIBLE
+═══════════════════════════════════════ -->
+<div id="vista-previa">
+  <div class="preview-doc" id="contenido-preview">
+    <!-- generado por JS -->
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ═══════════════════════════════
+// SUPABASE + DATOS
+// ═══════════════════════════════
+const _SB_URL = 'https://wyfjmgywyqluzoymxoyp.supabase.co';
+const _SB_KEY = 'sb_publishable_t1YO4FWYyljZaQXWc2xK0A_zcukxDa1';
+const sb = supabase.createClient(_SB_URL, _SB_KEY);
+
+const USUARIOS_CRM = {
+  'jose.escobar@proconcreto.com.co':      { nombre: 'Jose Pablo Escobar Mejia',      cargo: 'Gerente Técnico',       cel: '+57 301 623 9733' },
+  'maria.escobar@proconcreto.com.co':     { nombre: 'Maria Alejandra Escobar Mejia', cargo: 'Gerente Administrativa', cel: '+57 311 635 1086' },
+  'mercadeo@mercadeo.com.co':             { nombre: 'Valentina Escobar Mejia',        cargo: 'Gerente Comercial',      cel: '+57 316 742 7494' },
+  'departamentotecnico@proconcreto.com.co':{ nombre: 'Ana María Mazuera',             cargo: 'Coordinadora Técnica',   cel: '+57 301 539 0344' },
+  'produccion@proconcreto.com.co':        { nombre: 'Jaime Eduardo Franco',           cargo: 'Jefe de Producción',     cel: '+57 311 408 2285' },
+  'logistica@proconcreto.com.co':         { nombre: 'Jennifer Lopez',                 cargo: 'Jefe de Logística',      cel: '+57 324 367 8723' },
+};
+
+let COTIZACIONES = [];
+let CLIENTES = [];
+let USUARIO_ACTUAL = null;
+
+// Contador de cotizaciones
+function siguienteNum() {
+  const nums = COTIZACIONES.map(c => parseInt(c.numero.replace('C','')) || 0);
+  const max = nums.length ? Math.max(...nums) : 0;
+  return 'C' + String(max + 1).padStart(4, '0');
+}
+
+// Tarifas de transporte (desde Excel)
+const TARIFAS_TRANSPORTE = {
+  'Manizales': 470000, 'Pereira': 580000, 'Armenia': 1160000,
+  'Chinchiná': 230000, 'Santarosa': 390000, 'Palestina': 250000,
+  'Viterbo': 1060000, 'San José': 990000, 'Risaralda': 950000,
+  'Belalcázar': 880000, 'Anserma': 1020000, 'Supía': 1100000,
+  'Riosucio': 1050000, 'Marmato': 1240000, 'La Merced': 1210000,
+  'Neira': 900000
+};
+
+// kg por viaje para calcular transportes (usamos tarifa por viaje de 10 TON)
+const TARIFAS_KG_TRANSPORTE = {
+  'Manizales': 43, 'Pereira': 53, 'Armenia': 106, 'Chinchiná': 21,
+  'Santarosa': 36, 'Palestina': 23, 'Viterbo': 97, 'San José': 90,
+  'Risaralda': 87, 'Belalcázar': 80, 'Anserma': 93, 'Supía': 100,
+  'Riosucio': 96, 'Marmato': 113, 'La Merced': 110, 'Neira': 82
+};
+
+// Catálogo de productos — Lista de precios Mayo 2026
+const PRODUCTOS = [
+  // ADOQUÍN
+  {codigo:'PBCADCRV8G',  nombre:'Adoquín Cruz Vehicular Gris',               medidas:'a=23 b=25 h=8 cm',   unidad:'UD', peso:8.1,  iva:'NO', lista:5510,    minimo:4724,    grupo:'Adoquín'},
+  {codigo:'PBBCARPG04',  nombre:'Adoquín Peatonal h=4cm Gris',               medidas:'a=20 b=10 h=4 cm',   unidad:'UD', peso:1.66, iva:'NO', lista:950,     minimo:860,     grupo:'Adoquín'},
+  {codigo:'PBBCARPN04',  nombre:'Adoquín Peatonal h=4cm Negro',              medidas:'a=20 b=10 h=4 cm',   unidad:'UD', peso:1.66, iva:'NO', lista:1220,    minimo:1100,    grupo:'Adoquín'},
+  {codigo:'PBBCARPO04',  nombre:'Adoquín Peatonal h=4cm Ocre',               medidas:'a=20 b=10 h=4 cm',   unidad:'UD', peso:1.66, iva:'NO', lista:1130,    minimo:1020,    grupo:'Adoquín'},
+  {codigo:'PBBCARPR04',  nombre:'Adoquín Peatonal h=4cm Rojo',               medidas:'a=20 b=10 h=4 cm',   unidad:'UD', peso:1.66, iva:'NO', lista:1220,    minimo:1100,    grupo:'Adoquín'},
+  {codigo:'PBCADREP6G',  nombre:'Adoquín Peatonal h=6cm Gris',               medidas:'a=20 b=10 h=6 cm',   unidad:'UD', peso:2.70, iva:'NO', lista:1170,    minimo:1060,    grupo:'Adoquín'},
+  {codigo:'PBBCARPN06',  nombre:'Adoquín Peatonal h=6cm Negro',              medidas:'a=20 b=10 h=6 cm',   unidad:'UD', peso:2.70, iva:'NO', lista:1570,    minimo:1420,    grupo:'Adoquín'},
+  {codigo:'PBCADREP6O',  nombre:'Adoquín Peatonal h=6cm Ocre',               medidas:'a=20 b=10 h=6 cm',   unidad:'UD', peso:2.70, iva:'NO', lista:1440,    minimo:1300,    grupo:'Adoquín'},
+  {codigo:'PBBCARPR06',  nombre:'Adoquín Peatonal h=6cm Rojo',               medidas:'a=20 b=10 h=6 cm',   unidad:'UD', peso:2.70, iva:'NO', lista:1570,    minimo:1420,    grupo:'Adoquín'},
+  {codigo:'PBCADREP6S',  nombre:'Adoquín Peatonal h=6cm Salmón',             medidas:'a=20 b=10 h=6 cm',   unidad:'UD', peso:2.70, iva:'NO', lista:1570,    minimo:1420,    grupo:'Adoquín'},
+  {codigo:'PBCADRP6GO',  nombre:'Adoquín Peatonal h=6cm Gris Oscuro',        medidas:'a=20 b=10 h=6 cm',   unidad:'UD', peso:2.70, iva:'NO', lista:1570,    minimo:1420,    grupo:'Adoquín'},
+  {codigo:'PBCADREV8G',  nombre:'Adoquín Vehicular h=8cm Gris',              medidas:'a=20 b=10 h=8 cm',   unidad:'UD', peso:3.31, iva:'NO', lista:1410,    minimo:1270,    grupo:'Adoquín'},
+  {codigo:'PBBCARVN08',  nombre:'Adoquín Vehicular h=8cm Negro',             medidas:'a=20 b=10 h=8 cm',   unidad:'UD', peso:3.31, iva:'NO', lista:1960,    minimo:1770,    grupo:'Adoquín'},
+  {codigo:'PBCADREV8O',  nombre:'Adoquín Vehicular h=8cm Ocre',              medidas:'a=20 b=10 h=8 cm',   unidad:'UD', peso:3.31, iva:'NO', lista:1790,    minimo:1610,    grupo:'Adoquín'},
+  {codigo:'PBCADREV8R',  nombre:'Adoquín Vehicular h=8cm Rojo',              medidas:'a=20 b=10 h=8 cm',   unidad:'UD', peso:3.31, iva:'NO', lista:1960,    minimo:1770,    grupo:'Adoquín'},
+  {codigo:'PBBCARVG10',  nombre:'Adoquín Vehicular h=10cm Gris',             medidas:'a=20 b=10 h=10 cm',  unidad:'UD', peso:4.2,  iva:'NO', lista:1560,    minimo:1410,    grupo:'Adoquín'},
+  {codigo:'PBBCARVN10',  nombre:'Adoquín Vehicular h=10cm Negro',            medidas:'a=20 b=10 h=10 cm',  unidad:'UD', peso:4.2,  iva:'NO', lista:2100,    minimo:1950,    grupo:'Adoquín'},
+  {codigo:'PBBCARVO10',  nombre:'Adoquín Vehicular h=10cm Ocre',             medidas:'a=20 b=10 h=10 cm',  unidad:'UD', peso:4.2,  iva:'NO', lista:2100,    minimo:1950,    grupo:'Adoquín'},
+  {codigo:'PBBCARVR10',  nombre:'Adoquín Vehicular h=10cm Rojo',             medidas:'a=20 b=10 h=10 cm',  unidad:'UD', peso:4.2,  iva:'NO', lista:2100,    minimo:1950,    grupo:'Adoquín'},
+  // ALFAJÍA
+  {codigo:'PALFM12A19',  nombre:'Alfajía M12 cm',                            medidas:'a=19 b=100 h=6.5 cm',unidad:'UD', peso:17.3, iva:'SI', lista:40590,   minimo:34790,   grupo:'Alfajía'},
+  {codigo:'PALFM14A21',  nombre:'Alfajía M14 cm',                            medidas:'a=21 b=100 h=6.8 cm',unidad:'UD', peso:19.7, iva:'SI', lista:41250,   minimo:35360,   grupo:'Alfajía'},
+  {codigo:'PALFM20A27',  nombre:'Alfajía M20 cm',                            medidas:'a=27 b=100 h=8.1 cm',unidad:'UD', peso:27.1, iva:'SI', lista:43410,   minimo:37207,   grupo:'Alfajía'},
+  {codigo:'PALF12AGU1',  nombre:'Alfajía M12 Un Agua',                       medidas:'a=23 b=100 cm',      unidad:'UD', peso:27.5, iva:'SI', lista:41490,   minimo:38301,   grupo:'Alfajía'},
+  {codigo:'PALF1AG18',   nombre:'Alfajía M12 Un Agua (18cm)',                medidas:'a=18 b=100 cm',      unidad:'UD', peso:25.2, iva:'SI', lista:40370,   minimo:37264,   grupo:'Alfajía'},
+  // BANCA
+  {codigo:'PBAINTD30G',  nombre:'Banca Individual Tipo Dado Gris',           medidas:'a=40 b=40 h=30 cm',  unidad:'UD', peso:155,  iva:'SI', lista:210280,  minimo:180241,  grupo:'Banca'},
+  {codigo:'PBANCCP3PM',  nombre:'Banca Concreto Pulido Tres Piezas Maciza',  medidas:'a=42 L=150 H=69.5 cm',unidad:'UD',peso:286.6,iva:'SI', lista:496250,  minimo:425361,  grupo:'Banca'},
+  {codigo:'PBANCCP3PP',  nombre:'Banca Concreto Pulido Tres Piezas Perf.',   medidas:'a=50 L=150 H=85 cm', unidad:'UD', peso:243.8,iva:'SI', lista:457070,  minimo:391777,  grupo:'Banca'},
+  {codigo:'PBASEBA150',  nombre:'Base para Banca 150',                       medidas:'a=30 b=150 h=35 cm', unidad:'UD', peso:270,  iva:'SI', lista:572140,  minimo:490404,  grupo:'Banca'},
+  {codigo:'PBANEBA150',  nombre:'Banca para Base 150',                       medidas:'a=45 b=150 e=8 cm',  unidad:'UD', peso:150,  iva:'SI', lista:424310,  minimo:363697,  grupo:'Banca'},
+  {codigo:'PBANCINDTC',  nombre:'Banca Individual Tipo C',                   medidas:'a=42 b=45 h=50 cm',  unidad:'UD', peso:132.5,iva:'SI', lista:227590,  minimo:195078,  grupo:'Banca'},
+  {codigo:'PBAINTDM6G',  nombre:'Banca Individual Dado Malla 6mm Gris',      medidas:'a=40 b=40 h=30 cm',  unidad:'UD', peso:155,  iva:'SI', lista:198920,  minimo:184708,  grupo:'Banca'},
+  // BARRERA
+  {codigo:'PJERBIDH80',  nombre:'Barrera Jersey Bidireccional H80',          medidas:'a1=15 a2=60 h=80 L=200 cm',unidad:'UD',peso:1260,iva:'SI',lista:826590, minimo:708509, grupo:'Barrera'},
+  {codigo:'PNEWJERH80',  nombre:'Barrera New Jersey A-60 B80 H-80',          medidas:'h=80 cm',            unidad:'UD', peso:432,  iva:'SI', lista:478310,  minimo:409980,  grupo:'Barrera'},
+  // BLOQUE MAMPOSTERÍA
+  {codigo:'PBBE0908MP',  nombre:'Bloque Estructural 9cm (8 MPa)',            medidas:'a=9 b=40 h=20 cm',   unidad:'UD', peso:9,    iva:'NO', lista:2510,    minimo:2200,    grupo:'Bloque'},
+  {codigo:'PBBE0910MP',  nombre:'Bloque Estructural 9cm (10 MPa)',           medidas:'a=9 b=40 h=20 cm',   unidad:'UD', peso:9,    iva:'NO', lista:2620,    minimo:2290,    grupo:'Bloque'},
+  {codigo:'PBBCEG0913',  nombre:'Bloque Estructural 9cm (13 MPa)',           medidas:'a=9 b=40 h=20 cm',   unidad:'UD', peso:9,    iva:'NO', lista:2720,    minimo:2380,    grupo:'Bloque'},
+  {codigo:'PBBE1208MP',  nombre:'Bloque Estructural 12cm (8 MPa)',           medidas:'a=12 b=40 h=20 cm',  unidad:'UD', peso:12,   iva:'NO', lista:3280,    minimo:2870,    grupo:'Bloque'},
+  {codigo:'PBBE1210MP',  nombre:'Bloque Estructural 12cm (10 MPa)',          medidas:'a=12 b=40 h=20 cm',  unidad:'UD', peso:12,   iva:'NO', lista:3420,    minimo:2990,    grupo:'Bloque'},
+  {codigo:'PBBE1213MP',  nombre:'Bloque Estructural 12cm (13 MPa)',          medidas:'a=12 b=40 h=20 cm',  unidad:'UD', peso:12,   iva:'NO', lista:3560,    minimo:3120,    grupo:'Bloque'},
+  {codigo:'PBBECATM20',  nombre:'Bloque Estructural Catalán 12cm',           medidas:'a=12 b=40 h=10 cm',  unidad:'UD', peso:12,   iva:'NO', lista:5950,    minimo:5099,    grupo:'Bloque'},
+  {codigo:'PBBE1408MP',  nombre:'Bloque Estructural 14cm (8 MPa)',           medidas:'a=14 b=40 h=20 cm',  unidad:'UD', peso:14,   iva:'NO', lista:3910,    minimo:3420,    grupo:'Bloque'},
+  {codigo:'PBBCEG1410',  nombre:'Bloque Estructural 14cm (10 MPa)',          medidas:'a=14 b=40 h=20 cm',  unidad:'UD', peso:14,   iva:'NO', lista:4080,    minimo:3570,    grupo:'Bloque'},
+  {codigo:'PBBCEG1413',  nombre:'Bloque Estructural 14cm (13 MPa)',          medidas:'a=14 b=40 h=20 cm',  unidad:'UD', peso:14,   iva:'NO', lista:4240,    minimo:3710,    grupo:'Bloque'},
+  {codigo:'PBBE1908MP',  nombre:'Bloque Estructural 19cm (8 MPa)',           medidas:'a=19 b=40 h=20 cm',  unidad:'UD', peso:18,   iva:'NO', lista:5170,    minimo:4520,    grupo:'Bloque'},
+  {codigo:'PBBE19M08M',  nombre:'Bloque Estructural Medio 19cm (8 MPa)',     medidas:'a=19 b=20 h=20 cm',  unidad:'UD', peso:9.5,  iva:'NO', lista:3640,    minimo:3120,    grupo:'Bloque'},
+  {codigo:'PBBE1910MP',  nombre:'Bloque Estructural 19cm (10 MPa)',          medidas:'a=19 b=40 h=20 cm',  unidad:'UD', peso:18,   iva:'NO', lista:5380,    minimo:4710,    grupo:'Bloque'},
+  {codigo:'PBBE1913MP',  nombre:'Bloque Estructural 19cm (13 MPa)',          medidas:'a=19 b=40 h=20 cm',  unidad:'UD', peso:18,   iva:'NO', lista:5600,    minimo:4900,    grupo:'Bloque'},
+  {codigo:'PBEF193908',  nombre:'Bloque Estructural Contra Fuego 19cm (8 MPa)',medidas:'a=19 b=39 h=19 cm',unidad:'UD', peso:18,   iva:'NO', lista:6540,    minimo:5603,    grupo:'Bloque'},
+  {codigo:'PBBE12M08M',  nombre:'Bloque Estructural Medio 12cm (8 MPa)',     medidas:'a=12 b=20 h=20 cm',  unidad:'UD', peso:6,    iva:'NO', lista:2150,    minimo:1847,    grupo:'Bloque'},
+  {codigo:'PBBSPLI14G',  nombre:'Bloque Split Gris (8 MPa)',                 medidas:'a=14 b=40 h=20 cm',  unidad:'UD', peso:14,   iva:'NO', lista:4850,    minimo:4240,    grupo:'Bloque'},
+  {codigo:'PTBBCS1410',  nombre:'Bloque Split Gris (10 MPa)',                medidas:'a=14 b=40 h=20 cm',  unidad:'UD', peso:14,   iva:'NO', lista:5030,    minimo:4410,    grupo:'Bloque'},
+  {codigo:'PBBSP1413G',  nombre:'Bloque Split Gris (13 MPa)',                medidas:'a=14 b=40 h=20 cm',  unidad:'UD', peso:14,   iva:'NO', lista:5220,    minimo:4570,    grupo:'Bloque'},
+  {codigo:'PBBVIG098MP', nombre:'Bloque Viga 9cm (8 MPa)',                   medidas:'a=9 b=40 h=20 cm',   unidad:'UD', peso:9,    iva:'NO', lista:4990,    minimo:4276,    grupo:'Bloque'},
+  {codigo:'PBBVIG128MP', nombre:'Bloque Viga 12cm (8 MPa)',                  medidas:'a=12 b=40 h=20 cm',  unidad:'UD', peso:12,   iva:'NO', lista:8860,    minimo:7597,    grupo:'Bloque'},
+  {codigo:'PBBCMUTA20',  nombre:'Bloque Muro Tierra Armada',                 medidas:'a=33 b=41 h=20 cm',  unidad:'UD', peso:25,   iva:'NO', lista:18580,   minimo:15929,   grupo:'Bloque'},
+  {codigo:'PBBSPDC14G',  nombre:'Bloque Split Doble Cara Gris',              medidas:'a=14 b=40 h=20 cm',  unidad:'UD', peso:14,   iva:'NO', lista:6620,    minimo:5674,    grupo:'Bloque'},
+  // BOLARDO
+  {codigo:'PBOLABUCIL',  nombre:'Bolardo Abujardado Cilíndrico',             medidas:'d=18 h=80 cm',       unidad:'UD', peso:48.9, iva:'SI', lista:92440,   minimo:79238,   grupo:'Bolardo'},
+  {codigo:'PBOLPIRAMI',  nombre:'Bolardo Tipo Piramidal',                    medidas:'a=33 b=33 h=41 cm',  unidad:'UD', peso:38.1, iva:'NO', lista:35410,   minimo:30355,   grupo:'Bolardo'},
+  {codigo:'PBOLESFERA',  nombre:'Bolardo Tipo Esférico',                     medidas:'r=19 h=39 cm',       unidad:'UD', peso:70.7, iva:'SI', lista:124580,  minimo:115684,  grupo:'Bolardo'},
+  {codigo:'PBOLABUTRI',  nombre:'Bolardo Abujardado Triangular',             medidas:'d=18 h=80 cm',       unidad:'UD', peso:67,   iva:'SI', lista:120390,  minimo:111794,  grupo:'Bolardo'},
+  // BORDILLO
+  {codigo:'PBBORCUN35',  nombre:'Bordillo Cuneta',                           medidas:'a=50 b=60 h=35 cm',  unidad:'UD', peso:133,  iva:'NO', lista:75410,   minimo:65980,   grupo:'Bordillo'},
+  {codigo:'PBBORSAA10',  nombre:'Bordillo Sardinel A-10 H-50',               medidas:'a=20 b=80 h=50 cm',  unidad:'UD', peso:130,  iva:'NO', lista:70750,   minimo:61910,   grupo:'Bordillo'},
+  {codigo:'PBBORSAR45',  nombre:'Bordillo Sardinel H-45',                    medidas:'a=15 b=80 h=45 cm',  unidad:'UD', peso:106,  iva:'NO', lista:54350,   minimo:47560,   grupo:'Bordillo'},
+  {codigo:'PBBORCON35',  nombre:'Bordillo Confinamiento H-35',               medidas:'a=15 b=80 h=35 cm',  unidad:'UD', peso:81,   iva:'NO', lista:44690,   minimo:39100,   grupo:'Bordillo'},
+  {codigo:'PBBORSAR35',  nombre:'Bordillo Sardinel H-35',                    medidas:'a=15 b=100 h=35 cm', unidad:'UD', peso:104,  iva:'NO', lista:53770,   minimo:47050,   grupo:'Bordillo'},
+  {codigo:'PBBORCON20',  nombre:'Bordillo Confinamiento Andén H-20',         medidas:'a=10 b=100 h=20 cm', unidad:'UD', peso:49,   iva:'NO', lista:28590,   minimo:25010,   grupo:'Bordillo'},
+  {codigo:'PBBORTAB20',  nombre:'Bordillo Tabaco',                           medidas:'a=20 b=100 h=20 cm', unidad:'UD', peso:46,   iva:'NO', lista:50060,   minimo:42910,   grupo:'Bordillo'},
+  {codigo:'PBBOSAR45M',  nombre:'Bordillo Sardinel Medio H-45',              medidas:'a=15 b=40 h=45 cm',  unidad:'UD', peso:58.5, iva:'NO', lista:36900,   minimo:31626,   grupo:'Bordillo'},
+  {codigo:'PBCBEC40CM',  nombre:'Bordillo Especial Canal',                   medidas:'a=35 b=49 h=40 cm',  unidad:'UD', peso:120,  iva:'SI', lista:72960,   minimo:62540,   grupo:'Bordillo'},
+  {codigo:'PBBCBORSEP',  nombre:'Bordillo Separador',                        medidas:'a=23 b=100 h=60 cm', unidad:'UD', peso:164.7,iva:'NO', lista:119460,  minimo:102393,  grupo:'Bordillo'},
+  // BOVEDILLA
+  {codigo:'PBBOVTARCO',  nombre:'Bovedilla Tipo Arco',                       medidas:'h=10 cm',            unidad:'UD', peso:10.2, iva:'NO', lista:3050,    minimo:2616,    grupo:'Bovedilla'},
+  {codigo:'PBBOVEDH10',  nombre:'Bovedilla H10',                             medidas:'h=10 cm',            unidad:'UD', peso:15.85,iva:'NO', lista:4600,    minimo:4030,    grupo:'Bovedilla'},
+  // BOX CULVERT
+  {codigo:'PBOXCUL700',  nombre:'Box Culvert Prefabricado 700',              medidas:'a1=200 h1=270 L=60 cm',unidad:'UD',peso:3200, iva:'SI', lista:4703750, minimo:4031784, grupo:'Box Culvert'},
+  {codigo:'PBOXCULPT2',  nombre:'Box Culvert Prefabricado PT2',              medidas:'a1=170 h1=140 cm',   unidad:'UD', peso:3600, iva:'SI', lista:5222920, minimo:4476789, grupo:'Box Culvert'},
+  {codigo:'PLLACOREBC',  nombre:'Llave en Concreto para Box Culvert',        medidas:'',                   unidad:'UD', peso:0,    iva:'SI', lista:857640,  minimo:735120,  grupo:'Box Culvert'},
+  // CALADO
+  {codigo:'PBCCALRECG',  nombre:'Calado Rectangular Gris (8 MPa)',           medidas:'a=20 b=19 h=14 cm',  unidad:'UD', peso:5.5,  iva:'NO', lista:4370,    minimo:3743,    grupo:'Calado'},
+  {codigo:'PBCCALCIRG',  nombre:'Calado Circular Gris (8 MPa)',              medidas:'a=19 b=19 h=14 cm',  unidad:'UD', peso:6.2,  iva:'NO', lista:4390,    minimo:4075,    grupo:'Calado'},
+  // CIMIENTO
+  {codigo:'PCIMPAN8CM',  nombre:'Cimiento para Panel 8cm',                   medidas:'',                   unidad:'UD', peso:230.4,iva:'SI', lista:162920,  minimo:139646,  grupo:'Cimiento'},
+  {codigo:'PCIMPAN4CM',  nombre:'Cimiento para Panel 4cm',                   medidas:'',                   unidad:'UD', peso:174.4,iva:'SI', lista:121080,  minimo:103781,  grupo:'Cimiento'},
+  {codigo:'PPECPANELS',  nombre:'Base Prefabricada para Paneles Solares',    medidas:'',                   unidad:'UD', peso:78,   iva:'SI', lista:190100,  minimo:162941,  grupo:'Cimiento'},
+  {codigo:'PBAC602017',  nombre:'Bloque Anclaje Concreto',                   medidas:'a=20 b=60 h=17 cm',  unidad:'UD', peso:39.2, iva:'SI', lista:89230,   minimo:76482,   grupo:'Cimiento'},
+  {codigo:'PTZAPATATT',  nombre:'Zapata Tipo T',                             medidas:'A1=90 B1=90 H1=25 cm',unidad:'UD',peso:667.4,iva:'SI', lista:553600,  minimo:474512,  grupo:'Cimiento'},
+  {codigo:'PBBDADOPF1',  nombre:'Dado Perforado Cimiento',                   medidas:'a=30 b=30 h=30 cm',  unidad:'UD', peso:60,   iva:'NO', lista:49280,   minimo:45758,   grupo:'Cimiento'},
+  {codigo:'PPECPANSIN',  nombre:'Base Paneles Solares Sin Platina',          medidas:'',                   unidad:'UD', peso:76,   iva:'SI', lista:139730,  minimo:129746,  grupo:'Cimiento'},
+  // CUNETA
+  {codigo:'PBBCUNEU35',  nombre:'Cuneta en U',                               medidas:'a=35 b=80 h=15 cm',  unidad:'UD', peso:72,   iva:'NO', lista:61420,   minimo:56695,   grupo:'Cuneta'},
+  // DURMIENTE
+  {codigo:'PDURMTRO27',  nombre:'Durmiente Traviesa Trocha 27"',             medidas:'',                   unidad:'UD', peso:70,   iva:'SI', lista:258450,  minimo:221527,  grupo:'Durmiente'},
+  {codigo:'PDURMTRO32',  nombre:'Durmiente Traviesa Trocha 32"',             medidas:'',                   unidad:'UD', peso:70,   iva:'SI', lista:258450,  minimo:221527,  grupo:'Durmiente'},
+  {codigo:'PDURMTRO76',  nombre:'Durmiente Traviesa Trocha 76"',             medidas:'',                   unidad:'UD', peso:207,  iva:'SI', lista:213320,  minimo:198080,  grupo:'Durmiente'},
+  // GRAMOQUIN
+  {codigo:'PBCGRAMV8G',  nombre:'Gramoquín Vehicular h=8cm Gris',            medidas:'a=29 b=43 h=8 cm',   unidad:'UD', peso:17,   iva:'NO', lista:9660,    minimo:8284,    grupo:'Gramoquín'},
+  {codigo:'PBCGRAM10G',  nombre:'Gramoquín Vehicular h=10cm Gris',           medidas:'a=29 b=43 h=10 cm',  unidad:'UD', peso:19.5, iva:'NO', lista:10790,   minimo:9250,    grupo:'Gramoquín'},
+  {codigo:'PBCGRAMV12',  nombre:'Gramoquín Vehicular 20x20 h=12cm Gris',     medidas:'a=20 b=20 h=12 cm',  unidad:'UD', peso:null, iva:'NO', lista:3880,    minimo:3500,    grupo:'Gramoquín'},
+  {codigo:'PBCGRAV12N',  nombre:'Gramoquín Vehicular 20x20 h=12cm Negro',    medidas:'a=20 b=20 h=12 cm',  unidad:'UD', peso:null, iva:'NO', lista:5030,    minimo:4550,    grupo:'Gramoquín'},
+  {codigo:'PBCGRAV12O',  nombre:'Gramoquín Vehicular 20x20 h=12cm Ocre',     medidas:'a=20 b=20 h=12 cm',  unidad:'UD', peso:null, iva:'NO', lista:4660,    minimo:4210,    grupo:'Gramoquín'},
+  {codigo:'PBCGRAV12R',  nombre:'Gramoquín Vehicular 20x20 h=12cm Rojo',     medidas:'a=20 b=20 h=12 cm',  unidad:'UD', peso:null, iva:'NO', lista:5030,    minimo:4550,    grupo:'Gramoquín'},
+  // JARDINERA / MATERO
+  {codigo:'PJARTIPOC0',  nombre:'Jardinera Tipo C',                          medidas:'',                   unidad:'UD', peso:246,  iva:'SI', lista:1913770, minimo:1640373, grupo:'Jardinera'},
+  {codigo:'PJARTIPOB0',  nombre:'Jardinera Tipo B',                          medidas:'',                   unidad:'UD', peso:240,  iva:'SI', lista:2237020, minimo:1917447, grupo:'Jardinera'},
+  {codigo:'PMATRECT83',  nombre:'Matero Rectangular',                        medidas:'a=30 b=49 h=83 cm',  unidad:'UD', peso:122,  iva:'SI', lista:398640,  minimo:341689,  grupo:'Jardinera'},
+  {codigo:'PMATCUAD43',  nombre:'Matero Cuadrado',                           medidas:'a=45 b=49 h=43 cm',  unidad:'UD', peso:99,   iva:'SI', lista:364170,  minimo:312142,  grupo:'Jardinera'},
+  // MURO CONTENCIÓN
+  {codigo:'PMUROCOTPA',  nombre:'Muro Contención Pretensado A=100cm Tipo A', medidas:'a=100 h=20 L=745 cm',unidad:'UD', peso:3576, iva:'SI', lista:6387010, minimo:5474582, grupo:'Muro Contención'},
+  {codigo:'PMUROCOTPB',  nombre:'Muro Contención Pretensado A=100cm Tipo B', medidas:'a=100 h=20 L=707 cm',unidad:'UD', peso:3393.6,iva:'SI',lista:6256830, minimo:5362994, grupo:'Muro Contención'},
+  {codigo:'PMURO50TPA',  nombre:'Muro Contención Pretensado A=50cm Tipo A',  medidas:'a=50 h=20 L=745 cm', unidad:'UD', peso:1788, iva:'SI', lista:3002110, minimo:2787672, grupo:'Muro Contención'},
+  {codigo:'PMURO50TPB',  nombre:'Muro Contención Pretensado A=50cm Tipo B',  medidas:'a=50 h=20 L=707 cm', unidad:'UD', peso:1696.8,iva:'SI',lista:2960170, minimo:2748727, grupo:'Muro Contención'},
+  // PANEL PRETENSADO
+  {codigo:'PPAPR3H4CM',  nombre:'Panel Pretensado Casa 4cm',                 medidas:'a=50 h=4 cm',        unidad:'M2', peso:51.6, iva:'SI', lista:36140,   minimo:33730,   grupo:'Panel Pretensado'},
+  // PASO
+  {codigo:'PPP294GA30',  nombre:'Paso Pretensado Abujardado 30cm',           medidas:'L=294 a=30 cm',      unidad:'UD', peso:211.7,iva:'SI', lista:1275810, minimo:1093553, grupo:'Paso'},
+  {codigo:'PPP294GA50',  nombre:'Paso Pretensado Abujardado 50cm',           medidas:'L=294 a=50 cm',      unidad:'UD', peso:352.8,iva:'SI', lista:1309850, minimo:1122729, grupo:'Paso'},
+  {codigo:'PPASOSP100',  nombre:'Paso Prefabricado 1.0m',                    medidas:'a=0.3 b=1.0 cm',     unidad:'UD', peso:55.4, iva:'SI', lista:168250,  minimo:156236,  grupo:'Paso'},
+  {codigo:'PPASOPREFL',  nombre:'Paso Prefabricado en L',                    medidas:'a=125 b=34 h=14 cm', unidad:'UD', peso:72.9, iva:'SI', lista:127330,  minimo:118231,  grupo:'Paso'},
+  // PLACA
+  {codigo:'PPLAHLLA10',  nombre:'Placa Huella Prefabricada',                 medidas:'a=90 b=49 h=10 cm',  unidad:'UD', peso:105,  iva:'SI', lista:108184,  minimo:102776,  grupo:'Placa'},
+  {codigo:'PPLCAPREH8',  nombre:'Placa Pretensada 5 Hilos A=50cm H=8cm',    medidas:'a=50 h=8 b=96 cm',   unidad:'UD', peso:95,   iva:'SI', lista:62770,   minimo:58291,   grupo:'Placa'},
+  // PLAQUETA PEATONAL 40cm
+  {codigo:'PBCPLAA40G',  nombre:'Plaqueta Peatonal 40x40 Abujardada Gris',   medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:29230,   minimo:25050,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAA40N',  nombre:'Plaqueta Peatonal 40x40 Abujardada Negra',  medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:32100,   minimo:27513,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAA40O',  nombre:'Plaqueta Peatonal 40x40 Abujardada Ocre',   medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:31180,   minimo:26728,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAA40R',  nombre:'Plaqueta Peatonal 40x40 Abujardada Roja',   medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:32100,   minimo:27513,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAE40G',  nombre:'Plaqueta Peatonal 40x40 Estriada Gris',     medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:23150,   minimo:19845,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAE40N',  nombre:'Plaqueta Peatonal 40x40 Estriada Negra',    medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:26030,   minimo:22308,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAE40O',  nombre:'Plaqueta Peatonal 40x40 Estriada Ocre',     medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:25110,   minimo:21523,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAE40R',  nombre:'Plaqueta Peatonal 40x40 Estriada Roja',     medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:26030,   minimo:22308,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAL40G',  nombre:'Plaqueta Peatonal 40x40 Lisa Gris',         medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:23150,   minimo:19845,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAL40N',  nombre:'Plaqueta Peatonal 40x40 Lisa Negra',        medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:26030,   minimo:22308,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAL40O',  nombre:'Plaqueta Peatonal 40x40 Lisa Ocre',         medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:25110,   minimo:21523,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAL40R',  nombre:'Plaqueta Peatonal 40x40 Lisa Roja',         medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:26030,   minimo:22308,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAT40G',  nombre:'Plaqueta Peatonal 40x40 Toperol Gris',      medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:23150,   minimo:19845,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAT40N',  nombre:'Plaqueta Peatonal 40x40 Toperol Negra',     medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:26030,   minimo:22308,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAT40O',  nombre:'Plaqueta Peatonal 40x40 Toperol Ocre',      medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:25110,   minimo:21523,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAT40R',  nombre:'Plaqueta Peatonal 40x40 Toperol Roja',      medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:26030,   minimo:22308,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAG40G',  nombre:'Plaqueta Peatonal 40x40 Guía Gris',         medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:23150,   minimo:19845,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAG40N',  nombre:'Plaqueta Peatonal 40x40 Guía Negra',        medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:26030,   minimo:22308,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAG40O',  nombre:'Plaqueta Peatonal 40x40 Guía Ocre',         medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:25110,   minimo:21523,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAG40R',  nombre:'Plaqueta Peatonal 40x40 Guía Roja',         medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'NO', lista:26030,   minimo:22308,   grupo:'Plaqueta'},
+  // PLAQUETA PEATONAL 50cm
+  {codigo:'PBCPLAA50G',  nombre:'Plaqueta Peatonal 50x50 Abujardada Gris',   medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:37790,   minimo:32393,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAA50N',  nombre:'Plaqueta Peatonal 50x50 Abujardada Negra',  medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:42280,   minimo:36240,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAA50O',  nombre:'Plaqueta Peatonal 50x50 Abujardada Ocre',   medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:40850,   minimo:35014,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAA50R',  nombre:'Plaqueta Peatonal 50x50 Abujardada Roja',   medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:42280,   minimo:36240,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAE50G',  nombre:'Plaqueta Peatonal 50x50 Estriada Gris',     medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:29150,   minimo:24987,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAE50N',  nombre:'Plaqueta Peatonal 50x50 Estriada Negra',    medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:33640,   minimo:28835,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAE50O',  nombre:'Plaqueta Peatonal 50x50 Estriada Ocre',     medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:32210,   minimo:27608,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAE50R',  nombre:'Plaqueta Peatonal 50x50 Estriada Roja',     medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:33640,   minimo:28835,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAT50G',  nombre:'Plaqueta Peatonal 50x50 Toperol Gris',      medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:29150,   minimo:24987,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAT50N',  nombre:'Plaqueta Peatonal 50x50 Toperol Negra',     medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:33640,   minimo:28835,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAT50O',  nombre:'Plaqueta Peatonal 50x50 Toperol Ocre',      medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:32210,   minimo:27608,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAT50R',  nombre:'Plaqueta Peatonal 50x50 Toperol Roja',      medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:33640,   minimo:28835,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAG50G',  nombre:'Plaqueta Peatonal 50x50 Guía Gris',         medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:29150,   minimo:24987,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAG50N',  nombre:'Plaqueta Peatonal 50x50 Guía Negra',        medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:33640,   minimo:28835,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAG50O',  nombre:'Plaqueta Peatonal 50x50 Guía Ocre',         medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:32210,   minimo:27608,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAG50R',  nombre:'Plaqueta Peatonal 50x50 Guía Roja',         medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:33640,   minimo:28835,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAL50G',  nombre:'Plaqueta Peatonal 50x50 Lisa Gris',         medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:29150,   minimo:24987,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAL50N',  nombre:'Plaqueta Peatonal 50x50 Lisa Negra',        medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:33640,   minimo:28835,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAL50O',  nombre:'Plaqueta Peatonal 50x50 Lisa Ocre',         medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:32210,   minimo:27608,   grupo:'Plaqueta'},
+  {codigo:'PBCPLAL50R',  nombre:'Plaqueta Peatonal 50x50 Lisa Roja',         medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'NO', lista:33640,   minimo:28835,   grupo:'Plaqueta'},
+  // PLAQUETA VEHICULAR 40cm
+  {codigo:'PPLAVEA40G',  nombre:'Plaqueta Vehicular 40x40 Abujardada Gris',  medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'SI', lista:32780,   minimo:28094,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEA40N',  nombre:'Plaqueta Vehicular 40x40 Abujardada Negra', medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'SI', lista:35190,   minimo:30164,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEA40O',  nombre:'Plaqueta Vehicular 40x40 Abujardada Ocre',  medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'SI', lista:34420,   minimo:29504,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEA40R',  nombre:'Plaqueta Vehicular 40x40 Abujardada Roja',  medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'SI', lista:35190,   minimo:30164,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEE40G',  nombre:'Plaqueta Vehicular 40x40 Estriada Gris',    medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'SI', lista:26730,   minimo:22910,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEE40N',  nombre:'Plaqueta Vehicular 40x40 Estriada Negra',   medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'SI', lista:29140,   minimo:24980,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEE40O',  nombre:'Plaqueta Vehicular 40x40 Estriada Ocre',    medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'SI', lista:28370,   minimo:24320,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEE40R',  nombre:'Plaqueta Vehicular 40x40 Estriada Roja',    medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'SI', lista:29140,   minimo:24980,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEL40G',  nombre:'Plaqueta Vehicular 40x40 Lisa Gris',        medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'SI', lista:26730,   minimo:22910,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEL40N',  nombre:'Plaqueta Vehicular 40x40 Lisa Negra',       medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'SI', lista:29140,   minimo:24980,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEL40O',  nombre:'Plaqueta Vehicular 40x40 Lisa Ocre',        medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'SI', lista:28370,   minimo:24320,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEL40R',  nombre:'Plaqueta Vehicular 40x40 Lisa Roja',        medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'SI', lista:29140,   minimo:24980,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVET40G',  nombre:'Plaqueta Vehicular 40x40 Toperol Gris',     medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'SI', lista:26730,   minimo:22910,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEG40G',  nombre:'Plaqueta Vehicular 40x40 Guía Gris',        medidas:'a=40 b=40 h=6 cm',   unidad:'UD', peso:22.1, iva:'SI', lista:26730,   minimo:22910,   grupo:'Plaqueta Vehicular'},
+  // PLAQUETA VEHICULAR 50cm
+  {codigo:'PPLAVEA50G',  nombre:'Plaqueta Vehicular 50x50 Abujardada Gris',  medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'SI', lista:41540,   minimo:35609,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEA50N',  nombre:'Plaqueta Vehicular 50x50 Abujardada Negra', medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'SI', lista:45320,   minimo:38842,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEA50O',  nombre:'Plaqueta Vehicular 50x50 Abujardada Ocre',  medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'SI', lista:44110,   minimo:37811,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEA50R',  nombre:'Plaqueta Vehicular 50x50 Abujardada Roja',  medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'SI', lista:45320,   minimo:38842,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEE50G',  nombre:'Plaqueta Vehicular 50x50 Estriada Gris',    medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'SI', lista:34870,   minimo:29886,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEE50O',  nombre:'Plaqueta Vehicular 50x50 Estriada Ocre',    medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'SI', lista:37440,   minimo:32088,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEE50R',  nombre:'Plaqueta Vehicular 50x50 Estriada Roja',    medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'SI', lista:38640,   minimo:33119,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEL50G',  nombre:'Plaqueta Vehicular 50x50 Lisa Gris',        medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'SI', lista:34870,   minimo:29886,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVET50G',  nombre:'Plaqueta Vehicular 50x50 Toperol Gris',     medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'SI', lista:34870,   minimo:29886,   grupo:'Plaqueta Vehicular'},
+  {codigo:'PPLAVEG50G',  nombre:'Plaqueta Vehicular 50x50 Guía Gris',        medidas:'a=50 b=50 h=7 cm',   unidad:'UD', peso:42,   iva:'SI', lista:34870,   minimo:29886,   grupo:'Plaqueta Vehicular'},
+  // POSTE
+  {codigo:'PPOSTCU290',  nombre:'Poste Cerco Curvo 290cm',                   medidas:'a=8 b=10 L=290 cm',  unidad:'UD', peso:56.4, iva:'SI', lista:86500,   minimo:74140,   grupo:'Poste'},
+  {codigo:'PPOSTRE150',  nombre:'Poste Cerco Recto 150cm',                   medidas:'a=10 b=10 L=150 cm', unidad:'UD', peso:36,   iva:'SI', lista:66810,   minimo:57267,   grupo:'Poste'},
+  {codigo:'PPOSTRE200',  nombre:'Poste Cerco Recto 200cm',                   medidas:'a=10 b=10 L=200 cm', unidad:'UD', peso:48,   iva:'SI', lista:74600,   minimo:63943,   grupo:'Poste'},
+  {codigo:'PPOSTRE250',  nombre:'Poste Cerco Recto 250cm',                   medidas:'a=10 b=10 L=250 cm', unidad:'UD', peso:60,   iva:'SI', lista:81900,   minimo:70200,   grupo:'Poste'},
+  {codigo:'PPOSTRE300',  nombre:'Poste Cerco Recto 300cm',                   medidas:'a=10 b=10 L=300 cm', unidad:'UD', peso:69.6, iva:'SI', lista:98070,   minimo:84062,   grupo:'Poste'},
+  {codigo:'PPOSTPREML',  nombre:'Poste Pretensado 3 Hilos (ml)',             medidas:'a=10 b=8 cm ML',     unidad:'ML', peso:19.2, iva:'SI', lista:27990,   minimo:25987,   grupo:'Poste'},
+  // PRELOSA
+  {codigo:'PPREPRET2H-03',nombre:'Prelosa Pretensada 2 Hilos A=20cm',       medidas:'a=20 h=5 cm',        unidad:'ML', peso:25.44,iva:'SI', lista:34320,   minimo:32030,   grupo:'Prelosa'},
+  {codigo:'PPREPRET3H-02',nombre:'Prelosa Pretensada 3 Hilos A=30cm',       medidas:'a=30 h=5 cm',        unidad:'ML', peso:38.16,iva:'SI', lista:38370,   minimo:35810,   grupo:'Prelosa'},
+  {codigo:'PPREPRET4H-02',nombre:'Prelosa Pretensada 4 Hilos A=40cm',       medidas:'a=40 h=5 cm',        unidad:'ML', peso:50.88,iva:'SI', lista:42420,   minimo:39590,   grupo:'Prelosa'},
+  {codigo:'PPREPRET3H-03',nombre:'Prelosa Pretensada 3 Hilos A=50cm',       medidas:'a=50 h=5 cm',        unidad:'ML', peso:63.6, iva:'SI', lista:44020,   minimo:41090,   grupo:'Prelosa'},
+  {codigo:'PPREPRET4H-03',nombre:'Prelosa Pretensada 4 Hilos A=50cm',       medidas:'a=50 h=5 cm',        unidad:'ML', peso:63.6, iva:'SI', lista:45240,   minimo:42230,   grupo:'Prelosa'},
+  {codigo:'PPREPRET5H-04',nombre:'Prelosa Pretensada 5 Hilos A=50cm',       medidas:'a=50 h=5 cm',        unidad:'ML', peso:63.6, iva:'SI', lista:46460,   minimo:43370,   grupo:'Prelosa'},
+  {codigo:'PPREPRET6H-03',nombre:'Prelosa Pretensada 6 Hilos A=50cm',       medidas:'a=50 h=5 cm',        unidad:'ML', peso:63.6, iva:'SI', lista:47690,   minimo:44510,   grupo:'Prelosa'},
+  {codigo:'PPRESUM100',   nombre:'Prelosa Pretensada Trincho 3 Hilos',       medidas:'a=50 h=5 cm',        unidad:'ML', peso:63.6, iva:'SI', lista:42060,   minimo:36047,   grupo:'Prelosa'},
+  // PROTECTOR ÁRBOL
+  {codigo:'PPTARBAB4G',  nombre:'Protector Árbol Abujardado Gris (4 piezas)',medidas:'a=50 b=50 h=8 cm',   unidad:'UD', peso:89.2, iva:'NO', lista:120380,  minimo:103183,  grupo:'Protector Árbol'},
+  {codigo:'PPTARBAB4O',  nombre:'Protector Árbol Abujardado Ocre (4 piezas)',medidas:'a=50 b=50 h=8 cm',   unidad:'UD', peso:89.2, iva:'NO', lista:126310,  minimo:108267,  grupo:'Protector Árbol'},
+  {codigo:'PPTARBAB4N',  nombre:'Protector Árbol Abujardado Negro (4 piezas)',medidas:'a=50 b=50 h=8 cm',  unidad:'UD', peso:89.2, iva:'NO', lista:129090,  minimo:110647,  grupo:'Protector Árbol'},
+  {codigo:'PPTARBAB4R',  nombre:'Protector Árbol Abujardado Rojo (4 piezas)',medidas:'a=50 b=50 h=8 cm',   unidad:'UD', peso:89.2, iva:'NO', lista:129090,  minimo:110647,  grupo:'Protector Árbol'},
+  // SUMIDERO / REJILLA
+  {codigo:'PREJRECT60',  nombre:'Rejilla Rectangular 60x30 (5 perf.)',       medidas:'a=60 b=30 h=6 cm',   unidad:'UD', peso:21.5, iva:'SI', lista:52430,   minimo:44942,   grupo:'Sumidero'},
+  {codigo:'PREJRECT35',  nombre:'Rejilla Rectangular 35x100',                medidas:'a=35 b=100 h=6 cm',  unidad:'UD', peso:42,   iva:'SI', lista:78270,   minimo:67092,   grupo:'Sumidero'},
+  {codigo:'PREJTFPE12',  nombre:'Rejilla Tráfico Pesado',                    medidas:'a=58 b=52 h=12 cm',  unidad:'UD', peso:78.9, iva:'SI', lista:106480,  minimo:91266,   grupo:'Sumidero'},
+  {codigo:'PREJRECT21',  nombre:'Rejilla Tapa Traviesa',                     medidas:'a=21.5 b=49 h=4.5 cm',unidad:'UD',peso:8.6,  iva:'SI', lista:41280,   minimo:35386,   grupo:'Sumidero'},
+  {codigo:'PREJRECT50',  nombre:'Rejilla Rectangular 35x50',                 medidas:'a=35 b=50 h=6 cm',   unidad:'UD', peso:21,   iva:'SI', lista:44750,   minimo:38356,   grupo:'Sumidero'},
+  {codigo:'PREJR6PT60',  nombre:'Rejilla Rectangular 60x30 (6 perf.)',       medidas:'a=60 b=30 h=6 cm',   unidad:'UD', peso:21.5, iva:'SI', lista:51060,   minimo:47409,   grupo:'Sumidero'},
+  // TOPELLANTA
+  {codigo:'PTPLSP0A40',  nombre:'Topellantas Pequeño A=40cm',                medidas:'a=40 b=15 h=13 cm',  unidad:'UD', peso:10.8, iva:'SI', lista:22460,   minimo:19251,   grupo:'Topellanta'},
+  {codigo:'PTPLSPA200',  nombre:'Topellantas Largo A=200cm',                 medidas:'a=200 b=10 h=10 cm', unidad:'UD', peso:70.1, iva:'SI', lista:78180,   minimo:67012,   grupo:'Topellanta'},
+  {codigo:'PTPLSP0A50',  nombre:'Topellantas Pequeño A=50cm',                medidas:'a=50 b=15 h=13 cm',  unidad:'UD', peso:13.5, iva:'SI', lista:23710,   minimo:20326,   grupo:'Topellanta'},
+  // TRAVIESA
+  {codigo:'PTRAVCPQ17',  nombre:'Traviesa Canal Pequeña',                    medidas:'a=40 b=22 h=17 cm',  unidad:'UD', peso:23.2, iva:'SI', lista:37320,   minimo:31987,   grupo:'Traviesa'},
+  {codigo:'PTRAVCST30',  nombre:'Traviesa Canal Sin Tapa',                   medidas:'a=49 b=30 h=30 cm',  unidad:'UD', peso:53.2, iva:'SI', lista:79620,   minimo:68249,   grupo:'Traviesa'},
+  {codigo:'PTRAVENV18',  nombre:'Traviesa Canal Trapezoidal en V',           medidas:'a=35 b=28 h=18 cm',  unidad:'UD', peso:23.2, iva:'SI', lista:65600,   minimo:56227,   grupo:'Traviesa'},
+  // TUBO
+  {codigo:'PTBCRC2B36',  nombre:'Tubo Carretero 36" Clase II Pared B',       medidas:'d=36"',              unidad:'UD', peso:754,  iva:'SI', lista:541040,  minimo:463746,  grupo:'Tubo'},
+  {codigo:'PTBCRC3B36',  nombre:'Tubo Carretero 36" Clase III Pared B',      medidas:'d=36"',              unidad:'UD', peso:754,  iva:'SI', lista:594880,  minimo:509899,  grupo:'Tubo'},
+  // VIGA PRETENSADA
+  {codigo:'PVGPPH112H',  nombre:'Vigueta Pretensada H11 2 Hilos + 1',        medidas:'a=11 h=11 cm ML',    unidad:'ML', peso:21.5, iva:'SI', lista:19410,   minimo:17530,   grupo:'Viga Pretensada'},
+  {codigo:'PVGPPH113H-01',nombre:'Vigueta Pretensada H11 3 Hilos + 1',       medidas:'a=11 h=11 cm ML',    unidad:'ML', peso:21.5, iva:'SI', lista:20840,   minimo:18820,   grupo:'Viga Pretensada'},
+  {codigo:'PVGPPH182H',  nombre:'Vigueta Pretensada H18 2 Hilos + 1',        medidas:'a=11 h=18 cm ML',    unidad:'ML', peso:32,   iva:'SI', lista:21190,   minimo:19130,   grupo:'Viga Pretensada'},
+  {codigo:'PVGPPH183H',  nombre:'Vigueta Pretensada H18 3 Hilos + 1',        medidas:'a=11 h=18 cm ML',    unidad:'ML', peso:32,   iva:'SI', lista:22590,   minimo:20390,   grupo:'Viga Pretensada'},
+  {codigo:'PVGPPH184H-01',nombre:'Vigueta Pretensada H18 4 Hilos + 1',       medidas:'a=11 h=18 cm ML',    unidad:'ML', peso:32,   iva:'SI', lista:23990,   minimo:21660,   grupo:'Viga Pretensada'},
+];
+
+// Ítems actuales
+let itemsActuales = [];
+
+// ═══════════════════════════════
+// NAVEGACIÓN
+// ═══════════════════════════════
+function activarModulo(modulo) {
+  document.querySelectorAll('.nav-modulo').forEach(b => b.classList.remove('activo'));
+  event.currentTarget.classList.add('activo');
+  document.getElementById('subnav-cotizaciones').style.display = modulo === 'cotizaciones' ? 'flex' : 'none';
+  document.getElementById('subnav-produccion').style.display = modulo === 'produccion' ? 'flex' : 'none';
+  if (modulo === 'produccion') {
+    document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+    document.getElementById('pantalla-ordenes-servicio').classList.add('activa');
+    renderOrdenes();
+  }
+}
+
+function ir(pantalla) {
+  document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('activo'));
+  document.getElementById('pantalla-' + pantalla).classList.add('activa');
+  event.currentTarget.classList.add('activo');
+  if (pantalla === 'pipeline') renderPipeline();
+  if (pantalla === 'pipeline-produccion') renderPipelineProduccion();
+  if (pantalla === 'historico') renderHistorico();
+  if (pantalla === 'clientes') renderClientes();
+  if (pantalla === 'estadisticas') { poblarFiltrosEstadisticas(); renderEstadisticas(); }
+}
+
+// ═══════════════════════════════
+// ÓRDENES DE SERVICIO
+// ═══════════════════════════════
+let ORDENES = [];
+
+async function cargarOrdenes() {
+  const { data, error } = await sb.from('ordenes_servicio').select('datos').order('creado', { ascending: false });
+  if (error) { console.error('Error cargando órdenes:', error.message); return; }
+  ORDENES = (data || []).filter(r => r.datos).map(r => r.datos);
+}
+
+function renderOrdenes(lista) {
+  const data = lista !== undefined ? lista : ORDENES;
+  const tbody = document.getElementById('ordenes-body');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">📝</div><div>No hay órdenes de servicio registradas.</div></td></tr>`;
+    return;
+  }
+  const colorOS = { 'Pendiente':'#E65100', 'En producción':'#1565C0', 'Listo':'#2E7D32', 'Despachado':'#00695C', 'Cancelado':'#C62828' };
+  const bgOS =    { 'Pendiente':'#FFF3E0', 'En producción':'#E3F2FD', 'Listo':'#E8F5E9', 'Despachado':'#E0F2F1', 'Cancelado':'#FFEBEE' };
+  tbody.innerHTML = data.map(o => `
+    <tr style="border-bottom:1px solid var(--gris-borde);font-size:13px">
+      <td style="padding:10px 12px;font-weight:700;color:var(--azul)">${o.numero}</td>
+      <td style="padding:10px 12px">
+        ${o.cotizacion ? `<span style="font-weight:600;color:var(--azul)">${o.cotizacion}</span> <span style="font-size:11px;color:var(--gris-medio)">${o.versionCotizacion||''}</span>` : '—'}
+      </td>
+      <td style="padding:10px 12px;font-weight:600">${o.cliente}</td>
+      <td style="padding:10px 12px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${o.descripcion}">${o.descripcion}</td>
+      <td style="padding:10px 12px">${o.fechaEntrega ? new Date(o.fechaEntrega+'T12:00').toLocaleDateString('es-CO') : '—'}</td>
+      <td style="padding:8px 12px">
+        <button onclick="abrirModalEstadoOS('${o.id}')"
+          style="padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600;border:none;background:${bgOS[o.estado]||'#eee'};color:${colorOS[o.estado]||'#333'};cursor:pointer">
+          ${o.estado}
+        </button>
+      </td>
+      <td style="padding:10px 12px">
+        <div class="flex-gap">
+          <button class="btn btn-primario btn-xs" onclick="editarOrden('${o.id}')">✏️ Editar</button>
+          <button class="btn btn-secundario btn-xs" onclick="verPDFOrden('${o.id}')">📄 PDF</button>
+          <button class="btn btn-rojo btn-xs" onclick="eliminarOrden('${o.id}')">🗑️</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function filtrarOrdenes(q) {
+  const res = ORDENES.filter(o =>
+    o.numero?.toLowerCase().includes(q.toLowerCase()) ||
+    o.cliente?.toLowerCase().includes(q.toLowerCase()) ||
+    o.descripcion?.toLowerCase().includes(q.toLowerCase())
+  );
+  renderOrdenes(res);
+}
+
+function abrirModalOrden() {
+  document.getElementById('m-orden-id').value = '';
+  document.getElementById('modal-orden-titulo').textContent = '📝 Nueva Orden de Servicio';
+  ['m-orden-num','m-orden-cot','m-orden-cliente','m-orden-descripcion','m-orden-cantidad','m-orden-obs'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('m-orden-fecha').value = '';
+  document.getElementById('m-orden-estado').value = 'Pendiente';
+  document.getElementById('modal-orden').classList.add('abierto');
+}
+
+function editarOrden(id) {
+  const o = ORDENES.find(x => String(x.id) === String(id));
+  if (!o) return;
+  document.getElementById('m-orden-id').value = o.id;
+  document.getElementById('modal-orden-titulo').textContent = '✏️ Editar Orden de Servicio';
+  document.getElementById('m-orden-num').value = o.numero || '';
+  document.getElementById('m-orden-cot').value = o.cotizacion || '';
+  document.getElementById('m-orden-cliente').value = o.cliente || '';
+  document.getElementById('m-orden-descripcion').value = o.descripcion || '';
+  document.getElementById('m-orden-cantidad').value = o.cantidad || '';
+  document.getElementById('m-orden-fecha').value = o.fechaEntrega || '';
+  document.getElementById('m-orden-estado').value = o.estado || 'Pendiente';
+  document.getElementById('m-orden-obs').value = o.observaciones || '';
+  document.getElementById('modal-orden').classList.add('abierto');
+}
+
+function guardarOrden() {
+  const numero = document.getElementById('m-orden-num').value.trim();
+  const cliente = document.getElementById('m-orden-cliente').value.trim();
+  const descripcion = document.getElementById('m-orden-descripcion').value.trim();
+  if (!numero || !cliente || !descripcion) { alert('Completa los campos obligatorios (N° Orden, Cliente, Descripción).'); return; }
+  const editId = document.getElementById('m-orden-id').value;
+  const orden = {
+    id: editId || String(Date.now()),
+    numero, cliente, descripcion,
+    cotizacion: document.getElementById('m-orden-cot').value.trim(),
+    cantidad: document.getElementById('m-orden-cantidad').value,
+    fechaEntrega: document.getElementById('m-orden-fecha').value,
+    estado: document.getElementById('m-orden-estado').value,
+    observaciones: document.getElementById('m-orden-obs').value,
+    creadoPor: USUARIO_ACTUAL?.email,
+  };
+  const idx = ORDENES.findIndex(x => String(x.id) === String(orden.id));
+  if (idx >= 0) ORDENES[idx] = orden; else ORDENES.unshift(orden);
+  sb.from('ordenes_servicio').upsert({ numero: orden.numero, datos: orden, modificado: new Date().toISOString() }, { onConflict: 'numero' })
+    .then(({ error }) => { if (error) console.error('Error guardando orden:', error.message); });
+  cerrarModal('modal-orden');
+  renderOrdenes();
+}
+
+function irAOrdenDeCotizacion(numeroCot) {
+  const os = ORDENES.find(o => o.cotizacion === numeroCot);
+  if (!os) { alert('No se encontró la Orden de Servicio para esta cotización.'); return; }
+  document.querySelectorAll('.nav-modulo').forEach(b => b.classList.remove('activo'));
+  document.querySelector('[onclick="activarModulo(\'produccion\')"]')?.classList.add('activo');
+  document.getElementById('subnav-cotizaciones').style.display = 'none';
+  document.getElementById('subnav-produccion').style.display = 'flex';
+  document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+  document.getElementById('pantalla-ordenes-servicio').classList.add('activa');
+  renderOrdenes();
+}
+
+function verPDFOrden(id) {
+  const o = ORDENES.find(x => String(x.id) === String(id));
+  if (!o) return;
+  const items = (o.items || []);
+  const filasItems = items.map(it => {
+    const adj = Math.round(it.precio * (1 - (it.descuento||0) / 100));
+    const tot = adj * it.cantidad;
+    return `<tr>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;color:#555;font-size:11px">${it.codigo||''}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px">${it.nombre}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;font-size:12px">${it.cantidad}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px">${it.unidad||''}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;font-size:12px">$${adj.toLocaleString()}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;font-size:12px;font-weight:600">$${tot.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+
+  const t = o.totales || {};
+  const html = `
+  <div id="os-preview-doc" style="font-family:Arial,sans-serif;max-width:780px;margin:0 auto;padding:0;color:#222">
+    <!-- Cabecera -->
+    <div style="background:#001F3F;color:white;padding:18px 24px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:17px;font-weight:700">Proconcreto Prefabricados</div>
+        <div style="font-size:11px;opacity:0.6;margin-top:2px">ORDEN DE SERVICIO</div>
+      </div>
+      <div style="background:#1D9E75;padding:8px 16px;border-radius:6px;text-align:right">
+        <div style="font-size:20px;font-weight:700">${o.numero}</div>
+        <div style="font-size:10px;opacity:0.8">Fecha: ${new Date().toLocaleDateString('es-CO')}</div>
+      </div>
+    </div>
+    <!-- Ref cotización -->
+    <div style="background:#E8F5E9;border-left:4px solid #1D9E75;padding:8px 16px;font-size:12px;color:#1B5E20">
+      Generada desde cotización <strong>${o.cotizacion||'—'} ${o.versionCotizacion||''}</strong> — Estado: Aceptada
+    </div>
+    <!-- Cliente -->
+    <div style="padding:14px 16px;border-bottom:1px solid #eee">
+      <div style="font-size:10px;font-weight:700;color:#888;letter-spacing:0.08em;margin-bottom:8px">INFORMACIÓN DEL CLIENTE</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div><div style="font-size:10px;color:#888">Razón social</div><div style="font-size:13px;font-weight:600;margin-top:2px">${o.clienteData?.nombre||o.cliente}</div></div>
+        <div><div style="font-size:10px;color:#888">Contacto</div><div style="font-size:12px;margin-top:2px">${o.clienteData?.contacto||'—'}</div></div>
+        <div><div style="font-size:10px;color:#888">Ciudad / Proyecto</div><div style="font-size:12px;margin-top:2px">${o.clienteData?.proyecto||'—'}</div></div>
+      </div>
+    </div>
+    <!-- Productos -->
+    <div style="padding:14px 16px;border-bottom:1px solid #eee">
+      <div style="font-size:10px;font-weight:700;color:#888;letter-spacing:0.08em;margin-bottom:8px">PRODUCTOS</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:#f5f5f5">
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:#555;font-weight:600">Código</th>
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:#555;font-weight:600">Producto</th>
+          <th style="padding:6px 8px;text-align:center;font-size:11px;color:#555;font-weight:600">Cant.</th>
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:#555;font-weight:600">Unidad</th>
+          <th style="padding:6px 8px;text-align:right;font-size:11px;color:#555;font-weight:600">V/Unit</th>
+          <th style="padding:6px 8px;text-align:right;font-size:11px;color:#555;font-weight:600">Total</th>
+        </tr></thead>
+        <tbody>${filasItems}</tbody>
+        <tfoot>
+          ${t.subtotal ? `<tr style="background:#f9f9f9"><td colspan="4"></td><td style="padding:5px 8px;text-align:right;font-size:11px;color:#888">Subtotal</td><td style="padding:5px 8px;text-align:right;font-size:12px">$${t.subtotal.toLocaleString()}</td></tr>` : ''}
+          ${t.iva ? `<tr style="background:#f9f9f9"><td colspan="4"></td><td style="padding:5px 8px;text-align:right;font-size:11px;color:#888">IVA 19%</td><td style="padding:5px 8px;text-align:right;font-size:12px">$${t.iva.toLocaleString()}</td></tr>` : ''}
+          ${t.transporte ? `<tr style="background:#f9f9f9"><td colspan="4"></td><td style="padding:5px 8px;text-align:right;font-size:11px;color:#888">Transporte</td><td style="padding:5px 8px;text-align:right;font-size:12px">$${t.transporte.toLocaleString()}</td></tr>` : ''}
+          ${t.logistica ? `<tr style="background:#f9f9f9"><td colspan="4"></td><td style="padding:5px 8px;text-align:right;font-size:11px;color:#888">Logística</td><td style="padding:5px 8px;text-align:right;font-size:12px">$${t.logistica.toLocaleString()}</td></tr>` : ''}
+          <tr style="background:#E8F5E9"><td colspan="4"></td><td style="padding:7px 8px;text-align:right;font-size:12px;font-weight:700;color:#1B5E20">TOTAL</td><td style="padding:7px 8px;text-align:right;font-size:14px;font-weight:700;color:#1B5E20">$${(t.total||0).toLocaleString()}</td></tr>
+        </tfoot>
+      </table>
+    </div>
+    <!-- Logística y condiciones -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #eee">
+      <div style="padding:14px 16px;border-right:1px solid #eee">
+        <div style="font-size:10px;font-weight:700;color:#888;letter-spacing:0.08em;margin-bottom:8px">LOGÍSTICA</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div style="font-size:10px;color:#888">Destino</div><div style="font-size:12px;margin-top:2px">${o.transporte?.destino||'—'}</div></div>
+          <div><div style="font-size:10px;color:#888">Cargue</div><div style="font-size:12px;margin-top:2px;text-transform:capitalize">${o.cargue||'No'}</div></div>
+        </div>
+      </div>
+      <div style="padding:14px 16px">
+        <div style="font-size:10px;font-weight:700;color:#888;letter-spacing:0.08em;margin-bottom:8px">CONDICIONES</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div style="font-size:10px;color:#888">Forma de pago</div><div style="font-size:12px;margin-top:2px">${o.condiciones?.pago||'—'}</div></div>
+          <div><div style="font-size:10px;color:#888">Tiempo entrega</div><div style="font-size:12px;margin-top:2px">${o.condiciones?.entrega||'—'}</div></div>
+          <div><div style="font-size:10px;color:#888">Fecha estimada</div><div style="font-size:12px;font-weight:600;color:#1B5E20;margin-top:2px">${o.fechaEntrega ? new Date(o.fechaEntrega+'T12:00').toLocaleDateString('es-CO') : '—'}</div></div>
+          <div><div style="font-size:10px;color:#888">Prioridad</div><div style="font-size:12px;margin-top:2px">${o.prioridad||'Normal'}</div></div>
+        </div>
+      </div>
+    </div>
+    <!-- Observaciones -->
+    <div style="padding:12px 16px;border-bottom:1px solid #eee">
+      <div style="font-size:10px;font-weight:700;color:#888;letter-spacing:0.08em;margin-bottom:6px">OBSERVACIONES DE PRODUCCIÓN</div>
+      <div style="font-size:12px;color:#555;min-height:28px">${o.observaciones||'—'}</div>
+    </div>
+    <!-- Firmas -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border-bottom:1px solid #eee">
+      ${[
+        { label: 'Aprobado por', persona: o.vendedor?.nombre||'—', cargo: o.vendedor?.cargo||'' },
+        { label: 'Recibido en producción', persona: 'Jaime Eduardo Franco', cargo: 'Jefe de Producción' },
+        { label: 'Recibido en logística', persona: 'Jennifer Lopez', cargo: 'Jefe de Logística' }
+      ].map((f,i) => `<div style="padding:16px;${i<2?'border-right:1px solid #eee':''}">
+        <div style="border-top:1px solid #333;margin-top:36px;padding-top:6px;text-align:center">
+          <div style="font-size:11px;color:#888">${f.label}</div>
+          <div style="font-size:12px;font-weight:600;margin-top:2px">${f.persona}</div>
+          <div style="font-size:11px;color:#888">${f.cargo}</div>
+        </div>
+      </div>`).join('')}
+    </div>
+    <!-- Pie -->
+    <div style="background:#f5f5f5;padding:8px 16px;text-align:center;font-size:10px;color:#999">
+      Proconcreto Prefabricados · Autopista del Café Km2, Vía Chinchiná – Santa Rosa · www.proconcreto.com.co
+    </div>
+  </div>`;
+
+  // Mostrar en vista previa con botón de descarga
+  const vistaPrevia = document.getElementById('vista-previa');
+  document.getElementById('contenido-preview').innerHTML = `
+    <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
+      <span style="font-weight:700">Orden de Servicio — ${o.numero}</span>
+      <div style="flex:1"></div>
+      <button onclick="descargarPDFOrden('${o.id}')" style="background:#1D9E75;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-os">⬇️ Descargar PDF</button>
+      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-ordenes-servicio').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+    </div>
+    <div class="preview-doc" id="os-preview-container" style="padding:0">${html}</div>`;
+  vistaPrevia.style.display = 'block';
+  document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+  window.scrollTo(0, 0);
+}
+
+async function descargarPDFOrden(id) {
+  const o = ORDENES.find(x => String(x.id) === String(id));
+  if (!o) return;
+  const btn = document.getElementById('btn-pdf-os');
+  if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
+  try {
+    const { jsPDF } = window.jspdf;
+    const el = document.getElementById('os-preview-doc');
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = 210, pageH = 297;
+    const imgH = (canvas.height * pageW) / canvas.width;
+    let y = 0;
+    while (y < imgH) {
+      if (y > 0) pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, -y, pageW, imgH);
+      y += pageH;
+    }
+    const fecha = new Date().toISOString().split('T')[0].replace(/-/g,'_');
+    const clienteNombre = (o.cliente||'').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g,'').trim().replace(/\s+/g,'_');
+    pdf.save(`${o.numero}_${fecha}_${clienteNombre}.pdf`);
+  } finally {
+    if (btn) { btn.textContent = '⬇️ Descargar PDF'; btn.disabled = false; }
+  }
+}
+
+function eliminarOrden(id) {
+  const o = ORDENES.find(x => String(x.id) === String(id));
+  if (!o || !confirm(`¿Eliminar la orden ${o.numero}?`)) return;
+  ORDENES = ORDENES.filter(x => String(x.id) !== String(id));
+  sb.from('ordenes_servicio').delete().eq('numero', o.numero);
+  renderOrdenes();
+}
+
+// ═══════════════════════════════
+// AUTH + INIT
+// ═══════════════════════════════
+window.onload = async function() {
+  // Detectar si venimos de un link de invitación o recuperación de contraseña
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'PASSWORD_RECOVERY' || event === 'INITIAL_SESSION' && session && window.location.hash.includes('type=invite')) {
+      // Mostrar formulario de nueva contraseña
+      document.getElementById('login-overlay').style.display = 'flex';
+      document.querySelector('.login-box').style.display = 'none';
+      document.getElementById('panel-recuperacion').style.display = 'none';
+      document.getElementById('panel-nueva-contrasena').style.display = 'block';
+      if (window.location.hash.includes('type=invite')) {
+        document.getElementById('nueva-pass-titulo').textContent = 'Bienvenido/a al CRM';
+        document.getElementById('nueva-pass-sub').textContent = 'Crea tu contraseña para comenzar a usar el sistema.';
+      } else {
+        document.getElementById('nueva-pass-titulo').textContent = 'Restablecer contraseña';
+        document.getElementById('nueva-pass-sub').textContent = 'Ingresa tu nueva contraseña.';
+      }
+      USUARIO_ACTUAL = session.user;
+      return;
+    }
+    if (event === 'SIGNED_IN' && session && !document.getElementById('panel-nueva-contrasena').style.display.includes('block')) {
+      if (!USUARIO_ACTUAL) {
+        USUARIO_ACTUAL = session.user;
+        document.getElementById('login-overlay').style.display = 'none';
+        await mostrarApp();
+      }
+    }
+  });
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (session && !window.location.hash.includes('type=recovery') && !window.location.hash.includes('type=invite')) {
+    USUARIO_ACTUAL = session.user;
+    await mostrarApp();
+  } else if (!session && !window.location.hash.includes('access_token')) {
+    document.getElementById('login-overlay').style.display = 'flex';
+  }
+};
+
+async function iniciarSesion() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const btn = document.getElementById('btn-login');
+  const errDiv = document.getElementById('login-error');
+  errDiv.textContent = '';
+  btn.textContent = 'Verificando...'; btn.disabled = true;
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  btn.textContent = 'Ingresar'; btn.disabled = false;
+  if (error) { errDiv.textContent = 'Email o contraseña incorrectos.'; return; }
+  USUARIO_ACTUAL = data.user;
+  document.getElementById('login-overlay').style.display = 'none';
+  await mostrarApp();
+}
+
+async function cerrarSesion() {
+  await sb.auth.signOut();
+  window.location.href = window.location.origin + window.location.pathname;
+}
+
+function mostrarRecuperacion() {
+  document.querySelector('.login-box').style.display = 'none';
+  document.getElementById('panel-recuperacion').style.display = 'block';
+  document.getElementById('recuperar-msg').textContent = '';
+}
+
+function mostrarLogin() {
+  document.getElementById('panel-recuperacion').style.display = 'none';
+  document.querySelector('.login-box').style.display = 'block';
+}
+
+async function enviarRecuperacion() {
+  const email = document.getElementById('recuperar-email').value.trim();
+  const msgDiv = document.getElementById('recuperar-msg');
+  const btn = document.getElementById('btn-recuperar');
+  if (!email) { msgDiv.style.color = '#C62828'; msgDiv.textContent = 'Ingresa tu correo.'; return; }
+  btn.textContent = 'Enviando...'; btn.disabled = true;
+  const redirectTo = window.location.origin + window.location.pathname;
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+  btn.textContent = 'Enviar enlace'; btn.disabled = false;
+  if (error) {
+    msgDiv.style.color = '#C62828';
+    msgDiv.textContent = 'Error: ' + error.message;
+  } else {
+    msgDiv.style.color = 'var(--verde)';
+    msgDiv.textContent = '✅ Enlace enviado. Revisa tu bandeja de entrada.';
+  }
+}
+
+async function guardarNuevaContrasena() {
+  const pass1 = document.getElementById('nueva-pass-1').value;
+  const pass2 = document.getElementById('nueva-pass-2').value;
+  const msgDiv = document.getElementById('nueva-pass-msg');
+  const btn = document.getElementById('btn-nueva-pass');
+  msgDiv.textContent = '';
+  if (pass1.length < 8) { msgDiv.style.color = '#C62828'; msgDiv.textContent = 'La contraseña debe tener al menos 8 caracteres.'; return; }
+  if (pass1 !== pass2) { msgDiv.style.color = '#C62828'; msgDiv.textContent = 'Las contraseñas no coinciden.'; return; }
+  btn.textContent = 'Guardando...'; btn.disabled = true;
+  const { error } = await sb.auth.updateUser({ password: pass1 });
+  btn.textContent = 'Guardar contraseña'; btn.disabled = false;
+  if (error) {
+    msgDiv.style.color = '#C62828';
+    msgDiv.textContent = 'Error: ' + error.message;
+  } else {
+    msgDiv.style.color = 'var(--verde)';
+    msgDiv.textContent = '✅ Contraseña guardada. Ingresando...';
+    setTimeout(async () => {
+      document.getElementById('panel-nueva-contrasena').style.display = 'none';
+      document.getElementById('login-overlay').style.display = 'none';
+      // Limpiar el hash de la URL
+      history.replaceState(null, '', window.location.pathname);
+      await mostrarApp();
+    }, 1500);
+  }
+}
+
+async function cargarDatosSupabase() {
+  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }] = await Promise.all([
+    sb.from('cotizaciones').select('datos, estado').order('creado', { ascending: true }),
+    sb.from('clientes').select('datos').order('creado', { ascending: true }),
+    sb.from('ordenes_servicio').select('datos').order('creado', { ascending: false })
+  ]);
+  if (e3) console.warn('Tabla ordenes_servicio no disponible aún.');
+  ORDENES = (ords || []).filter(r => r.datos).map(r => r.datos);
+  if (e1) console.error('Error cargando cotizaciones:', e1.message);
+  if (e2) console.error('Error cargando clientes:', e2.message);
+  COTIZACIONES = (cots || []).filter(r => r.datos).map(r => ({ ...r.datos, estado: r.estado }));
+
+  // Clientes desde la tabla clientes
+  CLIENTES = (clts || []).filter(r => r.datos).map(r => r.datos);
+
+  // Migración: clientes que solo existen en cotizaciones → guardarlos en la tabla clientes
+  const clientesFaltantes = [];
+  COTIZACIONES.forEach(c => {
+    if (c.cliente?.nombre && !CLIENTES.find(x => x.nombre === c.cliente.nombre) && !clientesFaltantes.find(x => x.nombre === c.cliente.nombre)) {
+      clientesFaltantes.push({ id: Date.now() + Math.floor(Math.random()*10000), nombre: c.cliente.nombre, contacto: c.cliente.contacto || '', cel: c.cliente.cel || '', email: '', ciudad: '', nit: '' });
+    }
+  });
+  if (clientesFaltantes.length) {
+    CLIENTES.push(...clientesFaltantes);
+    clientesFaltantes.forEach(c => {
+      sb.from('clientes').upsert({ nombre: c.nombre, datos: c }, { onConflict: 'nombre' });
+    });
+  }
+}
+
+async function mostrarApp() {
+  document.getElementById('usuario-email').textContent = USUARIO_ACTUAL.email;
+  const perfil = USUARIOS_CRM[USUARIO_ACTUAL.email];
+  if (perfil) {
+    document.getElementById('vendedor-nombre').value = perfil.nombre;
+    document.getElementById('vendedor-cargo').value = perfil.cargo;
+  }
+  await cargarDatosSupabase();
+  poblarGrupos();
+  document.getElementById('fecha-cot').value = new Date().toISOString().split('T')[0];
+  document.getElementById('num-cot').value = '';
+  document.getElementById('display-num-cot').textContent = '—';
+  document.getElementById('sugerencia-num').textContent = '— Último usado: ' + (COTIZACIONES.length ? COTIZACIONES.reduce((a,b) => (parseInt(a.numero.replace(/\D/g,''))||0) > (parseInt(b.numero.replace(/\D/g,''))||0) ? a : b).numero : 'ninguno');
+  const sel = document.getElementById('destino-transporte');
+  while (sel.options.length > 1) sel.remove(1);
+  Object.keys(TARIFAS_TRANSPORTE).forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d; opt.textContent = d + ' ($' + TARIFAS_KG_TRANSPORTE[d].toLocaleString() + '/kg)';
+    sel.appendChild(opt);
+  });
+}
+
+// ═══════════════════════════════
+// BÚSQUEDA PRODUCTO
+// ═══════════════════════════════
+function poblarGrupos() {
+  const sel = document.getElementById('filtro-grupo');
+  if (!sel) return;
+  const grupos = [...new Set(PRODUCTOS.map(p => p.grupo))].sort();
+  grupos.forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g; opt.textContent = g;
+    sel.appendChild(opt);
+  });
+}
+
+function filtrarProductos() {
+  const div = document.getElementById('resultado-busqueda');
+  if (!div) return;
+  const grupo = (document.getElementById('filtro-grupo') || {}).value || '';
+  const q = ((document.getElementById('buscar-producto') || {}).value || '').toLowerCase().trim();
+  if (!grupo && q.length < 2) { div.style.display = 'none'; return; }
+  const res = PRODUCTOS.filter(p => {
+    const gOk = !grupo || p.grupo === grupo;
+    const tOk = q.length < 2 || (p.nombre + ' ' + p.codigo + ' ' + (p.medidas||'')).toLowerCase().includes(q);
+    return gOk && tOk;
+  }).slice(0, 18);
+  if (!res.length) {
+    div.innerHTML = '<div style="padding:12px 14px;color:#888;font-size:13px">Sin resultados para esta búsqueda.</div>';
+  } else {
+    div.innerHTML = res.map(p =>
+      `<div onclick="agregarItem('${p.codigo}')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:8px" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
+        <div>
+          <div style="font-weight:600;font-size:13px;color:#1e293b">${p.nombre}</div>
+          <div style="font-size:11px;color:#64748b">${p.codigo}${p.medidas ? ' · ' + p.medidas : ''} · ${p.unidad}</div>
+        </div>
+        <div style="text-align:right;white-space:nowrap">
+          <div style="font-weight:700;font-size:13px;color:#1565C0">$${Number(p.lista).toLocaleString('es-CO')}</div>
+          <div style="font-size:10px;color:${p.iva==='SI'?'#C62828':'#2E7D32'}">IVA ${p.iva}</div>
+        </div>
+      </div>`
+    ).join('');
+  }
+  div.style.display = 'block';
+}
+
+function cerrarBuscador() {
+  const div = document.getElementById('resultado-busqueda');
+  if (div) div.style.display = 'none';
+  const inp = document.getElementById('buscar-producto');
+  if (inp) inp.value = '';
+  const sel = document.getElementById('filtro-grupo');
+  if (sel) sel.value = '';
+}
+
+function buscarProducto(q) { filtrarProductos(); }
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#buscador-wrap')) {
+    const d = document.getElementById('resultado-busqueda');
+    if (d) d.style.display = 'none';
+  }
+  if (!e.target.closest('#lista-clientes-cot') && !e.target.closest('#buscar-cliente-cot')) {
+    const d = document.getElementById('lista-clientes-cot');
+    if (d) d.style.display = 'none';
+  }
+});
+
+function agregarItem(codigo) {
+  const prod = PRODUCTOS.find(p => p.codigo === codigo);
+  if (!prod) return;
+
+  // Si ya existe en la tabla, sumar 1 a la cantidad
+  const existente = itemsActuales.find(it => it.codigo === codigo);
+  if (existente) {
+    existente.cantidad += 1;
+    renderItems();
+    cerrarBuscador();
+    mostrarToast(`+1 unidad — ${prod.nombre}`);
+    document.getElementById('buscar-producto').focus();
+    return;
+  }
+
+  const item = {
+    codigo: prod.codigo, nombre: prod.nombre, medidas: prod.medidas,
+    unidad: prod.unidad, peso: prod.peso, iva: prod.iva,
+    lista: prod.lista, minimo: prod.minimo,
+    cantidad: 1, precio: prod.lista, descuento: 0
+  };
+  itemsActuales.push(item);
+  renderItems();
+  cerrarBuscador();
+  mostrarToast(`✅ ${prod.nombre} agregado`);
+  document.getElementById('buscar-producto').focus();
+}
+
+function mostrarToast(msg) {
+  let t = document.getElementById('toast-msg');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast-msg';
+    t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1C2333;color:white;padding:10px 22px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.25);transition:opacity .3s';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.style.opacity = '0', 2000);
+}
+
+// ═══════════════════════════════
+// RENDER TABLA ÍTEMS
+// ═══════════════════════════════
+function renderItems() {
+  const tbody = document.getElementById('items-body');
+  tbody.innerHTML = itemsActuales.map((it, i) => {
+    const adjUnit = Math.round(it.precio * (1 - it.descuento / 100));
+    const total = Math.round(adjUnit * it.cantidad);
+    const alerta = adjUnit < it.minimo ? `<span style="color:var(--rojo);font-size:10px;display:block">⚠️ Bajo mínimo ($${it.minimo.toLocaleString()})</span>` : '';
+    return `<tr>
+      <td><input type="number" min="0.1" step="0.1" value="${it.cantidad}" style="width:70px" onchange="actualizarItem(${i},'cantidad',this.value)"></td>
+      <td><span style="background:var(--gris-claro);padding:3px 6px;border-radius:4px;font-size:11px;font-weight:700">${it.unidad}</span></td>
+      <td>
+        <div style="font-weight:600;font-size:13px">${it.nombre}</div>
+        <div style="font-size:11px;color:var(--gris-medio)">${it.medidas}</div>
+        <div style="font-size:10px;color:#90A4AE">${it.codigo}</div>
+      </td>
+      <td><span style="color:${it.iva==='SI'?'var(--rojo)':'var(--verde)'};font-weight:700;font-size:12px">${it.iva}</span></td>
+      <td><input type="number" value="${it.precio}" style="width:90px" onchange="actualizarItem(${i},'precio',this.value)"></td>
+      <td><input type="number" min="0" max="50" value="${it.descuento}" style="width:60px" onchange="actualizarItem(${i},'descuento',this.value)">%</td>
+      <td style="font-weight:600;color:var(--azul)">$${adjUnit.toLocaleString()}${alerta}</td>
+      <td style="font-weight:700">$${total.toLocaleString()}</td>
+      <td><button class="btn btn-rojo btn-xs" onclick="eliminarItem(${i})">✕</button></td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--gris-medio)">Busca y agrega productos arriba</td></tr>`;
+  recalcular();
+}
+
+function actualizarItem(i, campo, val) {
+  itemsActuales[i][campo] = parseFloat(val) || 0;
+  renderItems();
+}
+
+function eliminarItem(i) {
+  itemsActuales.splice(i, 1);
+  renderItems();
+}
+
+// ═══════════════════════════════
+// CÁLCULOS
+// ═══════════════════════════════
+function recalcular() {
+  let subtotal = 0, iva = 0;
+  let pesoTotal = 0;
+  itemsActuales.forEach(it => {
+    const adj = Math.round(it.precio * (1 - it.descuento / 100));
+    const tot = adj * it.cantidad;
+    if (it.iva === 'SI') { subtotal += tot; iva += Math.round(tot * 0.19); }
+    else subtotal += tot;
+    if (it.peso) pesoTotal += it.peso * it.cantidad;
+  });
+
+  document.getElementById('peso-transporte').value = Math.round(pesoTotal);
+
+  const tieneIva = itemsActuales.some(it => it.iva === 'SI');
+  const descTrans = parseFloat(document.getElementById('desc-transporte')?.value) || 0;
+  const descCargue = parseFloat(document.getElementById('desc-cargue')?.value) || 0;
+  const descDescargue = parseFloat(document.getElementById('desc-descargue')?.value) || 0;
+
+  let transporte = 0;
+  const destino = document.getElementById('destino-transporte').value;
+  if (destino && pesoTotal > 0) {
+    const tarifaBase = Math.round(pesoTotal * (TARIFAS_KG_TRANSPORTE[destino] || 0));
+    const tarifaConDesc = Math.round(tarifaBase * (1 - descTrans / 100));
+    transporte = tieneIva ? Math.round(tarifaConDesc * 1.19) : tarifaConDesc;
+  }
+
+  let logisticaBase = 0;
+  if (document.getElementById('cargue-mano').value === 'si') {
+    const base = Math.round(pesoTotal * 11 * (1 - descCargue / 100));
+    logisticaBase += base;
+  }
+  if (document.getElementById('descargue-mecanico').value === 'si') {
+    const base = Math.round(pesoTotal * 11 * (1 - descDescargue / 100));
+    logisticaBase += base;
+  }
+  const ivaLogistica = Math.round(logisticaBase * 0.19);
+  const logistica = logisticaBase + ivaLogistica;
+
+  const total = subtotal + iva + transporte + logistica;
+  document.getElementById('tot-subtotal').textContent = '$' + subtotal.toLocaleString();
+  document.getElementById('tot-iva').textContent = '$' + iva.toLocaleString();
+  document.getElementById('tot-transporte').textContent = '$' + transporte.toLocaleString();
+  document.getElementById('tot-logistica').textContent = '$' + logistica.toLocaleString();
+  document.getElementById('tot-total').textContent = '$' + total.toLocaleString();
+}
+
+function actualizarTransporte() { recalcular(); }
+function aplicarTarifaTransporte() { recalcular(); }
+function actualizarCargue() {
+  const tieneTransporte = !!document.getElementById('destino-transporte').value;
+  const sel = document.getElementById('cargue-mano');
+  if (tieneTransporte) {
+    sel.value = 'no';
+    sel.disabled = true;
+    sel.style.opacity = '0.5';
+    sel.title = 'No disponible cuando hay transporte incluido';
+  } else {
+    sel.disabled = false;
+    sel.style.opacity = '';
+    sel.title = '';
+  }
+  recalcular();
+}
+
+// ═══════════════════════════════
+// GUARDAR / CARGAR COTIZACIÓN
+// ═══════════════════════════════
+function guardarCotizacion() {
+  const num = document.getElementById('num-cot').value.trim().toUpperCase();
+  if (!num) {
+    alert('⚠️ Debes asignar un número de cotización antes de guardar.');
+    document.getElementById('num-cot').focus();
+    return;
+  }
+  if (!/^[A-Z]\d{4}$/.test(num)) {
+    alert('⚠️ El número debe tener el formato C0085 (una letra seguida de 4 dígitos).');
+    document.getElementById('num-cot').focus();
+    return;
+  }
+  const duplicado = COTIZACIONES.find(c => c.numero === num && c.id !== (COTIZACIONES.find(x => x.numero === num)?.id));
+  if (duplicado && !COTIZACIONES.find(c => c.numero === num && c.id === duplicado.id)) {
+    if (!confirm(`Ya existe la cotización ${num}. ¿Deseas sobreescribirla?`)) return;
+  }
+  if (!document.getElementById('cliente-nombre').value.trim()) {
+    alert('Por favor ingresa el nombre del cliente.');
+    return;
+  }
+  if (!document.getElementById('cliente-proyecto').value.trim()) {
+    alert('⚠️ Debes ingresar la ciudad / proyecto antes de guardar.');
+    document.getElementById('cliente-proyecto').focus();
+    return;
+  }
+  if (itemsActuales.length === 0) {
+    alert('Agrega al menos un producto.');
+    return;
+  }
+  let subtotal = 0, iva = 0, pesoTotal = 0;
+  itemsActuales.forEach(it => {
+    const adj = Math.round(it.precio * (1 - it.descuento / 100));
+    const tot = adj * it.cantidad;
+    if (it.iva === 'SI') { subtotal += tot; iva += Math.round(tot * 0.19); }
+    else subtotal += tot;
+    if (it.peso) pesoTotal += it.peso * it.cantidad;
+  });
+  const destino = document.getElementById('destino-transporte').value;
+  const tieneIva = itemsActuales.some(it => it.iva === 'SI');
+  const descTrans = parseFloat(document.getElementById('desc-transporte')?.value) || 0;
+  const descCargue = parseFloat(document.getElementById('desc-cargue')?.value) || 0;
+  const descDescargue = parseFloat(document.getElementById('desc-descargue')?.value) || 0;
+  const tarifaBaseT = destino && pesoTotal > 0 ? Math.round(pesoTotal * (TARIFAS_KG_TRANSPORTE[destino] || 0) * (1 - descTrans / 100)) : 0;
+  let transporte = tieneIva ? Math.round(tarifaBaseT * 1.19) : tarifaBaseT;
+  let logisticaBase = 0;
+  if (document.getElementById('cargue-mano').value === 'si') logisticaBase += Math.round(pesoTotal * 11 * (1 - descCargue / 100));
+  if (document.getElementById('descargue-mecanico').value === 'si') logisticaBase += Math.round(pesoTotal * 11 * (1 - descDescargue / 100));
+  const ivaLogistica = Math.round(logisticaBase * 0.19);
+  const logistica = logisticaBase + ivaLogistica;
+
+  const version = document.getElementById('version-cot').value || 'V1';
+  const existente = COTIZACIONES.find(c => c.numero === num && c.version === version);
+  const cot = {
+    id: existente ? existente.id : Date.now(),
+    numero: num,
+    version: version,
+    fecha: document.getElementById('fecha-cot').value,
+    cliente: {
+      nombre: document.getElementById('cliente-nombre').value,
+      contacto: document.getElementById('cliente-contacto').value,
+      cel: document.getElementById('cliente-cel').value,
+      proyecto: document.getElementById('cliente-proyecto').value,
+    },
+    items: JSON.parse(JSON.stringify(itemsActuales)),
+    transporte: { destino, pesoTotal, grabado: tieneIva },
+    cargue: document.getElementById('cargue-mano').value,
+    descargue: document.getElementById('descargue-mecanico').value,
+    descuentos: { transporte: descTrans, cargue: descCargue, descargue: descDescargue },
+    condiciones: {
+      pago: document.getElementById('forma-pago').value,
+      entrega: document.getElementById('tiempo-entrega').value,
+      validez: document.getElementById('validez').value,
+    },
+    vendedor: {
+      nombre: document.getElementById('vendedor-nombre').value,
+      cargo: document.getElementById('vendedor-cargo').value,
+    },
+    totales: { subtotal, iva, transporte, logistica, total: subtotal + iva + transporte + logistica },
+    estado: existente ? existente.estado : 'Borrador',
+    creado: existente ? existente.creado : new Date().toISOString()
+  };
+
+  const idx = COTIZACIONES.findIndex(c => c.numero === num && c.version === version);
+  if (idx >= 0) COTIZACIONES[idx] = cot;
+  else COTIZACIONES.push(cot);
+
+  // Registrar o actualizar cliente en la tabla clientes
+  if (!CLIENTES.find(c => c.nombre === cot.cliente.nombre)) {
+    const nuevoCliente = { id: Date.now(), nombre: cot.cliente.nombre, contacto: cot.cliente.contacto || '', cel: cot.cliente.cel || '', email: '', ciudad: cot.cliente.proyecto || '', nit: '' };
+    CLIENTES.push(nuevoCliente);
+    sb.from('clientes').upsert({ nombre: nuevoCliente.nombre, datos: nuevoCliente }, { onConflict: 'nombre' })
+      .then(({ error }) => { if (error) console.warn('Cliente no guardado:', error.message); });
+  }
+
+  // Guardar en Supabase
+  sb.from('cotizaciones').upsert({
+    numero: cot.numero,
+    version: cot.version,
+    estado: cot.estado,
+    cliente: cot.cliente,
+    items: cot.items,
+    condiciones: cot.condiciones,
+    datos: cot,
+    modificado: new Date().toISOString()
+  }, { onConflict: 'numero,version' }).then(({ error }) => {
+    if (error) alert(`✅ Cotización ${num} ${cot.version} guardada.\n⚠️ Error al sincronizar: ${error.message}`);
+    else alert(`✅ Cotización ${num} ${cot.version} guardada y sincronizada.`);
+  });
+
+  document.getElementById('num-cot').value = '';
+  document.getElementById('display-num-cot').textContent = '—';
+  document.getElementById('sugerencia-num').textContent = '— Último usado: ' + num;
+}
+
+function cargarCotizacion(id) {
+  const cot = COTIZACIONES.find(c => c.id === id);
+  if (!cot) return;
+  const versiones = COTIZACIONES.filter(c => c.numero === cot.numero);
+  const maxVer = versiones.reduce((max, c) => {
+    const n = parseInt((c.version || 'V1').replace(/\D/g, '')) || 1;
+    return Math.max(max, n);
+  }, 1);
+  const nuevaVersion = 'V' + (maxVer + 1);
+  if (!confirm(`¿Editar la cotización ${cot.numero}?\n\nSe creará la versión ${nuevaVersion}. La ${cot.version || 'V1'} actual quedará guardada en el histórico.`)) return;
+  document.getElementById('num-cot').value = cot.numero;
+  document.getElementById('display-num-cot').textContent = cot.numero;
+  document.getElementById('version-cot').value = nuevaVersion;
+  document.getElementById('fecha-cot').value = new Date().toISOString().split('T')[0];
+  document.getElementById('cliente-nombre').value = cot.cliente.nombre;
+  document.getElementById('cliente-contacto').value = cot.cliente.contacto;
+  document.getElementById('cliente-cel').value = cot.cliente.cel;
+  document.getElementById('cliente-proyecto').value = cot.cliente.proyecto;
+  document.getElementById('destino-transporte').value = cot.transporte.destino || '';
+  document.getElementById('cargue-mano').value = cot.cargue || 'no';
+  document.getElementById('descargue-mecanico').value = cot.descargue || 'no';
+  document.getElementById('desc-transporte').value = cot.descuentos?.transporte || 0;
+  document.getElementById('desc-cargue').value = cot.descuentos?.cargue || 0;
+  document.getElementById('desc-descargue').value = cot.descuentos?.descargue || 0;
+  document.getElementById('forma-pago').value = cot.condiciones.pago;
+  document.getElementById('tiempo-entrega').value = cot.condiciones.entrega;
+  document.getElementById('validez').value = cot.condiciones.validez;
+  document.getElementById('vendedor-nombre').value = cot.vendedor.nombre;
+  document.getElementById('vendedor-cargo').value = cot.vendedor.cargo;
+  itemsActuales = JSON.parse(JSON.stringify(cot.items));
+  renderItems();
+  actualizarCargue();
+  document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+  document.getElementById('pantalla-nueva-cotizacion').classList.add('activa');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('activo'));
+  document.querySelectorAll('.nav-btn')[0].classList.add('activo');
+}
+
+function limpiarFormulario() {
+  if (!confirm('¿Limpiar el formulario actual?')) return;
+  itemsActuales = [];
+  document.getElementById('cliente-nombre').value = '';
+  document.getElementById('cliente-contacto').value = '';
+  document.getElementById('cliente-cel').value = '';
+  document.getElementById('cliente-proyecto').value = '';
+  document.getElementById('destino-transporte').value = '';
+  document.getElementById('desc-transporte').value = 0;
+  document.getElementById('cargue-mano').value = 'no';
+  document.getElementById('desc-cargue').value = 0;
+  document.getElementById('descargue-mecanico').value = 'no';
+  document.getElementById('desc-descargue').value = 0;
+  document.getElementById('num-cot').value = '';
+  document.getElementById('display-num-cot').textContent = '—';
+  document.getElementById('sugerencia-num').textContent = COTIZACIONES.length ? '— Último usado: ' + COTIZACIONES.reduce((a,b) => (parseInt(a.numero.replace(/\D/g,''))||0) > (parseInt(b.numero.replace(/\D/g,''))||0) ? a : b).numero : '';
+  document.getElementById('fecha-cot').value = new Date().toISOString().split('T')[0];
+  const perfil = USUARIOS_CRM[USUARIO_ACTUAL?.email];
+  if (perfil) {
+    document.getElementById('vendedor-nombre').value = perfil.nombre;
+    document.getElementById('vendedor-cargo').value = perfil.cargo;
+  }
+  renderItems();
+}
+
+// ═══════════════════════════════
+// PREVISUALIZACIÓN / PDF
+// ═══════════════════════════════
+function previsualizarCotizacionById(id) {
+  const cot = COTIZACIONES.find(c => c.id === id);
+  if (!cot) return;
+  // Cargar en el formulario temporalmente solo para previsualizar
+  document.getElementById('num-cot').value = cot.numero;
+  document.getElementById('version-cot').value = cot.version || 'V1';
+  document.getElementById('fecha-cot').value = cot.fecha;
+  document.getElementById('cliente-nombre').value = cot.cliente.nombre;
+  document.getElementById('cliente-contacto').value = cot.cliente.contacto;
+  document.getElementById('cliente-cel').value = cot.cliente.cel;
+  document.getElementById('cliente-proyecto').value = cot.cliente.proyecto;
+  document.getElementById('destino-transporte').value = cot.transporte.destino || '';
+  document.getElementById('cargue-mano').value = cot.cargue || 'no';
+  document.getElementById('descargue-mecanico').value = cot.descargue || 'no';
+  document.getElementById('desc-transporte').value = cot.descuentos?.transporte || 0;
+  document.getElementById('desc-cargue').value = cot.descuentos?.cargue || 0;
+  document.getElementById('desc-descargue').value = cot.descuentos?.descargue || 0;
+  document.getElementById('forma-pago').value = cot.condiciones.pago;
+  document.getElementById('tiempo-entrega').value = cot.condiciones.entrega;
+  document.getElementById('validez').value = cot.condiciones.validez;
+  document.getElementById('vendedor-nombre').value = cot.vendedor.nombre;
+  document.getElementById('vendedor-cargo').value = cot.vendedor.cargo;
+  itemsActuales = JSON.parse(JSON.stringify(cot.items));
+  renderItems();
+  previsualizarCotizacion();
+}
+
+function previsualizarCotizacion() {
+  const num = document.getElementById('num-cot').value.trim().toUpperCase();
+  if (!num) {
+    alert('⚠️ Asigna un número de cotización antes de previsualizar.');
+    document.getElementById('num-cot').focus();
+    return;
+  }
+  if (!document.getElementById('cliente-proyecto').value.trim()) {
+    alert('⚠️ Debes ingresar la ciudad / proyecto antes de previsualizar.');
+    document.getElementById('cliente-proyecto').focus();
+    return;
+  }
+  const fecha = new Date(document.getElementById('fecha-cot').value + 'T12:00:00');
+  const fechaStr = fecha.toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
+  const cliente = {
+    nombre: document.getElementById('cliente-nombre').value || '—',
+    contacto: document.getElementById('cliente-contacto').value,
+    cel: document.getElementById('cliente-cel').value,
+    proyecto: document.getElementById('cliente-proyecto').value,
+  };
+
+  let filasTabla = '';
+  let subtotal = 0, ivaTotal = 0, pesoTotal = 0;
+  itemsActuales.forEach(it => {
+    const adj = Math.round(it.precio * (1 - it.descuento / 100));
+    const tot = adj * it.cantidad;
+    if (it.iva === 'SI') ivaTotal += Math.round(tot * 0.19);
+    subtotal += tot;
+    if (it.peso) pesoTotal += it.peso * it.cantidad;
+    filasTabla += `<tr>
+      <td style="width:55px">${it.cantidad}</td>
+      <td style="width:40px">${it.unidad}</td>
+      <td>${it.nombre}<br><span style="font-size:10px;color:#666">${it.medidas}</span></td>
+      <td style="width:40px;text-align:center">${it.iva}</td>
+      <td style="width:80px;text-align:right">$ ${it.precio.toLocaleString()}</td>
+      <td style="width:50px;text-align:center">${it.descuento}%</td>
+      <td style="width:90px;text-align:right">$ ${adj.toLocaleString()}</td>
+      <td style="width:90px;text-align:right">$ ${tot.toLocaleString()}</td>
+    </tr>`;
+  });
+
+  const destino = document.getElementById('destino-transporte').value;
+  const transIva = itemsActuales.some(it => it.iva === 'SI');
+  const descTrans = parseFloat(document.getElementById('desc-transporte')?.value) || 0;
+  const descCargue = parseFloat(document.getElementById('desc-cargue')?.value) || 0;
+  const descDescargue = parseFloat(document.getElementById('desc-descargue')?.value) || 0;
+  let transporte = 0;
+  if (destino && pesoTotal > 0) {
+    const tarifaKg = TARIFAS_KG_TRANSPORTE[destino];
+    const tarifaBase = Math.round(pesoTotal * tarifaKg);
+    const tarifaConDesc = Math.round(tarifaBase * (1 - descTrans / 100));
+    transporte = transIva ? Math.round(tarifaConDesc * 1.19) : tarifaConDesc;
+    const descLabel = descTrans > 0 ? ` (desc. ${descTrans}%)` : '';
+    filasTabla += `<tr>
+      <td>${Math.round(pesoTotal)}</td><td>kg</td>
+      <td>Transporte ${transIva ? 'grabado' : 'no grabado'}${descLabel}:<br><span style="font-size:10px;color:#666">Chinchiná – ${destino}</span></td>
+      <td style="text-align:center">${transIva ? 'SI' : 'NO'}</td>
+      <td style="text-align:right">$ ${tarifaKg.toLocaleString()}</td>
+      <td style="text-align:center">${descTrans > 0 ? descTrans + '%' : (transIva ? '19%' : '0%')}</td>
+      <td style="text-align:right">$ ${transIva ? (tarifaKg * 1.19).toFixed(2) : tarifaKg.toLocaleString()}</td>
+      <td style="text-align:right">$ ${transporte.toLocaleString()}</td>
+    </tr>`;
+  }
+  let logisticaBase = 0;
+  if (document.getElementById('cargue-mano').value === 'si') {
+    const base = Math.round(pesoTotal * 11 * (1 - descCargue / 100));
+    const ivaL = Math.round(base * 0.19);
+    logisticaBase += base + ivaL;
+    const descLabel = descCargue > 0 ? ` (desc. ${descCargue}%)` : '';
+    filasTabla += `<tr><td>${Math.round(pesoTotal)}</td><td>kg</td><td>Cargue a mano${descLabel}</td><td style="text-align:center">SI</td><td style="text-align:right">$ 11</td><td style="text-align:center">19%</td><td style="text-align:right">$ ${(11*1.19).toFixed(2)}</td><td style="text-align:right">$ ${(base+ivaL).toLocaleString()}</td></tr>`;
+  }
+  if (document.getElementById('descargue-mecanico').value === 'si') {
+    const base = Math.round(pesoTotal * 11 * (1 - descDescargue / 100));
+    const ivaL = Math.round(base * 0.19);
+    logisticaBase += base + ivaL;
+    const descLabel = descDescargue > 0 ? ` (desc. ${descDescargue}%)` : '';
+    filasTabla += `<tr><td>${Math.round(pesoTotal)}</td><td>kg</td><td>Descargue mecánico${descLabel}</td><td style="text-align:center">SI</td><td style="text-align:right">$ 11</td><td style="text-align:center">19%</td><td style="text-align:right">$ ${(11*1.19).toFixed(2)}</td><td style="text-align:right">$ ${(base+ivaL).toLocaleString()}</td></tr>`;
+  }
+  const logistica = logisticaBase;
+
+  const total = subtotal + ivaTotal + transporte + logistica;
+
+  const html = `
+    <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
+      <span style="font-weight:700">Vista previa — Cotización ${num}</span>
+      <div style="flex:1"></div>
+      <button onclick="descargarPDF('${num}')" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700">⬇️ Descargar PDF</button>
+      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-nueva-cotizacion').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+    </div>
+    <div class="preview-doc" id="pdf-documento">
+      <!-- Cabecera membrete -->
+      <div class="preview-membrete-header">
+        <img src="membrete-top.jpg" alt="">
+      </div>
+
+      <!-- Cuerpo del documento -->
+      <div class="preview-content">
+        <div class="preview-header">
+          <div class="preview-cod">
+            <div style="color:#003F7F;font-weight:700;font-size:15px">COTIZACIÓN N°${num}</div>
+            <div style="color:#1565C0;font-weight:600;font-size:12px">VERSIÓN N°${document.getElementById('version-cot').value}</div>
+            <div style="font-size:11px;color:#555;margin-top:2px">Chinchiná, ${fechaStr}</div>
+          </div>
+        </div>
+        <div class="preview-cliente-box">
+          <div style="font-size:12px;color:#555">Señores</div>
+          <div style="font-weight:700;font-size:15px;color:#1a1a1a">${cliente.nombre}</div>
+          ${cliente.contacto ? `<div style="font-size:12px">Atte. ${cliente.contacto}</div>` : ''}
+          ${cliente.cel ? `<div style="font-size:12px">Cel: ${cliente.cel}</div>` : ''}
+          ${cliente.ciudad ? `<div style="font-size:12px">${cliente.ciudad}</div>` : ''}
+        </div>
+        <div class="preview-intro">
+          Cordial Saludo<br><br>
+          Atendiendo su solicitud, a continuación, hacemos entrega de la cotización de suministro de prefabricados en concreto${cliente.proyecto ? `, requeridos para el proyecto <strong>${cliente.proyecto}</strong>` : ''}, así:
+        </div>
+        <table class="preview-tabla">
+          <thead>
+            <tr>
+              <th style="width:52px">CANT.</th><th style="width:44px">UNID.</th><th>PRODUCTO</th><th style="width:38px">IVA</th><th style="width:80px">V/UNIT</th><th style="width:50px">DESC.</th><th style="width:90px">V/UNIT AJUSTADO</th><th style="width:130px">V/R TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>${filasTabla}</tbody>
+          <tfoot>
+            ${ivaTotal > 0 ? `<tr><td colspan="7" style="text-align:right;padding:7px 8px;font-size:12px">IVA (19%)</td><td style="text-align:right;padding:7px 8px;font-weight:600">$ ${ivaTotal.toLocaleString()}</td></tr>` : ''}
+            <tr class="total-row"><td colspan="7" style="text-align:right;padding:8px">TOTAL</td><td style="text-align:right;padding:8px;white-space:nowrap">$ ${total.toLocaleString()}</td></tr>
+          </tfoot>
+        </table>
+        <div class="preview-aclaraciones">
+          <h4>ACLARACIONES IMPORTANTES SOBRE LA PROPUESTA</h4>
+          <ul>
+            <li><strong>FORMA DE PAGO:</strong> ${document.getElementById('forma-pago').value}</li>
+            <li><strong>TIEMPO DE ENTREGA:</strong> ${document.getElementById('tiempo-entrega').value}</li>
+            <li><strong>VALIDEZ DE LA OFERTA:</strong> ${document.getElementById('validez').value}</li>
+            ${transporte > 0 ? `
+            <li>Esta propuesta incluye transporte hasta el sitio de la obra en camión tipo planchón de 10 TON de capacidad de carga. El valor del transporte no está considerado en el precio del producto, por lo que deberá ser calculado de acuerdo con el peso unitario y a la cantidad requerida. El material será entregado en obra en plataforma de camión hasta el sitio con acceso a criterio del conductor. <strong>NO INCLUYE DESCARGUE.</strong></li>
+            <li>El tiempo estipulado para el recibo y la descarga del material es de 120 minutos; las demoras por hora o fracción serán facturadas a <strong>$50.000 más IVA</strong>.</li>
+            <li>Se ofrece la opción de descargue mecánico con grúa, la cual está sujeta a disponibilidad de vehículo. El valor del descargue no está considerado en el precio del producto, por lo que deberá ser calculado de acuerdo al peso unitario y a la cantidad requerida. De aceptar esta opción, se requiere de un espacio <strong>SIN PENDIENTE</strong> y abierto en el sitio de recepción de 6m por 12m. Se requiere también de una persona de obra quien apoye la actividad de descargue enganchando la estiba en plataforma para el izaje y descargue.</li>
+            <li>De no tomar la opción de transporte, el material será entregado en planta en plataforma de camión y solo se permite el cargue en camión tipo planchón sin carpa ni obstrucciones laterales para cargue con montacargas. De no tener esta opción de vehículo, se permite el ingreso de personal para el cargue de manera manual siempre y cuando el personal esté debidamente afiliado a la seguridad social correspondiente; de lo contrario, se ofrece el servicio de cargue manual en planta y será cobrado a <strong>$11.000 por tonelada</strong>.</li>
+            <li>El material es entregado en estibas. De ser descargado en las mismas, es responsabilidad de la obra devolverlas en buen estado; de lo contrario, pasado 1 mes se procederá a su facturación (<strong>$20.000 más IVA por unidad</strong>).</li>
+            ` : `
+            <li>El material será entregado en planta en plataforma de camión y solo se permite el cargue en camión tipo planchón sin carpa ni obstrucciones laterales para cargue con montacargas. De no tener esta opción de vehículo, se permite el ingreso de personal para el cargue de manera manual siempre y cuando el personal esté debidamente afiliado a la seguridad social correspondiente; de lo contrario, se ofrece el servicio de cargue manual en planta y será cobrado a <strong>$11.000 por tonelada</strong>.</li>
+            `}
+            <li>Los productos fabricados son a la medida y requerimientos del cliente. Por tal razón, Proconcreto no recibe devoluciones de material de lo pedido por el cliente.</li>
+            <li>La propuesta ofrecida por Proconcreto incluye la fabricación de lo especificado en la presente cotización. La fabricación estará determinada por las especificaciones dadas; si existiera alguna especificación adicional, esta se atenderá previo estudio por el Departamento de Ingeniería de Proconcreto y con el ajuste en precio y condiciones de entrega de los elementos que resulten afectados.</li>
+            <li>Proconcreto se responsabiliza por el diseño y comportamiento de los elementos prefabricados ofrecidos en la presente cotización. El diseño, formaletería y comportamiento de la estructura que soporte estos elementos y lo que ella afecte es responsabilidad del cliente.</li>
+          </ul>
+        </div>
+        <div style="font-size:12px;margin-bottom:16px">Agradecemos se nos haya tenido en cuenta para su proyecto. Cualquier inquietud con gusto será atendida por nuestro Departamento de Ingeniería.</div>
+        <div style="font-size:12px">Cordialmente,</div>
+        <div class="preview-firma">
+          <div style="border-top:1px solid #333;width:260px;padding-top:6px;margin-top:32px">
+            <div style="font-weight:700;font-size:13px">${document.getElementById('vendedor-nombre').value}</div>
+            <div style="font-size:11px;color:#555">${document.getElementById('vendedor-cargo').value}</div>
+            ${(()=>{ const p = USUARIOS_CRM[USUARIO_ACTUAL?.email]; return p ? `<div style="font-size:11px;color:#555">${p.cel}</div><div style="font-size:11px;color:#555">${USUARIO_ACTUAL.email}</div>` : ''; })()}
+          </div>
+        </div>
+      </div>
+
+      <!-- Pie membrete -->
+      <div class="preview-membrete-footer">
+        <div class="pf-arco"></div>
+        <div class="pf-datos">
+          <div class="pf-col"><span class="pf-icon">📞</span><span>+57 (6) 887 3839<br>+57 (6) 887 5246</span></div>
+          <div class="pf-col"><span class="pf-icon">🏠</span><span>Autopista del Café Km2<br>Vía Chinchiná – Santa Rosa</span></div>
+          <div class="pf-col"><span class="pf-icon">🌐</span><span>www.proconcreto.com.co</span></div>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('contenido-preview').innerHTML = html;
+  document.getElementById('vista-previa').style.display = 'block';
+  document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+  window.scrollTo(0, 0);
+}
+
+// ═══════════════════════════════
+// HISTÓRICO
+// ═══════════════════════════════
+let filtroTexto = '', filtroEstado = '';
+
+function renderHistorico(lista) {
+  const data = lista || COTIZACIONES;
+  const tbody = document.getElementById('historico-body');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">📋</div><div>No hay cotizaciones guardadas aún.</div></td></tr>`;
+    return;
+  }
+  // Agrupar por número, orden descendente por número
+  const grupos = {};
+  [...data].forEach(c => {
+    if (!grupos[c.numero]) grupos[c.numero] = [];
+    grupos[c.numero].push(c);
+  });
+  // Ordenar versiones dentro de cada grupo (más reciente primero)
+  Object.values(grupos).forEach(vers => {
+    vers.sort((a, b) => {
+      const na = parseInt((a.version||'V1').replace(/\D/g,'')) || 1;
+      const nb = parseInt((b.version||'V1').replace(/\D/g,'')) || 1;
+      return nb - na;
+    });
+  });
+  // Ordenar grupos por número descendente
+  const numerosOrdenados = Object.keys(grupos).sort((a, b) => {
+    const na = parseInt(a.replace(/\D/g,'')) || 0;
+    const nb = parseInt(b.replace(/\D/g,'')) || 0;
+    return nb - na;
+  });
+
+  tbody.innerHTML = numerosOrdenados.map(num => {
+    const versiones = grupos[num];
+    const latest = versiones[0];
+    const oldVersions = versiones.slice(1);
+    const tieneVersiones = oldVersions.length > 0;
+    const verBtn = tieneVersiones
+      ? `<button class="btn-toggle-ver" id="btn-toggle-${num}" onclick="toggleVersiones('${num}')" title="Mostrar/ocultar versiones anteriores">▲ ocultar versiones</button>`
+      : '';
+    const mainRow = `<tr style="border-top:2px solid var(--azul-oscuro)">
+      <td>
+        <div style="font-weight:700;color:var(--azul);display:flex;align-items:center;gap:6px">
+          ${latest.numero}
+          <span style="font-size:11px;background:var(--azul);color:white;padding:2px 6px;border-radius:3px;font-weight:600">${latest.version||'V1'}</span>
+          <span style="font-size:10px;background:#E8F5E9;color:#2E7D32;padding:1px 5px;border-radius:3px">ACTIVA</span>
+        </div>
+        ${tieneVersiones ? `<div style="margin-top:4px">${verBtn}</div>` : ''}
+      </td>
+      <td>${new Date(latest.fecha+'T12:00').toLocaleDateString('es-CO')}</td>
+      <td style="font-weight:600">${latest.cliente.nombre}</td>
+      <td style="color:var(--gris-medio)">${latest.cliente.proyecto||'—'}</td>
+      <td style="font-weight:700">$${latest.totales.total.toLocaleString()}</td>
+      <td><span class="badge badge-${latest.estado.toLowerCase()}">${latest.estado}</span></td>
+      <td>
+        <div class="flex-gap">
+          <button class="btn btn-primario btn-xs" onclick="cargarCotizacion(${latest.id})">✏️ Editar</button>
+          <button class="btn btn-secundario btn-xs" onclick="abrirModalEstado(${latest.id})">Estado</button>
+          <button class="btn btn-secundario btn-xs" onclick="previsualizarCotizacionById(${latest.id})">👁️</button>
+          ${latest.estado === 'Aceptada' ? `<button class="btn btn-xs" style="background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7" onclick="irAOrdenDeCotizacion('${latest.numero}')">📝 OS</button>` : ''}
+          <button class="btn btn-rojo btn-xs" onclick="eliminarCotizacion(${latest.id})">🗑️</button>
+        </div>
+      </td>
+    </tr>`;
+    const oldRows = oldVersions.map((v, idx) => `
+      <tr class="historico-version-row" id="ver-row-${num}-${v.version}" style="background:#F8F9FB;border-left:3px solid var(--gris-borde)">
+        <td style="padding-left:20px">
+          <div style="display:flex;align-items:center;gap:6px;color:var(--gris-medio)">
+            <span style="font-size:11px;color:var(--gris-texto)">↳</span>
+            <span style="font-weight:600;color:var(--gris-texto)">${v.numero}</span>
+            <span style="font-size:11px;background:var(--gris-borde);color:var(--gris-texto);padding:2px 6px;border-radius:3px;font-weight:600">${v.version||'V1'}</span>
+          </div>
+        </td>
+        <td style="color:var(--gris-medio);font-size:13px">${new Date(v.fecha+'T12:00').toLocaleDateString('es-CO')}</td>
+        <td style="color:var(--gris-medio);font-size:13px">${v.cliente.nombre}</td>
+        <td style="color:var(--gris-medio);font-size:13px">${v.cliente.proyecto||'—'}</td>
+        <td style="color:var(--gris-medio);font-size:13px">$${v.totales.total.toLocaleString()}</td>
+        <td><span class="badge badge-${v.estado.toLowerCase()}" style="opacity:0.7">${v.estado}</span></td>
+        <td>
+          <div class="flex-gap">
+            <button class="btn btn-secundario btn-xs" onclick="previsualizarCotizacionById(${v.id})">👁️ Ver PDF</button>
+            <button class="btn btn-rojo btn-xs" onclick="eliminarCotizacion(${v.id})">🗑️</button>
+          </div>
+        </td>
+      </tr>`).join('');
+    return mainRow + oldRows;
+  }).join('');
+}
+
+function toggleVersiones(num) {
+  const rows = document.querySelectorAll(`[id^="ver-row-${num}-"]`);
+  const btn = document.getElementById(`btn-toggle-${num}`);
+  const visible = rows.length && rows[0].style.display !== 'none';
+  rows.forEach(r => { r.style.display = visible ? 'none' : ''; });
+  if (btn) btn.textContent = visible ? '▼ ver versiones anteriores' : '▲ ocultar versiones';
+}
+
+function filtrarHistorico(q) {
+  filtroTexto = q.toLowerCase();
+  aplicarFiltros();
+}
+function filtrarHistoricoEstado(e) {
+  filtroEstado = e;
+  aplicarFiltros();
+}
+function aplicarFiltros() {
+  let res = COTIZACIONES;
+  if (filtroTexto) res = res.filter(c =>
+    c.numero.toLowerCase().includes(filtroTexto) ||
+    c.cliente.nombre.toLowerCase().includes(filtroTexto) ||
+    (c.cliente.proyecto||'').toLowerCase().includes(filtroTexto)
+  );
+  if (filtroEstado) res = res.filter(c => c.estado === filtroEstado);
+  renderHistorico(res);
+}
+
+function eliminarCotizacion(id) {
+  const cot = COTIZACIONES.find(c => c.id === id);
+  if (!cot) return;
+  const label = `${cot.numero} ${cot.version || 'V1'}`;
+  if (!confirm(`¿Eliminar la cotización ${label}?`)) return;
+  COTIZACIONES = COTIZACIONES.filter(c => c.id !== id);
+  // Si hay otras versiones del mismo número, borrar solo esta versión; si no, borrar todo el número
+  const otrasVersiones = COTIZACIONES.filter(c => c.numero === cot.numero);
+  const deleteQuery = sb.from('cotizaciones').delete().eq('numero', cot.numero);
+  if (otrasVersiones.length > 0 && cot.version) {
+    deleteQuery.eq('version', cot.version).then(({ error }) => { if (error) console.error('Error eliminando:', error.message); });
+  } else {
+    deleteQuery.then(({ error }) => { if (error) console.error('Error eliminando:', error.message); });
+  }
+  renderHistorico();
+  renderPipeline();
+  renderEstadisticas();
+}
+
+function abrirModalEstado(id) {
+  document.getElementById('estado-cot-id').value = id;
+  document.getElementById('modal-estado').classList.add('abierto');
+}
+
+function cambiarEstado(estado) {
+  const id = parseInt(document.getElementById('estado-cot-id').value);
+  const cot = COTIZACIONES.find(c => c.id === id);
+  if (cot) {
+    cot.estado = estado;
+    const cotActualizada = { ...cot, estado };
+    sb.from('cotizaciones').upsert({
+      numero: cot.numero,
+      version: cot.version || 'V1',
+      estado,
+      cliente: cot.cliente,
+      items: cot.items,
+      condiciones: cot.condiciones,
+      datos: cotActualizada,
+      modificado: new Date().toISOString()
+    }, { onConflict: 'numero,version' }).then(({ error }) => {
+      if (error) console.error('Error actualizando estado:', error.message);
+    });
+    // Auto-crear Orden de Servicio al aceptar
+    if (estado === 'Aceptada') {
+      const osExistente = ORDENES.find(o => o.cotizacion === cot.numero);
+      if (!osExistente) crearOrdenDesdeCotizacion(cot);
+    }
+  }
+  cerrarModal('modal-estado');
+  renderHistorico();
+  renderPipeline();
+  renderEstadisticas();
+}
+
+function siguienteNumeroOS() {
+  const nums = ORDENES.map(o => parseInt((o.numero || '').replace(/\D/g, '')) || 0);
+  const max = nums.length ? Math.max(...nums) : 0;
+  return 'OS-' + String(max + 1).padStart(4, '0');
+}
+
+function crearOrdenDesdeCotizacion(cot) {
+  const orden = {
+    id: String(Date.now()),
+    numero: siguienteNumeroOS(),
+    cotizacion: cot.numero,
+    versionCotizacion: cot.version || 'V1',
+    cliente: cot.cliente?.nombre || '',
+    clienteData: cot.cliente,
+    descripcion: (cot.items || []).map(i => `${i.nombre} (${i.cantidad} ${i.unidad})`).join(' / '),
+    items: cot.items,
+    transporte: cot.transporte,
+    cargue: cot.cargue,
+    descargue: cot.descargue,
+    condiciones: cot.condiciones,
+    vendedor: cot.vendedor,
+    totales: cot.totales,
+    cantidad: (cot.items || []).reduce((s, i) => s + (i.cantidad || 0), 0),
+    fechaEntrega: '',
+    estado: 'Pendiente',
+    prioridad: 'Normal',
+    observaciones: '',
+    creadoPor: USUARIO_ACTUAL?.email,
+    creadoEn: new Date().toISOString(),
+  };
+  ORDENES.unshift(orden);
+  sb.from('ordenes_servicio').upsert({ numero: orden.numero, datos: orden, modificado: new Date().toISOString() }, { onConflict: 'numero' })
+    .then(({ error }) => { if (error) console.error('Error creando OS:', error.message); });
+}
+
+// ═══════════════════════════════
+// CLIENTES
+// ═══════════════════════════════
+function renderClientes(lista) {
+  const data = lista || CLIENTES;
+  const grid = document.getElementById('grid-clientes');
+  if (!data.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="icono">👥</div><div>No hay clientes registrados aún.</div></div>`;
+    return;
+  }
+  grid.innerHTML = data.map(c => {
+    const numCots = COTIZACIONES.filter(q => q.cliente?.nombre === c.nombre);
+    const latestCots = versionesLatest ? versionesLatest().filter(q => q.cliente?.nombre === c.nombre) : numCots;
+    const cotLabel = latestCots.length ? `📋 ${latestCots.length} cotización${latestCots.length>1?'es':''}` : '📋 Sin cotizaciones';
+    return `
+    <div class="cliente-card">
+      <div class="nombre">${c.nombre}</div>
+      ${c.nit ? `<div class="dato" style="font-size:11px;color:var(--gris-medio)">NIT: ${c.nit}</div>` : ''}
+      ${c.contacto ? `<div class="dato">👤 ${c.contacto}</div>` : ''}
+      ${c.cel ? `<div class="dato">📱 ${c.cel}</div>` : ''}
+      ${c.email ? `<div class="dato">✉️ ${c.email}</div>` : ''}
+      ${c.ciudad ? `<div class="dato">📍 ${c.ciudad}</div>` : ''}
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">
+        <button class="btn btn-primario btn-xs" onclick="usarCliente('${c.id}')">+ Cotizar</button>
+        <button class="btn btn-secundario btn-xs" onclick="editarCliente('${c.id}')">✏️ Editar</button>
+        <button class="btn btn-secundario btn-xs" onclick="verCotizacionesCliente('${c.nombre.replace(/'/g,"\\'")}')">📋 Ver cots.</button>
+        <button class="btn btn-rojo btn-xs" onclick="eliminarCliente('${c.id}')">🗑️</button>
+      </div>
+      ${latestCots.length ? `<div style="font-size:11px;color:var(--gris-medio);margin-top:6px">${cotLabel}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function filtrarClientes(q) {
+  const res = CLIENTES.filter(c =>
+    c.nombre.toLowerCase().includes(q.toLowerCase()) ||
+    (c.contacto||'').toLowerCase().includes(q.toLowerCase())
+  );
+  renderClientes(res);
+}
+
+function abrirModalCliente() {
+  document.getElementById('m-cliente-id').value = '';
+  document.getElementById('modal-cliente-titulo').textContent = '➕ Nuevo Cliente';
+  ['m-cliente-nombre','m-cliente-contacto','m-cliente-cel','m-cliente-email','m-cliente-ciudad','m-cliente-nit']
+    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('modal-cliente').classList.add('abierto');
+}
+
+function editarCliente(id) {
+  const c = CLIENTES.find(cl => String(cl.id) === String(id));
+  if (!c) return;
+  document.getElementById('m-cliente-id').value = c.id;
+  document.getElementById('modal-cliente-titulo').textContent = '✏️ Editar Cliente';
+  document.getElementById('m-cliente-nombre').value = c.nombre || '';
+  document.getElementById('m-cliente-contacto').value = c.contacto || '';
+  document.getElementById('m-cliente-cel').value = c.cel || '';
+  document.getElementById('m-cliente-email').value = c.email || '';
+  document.getElementById('m-cliente-ciudad').value = c.ciudad || '';
+  document.getElementById('m-cliente-nit').value = c.nit || '';
+  document.getElementById('modal-cliente').classList.add('abierto');
+}
+
+function guardarCliente() {
+  const nombre = document.getElementById('m-cliente-nombre').value.trim();
+  if (!nombre) { alert('El nombre es requerido.'); return; }
+  const editId = document.getElementById('m-cliente-id').value;
+  const clienteData = {
+    nombre,
+    contacto: document.getElementById('m-cliente-contacto').value,
+    cel: document.getElementById('m-cliente-cel').value,
+    email: document.getElementById('m-cliente-email').value,
+    ciudad: document.getElementById('m-cliente-ciudad').value,
+    nit: document.getElementById('m-cliente-nit').value,
+  };
+  if (editId) {
+    const idx = CLIENTES.findIndex(c => String(c.id) === String(editId));
+    if (idx >= 0) {
+      const nombreAnterior = CLIENTES[idx].nombre;
+      const clienteActualizado = { ...CLIENTES[idx], ...clienteData };
+      CLIENTES[idx] = clienteActualizado;
+      if (nombreAnterior !== nombre) {
+        // Nombre cambió: borrar registro anterior e insertar nuevo
+        sb.from('clientes').delete().eq('nombre', nombreAnterior).then(() => {
+          sb.from('clientes').insert({ nombre: nombre, datos: clienteActualizado })
+            .then(({ error }) => { if (error) console.error('Error guardando cliente:', error.message); });
+        });
+      } else {
+        // Mismo nombre: actualizar directamente
+        sb.from('clientes').update({ datos: clienteActualizado, modificado: new Date().toISOString() })
+          .eq('nombre', nombreAnterior)
+          .then(({ error }) => { if (error) console.error('Error actualizando cliente:', error.message); });
+      }
+    }
+  } else {
+    const nuevoCliente = { id: Date.now(), ...clienteData };
+    CLIENTES.push(nuevoCliente);
+    sb.from('clientes').insert({ nombre: nuevoCliente.nombre, datos: nuevoCliente })
+      .then(({ error }) => {
+        if (error) {
+          // Si ya existe, actualizar
+          sb.from('clientes').update({ datos: nuevoCliente }).eq('nombre', nuevoCliente.nombre);
+        }
+      });
+  }
+  cerrarModal('modal-cliente');
+  renderClientes();
+}
+
+function verCotizacionesCliente(nombre) {
+  // Ir al histórico con filtro del cliente
+  document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+  document.getElementById('pantalla-historico').classList.add('activa');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('activo'));
+  // Activar botón Histórico
+  document.querySelector('[onclick="ir(\'historico\')"]')?.classList.add('activo');
+  // Aplicar filtro
+  const input = document.querySelector('#pantalla-historico input[type="text"]');
+  if (input) { input.value = nombre; }
+  filtroTexto = nombre.toLowerCase();
+  aplicarFiltros();
+}
+
+function eliminarCliente(id) {
+  if (!confirm('¿Eliminar este cliente?')) return;
+  const cli = CLIENTES.find(c => String(c.id) === String(id));
+  CLIENTES = CLIENTES.filter(c => String(c.id) !== String(id));
+  if (cli) sb.from('clientes').delete().eq('nombre', cli.nombre);
+  renderClientes();
+}
+
+function usarCliente(id) {
+  const c = CLIENTES.find(cl => String(cl.id) === String(id));
+  if (!c) return;
+  document.getElementById('cliente-nombre').value = c.nombre;
+  document.getElementById('cliente-contacto').value = c.contacto || '';
+  document.getElementById('cliente-cel').value = c.cel || '';
+  document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+  document.getElementById('pantalla-nueva-cotizacion').classList.add('activa');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('activo'));
+  document.querySelectorAll('.nav-btn')[0].classList.add('activo');
+}
+
+function buscarClienteEnCot(q) {
+  const div = document.getElementById('lista-clientes-cot');
+  if (!q || q.length < 2) { div.style.display = 'none'; return; }
+  const res = CLIENTES.filter(c => c.nombre.toLowerCase().includes(q.toLowerCase())).slice(0, 8);
+  if (!res.length) { div.style.display = 'none'; return; }
+  div.innerHTML = res.map(c => `
+    <div class="buscador-item" onclick="seleccionarClienteCot(${c.id})">
+      <div class="nombre">${c.nombre}</div>
+      <div class="detalle">${c.contacto||''} ${c.cel ? '· ' + c.cel : ''}</div>
+    </div>`).join('');
+  div.style.display = 'block';
+}
+
+function seleccionarClienteCot(id) {
+  const c = CLIENTES.find(cl => cl.id === id);
+  if (!c) return;
+  document.getElementById('cliente-nombre').value = c.nombre;
+  document.getElementById('cliente-contacto').value = c.contacto || '';
+  document.getElementById('cliente-cel').value = c.cel || '';
+  document.getElementById('cliente-proyecto').value = '';
+  document.getElementById('lista-clientes-cot').style.display = 'none';
+  document.getElementById('buscar-cliente-cot').value = '';
+  document.getElementById('cliente-proyecto').focus();
+}
+
+// ═══════════════════════════════
+// ESTADÍSTICAS
+// ═══════════════════════════════
+let _periodoStats = 'anual';
+
+function setPeriodo(p) {
+  _periodoStats = p;
+  document.getElementById('btn-anual').style.background = p === 'anual' ? 'var(--azul)' : 'white';
+  document.getElementById('btn-anual').style.color = p === 'anual' ? 'white' : 'var(--gris-medio)';
+  document.getElementById('btn-mensual').style.background = p === 'mensual' ? 'var(--azul)' : 'white';
+  document.getElementById('btn-mensual').style.color = p === 'mensual' ? 'white' : 'var(--gris-medio)';
+  document.getElementById('filtro-mes').style.display = p === 'mensual' ? '' : 'none';
+  renderEstadisticas();
+}
+
+function poblarFiltrosEstadisticas() {
+  // Años disponibles
+  const anios = [...new Set(COTIZACIONES.map(c => c.fecha ? c.fecha.substring(0,4) : null).filter(Boolean))].sort().reverse();
+  const selAnio = document.getElementById('filtro-anio');
+  const anioActual = new Date().getFullYear().toString();
+  selAnio.innerHTML = '<option value="">Todos los años</option>' + anios.map(a => `<option value="${a}" ${a === anioActual ? 'selected' : ''}>${a}</option>`).join('');
+
+  // Mes actual por defecto
+  document.getElementById('filtro-mes').value = new Date().getMonth() + 1;
+
+  // Vendedores disponibles
+  const vendedores = [...new Set(COTIZACIONES.map(c => c.vendedor?.nombre).filter(Boolean))].sort();
+  const selVendedor = document.getElementById('filtro-vendedor');
+  selVendedor.innerHTML = '<option value="">Todos los vendedores</option>' + vendedores.map(v => `<option value="${v}">${v}</option>`).join('');
+}
+
+function renderEstadisticas() {
+  const anio = document.getElementById('filtro-anio').value;
+  const mes = document.getElementById('filtro-mes').value;
+  const vendedor = document.getElementById('filtro-vendedor').value;
+
+  let datos = versionesLatest();
+
+  // Filtro por vendedor
+  if (vendedor) datos = datos.filter(c => c.vendedor?.nombre === vendedor);
+
+  // Filtro por período
+  if (anio) {
+    datos = datos.filter(c => c.fecha && c.fecha.startsWith(anio));
+    if (_periodoStats === 'mensual' && mes) {
+      const mesStr = String(mes).padStart(2, '0');
+      datos = datos.filter(c => c.fecha && c.fecha.substring(5, 7) === mesStr);
+    }
+  }
+
+  const total = datos.length;
+  const totalValor = datos.reduce((s, c) => s + (c.totales?.total || 0), 0);
+  const aceptadas = datos.filter(c => c.estado === 'Aceptada').length;
+  const valorAceptado = datos.filter(c => c.estado === 'Aceptada').reduce((s, c) => s + (c.totales?.total || 0), 0);
+  const tasaExito = total > 0 ? Math.round((aceptadas / total) * 100) : 0;
+
+  document.getElementById('stats-cards').innerHTML = `
+    <div class="stat-card"><div class="valor">${total}</div><div class="etiqueta">Total cotizaciones</div></div>
+    <div class="stat-card" style="border-color:var(--verde)"><div class="valor" style="color:var(--verde)">${aceptadas}</div><div class="etiqueta">Aceptadas</div></div>
+    <div class="stat-card" style="border-color:var(--naranja)"><div class="valor" style="color:var(--naranja)">$${(totalValor/1000000).toFixed(1)}M</div><div class="etiqueta">Valor total cotizado</div></div>
+    <div class="stat-card" style="border-color:var(--verde)"><div class="valor" style="color:var(--verde)">$${(valorAceptado/1000000).toFixed(1)}M</div><div class="etiqueta">Valor aceptado</div></div>`;
+
+  const estados = ['Prospecto','Borrador','Enviada','Negociación','Aceptada','Rechazada'];
+  const colores = ['#7B1FA2','#E65100','#1565C0','#F57F17','#2E7D32','#C62828'];
+  const conteos = estados.map(e => datos.filter(c => c.estado === e).length);
+  const ctx = document.getElementById('chart-estados').getContext('2d');
+  if (window._chartEstados) window._chartEstados.destroy();
+  window._chartEstados = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: estados, datasets: [{ data: conteos, backgroundColor: colores, borderWidth: 2 }] },
+    options: { plugins: { legend: { position: 'bottom' } } }
+  });
+
+  const porCliente = {};
+  datos.forEach(c => {
+    const k = c.cliente?.nombre;
+    if (!k) return;
+    if (!porCliente[k]) porCliente[k] = 0;
+    porCliente[k] += (c.totales?.total || 0);
+  });
+  const top = Object.entries(porCliente).sort((a,b) => b[1]-a[1]).slice(0,5);
+  document.getElementById('top-clientes').innerHTML = top.length ? top.map(([n,v],i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gris-claro)">
+      <span style="background:var(--azul);color:white;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">${i+1}</span>
+      <span style="flex:1;font-size:13px">${n}</span>
+      <span style="font-weight:700;color:var(--azul)">$${(v/1000000).toFixed(2)}M</span>
+    </div>`).join('') : '<div class="empty-state">Sin datos aún</div>';
+}
+
+// ═══════════════════════════════
+// PIPELINE KANBAN
+// ═══════════════════════════════
+const COLUMNAS = [
+  { id: 'Prospecto',   label: 'Prospecto',    color: '#7B1FA2', bg: '#F3E5F5' },
+  { id: 'Borrador',    label: 'Cotizado',     color: '#E65100', bg: '#FFF3E0' },
+  { id: 'Enviada',     label: 'Enviada',      color: '#1565C0', bg: '#E3F2FD' },
+  { id: 'Negociación', label: 'Negociación',  color: '#F57F17', bg: '#FFF8E1' },
+  { id: 'Aceptada',    label: 'Aceptada',     color: '#2E7D32', bg: '#E8F5E9' },
+  { id: 'Rechazada',   label: 'Rechazada',    color: '#C62828', bg: '#FFEBEE' },
+];
+
+let dragId = null;
+
+function versionesLatest() {
+  const map = {};
+  COTIZACIONES.forEach(c => {
+    const n = parseInt((c.version||'V1').replace(/\D/g,'')) || 1;
+    if (!map[c.numero] || n > (parseInt((map[c.numero].version||'V1').replace(/\D/g,''))||1)) map[c.numero] = c;
+  });
+  return Object.values(map);
+}
+
+function renderPipeline() {
+  const board = document.getElementById('kanban-board');
+  const resumen = document.getElementById('pipeline-resumen');
+  const latest = versionesLatest();
+
+  board.innerHTML = COLUMNAS.map(col => {
+    const cards = latest.filter(c => c.estado === col.id);
+    const totalCol = cards.reduce((s, c) => s + c.totales.total, 0);
+    const cardsHTML = cards.length
+      ? cards.map(c => `
+          <div class="kanban-card" draggable="true"
+               style="border-left-color:${col.color}"
+               data-id="${c.id}"
+               ondragstart="onDragStart(event)"
+               ondragend="onDragEnd(event)">
+            <div class="kc-num">${c.numero} ${c.version||''}</div>
+            <div class="kc-cliente">${c.cliente.nombre}</div>
+            <div class="kc-proyecto">${c.cliente.proyecto || '—'}</div>
+            <div class="kc-total">$${c.totales.total.toLocaleString()}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+              <div class="kc-fecha">${new Date(c.fecha+'T12:00').toLocaleDateString('es-CO',{day:'2-digit',month:'short'})}</div>
+              <button class="btn btn-primario btn-xs" onclick="cargarCotizacion(${c.id})">✏️</button>
+            </div>
+          </div>`).join('')
+      : `<div class="kanban-drop-hint">Arrastra aquí</div>`;
+
+    return `
+      <div class="kanban-col">
+        <div class="kanban-col-header" style="background:${col.bg};color:${col.color}">
+          <span class="col-titulo">${col.label}</span>
+          <span class="col-count">${cards.length}</span>
+        </div>
+        <div class="kanban-col-body"
+             data-estado="${col.id}"
+             ondragover="onDragOver(event)"
+             ondragleave="onDragLeave(event)"
+             ondrop="onDrop(event)">
+          ${cardsHTML}
+        </div>
+      </div>`;
+  }).join('');
+
+  // Resumen de valores por columna
+  resumen.innerHTML = COLUMNAS.map(col => {
+    const cards = COTIZACIONES.filter(c => c.estado === col.id);
+    const total = cards.reduce((s, c) => s + c.totales.total, 0);
+    if (!cards.length) return '';
+    return `<div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid ${col.color};min-width:130px">
+      <div style="font-size:10px;font-weight:700;color:${col.color};text-transform:uppercase">${col.label}</div>
+      <div style="font-size:15px;font-weight:700;color:var(--gris-oscuro)">$${(total/1000000).toFixed(1)}M</div>
+      <div style="font-size:11px;color:var(--gris-medio)">${cards.length} cotización${cards.length>1?'es':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function onDragStart(e) {
+  dragId = parseInt(e.currentTarget.dataset.id);
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.kanban-col-body').forEach(c => c.classList.remove('drag-over'));
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+}
+
+function onDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const nuevoEstado = e.currentTarget.dataset.estado;
+  const cot = COTIZACIONES.find(c => c.id === dragId);
+  if (cot && cot.estado !== nuevoEstado) {
+    cot.estado = nuevoEstado;
+    const cotActualizada = { ...cot, estado: nuevoEstado };
+    sb.from('cotizaciones').upsert({
+      numero: cot.numero,
+      version: cot.version || 'V1',
+      estado: nuevoEstado,
+      cliente: cot.cliente,
+      items: cot.items,
+      condiciones: cot.condiciones,
+      datos: cotActualizada,
+      modificado: new Date().toISOString()
+    }, { onConflict: 'numero,version' }).then(({ error }) => {
+      if (error) console.error('Error actualizando estado pipeline:', error.message);
+    });
+    renderHistorico();
+    renderEstadisticas();
+  }
+  dragId = null;
+  renderPipeline();
+}
+
+// ═══════════════════════════════
+// PIPELINE PRODUCCIÓN
+// ═══════════════════════════════
+const COLUMNAS_OS = [
+  { id: 'Pendiente',     label: 'Pendiente',     color: '#E65100', bg: '#FFF3E0' },
+  { id: 'En producción', label: 'En producción', color: '#1565C0', bg: '#E3F2FD' },
+  { id: 'Listo',         label: 'Listo',          color: '#2E7D32', bg: '#E8F5E9' },
+  { id: 'Despachado',    label: 'Despachado',     color: '#00695C', bg: '#E0F2F1' },
+  { id: 'Cancelado',     label: 'Cancelado',      color: '#C62828', bg: '#FFEBEE' },
+];
+
+let dragOSId = null;
+
+function renderPipelineProduccion() {
+  const board = document.getElementById('kanban-board-prod');
+  const resumen = document.getElementById('pipeline-prod-resumen');
+  board.innerHTML = COLUMNAS_OS.map(col => {
+    const cards = ORDENES.filter(o => o.estado === col.id);
+    const cardsHTML = cards.length
+      ? cards.map(o => `
+          <div class="kanban-card" draggable="true"
+               style="border-left-color:${col.color}"
+               data-os-id="${o.id}"
+               ondragstart="onDragStartOS(event)"
+               ondragend="onDragEndOS(event)">
+            <div class="kc-num">${o.numero}</div>
+            <div class="kc-cliente">${o.cliente}</div>
+            <div class="kc-proyecto" style="font-size:11px;color:var(--gris-medio);margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${o.descripcion}">${o.descripcion}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+              <div class="kc-fecha">${o.fechaEntrega ? new Date(o.fechaEntrega+'T12:00').toLocaleDateString('es-CO',{day:'2-digit',month:'short'}) : '—'}</div>
+              <button class="btn btn-primario btn-xs" onclick="editarOrden('${o.id}')">✏️</button>
+            </div>
+          </div>`).join('')
+      : `<div class="kanban-drop-hint">Arrastra aquí</div>`;
+    return `
+      <div class="kanban-col">
+        <div class="kanban-col-header" style="background:${col.bg};color:${col.color}">
+          <span class="col-titulo">${col.label}</span>
+          <span class="col-count">${cards.length}</span>
+        </div>
+        <div class="kanban-col-body"
+             data-os-estado="${col.id}"
+             ondragover="onDragOverOS(event)"
+             ondragleave="onDragLeaveOS(event)"
+             ondrop="onDropOS(event)">
+          ${cardsHTML}
+        </div>
+      </div>`;
+  }).join('');
+
+  resumen.innerHTML = COLUMNAS_OS.map(col => {
+    const count = ORDENES.filter(o => o.estado === col.id).length;
+    if (!count) return '';
+    return `<div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid ${col.color};min-width:130px">
+      <div style="font-size:10px;font-weight:700;color:${col.color};text-transform:uppercase">${col.label}</div>
+      <div style="font-size:15px;font-weight:700;color:var(--gris-oscuro)">${count}</div>
+      <div style="font-size:11px;color:var(--gris-medio)">orden${count>1?'es':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function onDragStartOS(e) {
+  dragOSId = e.currentTarget.dataset.osId;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onDragEndOS(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.kanban-col-body').forEach(c => c.classList.remove('drag-over'));
+}
+function onDragOverOS(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+}
+function onDragLeaveOS(e) { e.currentTarget.classList.remove('drag-over'); }
+function onDropOS(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const nuevoEstado = e.currentTarget.dataset.osEstado;
+  cambiarEstadoOrden(dragOSId, nuevoEstado, true);
+  dragOSId = null;
+}
+
+function abrirModalEstadoOS(id) {
+  document.getElementById('estado-os-id').value = id;
+  document.getElementById('modal-estado-os').classList.add('abierto');
+}
+
+function aplicarEstadoOrden(nuevoEstado) {
+  const id = document.getElementById('estado-os-id').value;
+  cerrarModal('modal-estado-os');
+  cambiarEstadoOrden(id, nuevoEstado);
+}
+
+function cambiarEstadoOrden(id, nuevoEstado, fromDrop) {
+  const idx = ORDENES.findIndex(o => String(o.id) === String(id));
+  if (idx < 0) return;
+  ORDENES[idx] = { ...ORDENES[idx], estado: nuevoEstado };
+  const o = ORDENES[idx];
+  sb.from('ordenes_servicio').upsert({ numero: o.numero, datos: o, modificado: new Date().toISOString() }, { onConflict: 'numero' })
+    .then(({ error }) => { if (error) console.error('Error cambiando estado OS:', error.message); });
+  if (fromDrop) renderPipelineProduccion();
+  // re-render tabla si está visible
+  if (document.getElementById('pantalla-ordenes-servicio')?.classList.contains('activa')) renderOrdenes();
+}
+
+// ═══════════════════════════════
+// MODALES
+// ═══════════════════════════════
+function cerrarModal(id) { document.getElementById(id).classList.remove('abierto'); }
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('abierto'); });
+});
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+async function descargarPDF(numCot) {
+  const btn = document.querySelector('button[onclick*="descargarPDF"]');
+  if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const pageW = 210, pageH = 297; // A4 en mm
+
+    // Cargar imagen de cabecera
+    const topImg = await cargarImagen('membrete-top.jpg');
+    const headerH = pageW * (topImg.naturalHeight / topImg.naturalWidth);
+
+    // Renderizar cabecera del documento y contenido
+    const contentEl = document.querySelector('.preview-content');
+    const contentCanvas = await html2canvas(contentEl, {
+      scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false
+    });
+    const pxToMm = pageW / contentCanvas.width;
+    const contentTotalH = contentCanvas.height * pxToMm;
+
+    // Renderizar pie
+    const footerEl = document.querySelector('.preview-membrete-footer');
+    const footerCanvas = await html2canvas(footerEl, {
+      scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false
+    });
+    const footerH = footerCanvas.height * pxToMm;
+
+    // Área de contenido disponible por página
+    const availH = pageH - headerH - footerH - 6;
+    const numPages = Math.ceil(contentTotalH / availH);
+
+    const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    const footerData = footerCanvas.toDataURL('image/jpeg', 0.95);
+
+    for (let i = 0; i < numPages; i++) {
+      if (i > 0) pdf.addPage();
+
+      // Cabecera en cada página
+      pdf.addImage(topImg, 'JPEG', 0, 0, pageW, headerH);
+
+      // Slice de contenido para esta página
+      const sliceY_px = i * (availH / pxToMm);
+      const sliceH_px = Math.min(availH / pxToMm, contentCanvas.height - sliceY_px);
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = contentCanvas.width;
+      sliceCanvas.height = Math.ceil(sliceH_px);
+      sliceCanvas.getContext('2d').drawImage(
+        contentCanvas, 0, Math.floor(sliceY_px),
+        contentCanvas.width, Math.ceil(sliceH_px),
+        0, 0, contentCanvas.width, Math.ceil(sliceH_px)
+      );
+      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.95), 'JPEG',
+        0, headerH + 2, pageW, sliceH_px * pxToMm);
+
+      // Pie en cada página
+      pdf.addImage(footerData, 'JPEG', 0, pageH - footerH, pageW, footerH);
+    }
+
+    const cot = COTIZACIONES.find(c => c.numero === numCot);
+    const fecha = (cot?.fecha || document.getElementById('fecha-cot').value || new Date().toISOString().split('T')[0]).replace(/-/g, '_');
+    const nombreCliente = cot?.cliente?.nombre || document.getElementById('cliente-nombre').value || '';
+    const cliente = nombreCliente.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '_');
+    pdf.save(`${numCot}_${fecha}_${cliente}.pdf`);
+  } finally {
+    if (btn) { btn.textContent = '⬇️ Descargar PDF'; btn.disabled = false; }
+  }
+}
+
+function cargarImagen(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src + '?t=' + Date.now();
+  });
+}
+</script>
+</body>
+</html>
