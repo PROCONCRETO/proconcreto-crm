@@ -346,7 +346,9 @@
 
 <nav class="nav" id="subnav-produccion" style="display:none">
   <button class="nav-btn" onclick="ir('pipeline-produccion')">🗂️ Pipeline</button>
-  <button class="nav-btn activo" onclick="ir('ordenes-servicio')">📝 Órdenes de Servicio</button>
+  <button class="nav-btn activo" onclick="ir('ordenes-servicio')">📝 Órdenes de Producción</button>
+  <button class="nav-btn" onclick="ir('produccion-diaria')">📅 Producción Diaria</button>
+  <button class="nav-btn" onclick="ir('inventario')">📦 Inventario</button>
 </nav>
 
 <!-- ═══════════════════════════════════════
@@ -607,7 +609,7 @@
           <th>PROYECTO</th>
           <th>TOTAL</th>
           <th>ESTADO</th>
-          <th>ACCIONES</th>
+          <th style="min-width:260px">ACCIONES</th>
         </tr>
       </thead>
       <tbody id="historico-body">
@@ -689,36 +691,141 @@
 ═══════════════════════════════════════ -->
 <div id="pantalla-ordenes-servicio" class="pantalla">
   <div class="acciones-row">
-    <div style="font-size:18px;font-weight:700;color:var(--azul)">Órdenes de Servicio</div>
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Órdenes de Producción</div>
     <div class="flex-gap">
       <input type="text" class="buscador-input" placeholder="🔍 Buscar orden..." oninput="filtrarOrdenes(this.value)">
       <button class="btn btn-primario" onclick="abrirModalOrden()">+ Nueva Orden</button>
     </div>
   </div>
-  <div style="overflow-x:auto">
-    <table class="tabla-historico" style="width:100%;border-collapse:collapse">
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" id="tabla-ordenes">
       <thead>
-        <tr style="background:var(--azul-oscuro);color:white;font-size:12px">
-          <th style="padding:10px 12px;text-align:left">N° Orden</th>
-          <th style="padding:10px 12px;text-align:left">Cotización</th>
-          <th style="padding:10px 12px;text-align:left">Cliente</th>
-          <th style="padding:10px 12px;text-align:left">Producto / Descripción</th>
-          <th style="padding:10px 12px;text-align:left">Cantidad</th>
-          <th style="padding:10px 12px;text-align:left">Fecha entrega</th>
-          <th style="padding:10px 12px;text-align:left">Estado</th>
-          <th style="padding:10px 12px;text-align:left">Acciones</th>
+        <tr>
+          <th>N° ORDEN</th>
+          <th>COTIZACIÓN</th>
+          <th>CLIENTE</th>
+          <th>PRODUCTO / DESCRIPCIÓN</th>
+          <th>FECHA ENTREGA</th>
+          <th>ESTADO</th>
+          <th style="min-width:260px">ACCIONES</th>
         </tr>
       </thead>
       <tbody id="ordenes-body">
-        <tr><td colspan="8" class="empty-state"><div class="icono">📝</div><div>No hay órdenes de servicio registradas.</div></td></tr>
+        <tr><td colspan="7" class="empty-state"><div class="icono">📝</div><div>No hay órdenes de producción registradas.</div></td></tr>
       </tbody>
     </table>
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════
+     PANTALLA: PRODUCCIÓN DIARIA
+═══════════════════════════════════════ -->
+<div id="pantalla-produccion-diaria" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Registro de Producción Diaria</div>
+    <div class="flex-gap">
+      <input type="date" id="filtro-fecha-prod" class="buscador-input" style="width:auto" onchange="renderProduccionDiaria()" title="Filtrar por fecha">
+      <input type="text" id="buscar-produccion" class="buscador-input" placeholder="🔍 Buscar producto..." oninput="renderProduccionDiaria()">
+      <button class="btn btn-primario" onclick="abrirModalProduccion()">+ Registrar Producción</button>
+    </div>
+  </div>
+  <div id="prod-diaria-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" id="tabla-produccion">
+      <thead>
+        <tr>
+          <th>FECHA</th>
+          <th>PRODUCTO</th>
+          <th>CANTIDAD</th>
+          <th>ORDEN PROD.</th>
+          <th>RESPONSABLE</th>
+          <th>OBSERVACIONES</th>
+          <th style="min-width:150px">ACCIONES</th>
+        </tr>
+      </thead>
+      <tbody id="produccion-body">
+        <tr><td colspan="7" class="empty-state"><div class="icono">📅</div><div>No hay producciones registradas.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: INVENTARIO PRODUCTO TERMINADO
+═══════════════════════════════════════ -->
+<div id="pantalla-inventario" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Inventario de Producto Terminado</div>
+    <div class="flex-gap">
+      <select id="filtro-grupo-inv" class="buscador-input" style="width:auto" onchange="renderInventario()">
+        <option value="">Todos los grupos</option>
+      </select>
+      <input type="text" id="buscar-inventario" class="buscador-input" placeholder="🔍 Buscar producto..." oninput="renderInventario()">
+    </div>
+  </div>
+  <div id="inv-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" id="tabla-inventario">
+      <thead>
+        <tr>
+          <th>PRODUCTO</th>
+          <th>GRUPO</th>
+          <th>UNID.</th>
+          <th style="text-align:right">PRODUCIDO</th>
+          <th style="text-align:right">DESPACHADO</th>
+          <th style="text-align:right">EN INVENTARIO</th>
+          <th>ÚLTIMA PROD.</th>
+        </tr>
+      </thead>
+      <tbody id="inventario-body">
+        <tr><td colspan="7" class="empty-state"><div class="icono">📦</div><div>Sin existencias registradas. Registra producciones diarias para alimentar el inventario.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-produccion">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-titulo" id="modal-produccion-titulo">📅 Registrar Producción</div>
+    <input type="hidden" id="m-prod-id">
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo">
+        <label>Fecha *</label>
+        <input type="date" id="m-prod-fecha">
+      </div>
+      <div class="form-grupo">
+        <label>Cantidad producida *</label>
+        <input type="number" id="m-prod-cantidad" placeholder="0" min="0">
+      </div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px">
+      <label>Producto *</label>
+      <select id="m-prod-producto" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px">
+      <label>Orden de producción asociada</label>
+      <select id="m-prod-orden" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <option value="">— Sin orden asociada —</option>
+      </select>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px">
+      <label>Responsable / Turno</label>
+      <input type="text" id="m-prod-responsable" placeholder="Nombre del responsable">
+    </div>
+    <div class="form-grupo" style="margin-bottom:16px">
+      <label>Observaciones</label>
+      <textarea id="m-prod-obs" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical" placeholder="Notas (lote, defectos, etc.)"></textarea>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-produccion')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarProduccion()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-orden">
   <div class="modal" style="max-width:560px">
-    <div class="modal-titulo" id="modal-orden-titulo">📝 Nueva Orden de Servicio</div>
+    <div class="modal-titulo" id="modal-orden-titulo">📝 Nueva Orden de Producción</div>
     <input type="hidden" id="m-orden-id">
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo">
@@ -1168,6 +1275,9 @@ function ir(pantalla) {
   event.currentTarget.classList.add('activo');
   if (pantalla === 'pipeline') renderPipeline();
   if (pantalla === 'pipeline-produccion') renderPipelineProduccion();
+  if (pantalla === 'ordenes-servicio') renderOrdenes();
+  if (pantalla === 'produccion-diaria') renderProduccionDiaria();
+  if (pantalla === 'inventario') renderInventario();
   if (pantalla === 'historico') renderHistorico();
   if (pantalla === 'clientes') renderClientes();
   if (pantalla === 'estadisticas') { poblarFiltrosEstadisticas(); renderEstadisticas(); }
@@ -1188,27 +1298,31 @@ function renderOrdenes(lista) {
   const data = lista !== undefined ? lista : ORDENES;
   const tbody = document.getElementById('ordenes-body');
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">📝</div><div>No hay órdenes de servicio registradas.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">📝</div><div>No hay órdenes de servicio registradas.</div></td></tr>`;
     return;
   }
   const colorOS = { 'Pendiente':'#E65100', 'En producción':'#1565C0', 'Listo':'#2E7D32', 'Despachado':'#00695C', 'Cancelado':'#C62828' };
   const bgOS =    { 'Pendiente':'#FFF3E0', 'En producción':'#E3F2FD', 'Listo':'#E8F5E9', 'Despachado':'#E0F2F1', 'Cancelado':'#FFEBEE' };
   tbody.innerHTML = data.map(o => `
-    <tr style="border-bottom:1px solid var(--gris-borde);font-size:13px">
-      <td style="padding:10px 12px;font-weight:700;color:var(--azul)">${o.numero}</td>
-      <td style="padding:10px 12px">
-        ${o.cotizacion ? `<span style="font-weight:600;color:var(--azul)">${o.cotizacion}</span> <span style="font-size:11px;color:var(--gris-medio)">${o.versionCotizacion||''}</span>` : '—'}
+    <tr style="border-top:2px solid var(--azul-oscuro)">
+      <td>
+        <div style="font-weight:700;color:var(--azul);display:flex;align-items:center;gap:6px">
+          ${o.numero}
+        </div>
       </td>
-      <td style="padding:10px 12px;font-weight:600">${o.cliente}</td>
-      <td style="padding:10px 12px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${o.descripcion}">${o.descripcion}</td>
-      <td style="padding:10px 12px">${o.fechaEntrega ? new Date(o.fechaEntrega+'T12:00').toLocaleDateString('es-CO') : '—'}</td>
-      <td style="padding:8px 12px">
-        <button onclick="abrirModalEstadoOS('${o.id}')"
-          style="padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600;border:none;background:${bgOS[o.estado]||'#eee'};color:${colorOS[o.estado]||'#333'};cursor:pointer">
+      <td>
+        ${o.cotizacion ? `<span style="font-weight:600;color:var(--azul)">${o.cotizacion}</span> <span style="font-size:11px;background:var(--gris-borde);color:var(--gris-texto);padding:2px 6px;border-radius:3px;font-weight:600">${o.versionCotizacion||''}</span>` : '—'}
+      </td>
+      <td style="font-weight:600">${o.cliente}</td>
+      <td style="color:var(--gris-medio);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${o.descripcion}">${o.descripcion}</td>
+      <td>${o.fechaEntrega ? new Date(o.fechaEntrega+'T12:00').toLocaleDateString('es-CO') : '—'}</td>
+      <td>
+        <button class="badge" onclick="abrirModalEstadoOS('${o.id}')"
+          style="border:none;cursor:pointer;background:${bgOS[o.estado]||'#eee'};color:${colorOS[o.estado]||'#333'}">
           ${o.estado}
         </button>
       </td>
-      <td style="padding:10px 12px">
+      <td>
         <div class="flex-gap">
           <button class="btn btn-primario btn-xs" onclick="editarOrden('${o.id}')">✏️ Editar</button>
           <button class="btn btn-secundario btn-xs" onclick="verPDFOrden('${o.id}')">📄 PDF</button>
@@ -1229,7 +1343,7 @@ function filtrarOrdenes(q) {
 
 function abrirModalOrden() {
   document.getElementById('m-orden-id').value = '';
-  document.getElementById('modal-orden-titulo').textContent = '📝 Nueva Orden de Servicio';
+  document.getElementById('modal-orden-titulo').textContent = '📝 Nueva Orden de Producción';
   ['m-orden-num','m-orden-cot','m-orden-cliente','m-orden-descripcion','m-orden-cantidad','m-orden-obs'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('m-orden-fecha').value = '';
   document.getElementById('m-orden-estado').value = 'Pendiente';
@@ -1240,7 +1354,7 @@ function editarOrden(id) {
   const o = ORDENES.find(x => String(x.id) === String(id));
   if (!o) return;
   document.getElementById('m-orden-id').value = o.id;
-  document.getElementById('modal-orden-titulo').textContent = '✏️ Editar Orden de Servicio';
+  document.getElementById('modal-orden-titulo').textContent = '✏️ Editar Orden de Producción';
   document.getElementById('m-orden-num').value = o.numero || '';
   document.getElementById('m-orden-cot').value = o.cotizacion || '';
   document.getElementById('m-orden-cliente').value = o.cliente || '';
@@ -1278,7 +1392,7 @@ function guardarOrden() {
 
 function irAOrdenDeCotizacion(numeroCot) {
   const os = ORDENES.find(o => o.cotizacion === numeroCot);
-  if (!os) { alert('No se encontró la Orden de Servicio para esta cotización.'); return; }
+  if (!os) { alert('No se encontró la Orden de Producción para esta cotización.'); return; }
   document.querySelectorAll('.nav-modulo').forEach(b => b.classList.remove('activo'));
   document.querySelector('[onclick="activarModulo(\'produccion\')"]')?.classList.add('activo');
   document.getElementById('subnav-cotizaciones').style.display = 'none';
@@ -1312,7 +1426,7 @@ function verPDFOrden(id) {
     <div style="background:#001F3F;color:white;padding:18px 24px;display:flex;align-items:center;justify-content:space-between">
       <div>
         <div style="font-size:17px;font-weight:700">Proconcreto Prefabricados</div>
-        <div style="font-size:11px;opacity:0.6;margin-top:2px">ORDEN DE SERVICIO</div>
+        <div style="font-size:11px;opacity:0.6;margin-top:2px">ORDEN DE PRODUCCIÓN</div>
       </div>
       <div style="background:#1D9E75;padding:8px 16px;border-radius:6px;text-align:right">
         <div style="font-size:20px;font-weight:700">${o.numero}</div>
@@ -1402,7 +1516,7 @@ function verPDFOrden(id) {
   const vistaPrevia = document.getElementById('vista-previa');
   document.getElementById('contenido-preview').innerHTML = `
     <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
-      <span style="font-weight:700">Orden de Servicio — ${o.numero}</span>
+      <span style="font-weight:700">Orden de Producción — ${o.numero}</span>
       <div style="flex:1"></div>
       <button onclick="descargarPDFOrden('${o.id}')" style="background:#1D9E75;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-os">⬇️ Descargar PDF</button>
       <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-ordenes-servicio').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
@@ -1455,6 +1569,243 @@ function eliminarOrden(id) {
         renderOrdenes();
       }
     });
+}
+
+// ═══════════════════════════════
+// PRODUCCIÓN DIARIA
+// ═══════════════════════════════
+let PRODUCCIONES = [];
+
+function renderProduccionDiaria() {
+  const tbody = document.getElementById('produccion-body');
+  const resumen = document.getElementById('prod-diaria-resumen');
+  const q = (document.getElementById('buscar-produccion')?.value || '').toLowerCase();
+  const fFecha = document.getElementById('filtro-fecha-prod')?.value || '';
+
+  let data = [...PRODUCCIONES];
+  if (fFecha) data = data.filter(p => p.fecha === fFecha);
+  if (q) data = data.filter(p => (p.producto || '').toLowerCase().includes(q) || (p.responsable || '').toLowerCase().includes(q));
+  // Orden: más reciente primero
+  data.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.creadoEn || '').localeCompare(a.creadoEn || ''));
+
+  // Resumen
+  const hoy = new Date().toISOString().split('T')[0];
+  const totalHoy = PRODUCCIONES.filter(p => p.fecha === hoy).reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
+  const totalMostrado = data.reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
+  resumen.innerHTML = `
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--verde);min-width:140px">
+      <div style="font-size:10px;font-weight:700;color:var(--verde);text-transform:uppercase">Producido hoy</div>
+      <div style="font-size:18px;font-weight:800;color:var(--gris-oscuro)">${totalHoy.toLocaleString()} ud</div>
+    </div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--azul);min-width:140px">
+      <div style="font-size:10px;font-weight:700;color:var(--azul);text-transform:uppercase">${fFecha || q ? 'Filtrado' : 'Total registros'}</div>
+      <div style="font-size:18px;font-weight:800;color:var(--gris-oscuro)">${totalMostrado.toLocaleString()} ud</div>
+      <div style="font-size:11px;color:var(--gris-medio)">${data.length} registro${data.length===1?'':'s'}</div>
+    </div>`;
+
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">📅</div><div>No hay producciones registradas${fFecha||q?' para este filtro':''}.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(p => `
+    <tr style="border-top:2px solid var(--azul-oscuro)">
+      <td style="font-weight:600">${p.fecha ? new Date(p.fecha+'T12:00').toLocaleDateString('es-CO') : '—'}</td>
+      <td style="font-weight:600;color:var(--azul)">${p.producto || '—'}</td>
+      <td style="font-weight:700">${(Number(p.cantidad)||0).toLocaleString()} <span style="font-size:11px;color:var(--gris-medio);font-weight:400">${p.unidad||'ud'}</span></td>
+      <td>${p.orden ? `<span style="font-size:11px;background:#E3F2FD;color:#1565C0;padding:2px 6px;border-radius:3px;font-weight:600">${p.orden}</span>` : '—'}</td>
+      <td>${p.responsable || '—'}</td>
+      <td style="color:var(--gris-medio);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${p.observaciones||''}">${p.observaciones || '—'}</td>
+      <td>
+        <div class="flex-gap">
+          <button class="btn btn-primario btn-xs" onclick="editarProduccion('${p.id}')">✏️ Editar</button>
+          <button class="btn btn-rojo btn-xs" onclick="eliminarProduccion('${p.id}')">🗑️</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function poblarSelectProductos() {
+  const sel = document.getElementById('m-prod-producto');
+  if (!sel) return;
+  // Agrupar productos por grupo
+  const grupos = {};
+  PRODUCTOS.forEach(p => { (grupos[p.grupo] = grupos[p.grupo] || []).push(p); });
+  let html = '<option value="">— Selecciona un producto —</option>';
+  Object.keys(grupos).sort().forEach(g => {
+    html += `<optgroup label="${g}">`;
+    grupos[g].forEach(p => {
+      html += `<option value="${p.nombre}" data-unidad="${p.unidad}">${p.nombre}</option>`;
+    });
+    html += '</optgroup>';
+  });
+  sel.innerHTML = html;
+}
+
+function poblarSelectOrdenesProd() {
+  const sel = document.getElementById('m-prod-orden');
+  if (!sel) return;
+  let html = '<option value="">— Sin orden asociada —</option>';
+  ORDENES.filter(o => o.estado !== 'Despachado' && o.estado !== 'Cancelado')
+    .forEach(o => { html += `<option value="${o.numero}">${o.numero} — ${o.cliente||''}</option>`; });
+  sel.innerHTML = html;
+}
+
+function abrirModalProduccion() {
+  document.getElementById('m-prod-id').value = '';
+  document.getElementById('modal-produccion-titulo').textContent = '📅 Registrar Producción';
+  poblarSelectProductos();
+  poblarSelectOrdenesProd();
+  document.getElementById('m-prod-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('m-prod-cantidad').value = '';
+  document.getElementById('m-prod-producto').value = '';
+  document.getElementById('m-prod-orden').value = '';
+  const perfil = USUARIOS_CRM[USUARIO_ACTUAL?.email];
+  document.getElementById('m-prod-responsable').value = perfil?.nombre || '';
+  document.getElementById('m-prod-obs').value = '';
+  document.getElementById('modal-produccion').classList.add('abierto');
+}
+
+function editarProduccion(id) {
+  const p = PRODUCCIONES.find(x => String(x.id) === String(id));
+  if (!p) return;
+  document.getElementById('m-prod-id').value = p.id;
+  document.getElementById('modal-produccion-titulo').textContent = '✏️ Editar Producción';
+  poblarSelectProductos();
+  poblarSelectOrdenesProd();
+  document.getElementById('m-prod-fecha').value = p.fecha || '';
+  document.getElementById('m-prod-cantidad').value = p.cantidad || '';
+  document.getElementById('m-prod-producto').value = p.producto || '';
+  // Si la orden asociada ya no está en la lista activa, agregarla
+  if (p.orden && !document.querySelector(`#m-prod-orden option[value="${p.orden}"]`)) {
+    const opt = document.createElement('option'); opt.value = p.orden; opt.textContent = p.orden; document.getElementById('m-prod-orden').appendChild(opt);
+  }
+  document.getElementById('m-prod-orden').value = p.orden || '';
+  document.getElementById('m-prod-responsable').value = p.responsable || '';
+  document.getElementById('m-prod-obs').value = p.observaciones || '';
+  document.getElementById('modal-produccion').classList.add('abierto');
+}
+
+function guardarProduccion() {
+  const fecha = document.getElementById('m-prod-fecha').value;
+  const producto = document.getElementById('m-prod-producto').value;
+  const cantidad = parseFloat(document.getElementById('m-prod-cantidad').value);
+  if (!fecha || !producto || !(cantidad > 0)) { alert('Completa los campos obligatorios: Fecha, Producto y Cantidad (mayor a 0).'); return; }
+  const prodCat = PRODUCTOS.find(p => p.nombre === producto);
+  const editId = document.getElementById('m-prod-id').value;
+  const reg = {
+    id: editId || String(Date.now()),
+    fecha,
+    producto,
+    unidad: prodCat?.unidad || 'ud',
+    grupo: prodCat?.grupo || '',
+    cantidad,
+    orden: document.getElementById('m-prod-orden').value,
+    responsable: document.getElementById('m-prod-responsable').value.trim(),
+    observaciones: document.getElementById('m-prod-obs').value.trim(),
+    creadoPor: USUARIO_ACTUAL?.email,
+    creadoEn: editId ? (PRODUCCIONES.find(x => String(x.id) === String(editId))?.creadoEn || new Date().toISOString()) : new Date().toISOString(),
+  };
+  const idx = PRODUCCIONES.findIndex(x => String(x.id) === String(reg.id));
+  if (idx >= 0) PRODUCCIONES[idx] = reg; else PRODUCCIONES.unshift(reg);
+  sb.from('producciones').upsert({ id: reg.id, datos: reg, modificado: new Date().toISOString() }, { onConflict: 'id' })
+    .then(({ error }) => { if (error) console.error('Error guardando producción:', error.message); });
+  cerrarModal('modal-produccion');
+  renderProduccionDiaria();
+}
+
+function eliminarProduccion(id) {
+  const p = PRODUCCIONES.find(x => String(x.id) === String(id));
+  if (!p || !confirm(`¿Eliminar el registro de producción de ${p.producto} (${p.cantidad} ${p.unidad||'ud'})?`)) return;
+  PRODUCCIONES = PRODUCCIONES.filter(x => String(x.id) !== String(id));
+  renderProduccionDiaria();
+  sb.from('producciones').delete().eq('id', p.id)
+    .then(({ error }) => {
+      if (error) {
+        console.error('Error eliminando producción:', error.message);
+        alert('Error al eliminar el registro: ' + error.message);
+        PRODUCCIONES.push(p);
+        renderProduccionDiaria();
+      }
+    });
+}
+
+// ═══════════════════════════════
+// INVENTARIO DE PRODUCTO TERMINADO
+// ═══════════════════════════════
+function calcularInventario() {
+  // Producido: suma de producciones diarias por producto
+  const inv = {};
+  PRODUCCIONES.forEach(p => {
+    const k = p.producto;
+    if (!k) return;
+    if (!inv[k]) {
+      const cat = PRODUCTOS.find(x => x.nombre === k);
+      inv[k] = { producto: k, grupo: p.grupo || cat?.grupo || '—', unidad: p.unidad || cat?.unidad || 'ud', producido: 0, despachado: 0, ultima: '' };
+    }
+    inv[k].producido += Number(p.cantidad) || 0;
+    if ((p.fecha || '') > inv[k].ultima) inv[k].ultima = p.fecha || '';
+  });
+  // Despachado: ítems de órdenes en estado "Despachado"
+  ORDENES.filter(o => o.estado === 'Despachado').forEach(o => {
+    (o.items || []).forEach(it => {
+      const k = it.nombre;
+      if (!k || !inv[k]) return; // solo descontar si el producto existe en inventario
+      inv[k].despachado += Number(it.cantidad) || 0;
+    });
+  });
+  return Object.values(inv).map(r => ({ ...r, enInventario: r.producido - r.despachado }));
+}
+
+function poblarFiltroGrupoInv() {
+  const sel = document.getElementById('filtro-grupo-inv');
+  if (!sel) return;
+  const actual = sel.value;
+  const grupos = [...new Set(calcularInventario().map(r => r.grupo))].filter(Boolean).sort();
+  sel.innerHTML = '<option value="">Todos los grupos</option>' + grupos.map(g => `<option value="${g}">${g}</option>`).join('');
+  sel.value = actual;
+}
+
+function renderInventario() {
+  poblarFiltroGrupoInv();
+  const tbody = document.getElementById('inventario-body');
+  const resumen = document.getElementById('inv-resumen');
+  const q = (document.getElementById('buscar-inventario')?.value || '').toLowerCase();
+  const grupo = document.getElementById('filtro-grupo-inv')?.value || '';
+
+  let data = calcularInventario();
+  if (grupo) data = data.filter(r => r.grupo === grupo);
+  if (q) data = data.filter(r => r.producto.toLowerCase().includes(q));
+  data.sort((a, b) => a.grupo.localeCompare(b.grupo) || a.producto.localeCompare(b.producto));
+
+  const totalRefs = data.length;
+  const totalStock = data.reduce((s, r) => s + r.enInventario, 0);
+  resumen.innerHTML = `
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--azul);min-width:150px">
+      <div style="font-size:10px;font-weight:700;color:var(--azul);text-transform:uppercase">Referencias en stock</div>
+      <div style="font-size:18px;font-weight:800;color:var(--gris-oscuro)">${totalRefs}</div>
+    </div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--verde);min-width:150px">
+      <div style="font-size:10px;font-weight:700;color:var(--verde);text-transform:uppercase">Unidades en inventario</div>
+      <div style="font-size:18px;font-weight:800;color:var(--gris-oscuro)">${totalStock.toLocaleString()}</div>
+    </div>`;
+
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">📦</div><div>Sin existencias${grupo||q?' para este filtro':''}. Registra producciones diarias para alimentar el inventario.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(r => {
+    const bajo = r.enInventario <= 0;
+    return `
+    <tr style="border-top:1px solid var(--gris-borde)">
+      <td style="font-weight:600;color:var(--azul)">${r.producto}</td>
+      <td style="color:var(--gris-medio)">${r.grupo}</td>
+      <td>${r.unidad}</td>
+      <td style="text-align:right">${r.producido.toLocaleString()}</td>
+      <td style="text-align:right;color:var(--gris-medio)">${r.despachado.toLocaleString()}</td>
+      <td style="text-align:right;font-weight:800;color:${bajo?'#C62828':'#2E7D32'}">${r.enInventario.toLocaleString()}</td>
+      <td style="color:var(--gris-medio)">${r.ultima ? new Date(r.ultima+'T12:00').toLocaleDateString('es-CO') : '—'}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ═══════════════════════════════
@@ -1574,13 +1925,16 @@ async function guardarNuevaContrasena() {
 }
 
 async function cargarDatosSupabase() {
-  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }] = await Promise.all([
+  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }, { data: prods, error: e4 }] = await Promise.all([
     sb.from('cotizaciones').select('datos, estado').order('creado', { ascending: true }),
     sb.from('clientes').select('datos').order('creado', { ascending: true }),
-    sb.from('ordenes_servicio').select('datos').order('creado', { ascending: false })
+    sb.from('ordenes_servicio').select('datos').order('creado', { ascending: false }),
+    sb.from('producciones').select('datos').order('creado', { ascending: false })
   ]);
   if (e3) console.warn('Tabla ordenes_servicio no disponible aún.');
+  if (e4) console.warn('Tabla producciones no disponible aún.');
   ORDENES = (ords || []).filter(r => r.datos).map(r => r.datos);
+  PRODUCCIONES = (prods || []).filter(r => r.datos).map(r => r.datos);
   if (e1) console.error('Error cargando cotizaciones:', e1.message);
   if (e2) console.error('Error cargando clientes:', e2.message);
   COTIZACIONES = (cots || []).filter(r => r.datos).map(r => ({ ...r.datos, estado: r.estado }));
