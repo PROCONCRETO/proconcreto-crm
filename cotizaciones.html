@@ -239,6 +239,9 @@
   .num-cotizacion { font-size: 22px; font-weight: 700; color: var(--azul); background: var(--azul-suave); padding: 6px 14px; border-radius: var(--radio); display: inline-block; }
 
   .flex-gap { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  /* En las tablas, los botones de ACCIONES no se envuelven a otro renglón */
+  .tabla-cots td .flex-gap { flex-wrap: nowrap; gap: 5px; }
+  .tabla-cots td:last-child { white-space: nowrap; }
   .spacer { flex: 1; }
   hr { border: none; border-top: 1px solid var(--gris-borde); margin: 16px 0; }
   .texto-muted { color: var(--gris-medio); font-size: 12px; }
@@ -682,7 +685,8 @@
   <div class="acciones-row">
     <div style="font-size:18px;font-weight:700;color:var(--azul)">Pipeline de Producción</div>
   </div>
-  <div id="pipeline-prod-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
+  <div id="pipeline-prod-resumen" style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap"></div>
+  <div id="pipeline-prod-leyenda" style="font-size:11px;color:var(--gris-medio);margin-bottom:14px"></div>
   <div class="kanban-board" id="kanban-board-prod"></div>
 </div>
 
@@ -3238,26 +3242,50 @@ const COLUMNAS_OS = [
 
 let dragOSId = null;
 
+function evaluarInventarioOrden(o, invMap) {
+  const items = o.items || [];
+  if (!items.length) return { estado: 'sin-datos', detalle: 'Orden sin productos detallados — no se puede evaluar inventario' };
+  const faltantes = [];
+  items.forEach(it => {
+    const req = Number(it.cantidad) || 0;
+    const disp = invMap[it.nombre] !== undefined ? invMap[it.nombre] : 0;
+    if (disp < req) faltantes.push(`${it.nombre}: faltan ${(req - disp).toLocaleString()} (hay ${disp.toLocaleString()} de ${req.toLocaleString()})`);
+  });
+  if (faltantes.length) return { estado: 'insuficiente', detalle: 'Inventario insuficiente:\n• ' + faltantes.join('\n• ') };
+  return { estado: 'suficiente', detalle: 'Inventario suficiente para todos los productos de la orden' };
+}
+
 function renderPipelineProduccion() {
   const board = document.getElementById('kanban-board-prod');
   const resumen = document.getElementById('pipeline-prod-resumen');
+  // Mapa de inventario disponible por producto (producido - despachado)
+  const invMap = {};
+  calcularInventario().forEach(r => { invMap[r.producto] = r.enInventario; });
+  const bgInv = { 'suficiente':'#E8F5E9', 'insuficiente':'#FFEBEE', 'sin-datos':'#FFFFFF' };
+  const bordeInv = { 'suficiente':'#2E7D32', 'insuficiente':'#C62828', 'sin-datos':null };
   board.innerHTML = COLUMNAS_OS.map(col => {
     const cards = ORDENES.filter(o => o.estado === col.id);
     const cardsHTML = cards.length
-      ? cards.map(o => `
+      ? cards.map(o => {
+          const inv = evaluarInventarioOrden(o, invMap);
+          const borde = bordeInv[inv.estado] || col.color;
+          const iconoInv = inv.estado === 'suficiente' ? '🟢' : inv.estado === 'insuficiente' ? '🔴' : '⚪';
+          return `
           <div class="kanban-card" draggable="true"
-               style="border-left-color:${col.color}"
+               style="border-left-color:${borde};background:${bgInv[inv.estado]}"
                data-os-id="${o.id}"
+               title="${inv.detalle.replace(/"/g,'&quot;')}"
                ondragstart="onDragStartOS(event)"
                ondragend="onDragEndOS(event)">
-            <div class="kc-num">${o.numero}</div>
+            <div class="kc-num">${iconoInv} ${o.numero}</div>
             <div class="kc-cliente">${o.cliente}</div>
             <div class="kc-proyecto" style="font-size:11px;color:var(--gris-medio);margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${o.descripcion}">${o.descripcion}</div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
               <div class="kc-fecha">${o.fechaEntrega ? new Date(o.fechaEntrega+'T12:00').toLocaleDateString('es-CO',{day:'2-digit',month:'short'}) : '—'}</div>
               <button class="btn btn-primario btn-xs" onclick="editarOrden('${o.id}')">✏️</button>
             </div>
-          </div>`).join('')
+          </div>`;
+        }).join('')
       : `<div class="kanban-drop-hint">Arrastra aquí</div>`;
     return `
       <div class="kanban-col">
@@ -3274,6 +3302,13 @@ function renderPipelineProduccion() {
         </div>
       </div>`;
   }).join('');
+
+  // Leyenda de colores
+  const leyenda = document.getElementById('pipeline-prod-leyenda');
+  if (leyenda) leyenda.innerHTML = `
+    <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:#E8F5E9;border:1px solid #2E7D32;display:inline-block"></span> Inventario suficiente</span>
+    <span style="display:inline-flex;align-items:center;gap:4px;margin-left:14px"><span style="width:12px;height:12px;border-radius:3px;background:#FFEBEE;border:1px solid #C62828;display:inline-block"></span> Inventario insuficiente</span>
+    <span style="display:inline-flex;align-items:center;gap:4px;margin-left:14px"><span style="width:12px;height:12px;border-radius:3px;background:#fff;border:1px solid #ccc;display:inline-block"></span> Sin productos detallados</span>`;
 
   resumen.innerHTML = COLUMNAS_OS.map(col => {
     const count = ORDENES.filter(o => o.estado === col.id).length;
