@@ -2356,8 +2356,8 @@ function abrirModalEstado(id) {
 }
 
 function cambiarEstado(estado) {
-  const id = parseInt(document.getElementById('estado-cot-id').value);
-  const cot = COTIZACIONES.find(c => c.id === id);
+  const id = document.getElementById('estado-cot-id').value;
+  const cot = COTIZACIONES.find(c => String(c.id) === String(id));
   if (cot) {
     cot.estado = estado;
     const cotActualizada = { ...cot, estado };
@@ -2645,9 +2645,24 @@ function renderEstadisticas() {
   const tasaExito = total > 0 ? Math.round((aceptadas / total) * 100) : 0;
 
   // Meta de ventas
-  const META_MENSUAL = 300_000_000;
+  const META_MENSUAL = 350_000_000;
   const esMensual = _periodoStats === 'mensual';
-  const meta = esMensual ? META_MENSUAL : META_MENSUAL * 12;
+  const hoy = new Date();
+  const anoActual = hoy.getFullYear();
+  const mesActual = hoy.getMonth() + 1;
+  const anoFiltrado = parseInt(anio) || anoActual;
+  let mesesMeta = 1;
+  let labelPeriodo = 'mensual';
+  if (!esMensual) {
+    if (anoFiltrado === anoActual) {
+      mesesMeta = 13 - mesActual; // meses restantes incluyendo el mes actual
+      labelPeriodo = `anual (${mesesMeta} meses restantes)`;
+    } else {
+      mesesMeta = 12;
+      labelPeriodo = 'anual';
+    }
+  }
+  const meta = META_MENSUAL * mesesMeta;
   const pct = Math.min(Math.round((valorAceptado / meta) * 100), 100);
   const pctReal = Math.round((valorAceptado / meta) * 100);
   const colorMeta = pctReal >= 100 ? '#2E7D32' : pctReal >= 80 ? '#1565C0' : pctReal >= 50 ? '#F57F17' : '#C62828';
@@ -2657,7 +2672,7 @@ function renderEstadisticas() {
     <div class="stat-card" style="grid-column:1/-1;border-color:${colorMeta};padding:20px 24px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div>
-          <div style="font-size:12px;font-weight:700;color:${colorMeta};text-transform:uppercase;letter-spacing:0.5px">Meta de ventas ${esMensual ? 'mensual' : 'anual'}</div>
+          <div style="font-size:12px;font-weight:700;color:${colorMeta};text-transform:uppercase;letter-spacing:0.5px">Meta de ventas ${labelPeriodo}</div>
           <div style="font-size:22px;font-weight:800;color:${colorMeta};margin-top:2px">${pctReal}% cumplido</div>
           <div style="font-size:12px;color:var(--gris-medio);margin-top:2px">${labelMeta}</div>
         </div>
@@ -2671,13 +2686,24 @@ function renderEstadisticas() {
         <div style="height:100%;width:${pct}%;background:${colorMeta};border-radius:8px;transition:width 0.5s ease"></div>
       </div>
       <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:var(--gris-medio)">
-        <span>$0</span><span>Meta: $${(meta/1000000).toFixed(0)}M</span>
+        <span>$0</span><span>Meta: $${(meta/1000000).toFixed(0)}M ($${(META_MENSUAL/1000000).toFixed(0)}M/mes × ${mesesMeta} ${mesesMeta===1?'mes':'meses'})</span>
       </div>
     </div>
     <div class="stat-card"><div class="valor">${total}</div><div class="etiqueta">Total cotizaciones</div></div>
     <div class="stat-card" style="border-color:var(--verde)"><div class="valor" style="color:var(--verde)">${aceptadas}</div><div class="etiqueta">Aceptadas</div></div>
     <div class="stat-card" style="border-color:var(--naranja)"><div class="valor" style="color:var(--naranja)">$${(totalValor/1000000).toFixed(1)}M</div><div class="etiqueta">Valor total cotizado</div></div>
-    <div class="stat-card" style="border-color:var(--azul)"><div class="valor" style="color:var(--azul)">${tasaExito}%</div><div class="etiqueta">Tasa de éxito</div></div>`;
+    <div class="stat-card" style="border-color:var(--azul)">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div>
+          <div class="valor" style="color:var(--azul);font-size:20px">${tasaExito}%</div>
+          <div class="etiqueta">Tasa de éxito (# cotizaciones)</div>
+        </div>
+        <div style="border-top:1px solid var(--gris-borde);padding-top:6px">
+          <div class="valor" style="color:var(--verde);font-size:20px">${totalValor > 0 ? Math.round((valorAceptado/totalValor)*100) : 0}%</div>
+          <div class="etiqueta">Tasa de éxito (valor cotizado)</div>
+        </div>
+      </div>
+    </div>`;
 
   const estados = ['Prospecto','Borrador','Enviada','Negociación','Aceptada','Rechazada'];
   const colores = ['#7B1FA2','#E65100','#1565C0','#F57F17','#2E7D32','#C62828'];
@@ -2785,7 +2811,7 @@ function renderPipeline() {
 }
 
 function onDragStart(e) {
-  dragId = parseInt(e.currentTarget.dataset.id);
+  dragId = e.currentTarget.dataset.id;
   e.currentTarget.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move';
 }
@@ -2809,7 +2835,7 @@ function onDrop(e) {
   e.preventDefault();
   e.currentTarget.classList.remove('drag-over');
   const nuevoEstado = e.currentTarget.dataset.estado;
-  const cot = COTIZACIONES.find(c => c.id === dragId);
+  const cot = COTIZACIONES.find(c => String(c.id) === String(dragId));
   if (cot && cot.estado !== nuevoEstado) {
     cot.estado = nuevoEstado;
     const cotActualizada = { ...cot, estado: nuevoEstado };
@@ -2825,6 +2851,10 @@ function onDrop(e) {
     }, { onConflict: 'numero,version' }).then(({ error }) => {
       if (error) console.error('Error actualizando estado pipeline:', error.message);
     });
+    if (nuevoEstado === 'Aceptada') {
+      const osExistente = ORDENES.find(o => o.cotizacion === cot.numero);
+      if (!osExistente) crearOrdenDesdeCotizacion(cot);
+    }
     renderHistorico();
     renderEstadisticas();
   }
