@@ -135,7 +135,7 @@
   /* ── STATS ── */
   .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
   .stat-card { background: white; border-radius: var(--radio); padding: 18px; box-shadow: var(--sombra); border-left: 4px solid var(--azul); }
-  .stat-card .valor { font-size: 26px; font-weight: 700; color: var(--azul); }
+  .stat-card .valor { font-size: 36px; font-weight: 700; color: var(--azul); }
   .stat-card .etiqueta { font-size: 12px; color: var(--gris-medio); margin-top: 2px; }
 
   /* ── CLIENTES ── */
@@ -2097,7 +2097,7 @@ function previsualizarCotizacion() {
       <td>Transporte ${transIva ? 'grabado' : 'no grabado'}${descLabel}:<br><span style="font-size:10px;color:#666">Chinchiná – ${destino}</span></td>
       <td style="text-align:center">${transIva ? 'SI' : 'NO'}</td>
       <td style="text-align:right">$ ${tarifaKg.toLocaleString()}</td>
-      <td style="text-align:center">${descTrans > 0 ? descTrans + '%' : (transIva ? '19%' : '0%')}</td>
+      <td style="text-align:center">${descTrans > 0 ? descTrans + '%' : '0%'}</td>
       <td style="text-align:right">$ ${transIva ? (tarifaKg * 1.19).toFixed(2) : tarifaKg.toLocaleString()}</td>
       <td style="text-align:right">$ ${transporte.toLocaleString()}</td>
     </tr>`;
@@ -2108,14 +2108,14 @@ function previsualizarCotizacion() {
     const ivaL = Math.round(base * 0.19);
     logisticaBase += base + ivaL;
     const descLabel = descCargue > 0 ? ` (desc. ${descCargue}%)` : '';
-    filasTabla += `<tr><td>${Math.round(pesoTotal)}</td><td>kg</td><td>Cargue a mano${descLabel}</td><td style="text-align:center">SI</td><td style="text-align:right">$ 11</td><td style="text-align:center">19%</td><td style="text-align:right">$ ${(11*1.19).toFixed(2)}</td><td style="text-align:right">$ ${(base+ivaL).toLocaleString()}</td></tr>`;
+    filasTabla += `<tr><td>${Math.round(pesoTotal)}</td><td>kg</td><td>Cargue a mano${descLabel}</td><td style="text-align:center">SI</td><td style="text-align:right">$ 11</td><td style="text-align:center">${descCargue > 0 ? descCargue + '%' : '0%'}</td><td style="text-align:right">$ ${(11*1.19).toFixed(2)}</td><td style="text-align:right">$ ${(base+ivaL).toLocaleString()}</td></tr>`;
   }
   if (document.getElementById('descargue-mecanico').value === 'si') {
     const base = Math.round(pesoTotal * 11 * (1 - descDescargue / 100));
     const ivaL = Math.round(base * 0.19);
     logisticaBase += base + ivaL;
     const descLabel = descDescargue > 0 ? ` (desc. ${descDescargue}%)` : '';
-    filasTabla += `<tr><td>${Math.round(pesoTotal)}</td><td>kg</td><td>Descargue mecánico${descLabel}</td><td style="text-align:center">SI</td><td style="text-align:right">$ 11</td><td style="text-align:center">19%</td><td style="text-align:right">$ ${(11*1.19).toFixed(2)}</td><td style="text-align:right">$ ${(base+ivaL).toLocaleString()}</td></tr>`;
+    filasTabla += `<tr><td>${Math.round(pesoTotal)}</td><td>kg</td><td>Descargue mecánico${descLabel}</td><td style="text-align:center">SI</td><td style="text-align:right">$ 11</td><td style="text-align:center">${descDescargue > 0 ? descDescargue + '%' : '0%'}</td><td style="text-align:right">$ ${(11*1.19).toFixed(2)}</td><td style="text-align:right">$ ${(base+ivaL).toLocaleString()}</td></tr>`;
   }
   const logistica = logisticaBase;
 
