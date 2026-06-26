@@ -333,6 +333,7 @@
   <button class="nav-modulo" onclick="activarModulo('logistica')" style="opacity:0.4;cursor:default" disabled title="Próximamente">🚛 Logística</button>
   <button class="nav-modulo" onclick="activarModulo('cartera')" style="opacity:0.4;cursor:default" disabled title="Próximamente">💰 Cartera</button>
   <div id="nav-usuario">
+    <span id="rt-indicador" style="font-size:11px;font-weight:600;color:#999;white-space:nowrap" title="Estado de sincronización">⚪ Conectando…</span>
     <span id="usuario-email"></span>
     <button class="btn btn-secundario btn-sm" onclick="cerrarSesion()" style="font-size:11px;padding:4px 10px">Salir</button>
   </div>
@@ -1981,6 +1982,70 @@ async function mostrarApp() {
     opt.value = d; opt.textContent = d + ' ($' + TARIFAS_KG_TRANSPORTE[d].toLocaleString() + '/kg)';
     sel.appendChild(opt);
   });
+  suscribirRealtime();
+}
+
+// ═══════════════════════════════
+// SINCRONIZACIÓN EN TIEMPO REAL
+// ═══════════════════════════════
+let _canalRealtime = null;
+let _rtTimers = {};
+
+function rerenderPantallaActiva() {
+  const activa = document.querySelector('.pantalla.activa');
+  if (!activa) return;
+  switch (activa.id) {
+    case 'pantalla-historico': renderHistorico(); break;
+    case 'pantalla-pipeline': renderPipeline(); break;
+    case 'pantalla-clientes': renderClientes(); break;
+    case 'pantalla-estadisticas': renderEstadisticas(); break;
+    case 'pantalla-ordenes-servicio': renderOrdenes(); break;
+    case 'pantalla-pipeline-produccion': renderPipelineProduccion(); break;
+    case 'pantalla-produccion-diaria': renderProduccionDiaria(); break;
+    case 'pantalla-inventario': renderInventario(); break;
+  }
+}
+
+function _rtDebounce(tabla, fn) {
+  clearTimeout(_rtTimers[tabla]);
+  _rtTimers[tabla] = setTimeout(fn, 350);
+}
+
+async function recargarCotizacionesRT() {
+  const { data } = await sb.from('cotizaciones').select('datos, estado').order('creado', { ascending: true });
+  COTIZACIONES = (data || []).filter(r => r.datos).map(r => ({ ...r.datos, estado: r.estado }));
+  rerenderPantallaActiva();
+}
+async function recargarClientesRT() {
+  const { data } = await sb.from('clientes').select('datos').order('creado', { ascending: true });
+  CLIENTES = (data || []).filter(r => r.datos).map(r => r.datos);
+  rerenderPantallaActiva();
+}
+async function recargarOrdenesRT() {
+  const { data } = await sb.from('ordenes_servicio').select('datos').order('creado', { ascending: false });
+  ORDENES = (data || []).filter(r => r.datos).map(r => r.datos);
+  rerenderPantallaActiva();
+}
+async function recargarProduccionesRT() {
+  const { data } = await sb.from('producciones').select('datos').order('creado', { ascending: false });
+  PRODUCCIONES = (data || []).filter(r => r.datos).map(r => r.datos);
+  rerenderPantallaActiva();
+}
+
+function suscribirRealtime() {
+  if (_canalRealtime) return; // evitar suscripciones duplicadas
+  _canalRealtime = sb.channel('crm-cambios')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' },     () => _rtDebounce('cotizaciones', recargarCotizacionesRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'clientes' },          () => _rtDebounce('clientes', recargarClientesRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes_servicio' },  () => _rtDebounce('ordenes', recargarOrdenesRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'producciones' },      () => _rtDebounce('producciones', recargarProduccionesRT))
+    .subscribe((status) => {
+      const ind = document.getElementById('rt-indicador');
+      if (ind) {
+        if (status === 'SUBSCRIBED') { ind.textContent = '🟢 En vivo'; ind.title = 'Sincronización en tiempo real activa'; ind.style.color = '#2E7D32'; }
+        else { ind.textContent = '🔴 Sin conexión'; ind.title = 'Sincronización inactiva — refresca la página'; ind.style.color = '#C62828'; }
+      }
+    });
 }
 
 // ═══════════════════════════════
