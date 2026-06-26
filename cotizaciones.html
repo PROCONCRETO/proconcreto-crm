@@ -471,6 +471,16 @@
               <option value="">Seleccionar destino...</option>
             </select>
           </div>
+          <div id="bloque-otro-transporte" style="display:none;margin-bottom:6px;background:#FFF8E1;border:1px solid #FFE082;border-radius:6px;padding:8px">
+            <div class="form-grupo" style="margin-bottom:6px">
+              <label>Nombre del destino</label>
+              <input type="text" id="destino-otro-nombre" placeholder="Ej: Leticia, Amazonas" oninput="recalcular()">
+            </div>
+            <div class="form-grupo">
+              <label>Tarifa manual ($/kg)</label>
+              <input type="number" id="tarifa-manual" min="0" value="0" placeholder="$/kg" oninput="recalcular()" style="font-weight:600">
+            </div>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
             <div class="form-grupo">
               <label>Peso total (kg)</label>
@@ -1991,6 +2001,9 @@ async function mostrarApp() {
     opt.value = d; opt.textContent = d + ' ($' + TARIFAS_KG_TRANSPORTE[d].toLocaleString() + '/kg)';
     sel.appendChild(opt);
   });
+  const optOtro = document.createElement('option');
+  optOtro.value = 'Otro'; optOtro.textContent = 'Otro (tarifa manual)';
+  sel.appendChild(optOtro);
   suscribirRealtime();
 }
 
@@ -2117,6 +2130,11 @@ document.addEventListener('click', e => {
     const d = document.getElementById('resultado-busqueda');
     if (d) d.style.display = 'none';
   }
+  // Cerrar resultados de búsqueda de opciones adicionales
+  document.querySelectorAll('[id^="resultado-op-"]').forEach(div => {
+    const idx = div.id.replace('resultado-op-', '');
+    if (!e.target.closest('#buscador-op-' + idx)) div.style.display = 'none';
+  });
   if (!e.target.closest('#lista-clientes-cot') && !e.target.closest('#buscar-cliente-cot')) {
     const d = document.getElementById('lista-clientes-cot');
     if (d) d.style.display = 'none';
@@ -2226,8 +2244,9 @@ function recalcular() {
 
   let transporte = 0;
   const destino = document.getElementById('destino-transporte').value;
+  const tarifaManual = parseFloat(document.getElementById('tarifa-manual')?.value) || 0;
   if (destino && pesoTotal > 0) {
-    const tarifaBase = Math.round(pesoTotal * (TARIFAS_KG_TRANSPORTE[destino] || 0));
+    const tarifaBase = Math.round(pesoTotal * tarifaKgDe(destino, tarifaManual));
     const tarifaConDesc = Math.round(tarifaBase * (1 - descTrans / 100));
     transporte = tieneIva ? Math.round(tarifaConDesc * 1.19) : tarifaConDesc;
   }
@@ -2253,7 +2272,11 @@ function recalcular() {
 }
 
 function actualizarTransporte() { recalcular(); }
-function aplicarTarifaTransporte() { recalcular(); }
+function aplicarTarifaTransporte() {
+  const esOtro = document.getElementById('destino-transporte').value === 'Otro';
+  document.getElementById('bloque-otro-transporte').style.display = esOtro ? 'block' : 'none';
+  recalcular();
+}
 function actualizarCargue() {
   const tieneTransporte = !!document.getElementById('destino-transporte').value;
   const sel = document.getElementById('cargue-mano');
@@ -2268,6 +2291,15 @@ function actualizarCargue() {
     sel.title = '';
   }
   recalcular();
+}
+
+// Tarifa $/kg para un destino (soporta "Otro" con tarifa manual)
+function tarifaKgDe(destino, tarifaManual) {
+  if (destino === 'Otro') return parseFloat(tarifaManual) || 0;
+  return TARIFAS_KG_TRANSPORTE[destino] || 0;
+}
+function nombreDestino(destino, destinoNombre) {
+  return destino === 'Otro' ? (destinoNombre || 'destino remoto') : destino;
 }
 
 // ═══════════════════════════════
@@ -2298,7 +2330,7 @@ function calcOpcion(op) {
   const tieneIva = op.items.some(it => it.iva === 'SI');
   let transporte = 0;
   if (op.destino && pesoTotal > 0) {
-    const base = Math.round(pesoTotal * (TARIFAS_KG_TRANSPORTE[op.destino] || 0) * (1 - (op.descTrans || 0) / 100));
+    const base = Math.round(pesoTotal * tarifaKgDe(op.destino, op.tarifaManual) * (1 - (op.descTrans || 0) / 100));
     transporte = tieneIva ? Math.round(base * 1.19) : base;
   }
   let logBase = 0;
@@ -2310,7 +2342,7 @@ function calcOpcion(op) {
 
 function agregarOpcionExtra() {
   if (opcionesExtra.length >= 3) { alert('Máximo 4 opciones por cotización (Opción 1 + 3 adicionales).'); return; }
-  opcionesExtra.push({ items: [], destino: '', descTrans: 0, cargue: 'no', descCargue: 0, descargue: 'no', descDescargue: 0 });
+  opcionesExtra.push({ items: [], destino: '', tarifaManual: 0, destinoNombre: '', descTrans: 0, cargue: 'no', descCargue: 0, descargue: 'no', descDescargue: 0 });
   renderOpcionesExtra();
 }
 
@@ -2320,16 +2352,46 @@ function eliminarOpcionExtra(idx) {
   renderOpcionesExtra();
 }
 
-function agregarItemOpcion(idx) {
-  const codigo = document.getElementById('op-sel-' + idx).value;
-  const cant = parseFloat(document.getElementById('op-cant-' + idx).value) || 1;
-  if (!codigo) { alert('Selecciona un producto para agregar a la opción.'); return; }
+// Buscador de productos por opción (igual al de la Opción 1)
+function filtrarProductosOpcion(idx) {
+  const div = document.getElementById('resultado-op-' + idx);
+  if (!div) return;
+  const grupo = (document.getElementById('filtro-grupo-op-' + idx) || {}).value || '';
+  const q = ((document.getElementById('buscar-op-' + idx) || {}).value || '').toLowerCase().trim();
+  if (!grupo && q.length < 2) { div.style.display = 'none'; return; }
+  const res = PRODUCTOS.filter(p => {
+    const gOk = !grupo || p.grupo === grupo;
+    const tOk = q.length < 2 || (p.nombre + ' ' + p.codigo + ' ' + (p.medidas || '')).toLowerCase().includes(q);
+    return gOk && tOk;
+  }).slice(0, 18);
+  if (!res.length) {
+    div.innerHTML = '<div style="padding:12px 14px;color:#888;font-size:13px">Sin resultados para esta búsqueda.</div>';
+  } else {
+    div.innerHTML = res.map(p =>
+      `<div onclick="agregarItemOpcionCodigo(${idx},'${p.codigo}')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:8px" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
+        <div>
+          <div style="font-weight:600;font-size:13px;color:#1e293b">${p.nombre}</div>
+          <div style="font-size:11px;color:#64748b">${p.codigo}${p.medidas ? ' · ' + p.medidas : ''} · ${p.unidad}</div>
+        </div>
+        <div style="text-align:right;white-space:nowrap">
+          <div style="font-weight:700;font-size:13px;color:#1565C0">$${Number(p.lista).toLocaleString('es-CO')}</div>
+          <div style="font-size:10px;color:${p.iva === 'SI' ? '#C62828' : '#2E7D32'}">IVA ${p.iva}</div>
+        </div>
+      </div>`
+    ).join('');
+  }
+  div.style.display = 'block';
+}
+
+function agregarItemOpcionCodigo(idx, codigo) {
   const prod = PRODUCTOS.find(p => p.codigo === codigo);
+  if (!prod) return;
   const op = opcionesExtra[idx];
   const ex = op.items.find(it => it.codigo === codigo);
-  if (ex) ex.cantidad += cant;
-  else op.items.push({ codigo: prod.codigo, nombre: prod.nombre, medidas: prod.medidas, unidad: prod.unidad, peso: prod.peso, iva: prod.iva, lista: prod.lista, minimo: prod.minimo, cantidad: cant, precio: prod.lista, descuento: 0 });
+  if (ex) ex.cantidad += 1;
+  else op.items.push({ codigo: prod.codigo, nombre: prod.nombre, medidas: prod.medidas, unidad: prod.unidad, peso: prod.peso, iva: prod.iva, lista: prod.lista, minimo: prod.minimo, cantidad: 1, precio: prod.lista, descuento: 0 });
   renderOpcionesExtra();
+  mostrarToast(ex ? `+1 unidad — ${prod.nombre}` : `✅ ${prod.nombre} agregado a Opción ${idx + 2}`);
 }
 
 function actualizarItemOpcion(idx, i, campo, val) {
@@ -2344,7 +2406,7 @@ function eliminarItemOpcion(idx, i) {
 
 function actualizarCampoOpcion(idx, campo, val) {
   const op = opcionesExtra[idx];
-  if (campo === 'descTrans' || campo === 'descCargue' || campo === 'descDescargue') op[campo] = parseFloat(val) || 0;
+  if (campo === 'descTrans' || campo === 'descCargue' || campo === 'descDescargue' || campo === 'tarifaManual') op[campo] = parseFloat(val) || 0;
   else op[campo] = val;
   if (campo === 'destino' && val) op.cargue = 'no'; // sin cargue a mano cuando hay transporte
   renderOpcionesExtra();
@@ -2353,6 +2415,7 @@ function actualizarCampoOpcion(idx, campo, val) {
 function renderOpcionesExtra() {
   const cont = document.getElementById('opciones-extra-container');
   if (!cont) return;
+  const gruposProd = [...new Set(PRODUCTOS.map(p => p.grupo))].sort();
   cont.innerHTML = opcionesExtra.map((op, idx) => {
     const n = idx + 2;
     const t = calcOpcion(op);
@@ -2378,10 +2441,15 @@ function renderOpcionesExtra() {
         <div class="card-titulo" style="margin:0;color:var(--azul)">🔁 Opción ${n}</div>
         <button class="btn btn-rojo btn-sm" onclick="eliminarOpcionExtra(${idx})">🗑️ Quitar opción ${n}</button>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <select id="op-sel-${idx}" style="flex:2;min-width:220px;padding:8px;border:1.5px solid #93C5FD;border-radius:8px;font-size:13px">${optsProductosHTML()}</select>
-        <input type="number" id="op-cant-${idx}" placeholder="Cant." min="1" value="1" style="width:80px;padding:8px;border:1.5px solid #93C5FD;border-radius:8px">
-        <button class="btn btn-primario btn-sm" onclick="agregarItemOpcion(${idx})">+ Agregar producto</button>
+      <div id="buscador-op-${idx}" style="margin-bottom:10px">
+        <div style="display:flex;gap:8px">
+          <select id="filtro-grupo-op-${idx}" onchange="filtrarProductosOpcion(${idx})" style="padding:9px 10px;border:1.5px solid #93C5FD;border-radius:8px;font-size:13px">
+            <option value="">Todos los grupos</option>
+            ${gruposProd.map(g => `<option value="${g}">${g}</option>`).join('')}
+          </select>
+          <input id="buscar-op-${idx}" type="text" placeholder="Buscar por nombre o código..." oninput="filtrarProductosOpcion(${idx})" style="flex:1;padding:9px 12px;border:1.5px solid #93C5FD;border-radius:8px;font-size:13px">
+        </div>
+        <div id="resultado-op-${idx}" style="display:none;margin-top:6px;border:1.5px solid #93C5FD;border-radius:8px;background:#fff;max-height:280px;overflow-y:auto"></div>
       </div>
       <div style="overflow-x:auto">
         <table class="tabla-items"><thead><tr>
@@ -2395,8 +2463,14 @@ function renderOpcionesExtra() {
             <select onchange="actualizarCampoOpcion(${idx},'destino',this.value)">
               <option value="">Seleccionar...</option>
               ${Object.keys(TARIFAS_TRANSPORTE).map(d => `<option value="${d}" ${op.destino === d ? 'selected' : ''}>${d}</option>`).join('')}
+              <option value="Otro" ${op.destino === 'Otro' ? 'selected' : ''}>Otro (tarifa manual)</option>
             </select>
           </div>
+          ${op.destino === 'Otro' ? `
+          <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:6px;padding:6px;margin-bottom:6px">
+            <div class="form-grupo" style="margin-bottom:6px"><label>Nombre destino</label><input type="text" value="${op.destinoNombre || ''}" placeholder="Ej: Leticia" onchange="actualizarCampoOpcion(${idx},'destinoNombre',this.value)"></div>
+            <div class="form-grupo"><label>Tarifa ($/kg)</label><input type="number" min="0" value="${op.tarifaManual || 0}" onchange="actualizarCampoOpcion(${idx},'tarifaManual',this.value)"></div>
+          </div>` : ''}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
             <div class="form-grupo"><label>Peso (kg)</label><input type="number" value="${Math.round(t.pesoTotal)}" readonly style="background:#F7FAFC;font-weight:600;color:var(--azul)"></div>
             <div class="form-grupo"><label>Desc %</label><input type="number" value="${op.descTrans}" min="0" max="100" onchange="actualizarCampoOpcion(${idx},'descTrans',this.value)"></div>
@@ -2441,7 +2515,7 @@ function recogerOpcionesExtra() {
     return {
       nombre: 'Opción ' + (i + 2),
       items: JSON.parse(JSON.stringify(op.items)),
-      transporte: { destino: op.destino || '', pesoTotal: t.pesoTotal, grabado: op.items.some(it => it.iva === 'SI') },
+      transporte: { destino: op.destino || '', pesoTotal: t.pesoTotal, grabado: op.items.some(it => it.iva === 'SI'), tarifaManual: op.destino === 'Otro' ? (op.tarifaManual || 0) : 0, destinoNombre: op.destino === 'Otro' ? (op.destinoNombre || '') : '' },
       cargue: op.cargue, descargue: op.descargue,
       descuentos: { transporte: op.descTrans || 0, cargue: op.descCargue || 0, descargue: op.descDescargue || 0 },
       totales: { subtotal: t.subtotal, iva: t.iva, transporte: t.transporte, logistica: t.logistica, total: t.total }
@@ -2453,6 +2527,8 @@ function cargarOpcionesExtraDesde(cot) {
   opcionesExtra = (cot.opcionesExtra || []).map(op => ({
     items: JSON.parse(JSON.stringify(op.items || [])),
     destino: op.transporte?.destino || '',
+    tarifaManual: op.transporte?.tarifaManual || 0,
+    destinoNombre: op.transporte?.destinoNombre || '',
     descTrans: op.descuentos?.transporte || 0,
     cargue: op.cargue || 'no',
     descCargue: op.descuentos?.cargue || 0,
@@ -2485,7 +2561,7 @@ function valorRepresentativoCot(cot) {
 }
 
 // Construye la tabla HTML del PDF para un set de productos + logística (una opción)
-function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCargue, descargueVal, descDescargue) {
+function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCargue, descargueVal, descDescargue, tarifaManual, destinoNombre) {
   let filasTabla = '', subtotal = 0, ivaTotal = 0, pesoTotal = 0;
   items.forEach(it => {
     const adj = Math.round(it.precio * (1 - it.descuento / 100));
@@ -2507,14 +2583,15 @@ function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCarg
   const transIva = items.some(it => it.iva === 'SI');
   let transporte = 0;
   if (destino && pesoTotal > 0) {
-    const tarifaKg = TARIFAS_KG_TRANSPORTE[destino];
+    const tarifaKg = tarifaKgDe(destino, tarifaManual);
+    const destLabelNombre = nombreDestino(destino, destinoNombre);
     const tarifaBase = Math.round(pesoTotal * tarifaKg);
     const tarifaConDesc = Math.round(tarifaBase * (1 - descTrans / 100));
     transporte = transIva ? Math.round(tarifaConDesc * 1.19) : tarifaConDesc;
     const descLabel = descTrans > 0 ? ` (desc. ${descTrans}%)` : '';
     filasTabla += `<tr>
       <td>${Math.round(pesoTotal)}</td><td>kg</td>
-      <td>Transporte ${transIva ? 'grabado' : 'no grabado'}${descLabel}:<br><span style="font-size:10px;color:#666">Chinchiná – ${destino}</span></td>
+      <td>Transporte ${transIva ? 'grabado' : 'no grabado'}${descLabel}:<br><span style="font-size:10px;color:#666">Chinchiná – ${destLabelNombre}</span></td>
       <td style="text-align:center">${transIva ? 'SI' : 'NO'}</td>
       <td style="text-align:right">$ ${tarifaKg.toLocaleString()}</td>
       <td style="text-align:center">${descTrans > 0 ? descTrans + '%' : '0%'}</td>
@@ -2597,7 +2674,9 @@ function guardarCotizacion() {
   const descTrans = parseFloat(document.getElementById('desc-transporte')?.value) || 0;
   const descCargue = parseFloat(document.getElementById('desc-cargue')?.value) || 0;
   const descDescargue = parseFloat(document.getElementById('desc-descargue')?.value) || 0;
-  const tarifaBaseT = destino && pesoTotal > 0 ? Math.round(pesoTotal * (TARIFAS_KG_TRANSPORTE[destino] || 0) * (1 - descTrans / 100)) : 0;
+  const tarifaManual = parseFloat(document.getElementById('tarifa-manual')?.value) || 0;
+  const destinoNombre = document.getElementById('destino-otro-nombre')?.value || '';
+  const tarifaBaseT = destino && pesoTotal > 0 ? Math.round(pesoTotal * tarifaKgDe(destino, tarifaManual) * (1 - descTrans / 100)) : 0;
   let transporte = tieneIva ? Math.round(tarifaBaseT * 1.19) : tarifaBaseT;
   let logisticaBase = 0;
   if (document.getElementById('cargue-mano').value === 'si') logisticaBase += Math.round(pesoTotal * 11 * (1 - descCargue / 100));
@@ -2619,7 +2698,7 @@ function guardarCotizacion() {
       proyecto: document.getElementById('cliente-proyecto').value,
     },
     items: JSON.parse(JSON.stringify(itemsActuales)),
-    transporte: { destino, pesoTotal, grabado: tieneIva },
+    transporte: { destino, pesoTotal, grabado: tieneIva, tarifaManual: destino === 'Otro' ? tarifaManual : 0, destinoNombre: destino === 'Otro' ? destinoNombre : '' },
     cargue: document.getElementById('cargue-mano').value,
     descargue: document.getElementById('descargue-mecanico').value,
     descuentos: { transporte: descTrans, cargue: descCargue, descargue: descDescargue },
@@ -2690,6 +2769,9 @@ function cargarCotizacion(id) {
   document.getElementById('cliente-cel').value = cot.cliente.cel;
   document.getElementById('cliente-proyecto').value = cot.cliente.proyecto;
   document.getElementById('destino-transporte').value = cot.transporte.destino || '';
+  document.getElementById('tarifa-manual').value = cot.transporte.tarifaManual || 0;
+  document.getElementById('destino-otro-nombre').value = cot.transporte.destinoNombre || '';
+  document.getElementById('bloque-otro-transporte').style.display = cot.transporte.destino === 'Otro' ? 'block' : 'none';
   document.getElementById('cargue-mano').value = cot.cargue || 'no';
   document.getElementById('descargue-mecanico').value = cot.descargue || 'no';
   document.getElementById('desc-transporte').value = cot.descuentos?.transporte || 0;
@@ -2718,6 +2800,9 @@ function limpiarFormulario() {
   document.getElementById('cliente-cel').value = '';
   document.getElementById('cliente-proyecto').value = '';
   document.getElementById('destino-transporte').value = '';
+  document.getElementById('tarifa-manual').value = 0;
+  document.getElementById('destino-otro-nombre').value = '';
+  document.getElementById('bloque-otro-transporte').style.display = 'none';
   document.getElementById('desc-transporte').value = 0;
   document.getElementById('cargue-mano').value = 'no';
   document.getElementById('desc-cargue').value = 0;
@@ -2752,6 +2837,9 @@ function previsualizarCotizacionById(id) {
   document.getElementById('cliente-cel').value = cot.cliente.cel;
   document.getElementById('cliente-proyecto').value = cot.cliente.proyecto;
   document.getElementById('destino-transporte').value = cot.transporte.destino || '';
+  document.getElementById('tarifa-manual').value = cot.transporte.tarifaManual || 0;
+  document.getElementById('destino-otro-nombre').value = cot.transporte.destinoNombre || '';
+  document.getElementById('bloque-otro-transporte').style.display = cot.transporte.destino === 'Otro' ? 'block' : 'none';
   document.getElementById('cargue-mano').value = cot.cargue || 'no';
   document.getElementById('descargue-mecanico').value = cot.descargue || 'no';
   document.getElementById('desc-transporte').value = cot.descuentos?.transporte || 0;
@@ -2798,7 +2886,9 @@ function previsualizarCotizacion() {
       cargue: document.getElementById('cargue-mano').value,
       descCargue: parseFloat(document.getElementById('desc-cargue')?.value) || 0,
       descargue: document.getElementById('descargue-mecanico').value,
-      descDescargue: parseFloat(document.getElementById('desc-descargue')?.value) || 0
+      descDescargue: parseFloat(document.getElementById('desc-descargue')?.value) || 0,
+      tarifaManual: parseFloat(document.getElementById('tarifa-manual')?.value) || 0,
+      destinoNombre: document.getElementById('destino-otro-nombre')?.value || ''
     },
     ...opcionesExtra
   ];
@@ -2807,7 +2897,7 @@ function previsualizarCotizacion() {
   let hayTransporte = false;
   const totalesOpciones = [];
   opcionesPDF.forEach((op, i) => {
-    const r = construirTablaCotizacion(op.items, op.destino, op.descTrans, op.cargue, op.descCargue, op.descargue, op.descDescargue);
+    const r = construirTablaCotizacion(op.items, op.destino, op.descTrans, op.cargue, op.descCargue, op.descargue, op.descDescargue, op.tarifaManual, op.destinoNombre);
     if (r.transporte > 0) hayTransporte = true;
     totalesOpciones.push(r.total);
     if (multiOp) tablasHTML += `<div style="background:#003F7F;color:#fff;padding:7px 12px;font-weight:700;font-size:13px;border-radius:4px;margin:${i === 0 ? '4' : '20'}px 0 6px;display:flex;justify-content:space-between"><span>OPCIÓN ${i + 1}</span><span>TOTAL: $ ${r.total.toLocaleString()}</span></div>`;
