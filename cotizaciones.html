@@ -4275,6 +4275,19 @@ async function descargarPDF(numCot) {
       pdf.addImage(footerData, 'JPEG', 0, pageH - footerH, pageW, footerH);
     }
 
+    // Página final: ANEXO Medios de Pago (imagen a página completa)
+    const pagoImg = await cargarImagenOpcional(['medios-de-pago.jpg', 'medios-de-pago.png', 'medios_de_pago.jpg']);
+    if (pagoImg) {
+      pdf.addPage();
+      const ratio = pagoImg.naturalHeight / pagoImg.naturalWidth;
+      let w = pageW, h = pageW * ratio;
+      if (h > pageH) { h = pageH; w = pageH / ratio; }
+      const x = (pageW - w) / 2, y = (pageH - h) / 2;
+      pdf.addImage(pagoImg, 'JPEG', x, y, w, h);
+    } else {
+      console.warn('No se encontró "medios-de-pago.jpg"; se omite la página de medios de pago.');
+    }
+
     const cot = COTIZACIONES.find(c => c.numero === numCot);
     const fecha = (cot?.fecha || document.getElementById('fecha-cot').value || new Date().toISOString().split('T')[0]).replace(/-/g, '_');
     const nombreCliente = cot?.cliente?.nombre || document.getElementById('cliente-nombre').value || '';
@@ -4293,6 +4306,14 @@ function cargarImagen(src) {
     img.onerror = reject;
     img.src = src + '?t=' + Date.now();
   });
+}
+
+// Intenta cargar la primera imagen disponible de una lista de nombres; devuelve null si ninguna existe.
+async function cargarImagenOpcional(nombres) {
+  for (const src of nombres) {
+    try { return await cargarImagen(src); } catch (e) { /* probar siguiente */ }
+  }
+  return null;
 }
 </script>
 </body>
