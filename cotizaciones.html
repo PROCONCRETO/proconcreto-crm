@@ -4247,19 +4247,24 @@ async function descargarPDF(numCot) {
 
     // Área de contenido disponible por página
     const availH = pageH - headerH - footerH - 6;
-    // -0.5 mm de tolerancia para no crear una página extra por un sobrante mínimo
-    const numPages = Math.max(1, Math.ceil((contentTotalH - 0.5) / availH));
+    const pageH_px = availH / pxToMm;
 
     const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
     const footerData = footerCanvas.toDataURL('image/jpeg', 0.95);
 
-    for (let i = 0; i < numPages; i++) {
-      // Slice de contenido para esta página
-      const sliceY_px = i * (availH / pxToMm);
-      const sliceH_px = Math.min(availH / pxToMm, contentH_px - sliceY_px);
-      if (sliceH_px <= 1) break; // sin contenido real → no agregar página en blanco
+    // Paginación con corte limpio: el límite de cada página se ajusta a una franja en blanco
+    let cursorY = 0, pageIndex = 0, guard = 0;
+    while (cursorY < contentH_px - 1 && guard < 60) {
+      guard++;
+      let bottom = Math.min(contentH_px, cursorY + pageH_px);
+      // Si no es la última porción, retroceder hasta una fila en blanco para no partir texto
+      if (bottom < contentH_px) {
+        bottom = _filaBlancaCerca(contentCanvas, Math.floor(bottom), cursorY + pageH_px * 0.55);
+      }
+      const sliceH_px = bottom - cursorY;
+      if (sliceH_px <= 1) break;
 
-      if (i > 0) pdf.addPage();
+      if (pageIndex > 0) pdf.addPage();
 
       // Cabecera en cada página
       pdf.addImage(topImg, 'JPEG', 0, 0, pageW, headerH);
@@ -4268,7 +4273,7 @@ async function descargarPDF(numCot) {
       sliceCanvas.width = contentCanvas.width;
       sliceCanvas.height = Math.ceil(sliceH_px);
       sliceCanvas.getContext('2d').drawImage(
-        contentCanvas, 0, Math.floor(sliceY_px),
+        contentCanvas, 0, Math.floor(cursorY),
         contentCanvas.width, Math.ceil(sliceH_px),
         0, 0, contentCanvas.width, Math.ceil(sliceH_px)
       );
@@ -4277,13 +4282,16 @@ async function descargarPDF(numCot) {
 
       // Pie en cada página
       pdf.addImage(footerData, 'JPEG', 0, pageH - footerH, pageW, footerH);
+
+      cursorY = bottom;
+      pageIndex++;
     }
 
     // Página final: ANEXO Medios de Pago (imagen a página completa)
     const pagoImg = await cargarImagenOpcional(['medios-de-pago.jpg', 'medios-de-pago.png', 'medios_de_pago.jpg']);
     if (pagoImg) {
       pdf.addPage();
-      const margin = 14; // margen alrededor de la imagen (mm)
+      const margin = 24; // margen alrededor de la imagen (mm)
       const maxW = pageW - margin * 2, maxH = pageH - margin * 2;
       const ratio = pagoImg.naturalHeight / pagoImg.naturalWidth;
       let w = maxW, h = maxW * ratio;
@@ -4334,6 +4342,25 @@ function _alturaContenidoReal(canvas) {
   } catch (e) {
     return canvas.height; // si el canvas está "tainted", usar la altura completa
   }
+}
+
+// Busca, desde targetY hacia arriba (sin pasar de minY), una fila completamente blanca
+// para cortar la página ENTRE renglones y no partir el texto. Devuelve targetY si no encuentra.
+function _filaBlancaCerca(canvas, targetY, minY) {
+  try {
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    minY = Math.max(0, Math.floor(minY));
+    for (let y = Math.floor(targetY); y >= minY; y--) {
+      const data = ctx.getImageData(0, y, w, 1).data;
+      let blanca = true;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i] < 250 || data[i + 1] < 250 || data[i + 2] < 250) { blanca = false; break; }
+      }
+      if (blanca) return y;
+    }
+  } catch (e) { /* canvas tainted: usar el corte por defecto */ }
+  return targetY;
 }
 
 // Intenta cargar la primera imagen disponible de una lista de nombres; devuelve null si ninguna existe.
