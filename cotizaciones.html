@@ -4235,7 +4235,8 @@ async function descargarPDF(numCot) {
       scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false
     });
     const pxToMm = pageW / contentCanvas.width;
-    const contentTotalH = contentCanvas.height * pxToMm;
+    const contentH_px = _alturaContenidoReal(contentCanvas); // recorta el blanco sobrante al final
+    const contentTotalH = contentH_px * pxToMm;
 
     // Renderizar pie
     const footerEl = document.querySelector('.preview-membrete-footer');
@@ -4246,20 +4247,23 @@ async function descargarPDF(numCot) {
 
     // Área de contenido disponible por página
     const availH = pageH - headerH - footerH - 6;
-    const numPages = Math.ceil(contentTotalH / availH);
+    // -0.5 mm de tolerancia para no crear una página extra por un sobrante mínimo
+    const numPages = Math.max(1, Math.ceil((contentTotalH - 0.5) / availH));
 
     const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
     const footerData = footerCanvas.toDataURL('image/jpeg', 0.95);
 
     for (let i = 0; i < numPages; i++) {
+      // Slice de contenido para esta página
+      const sliceY_px = i * (availH / pxToMm);
+      const sliceH_px = Math.min(availH / pxToMm, contentH_px - sliceY_px);
+      if (sliceH_px <= 1) break; // sin contenido real → no agregar página en blanco
+
       if (i > 0) pdf.addPage();
 
       // Cabecera en cada página
       pdf.addImage(topImg, 'JPEG', 0, 0, pageW, headerH);
 
-      // Slice de contenido para esta página
-      const sliceY_px = i * (availH / pxToMm);
-      const sliceH_px = Math.min(availH / pxToMm, contentCanvas.height - sliceY_px);
       const sliceCanvas = document.createElement('canvas');
       sliceCanvas.width = contentCanvas.width;
       sliceCanvas.height = Math.ceil(sliceH_px);
@@ -4279,11 +4283,15 @@ async function descargarPDF(numCot) {
     const pagoImg = await cargarImagenOpcional(['medios-de-pago.jpg', 'medios-de-pago.png', 'medios_de_pago.jpg']);
     if (pagoImg) {
       pdf.addPage();
+      const margin = 14; // margen alrededor de la imagen (mm)
+      const maxW = pageW - margin * 2, maxH = pageH - margin * 2;
       const ratio = pagoImg.naturalHeight / pagoImg.naturalWidth;
-      let w = pageW, h = pageW * ratio;
-      if (h > pageH) { h = pageH; w = pageH / ratio; }
+      let w = maxW, h = maxW * ratio;
+      if (h > maxH) { h = maxH; w = maxH / ratio; }
       const x = (pageW - w) / 2, y = (pageH - h) / 2;
       pdf.addImage(pagoImg, 'JPEG', x, y, w, h);
+      // Marco sutil alrededor de la imagen
+      pdf.setDrawColor(210); pdf.setLineWidth(0.3); pdf.rect(x, y, w, h);
     } else {
       console.warn('No se encontró "medios-de-pago.jpg"; se omite la página de medios de pago.');
     }
@@ -4306,6 +4314,26 @@ function cargarImagen(src) {
     img.onerror = reject;
     img.src = src + '?t=' + Date.now();
   });
+}
+
+// Detecta la última fila con contenido real (no blanco) de un canvas, para recortar el espacio
+// en blanco sobrante al final del documento y evitar páginas vacías en el PDF.
+function _alturaContenidoReal(canvas) {
+  try {
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    for (let y = h - 1; y >= 0; y -= 2) {
+      const data = ctx.getImageData(0, y, w, 1).data;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245) {
+          return Math.min(h, y + 16); // pequeño respiro tras el último contenido
+        }
+      }
+    }
+    return h;
+  } catch (e) {
+    return canvas.height; // si el canvas está "tainted", usar la altura completa
+  }
 }
 
 // Intenta cargar la primera imagen disponible de una lista de nombres; devuelve null si ninguna existe.
