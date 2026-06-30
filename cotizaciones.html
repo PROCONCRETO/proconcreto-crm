@@ -330,6 +330,7 @@
   <div class="nav-logo"><img src="logo.png" alt="Proconcreto Prefabricados"></div>
   <button class="nav-modulo activo" onclick="activarModulo('cotizaciones')">📋 Cotizaciones y Ventas</button>
   <button class="nav-modulo" onclick="activarModulo('produccion')">🏭 Producción</button>
+  <button class="nav-modulo" onclick="activarModulo('productos')">📦 Productos</button>
   <button class="nav-modulo" onclick="activarModulo('logistica')" style="opacity:0.4;cursor:default" disabled title="Próximamente">🚛 Logística</button>
   <button class="nav-modulo" onclick="activarModulo('cartera')" style="opacity:0.4;cursor:default" disabled title="Próximamente">💰 Cartera</button>
   <div id="nav-usuario">
@@ -808,6 +809,81 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════
+     PANTALLA: PRODUCTOS (CATÁLOGO / ADMIN)
+═══════════════════════════════════════ -->
+<div id="pantalla-productos" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Catálogo de Productos</div>
+    <div class="flex-gap">
+      <select id="filtro-grupo-prod-adm" class="buscador-input" style="width:auto" onchange="renderProductosAdmin()"><option value="">Todos los grupos</option></select>
+      <input type="text" id="buscar-prod-adm" class="buscador-input" placeholder="🔍 Buscar producto o código..." oninput="renderProductosAdmin()">
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="ver-ocultos-prod" onchange="renderProductosAdmin()"> Ver ocultos</label>
+      <button class="btn btn-secundario" onclick="abrirModalImportar()">⬆️ Importar Excel</button>
+      <button class="btn btn-primario" onclick="abrirModalProducto()">+ Nuevo producto</button>
+    </div>
+  </div>
+  <div id="prod-adm-resumen" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap"></div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" id="tabla-productos-adm">
+      <thead><tr>
+        <th>CÓDIGO</th><th>PRODUCTO</th><th>GRUPO</th><th>UNID.</th><th>IVA</th>
+        <th style="text-align:right">PRECIO LISTA</th><th style="text-align:right">PRECIO MÍNIMO</th><th>ESTADO</th><th style="min-width:150px">ACCIONES</th>
+      </tr></thead>
+      <tbody id="productos-adm-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-producto">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-titulo" id="modal-producto-titulo">📦 Nuevo producto</div>
+    <input type="hidden" id="mp-codigo-orig">
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Código *</label><input type="text" id="mp-codigo" placeholder="Ej: PBCADCRV8G"></div>
+      <div class="form-grupo"><label>Grupo *</label><input type="text" id="mp-grupo" list="lista-grupos-dl" placeholder="Ej: Adoquín"></div>
+    </div>
+    <datalist id="lista-grupos-dl"></datalist>
+    <div class="form-grupo" style="margin-bottom:10px"><label>Nombre *</label><input type="text" id="mp-nombre"></div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Medidas</label><input type="text" id="mp-medidas" placeholder="Ej: a=20 b=10 h=6 cm"></div>
+      <div class="form-grupo"><label>Unidad</label><input type="text" id="mp-unidad" value="UD"></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Peso (kg)</label><input type="number" id="mp-peso" step="0.01" min="0"></div>
+      <div class="form-grupo"><label>IVA</label><select id="mp-iva"><option value="NO">NO</option><option value="SI">SI</option></select></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:16px">
+      <div class="form-grupo"><label>Precio Lista *</label><input type="number" id="mp-lista" min="0"></div>
+      <div class="form-grupo"><label>Precio Mínimo *</label><input type="number" id="mp-minimo" min="0"></div>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-producto')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarProducto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-importar">
+  <div class="modal" style="max-width:660px">
+    <div class="modal-titulo">⬆️ Importar lista de precios</div>
+    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:10px;line-height:1.5">
+      Sube un archivo <strong>Excel (.xlsx)</strong> o <strong>CSV</strong> con columnas: <em>Codigo, Producto, Grupo, Medidas, Unidad, Peso, IVA, Precio Lista, Precio Minimo</em>. La actualización se hace por <strong>Código</strong>.
+      <button class="btn btn-secundario btn-xs" style="margin-left:6px" onclick="descargarPlantillaProductos()">⬇️ Descargar plantilla</button>
+    </div>
+    <input type="file" id="archivo-importar" accept=".xlsx,.xls,.csv" onchange="procesarArchivoImportar(event)" style="margin-bottom:12px;font-size:13px">
+    <div id="importar-preview" style="display:none">
+      <div id="importar-resumen" style="margin-bottom:10px"></div>
+      <div style="max-height:230px;overflow:auto;border:1px solid var(--gris-borde);border-radius:6px" id="importar-detalle"></div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:10px"><input type="checkbox" id="importar-ocultar-faltantes" checked> Ocultar los productos del catálogo que NO vengan en el archivo (descontinuados)</label>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-importar')">Cancelar</button>
+      <button class="btn btn-primario" id="btn-aplicar-import" onclick="aplicarImportacion()" disabled>Aplicar cambios</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-produccion">
   <div class="modal" style="max-width:560px">
     <div class="modal-titulo" id="modal-produccion-titulo">📅 Registrar Producción</div>
@@ -1030,7 +1106,8 @@ const TARIFAS_KG_TRANSPORTE = {
 };
 
 // Catálogo de productos — Lista de precios Mayo 2026
-const PRODUCTOS = [
+// Catálogo semilla (se carga a Supabase la primera vez). La fuente de verdad pasa a ser la tabla "productos".
+const PRODUCTOS_SEED = [
   // ADOQUÍN
   {codigo:'PBCADCRV8G',  nombre:'Adoquín Cruz Vehicular Gris',               medidas:'a=23 b=25 h=8 cm',   unidad:'UD', peso:8.1,  iva:'NO', lista:5510,    minimo:4724,    grupo:'Adoquín'},
   {codigo:'PBBCARPG04',  nombre:'Adoquín Peatonal h=4cm Gris',               medidas:'a=20 b=10 h=4 cm',   unidad:'UD', peso:1.66, iva:'NO', lista:950,     minimo:860,     grupo:'Adoquín'},
@@ -1274,6 +1351,309 @@ const PRODUCTOS = [
   {codigo:'PVGPPH184H-01',nombre:'Vigueta Pretensada H18 4 Hilos + 1',       medidas:'a=11 h=18 cm ML',    unidad:'ML', peso:32,   iva:'SI', lista:23990,   minimo:21660,   grupo:'Viga Pretensada'},
 ];
 
+// CATALOGO = todos los productos (incluye ocultos) tal como vienen de Supabase.
+// PRODUCTOS = solo los activos, que es lo que ve el cotizador. Inicia con la semilla y se reemplaza al cargar.
+let CATALOGO = PRODUCTOS_SEED.map(p => ({ ...p, activo: true }));
+let PRODUCTOS = CATALOGO.filter(p => p.activo !== false);
+
+function refrescarCatalogo(rows) {
+  CATALOGO = rows.map(p => ({
+    codigo: p.codigo, nombre: p.nombre, medidas: p.medidas || '', unidad: p.unidad || 'UD',
+    peso: (p.peso === null || p.peso === undefined) ? null : Number(p.peso), iva: p.iva || 'NO',
+    lista: Number(p.lista) || 0, minimo: Number(p.minimo) || 0, grupo: p.grupo || 'Otros',
+    activo: p.activo !== false
+  }));
+  PRODUCTOS = CATALOGO.filter(p => p.activo !== false);
+}
+
+async function cargarCatalogo() {
+  const { data, error } = await sb.from('productos').select('*').order('grupo', { ascending: true }).order('nombre', { ascending: true });
+  if (error) {
+    console.warn('Tabla productos no disponible aún; usando catálogo del código (semilla).');
+    return;
+  }
+  if (data && data.length) {
+    refrescarCatalogo(data);
+  } else {
+    // Primera vez: sembrar la tabla con el catálogo del código
+    const seed = PRODUCTOS_SEED.map(p => ({
+      codigo: p.codigo, nombre: p.nombre, medidas: p.medidas, unidad: p.unidad,
+      peso: p.peso, iva: p.iva, lista: p.lista, minimo: p.minimo, grupo: p.grupo,
+      activo: true, modificado: new Date().toISOString()
+    }));
+    const { error: eSeed } = await sb.from('productos').upsert(seed, { onConflict: 'codigo' });
+    if (eSeed) { console.error('Error sembrando productos:', eSeed.message); return; }
+    refrescarCatalogo(seed);
+    console.log('Catálogo sembrado en Supabase:', seed.length, 'productos.');
+  }
+}
+
+// ═══════════════════════════════
+// ADMINISTRACIÓN DE PRODUCTOS (CATÁLOGO)
+// ═══════════════════════════════
+function _normHdr(s) { return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,''); }
+
+function renderProductosAdmin() {
+  const tbody = document.getElementById('productos-adm-body');
+  const resumen = document.getElementById('prod-adm-resumen');
+  if (!tbody) return;
+  // Poblar filtro de grupos y datalist
+  const grupos = [...new Set(CATALOGO.map(p => p.grupo))].filter(Boolean).sort();
+  const selG = document.getElementById('filtro-grupo-prod-adm');
+  const actual = selG.value;
+  selG.innerHTML = '<option value="">Todos los grupos</option>' + grupos.map(g => `<option value="${g}">${g}</option>`).join('');
+  selG.value = actual;
+  const dl = document.getElementById('lista-grupos-dl');
+  if (dl) dl.innerHTML = grupos.map(g => `<option value="${g}">`).join('');
+
+  const q = (document.getElementById('buscar-prod-adm')?.value || '').toLowerCase().trim();
+  const grupo = selG.value;
+  const verOcultos = document.getElementById('ver-ocultos-prod')?.checked;
+
+  let data = [...CATALOGO];
+  if (!verOcultos) data = data.filter(p => p.activo !== false);
+  if (grupo) data = data.filter(p => p.grupo === grupo);
+  if (q) data = data.filter(p => (p.nombre + ' ' + p.codigo + ' ' + (p.medidas||'')).toLowerCase().includes(q));
+  data.sort((a,b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre));
+
+  const activos = CATALOGO.filter(p => p.activo !== false).length;
+  const ocultos = CATALOGO.length - activos;
+  resumen.innerHTML = `
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--verde);min-width:130px"><div style="font-size:10px;font-weight:700;color:var(--verde);text-transform:uppercase">Productos activos</div><div style="font-size:18px;font-weight:800">${activos}</div></div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid #C62828;min-width:130px"><div style="font-size:10px;font-weight:700;color:#C62828;text-transform:uppercase">Ocultos</div><div style="font-size:18px;font-weight:800">${ocultos}</div></div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--azul);min-width:130px"><div style="font-size:10px;font-weight:700;color:var(--azul);text-transform:uppercase">Mostrados</div><div style="font-size:18px;font-weight:800">${data.length}</div></div>`;
+
+  if (!data.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">📦</div><div>Sin productos para este filtro.</div></td></tr>`; return; }
+  tbody.innerHTML = data.map(p => {
+    const inactivo = p.activo === false;
+    return `<tr style="border-top:1px solid var(--gris-borde);${inactivo?'opacity:.55':''}">
+      <td style="font-weight:600;color:var(--azul);font-size:12px">${p.codigo}</td>
+      <td><div style="font-weight:600;font-size:13px">${p.nombre}</div><div style="font-size:11px;color:var(--gris-medio)">${p.medidas||''}</div></td>
+      <td style="color:var(--gris-medio)">${p.grupo}</td>
+      <td style="text-align:center">${p.unidad}</td>
+      <td style="text-align:center"><span style="color:${p.iva==='SI'?'var(--rojo)':'var(--verde)'};font-weight:700;font-size:12px">${p.iva}</span></td>
+      <td style="text-align:right"><input type="number" value="${p.lista}" onchange="actualizarPrecioProducto('${p.codigo}','lista',this.value)" style="width:100px;text-align:right;padding:4px 6px;border:1px solid var(--gris-borde);border-radius:4px"></td>
+      <td style="text-align:right"><input type="number" value="${p.minimo}" onchange="actualizarPrecioProducto('${p.codigo}','minimo',this.value)" style="width:100px;text-align:right;padding:4px 6px;border:1px solid var(--gris-borde);border-radius:4px"></td>
+      <td><span class="badge" style="background:${inactivo?'#FFEBEE':'#E8F5E9'};color:${inactivo?'#C62828':'#2E7D32'}">${inactivo?'Oculto':'Activo'}</span></td>
+      <td><div class="flex-gap">
+        <button class="btn btn-primario btn-xs" onclick="abrirModalProducto('${p.codigo}')">✏️ Editar</button>
+        ${inactivo
+          ? `<button class="btn btn-verde btn-xs" onclick="toggleOcultarProducto('${p.codigo}',false)">↩️ Reactivar</button>`
+          : `<button class="btn btn-secundario btn-xs" onclick="toggleOcultarProducto('${p.codigo}',true)">🚫 Ocultar</button>`}
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function _upsertProducto(p) {
+  return sb.from('productos').upsert({
+    codigo: p.codigo, nombre: p.nombre, medidas: p.medidas, unidad: p.unidad,
+    peso: p.peso, iva: p.iva, lista: p.lista, minimo: p.minimo, grupo: p.grupo,
+    activo: p.activo !== false, modificado: new Date().toISOString()
+  }, { onConflict: 'codigo' });
+}
+
+function actualizarPrecioProducto(codigo, campo, valor) {
+  const p = CATALOGO.find(x => x.codigo === codigo);
+  if (!p) return;
+  p[campo] = parseFloat(valor) || 0;
+  PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
+  _upsertProducto(p).then(({ error }) => { if (error) { console.error(error.message); alert('No se pudo guardar el precio: ' + error.message); } });
+}
+
+function toggleOcultarProducto(codigo, ocultar) {
+  const p = CATALOGO.find(x => x.codigo === codigo);
+  if (!p) return;
+  if (ocultar && !confirm(`¿Ocultar "${p.nombre}"? Dejará de aparecer en cotizaciones nuevas (no se borra).`)) return;
+  p.activo = !ocultar;
+  PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
+  _upsertProducto(p).then(({ error }) => { if (error) alert('Error: ' + error.message); });
+  renderProductosAdmin();
+}
+
+function abrirModalProducto(codigo) {
+  const esEdit = !!codigo;
+  document.getElementById('modal-producto-titulo').textContent = esEdit ? '✏️ Editar producto' : '📦 Nuevo producto';
+  document.getElementById('mp-codigo-orig').value = codigo || '';
+  const p = esEdit ? CATALOGO.find(x => x.codigo === codigo) : null;
+  document.getElementById('mp-codigo').value = p?.codigo || '';
+  document.getElementById('mp-codigo').readOnly = esEdit;
+  document.getElementById('mp-grupo').value = p?.grupo || '';
+  document.getElementById('mp-nombre').value = p?.nombre || '';
+  document.getElementById('mp-medidas').value = p?.medidas || '';
+  document.getElementById('mp-unidad').value = p?.unidad || 'UD';
+  document.getElementById('mp-peso').value = (p && p.peso != null) ? p.peso : '';
+  document.getElementById('mp-iva').value = p?.iva || 'NO';
+  document.getElementById('mp-lista').value = p?.lista ?? '';
+  document.getElementById('mp-minimo').value = p?.minimo ?? '';
+  document.getElementById('modal-producto').classList.add('abierto');
+}
+
+function guardarProducto() {
+  const codigo = document.getElementById('mp-codigo').value.trim();
+  const nombre = document.getElementById('mp-nombre').value.trim();
+  const grupo = document.getElementById('mp-grupo').value.trim();
+  const lista = parseFloat(document.getElementById('mp-lista').value);
+  const minimo = parseFloat(document.getElementById('mp-minimo').value);
+  if (!codigo || !nombre || !grupo || !(lista >= 0) || !(minimo >= 0)) { alert('Completa: Código, Nombre, Grupo, Precio Lista y Precio Mínimo.'); return; }
+  const orig = document.getElementById('mp-codigo-orig').value;
+  if (!orig && CATALOGO.find(x => x.codigo === codigo)) { alert('Ya existe un producto con ese código.'); return; }
+  const pesoVal = document.getElementById('mp-peso').value;
+  const prod = {
+    codigo, nombre, grupo,
+    medidas: document.getElementById('mp-medidas').value.trim(),
+    unidad: document.getElementById('mp-unidad').value.trim() || 'UD',
+    peso: pesoVal === '' ? null : parseFloat(pesoVal),
+    iva: document.getElementById('mp-iva').value,
+    lista, minimo, activo: true
+  };
+  const idx = CATALOGO.findIndex(x => x.codigo === codigo);
+  if (idx >= 0) CATALOGO[idx] = { ...CATALOGO[idx], ...prod }; else CATALOGO.push(prod);
+  PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
+  _upsertProducto(prod).then(({ error }) => { if (error) alert('Error al guardar: ' + error.message); });
+  cerrarModal('modal-producto');
+  renderProductosAdmin();
+}
+
+// ── IMPORTACIÓN DESDE EXCEL / CSV ──
+let _importData = null;
+
+function abrirModalImportar() {
+  document.getElementById('archivo-importar').value = '';
+  document.getElementById('importar-preview').style.display = 'none';
+  document.getElementById('btn-aplicar-import').disabled = true;
+  _importData = null;
+  document.getElementById('modal-importar').classList.add('abierto');
+}
+
+function descargarPlantillaProductos() {
+  if (typeof XLSX === 'undefined') { alert('La librería de Excel no cargó. Verifica tu conexión.'); return; }
+  const rows = [['Codigo','Producto','Grupo','Medidas','Unidad','Peso','IVA','Precio Lista','Precio Minimo']];
+  CATALOGO.filter(p => p.activo !== false).sort((a,b)=>a.grupo.localeCompare(b.grupo)||a.nombre.localeCompare(b.nombre))
+    .forEach(p => rows.push([p.codigo, p.nombre, p.grupo, p.medidas, p.unidad, p.peso, p.iva, p.lista, p.minimo]));
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+  XLSX.writeFile(wb, 'Plantilla_Productos_Proconcreto.xlsx');
+}
+
+function procesarArchivoImportar(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  if (typeof XLSX === 'undefined') { alert('La librería de Excel no cargó. Verifica tu conexión.'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      if (aoa.length < 2) { alert('El archivo no tiene datos.'); return; }
+      const hdr = aoa[0].map(_normHdr);
+      const col = (claves) => hdr.findIndex(h => claves.includes(h));
+      const ci = {
+        codigo: col(['codigo','code']), nombre: col(['producto','nombre']), grupo: col(['grupo']),
+        medidas: col(['medidas','medida']), unidad: col(['unidad','unid']), peso: col(['peso','pesokg']),
+        iva: col(['iva']), lista: col(['preciolista','lista','preciolistacop']), minimo: col(['preciominimo','minimo','preciominimocop'])
+      };
+      if (ci.codigo < 0 || ci.lista < 0) { alert('El archivo debe tener al menos las columnas "Codigo" y "Precio Lista".'); return; }
+      const items = [];
+      for (let i = 1; i < aoa.length; i++) {
+        const r = aoa[i];
+        const codigo = String(r[ci.codigo] ?? '').trim();
+        if (!codigo) continue;
+        items.push({
+          codigo,
+          nombre: ci.nombre>=0 ? String(r[ci.nombre]??'').trim() : '',
+          grupo: ci.grupo>=0 ? String(r[ci.grupo]??'').trim() : '',
+          medidas: ci.medidas>=0 ? String(r[ci.medidas]??'').trim() : '',
+          unidad: ci.unidad>=0 ? (String(r[ci.unidad]??'').trim()||'UD') : 'UD',
+          peso: ci.peso>=0 && r[ci.peso]!=='' ? parseFloat(r[ci.peso]) : null,
+          iva: ci.iva>=0 ? (String(r[ci.iva]??'').trim().toUpperCase()==='SI'?'SI':'NO') : 'NO',
+          lista: parseFloat(r[ci.lista]) || 0,
+          minimo: ci.minimo>=0 ? (parseFloat(r[ci.minimo])||0) : 0
+        });
+      }
+      // Diff contra catálogo
+      const mapCat = {}; CATALOGO.forEach(p => mapCat[p.codigo] = p);
+      const codigosArchivo = new Set(items.map(i => i.codigo));
+      let nuevos=0, actualizados=0, sinCambio=0;
+      items.forEach(it => {
+        const ex = mapCat[it.codigo];
+        if (!ex) { it._estado='nuevo'; nuevos++; }
+        else {
+          const cambio = ex.lista!==it.lista || ex.minimo!==it.minimo || ex.nombre!==(it.nombre||ex.nombre) || ex.grupo!==(it.grupo||ex.grupo) || ex.activo===false;
+          if (cambio) { it._estado='actualizado'; actualizados++; } else { it._estado='igual'; sinCambio++; }
+        }
+      });
+      const faltantes = CATALOGO.filter(p => p.activo!==false && !codigosArchivo.has(p.codigo));
+      _importData = { items, faltantes };
+
+      document.getElementById('importar-resumen').innerHTML = `
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <span class="badge" style="background:#E8F5E9;color:#2E7D32">🆕 ${nuevos} nuevos</span>
+          <span class="badge" style="background:#E3F2FD;color:#1565C0">♻️ ${actualizados} actualizados</span>
+          <span class="badge" style="background:#F2F4F7;color:#555">= ${sinCambio} sin cambio</span>
+          <span class="badge" style="background:#FFF3E0;color:#E65100">🚫 ${faltantes.length} a ocultar</span>
+        </div>`;
+      const muestra = items.filter(i => i._estado!=='igual').slice(0, 60);
+      document.getElementById('importar-detalle').innerHTML = `<table class="tabla-cots" style="width:100%"><thead><tr><th>Código</th><th>Producto</th><th style="text-align:right">Lista</th><th style="text-align:right">Mínimo</th><th>Estado</th></tr></thead><tbody>${
+        muestra.map(it => {
+          const ex = mapCat[it.codigo];
+          const dif = ex && ex.lista!==it.lista ? ` <span style="font-size:10px;color:#888">(antes $${ex.lista.toLocaleString()})</span>` : '';
+          return `<tr><td style="font-size:11px;color:var(--azul)">${it.codigo}</td><td style="font-size:12px">${it.nombre||(ex?ex.nombre:'')}</td><td style="text-align:right">$${it.lista.toLocaleString()}${dif}</td><td style="text-align:right">$${it.minimo.toLocaleString()}</td><td>${it._estado==='nuevo'?'<span class="badge" style="background:#E8F5E9;color:#2E7D32">Nuevo</span>':'<span class="badge" style="background:#E3F2FD;color:#1565C0">Actualiza</span>'}</td></tr>`;
+        }).join('') + (items.filter(i=>i._estado!=='igual').length>60 ? `<tr><td colspan="5" style="text-align:center;color:#888;font-size:11px">… y más</td></tr>`:'')
+      }</tbody></table>`;
+      document.getElementById('importar-preview').style.display = 'block';
+      document.getElementById('btn-aplicar-import').disabled = (nuevos+actualizados+faltantes.length)===0;
+    } catch (err) {
+      console.error(err); alert('No se pudo leer el archivo: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function aplicarImportacion() {
+  if (!_importData) return;
+  const ocultarFalt = document.getElementById('importar-ocultar-faltantes').checked;
+  const btn = document.getElementById('btn-aplicar-import');
+  btn.disabled = true; btn.textContent = '⏳ Aplicando...';
+  // Filas a upsert: las del archivo (activas), completando datos faltantes desde el catálogo actual
+  const mapCat = {}; CATALOGO.forEach(p => mapCat[p.codigo] = p);
+  const upserts = _importData.items.map(it => {
+    const ex = mapCat[it.codigo] || {};
+    return {
+      codigo: it.codigo,
+      nombre: it.nombre || ex.nombre || it.codigo,
+      grupo: it.grupo || ex.grupo || 'Otros',
+      medidas: it.medidas || ex.medidas || '',
+      unidad: it.unidad || ex.unidad || 'UD',
+      peso: it.peso != null ? it.peso : (ex.peso ?? null),
+      iva: it.iva || ex.iva || 'NO',
+      lista: it.lista, minimo: it.minimo, activo: true, modificado: new Date().toISOString()
+    };
+  });
+  if (ocultarFalt) {
+    _importData.faltantes.forEach(p => upserts.push({ ...p, activo: false, modificado: new Date().toISOString() }));
+  }
+  try {
+    // Supabase upsert por lotes de 500
+    for (let i = 0; i < upserts.length; i += 500) {
+      const lote = upserts.slice(i, i+500);
+      const { error } = await sb.from('productos').upsert(lote, { onConflict: 'codigo' });
+      if (error) throw error;
+    }
+    const { data } = await sb.from('productos').select('*').order('grupo').order('nombre');
+    if (data) refrescarCatalogo(data);
+    cerrarModal('modal-importar');
+    renderProductosAdmin();
+    alert(`✅ Importación aplicada: ${upserts.length} registros procesados.`);
+  } catch (err) {
+    console.error(err); alert('Error al aplicar: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Aplicar cambios';
+  }
+}
+
 // Ítems actuales
 let itemsActuales = [];
 
@@ -1281,6 +1661,7 @@ let itemsActuales = [];
 // NAVEGACIÓN
 // ═══════════════════════════════
 function activarModulo(modulo) {
+  document.getElementById('vista-previa').style.display = 'none';
   document.querySelectorAll('.nav-modulo').forEach(b => b.classList.remove('activo'));
   event.currentTarget.classList.add('activo');
   document.getElementById('subnav-cotizaciones').style.display = modulo === 'cotizaciones' ? 'flex' : 'none';
@@ -1290,9 +1671,15 @@ function activarModulo(modulo) {
     document.getElementById('pantalla-ordenes-servicio').classList.add('activa');
     renderOrdenes();
   }
+  if (modulo === 'productos') {
+    document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+    document.getElementById('pantalla-productos').classList.add('activa');
+    renderProductosAdmin();
+  }
 }
 
 function ir(pantalla) {
+  document.getElementById('vista-previa').style.display = 'none';
   document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('activo'));
   document.getElementById('pantalla-' + pantalla).classList.add('activa');
@@ -1959,6 +2346,9 @@ async function cargarDatosSupabase() {
   if (e4) console.warn('Tabla producciones no disponible aún.');
   ORDENES = (ords || []).filter(r => r.datos).map(r => r.datos);
   PRODUCCIONES = (prods || []).filter(r => r.datos).map(r => r.datos);
+
+  // Catálogo de productos desde Supabase (con auto-siembra la primera vez)
+  await cargarCatalogo();
   if (e1) console.error('Error cargando cotizaciones:', e1.message);
   if (e2) console.error('Error cargando clientes:', e2.message);
   COTIZACIONES = (cots || []).filter(r => r.datos).map(r => ({ ...r.datos, estado: r.estado }));
@@ -2025,6 +2415,7 @@ function rerenderPantallaActiva() {
     case 'pantalla-pipeline-produccion': renderPipelineProduccion(); break;
     case 'pantalla-produccion-diaria': renderProduccionDiaria(); break;
     case 'pantalla-inventario': renderInventario(); break;
+    case 'pantalla-productos': renderProductosAdmin(); break;
   }
 }
 
@@ -2053,6 +2444,10 @@ async function recargarProduccionesRT() {
   PRODUCCIONES = (data || []).filter(r => r.datos).map(r => r.datos);
   rerenderPantallaActiva();
 }
+async function recargarProductosRT() {
+  const { data } = await sb.from('productos').select('*').order('grupo', { ascending: true }).order('nombre', { ascending: true });
+  if (data) { refrescarCatalogo(data); rerenderPantallaActiva(); }
+}
 
 function suscribirRealtime() {
   if (_canalRealtime) return; // evitar suscripciones duplicadas
@@ -2061,6 +2456,7 @@ function suscribirRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'clientes' },          () => _rtDebounce('clientes', recargarClientesRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes_servicio' },  () => _rtDebounce('ordenes', recargarOrdenesRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'producciones' },      () => _rtDebounce('producciones', recargarProduccionesRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' },          () => _rtDebounce('productos', recargarProductosRT))
     .subscribe((status) => {
       const ind = document.getElementById('rt-indicador');
       if (ind) {
@@ -3819,6 +4215,7 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 async function descargarPDF(numCot) {
   const btn = document.querySelector('button[onclick*="descargarPDF"]');
