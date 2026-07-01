@@ -330,10 +330,10 @@
   <div class="nav-logo"><img src="logo.png" alt="Proconcreto Prefabricados"></div>
   <button class="nav-modulo activo" onclick="activarModulo('cotizaciones')">📋 Cotizaciones y Ventas</button>
   <button class="nav-modulo" onclick="activarModulo('produccion')">🏭 Producción</button>
-  <button class="nav-modulo" onclick="activarModulo('productos')">📦 Productos</button>
   <button class="nav-modulo" onclick="activarModulo('logistica')" style="opacity:0.4;cursor:default" disabled title="Próximamente">🚛 Logística</button>
   <button class="nav-modulo" onclick="activarModulo('cartera')" style="opacity:0.4;cursor:default" disabled title="Próximamente">💰 Cartera</button>
-  <div id="nav-usuario">
+  <button class="nav-modulo" onclick="activarModulo('productos')" style="margin-left:auto">📦 Productos</button>
+  <div id="nav-usuario" style="margin-left:16px">
     <span id="rt-indicador" style="font-size:14px;font-weight:700;color:#999;white-space:nowrap;padding:4px 10px;border-radius:14px;background:rgba(255,255,255,0.12)" title="Estado de sincronización">⚪ Conectando…</span>
     <span id="usuario-email"></span>
     <button class="btn btn-secundario btn-sm" onclick="cerrarSesion()" style="font-size:11px;padding:4px 10px">Salir</button>
@@ -2638,28 +2638,28 @@ function recalcular() {
   const descCargue = parseFloat(document.getElementById('desc-cargue')?.value) || 0;
   const descDescargue = parseFloat(document.getElementById('desc-descargue')?.value) || 0;
 
-  let transporte = 0;
+  let transporte = 0; // base sin IVA
   const destino = document.getElementById('destino-transporte').value;
   const tarifaManual = parseFloat(document.getElementById('tarifa-manual')?.value) || 0;
   if (destino && pesoTotal > 0) {
     const tarifaBase = Math.round(pesoTotal * tarifaKgDe(destino, tarifaManual));
-    const tarifaConDesc = Math.round(tarifaBase * (1 - descTrans / 100));
-    transporte = tieneIva ? Math.round(tarifaConDesc * 1.19) : tarifaConDesc;
+    transporte = Math.round(tarifaBase * (1 - descTrans / 100)); // base
+    if (tieneIva) iva += Math.round(transporte * 0.19); // transporte grabado solo si el producto tiene IVA
   }
 
-  let logisticaBase = 0;
+  let logistica = 0; // base sin IVA (cargue/descargue: servicios SIEMPRE grabados)
   if (document.getElementById('cargue-mano').value === 'si') {
     const base = Math.round(pesoTotal * 11 * (1 - descCargue / 100));
-    logisticaBase += base;
+    logistica += base;
+    iva += Math.round(base * 0.19);
   }
   if (document.getElementById('descargue-mecanico').value === 'si') {
     const base = Math.round(pesoTotal * 11 * (1 - descDescargue / 100));
-    logisticaBase += base;
+    logistica += base;
+    iva += Math.round(base * 0.19);
   }
-  const ivaLogistica = Math.round(logisticaBase * 0.19);
-  const logistica = logisticaBase + ivaLogistica;
 
-  const total = subtotal + iva + transporte + logistica;
+  const total = subtotal + transporte + logistica + iva;
   document.getElementById('tot-subtotal').textContent = '$' + subtotal.toLocaleString();
   document.getElementById('tot-iva').textContent = '$' + iva.toLocaleString();
   document.getElementById('tot-transporte').textContent = '$' + transporte.toLocaleString();
@@ -2724,16 +2724,21 @@ function calcOpcion(op) {
     if (it.peso) pesoTotal += it.peso * it.cantidad;
   });
   const tieneIva = op.items.some(it => it.iva === 'SI');
-  let transporte = 0;
+  let transporte = 0; // base sin IVA
   if (op.destino && pesoTotal > 0) {
-    const base = Math.round(pesoTotal * tarifaKgDe(op.destino, op.tarifaManual) * (1 - (op.descTrans || 0) / 100));
-    transporte = tieneIva ? Math.round(base * 1.19) : base;
+    transporte = Math.round(pesoTotal * tarifaKgDe(op.destino, op.tarifaManual) * (1 - (op.descTrans || 0) / 100));
+    if (tieneIva) iva += Math.round(transporte * 0.19);
   }
-  let logBase = 0;
-  if (op.cargue === 'si') logBase += Math.round(pesoTotal * 11 * (1 - (op.descCargue || 0) / 100));
-  if (op.descargue === 'si') logBase += Math.round(pesoTotal * 11 * (1 - (op.descDescargue || 0) / 100));
-  const logistica = logBase + Math.round(logBase * 0.19);
-  return { subtotal, iva, transporte, logistica, pesoTotal, total: subtotal + iva + transporte + logistica };
+  let logistica = 0; // base sin IVA (cargue/descargue: servicios SIEMPRE grabados)
+  if (op.cargue === 'si') {
+    const base = Math.round(pesoTotal * 11 * (1 - (op.descCargue || 0) / 100));
+    logistica += base; iva += Math.round(base * 0.19);
+  }
+  if (op.descargue === 'si') {
+    const base = Math.round(pesoTotal * 11 * (1 - (op.descDescargue || 0) / 100));
+    logistica += base; iva += Math.round(base * 0.19);
+  }
+  return { subtotal, iva, transporte, logistica, pesoTotal, total: subtotal + transporte + logistica + iva };
 }
 
 function agregarOpcionExtra() {
@@ -2977,41 +2982,43 @@ function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCarg
     </tr>`;
   });
   const transIva = items.some(it => it.iva === 'SI');
-  let transporte = 0;
+  let transporte = 0; // base sin IVA
   if (destino && pesoTotal > 0) {
     const tarifaKg = tarifaKgDe(destino, tarifaManual);
     const destLabelNombre = nombreDestino(destino, destinoNombre);
     const tarifaBase = Math.round(pesoTotal * tarifaKg);
-    const tarifaConDesc = Math.round(tarifaBase * (1 - descTrans / 100));
-    transporte = transIva ? Math.round(tarifaConDesc * 1.19) : tarifaConDesc;
+    transporte = Math.round(tarifaBase * (1 - descTrans / 100)); // base (el IVA se discrimina abajo)
+    if (transIva) ivaTotal += Math.round(transporte * 0.19);
+    const tarifaAjust = tarifaKg * (1 - descTrans / 100);
     const descLabel = descTrans > 0 ? ` (desc. ${descTrans}%)` : '';
     filasTabla += `<tr>
       <td>${Math.round(pesoTotal)}</td><td>kg</td>
-      <td>Transporte ${transIva ? 'grabado' : 'no grabado'}${descLabel}:<br><span style="font-size:10px;color:#666">Chinchiná – ${destLabelNombre}</span></td>
+      <td>Transporte${descLabel}:<br><span style="font-size:10px;color:#666">Chinchiná – ${destLabelNombre}</span></td>
       <td style="text-align:center">${transIva ? 'SI' : 'NO'}</td>
       <td style="text-align:right">$ ${tarifaKg.toLocaleString()}</td>
       <td style="text-align:center">${descTrans > 0 ? descTrans + '%' : '0%'}</td>
-      <td style="text-align:right">$ ${transIva ? (tarifaKg * 1.19).toFixed(2) : tarifaKg.toLocaleString()}</td>
+      <td style="text-align:right">$ ${Number(tarifaAjust.toFixed(2)).toLocaleString()}</td>
       <td style="text-align:right">$ ${transporte.toLocaleString()}</td>
     </tr>`;
   }
-  let logisticaBase = 0;
+  let logistica = 0; // base sin IVA (cargue/descargue son servicios: SIEMPRE grabados)
   if (cargueVal === 'si') {
     const base = Math.round(pesoTotal * 11 * (1 - descCargue / 100));
-    const ivaL = Math.round(base * 0.19);
-    logisticaBase += base + ivaL;
+    logistica += base;
+    ivaTotal += Math.round(base * 0.19);
+    const tarifaAjust = 11 * (1 - descCargue / 100);
     const descLabel = descCargue > 0 ? ` (desc. ${descCargue}%)` : '';
-    filasTabla += `<tr><td>${Math.round(pesoTotal)}</td><td>kg</td><td>Cargue a mano${descLabel}</td><td style="text-align:center">SI</td><td style="text-align:right">$ 11</td><td style="text-align:center">${descCargue > 0 ? descCargue + '%' : '0%'}</td><td style="text-align:right">$ ${(11*1.19).toFixed(2)}</td><td style="text-align:right">$ ${(base+ivaL).toLocaleString()}</td></tr>`;
+    filasTabla += `<tr><td>${Math.round(pesoTotal)}</td><td>kg</td><td>Cargue a mano${descLabel}</td><td style="text-align:center">SI</td><td style="text-align:right">$ 11</td><td style="text-align:center">${descCargue > 0 ? descCargue + '%' : '0%'}</td><td style="text-align:right">$ ${Number(tarifaAjust.toFixed(2)).toLocaleString()}</td><td style="text-align:right">$ ${base.toLocaleString()}</td></tr>`;
   }
   if (descargueVal === 'si') {
     const base = Math.round(pesoTotal * 11 * (1 - descDescargue / 100));
-    const ivaL = Math.round(base * 0.19);
-    logisticaBase += base + ivaL;
+    logistica += base;
+    ivaTotal += Math.round(base * 0.19);
+    const tarifaAjust = 11 * (1 - descDescargue / 100);
     const descLabel = descDescargue > 0 ? ` (desc. ${descDescargue}%)` : '';
-    filasTabla += `<tr><td>${Math.round(pesoTotal)}</td><td>kg</td><td>Descargue mecánico${descLabel}</td><td style="text-align:center">SI</td><td style="text-align:right">$ 11</td><td style="text-align:center">${descDescargue > 0 ? descDescargue + '%' : '0%'}</td><td style="text-align:right">$ ${(11*1.19).toFixed(2)}</td><td style="text-align:right">$ ${(base+ivaL).toLocaleString()}</td></tr>`;
+    filasTabla += `<tr><td>${Math.round(pesoTotal)}</td><td>kg</td><td>Descargue mecánico${descLabel}</td><td style="text-align:center">SI</td><td style="text-align:right">$ 11</td><td style="text-align:center">${descDescargue > 0 ? descDescargue + '%' : '0%'}</td><td style="text-align:right">$ ${Number(tarifaAjust.toFixed(2)).toLocaleString()}</td><td style="text-align:right">$ ${base.toLocaleString()}</td></tr>`;
   }
-  const logistica = logisticaBase;
-  const total = subtotal + ivaTotal + transporte + logistica;
+  const total = subtotal + transporte + logistica + ivaTotal;
   const html = `<table class="preview-tabla">
     <thead><tr>
       <th style="width:52px">CANT.</th><th style="width:44px">UNID.</th><th>PRODUCTO</th><th style="width:38px">IVA</th><th style="width:80px">V/UNIT</th><th style="width:50px">DESC.</th><th style="width:90px">V/UNIT AJUSTADO</th><th style="width:130px">V/R TOTAL</th>
@@ -3072,13 +3079,18 @@ function guardarCotizacion() {
   const descDescargue = parseFloat(document.getElementById('desc-descargue')?.value) || 0;
   const tarifaManual = parseFloat(document.getElementById('tarifa-manual')?.value) || 0;
   const destinoNombre = document.getElementById('destino-otro-nombre')?.value || '';
-  const tarifaBaseT = destino && pesoTotal > 0 ? Math.round(pesoTotal * tarifaKgDe(destino, tarifaManual) * (1 - descTrans / 100)) : 0;
-  let transporte = tieneIva ? Math.round(tarifaBaseT * 1.19) : tarifaBaseT;
-  let logisticaBase = 0;
-  if (document.getElementById('cargue-mano').value === 'si') logisticaBase += Math.round(pesoTotal * 11 * (1 - descCargue / 100));
-  if (document.getElementById('descargue-mecanico').value === 'si') logisticaBase += Math.round(pesoTotal * 11 * (1 - descDescargue / 100));
-  const ivaLogistica = Math.round(logisticaBase * 0.19);
-  const logistica = logisticaBase + ivaLogistica;
+  // Transporte y logística en BASE (sin IVA); el IVA se discrimina en 'iva'.
+  const transporte = destino && pesoTotal > 0 ? Math.round(pesoTotal * tarifaKgDe(destino, tarifaManual) * (1 - descTrans / 100)) : 0;
+  if (tieneIva && transporte > 0) iva += Math.round(transporte * 0.19); // transporte grabado solo si el producto tiene IVA
+  let logistica = 0;
+  if (document.getElementById('cargue-mano').value === 'si') {
+    const base = Math.round(pesoTotal * 11 * (1 - descCargue / 100));
+    logistica += base; iva += Math.round(base * 0.19); // servicio: siempre grabado
+  }
+  if (document.getElementById('descargue-mecanico').value === 'si') {
+    const base = Math.round(pesoTotal * 11 * (1 - descDescargue / 100));
+    logistica += base; iva += Math.round(base * 0.19); // servicio: siempre grabado
+  }
 
   const version = document.getElementById('version-cot').value || 'V1';
   const existente = COTIZACIONES.find(c => c.numero === num && c.version === version);
