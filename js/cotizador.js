@@ -505,7 +505,7 @@ function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCarg
     filasTabla += `<tr>
       <td style="width:55px">${it.cantidad}</td>
       <td style="width:40px">${it.unidad}</td>
-      <td>${it.nombre}<br><span style="font-size:10px;color:#666">${it.medidas}</span></td>
+      <td>${it.nombre}<br><span style="font-size:10px;color:#666">${it.medidas}</span>${it.peso ? `<br><span style="font-size:10px;color:#888">Peso unitario: ${it.peso} kg/${it.unidad}</span>` : ''}</td>
       <td style="width:40px;text-align:center">${it.iva}</td>
       <td style="width:80px;text-align:right">$ ${it.precio.toLocaleString()}</td>
       <td style="width:50px;text-align:center">${it.descuento}%</td>
@@ -937,4 +937,3 @@ function previsualizarCotizacion() {
   document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
   window.scrollTo(0, 0);
 }
-
