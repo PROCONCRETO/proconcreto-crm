@@ -68,6 +68,7 @@
   <div class="nav-logo"><img src="logo.png" alt="Proconcreto Prefabricados"></div>
   <button class="nav-modulo activo" onclick="activarModulo('cotizaciones')">📋 Cotizaciones y Ventas</button>
   <button class="nav-modulo" onclick="activarModulo('produccion')">🏭 Producción</button>
+  <button class="nav-modulo" onclick="activarModulo('calidad')">🔬 Calidad</button>
   <button class="nav-modulo" onclick="activarModulo('logistica')" style="opacity:0.4;cursor:default" disabled title="Próximamente">🚛 Logística</button>
   <button class="nav-modulo" onclick="activarModulo('cartera')" style="opacity:0.4;cursor:default" disabled title="Próximamente">💰 Cartera</button>
   <button class="nav-modulo" onclick="activarModulo('productos')" style="margin-left:auto">📦 Productos</button>
@@ -92,6 +93,15 @@
   <button class="nav-btn activo" onclick="ir('ordenes-servicio')">📝 Órdenes de Producción</button>
   <button class="nav-btn" onclick="ir('produccion-diaria')">📅 Producción Diaria</button>
   <button class="nav-btn" onclick="ir('inventario')">📦 Inventario</button>
+</nav>
+
+<nav class="nav" id="subnav-calidad" style="display:none">
+  <button class="nav-btn activo" onclick="ir('diseno-mezcla')">🧪 Diseño de Mezcla</button>
+  <button class="nav-btn" onclick="ir('control-ensayos')">📐 Control de Ensayos</button>
+  <button class="nav-btn" onclick="ir('materia-prima')">🧱 Materia Prima</button>
+  <button class="nav-btn" onclick="ir('trazabilidad')">🔗 Trazabilidad</button>
+  <button class="nav-btn" onclick="ir('no-conformidades')">⚠️ No Conformidades</button>
+  <button class="nav-btn" onclick="ir('certificados-calidad')">📜 Certificados</button>
 </nav>
 
 <!-- ═══════════════════════════════════════
@@ -573,6 +583,333 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════
+     PANTALLA: DISEÑO DE MEZCLA
+═══════════════════════════════════════ -->
+<div id="pantalla-diseno-mezcla" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Diseño de Mezcla</div>
+    <div class="flex-gap">
+      <input type="text" id="buscar-diseno" class="buscador-input" placeholder="🔍 Buscar diseño..." oninput="renderDisenosMezcla()">
+      <button class="btn btn-primario" onclick="abrirModalDiseno()">+ Nuevo Diseño</button>
+    </div>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" id="tabla-disenos">
+      <thead><tr>
+        <th>CÓDIGO</th><th>NOMBRE</th><th style="text-align:center">RESISTENCIA</th><th style="text-align:center">ASENTAMIENTO</th><th style="text-align:center">A/C</th><th>ESTADO</th><th style="min-width:150px">ACCIONES</th>
+      </tr></thead>
+      <tbody id="disenos-body">
+        <tr><td colspan="7" class="empty-state"><div class="icono">🧪</div><div>No hay diseños de mezcla registrados.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: CONTROL DE ENSAYOS
+═══════════════════════════════════════ -->
+<div id="pantalla-control-ensayos" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Control de Ensayos de Resistencia</div>
+    <div class="flex-gap">
+      <select id="filtro-estado-ensayo" class="buscador-input" style="width:auto" onchange="renderEnsayosCalidad()">
+        <option value="">Todos los estados</option>
+        <option value="En curado">En curado</option>
+        <option value="Cumple">Cumple</option>
+        <option value="No cumple">No cumple</option>
+      </select>
+      <input type="text" id="buscar-ensayo" class="buscador-input" placeholder="🔍 Buscar ensayo..." oninput="renderEnsayosCalidad()">
+      <button class="btn btn-primario" onclick="abrirModalEnsayo()">+ Nuevo Ensayo</button>
+    </div>
+  </div>
+  <div id="ensayos-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" id="tabla-ensayos">
+      <thead><tr>
+        <th>N° ENSAYO</th><th>FECHA</th><th>DISEÑO</th><th>ELEMENTO</th><th style="text-align:center">OBJETIVO</th><th style="text-align:center">ÚLTIMO RESULTADO</th><th>ESTADO</th><th style="min-width:150px">ACCIONES</th>
+      </tr></thead>
+      <tbody id="ensayos-body">
+        <tr><td colspan="8" class="empty-state"><div class="icono">📐</div><div>No hay ensayos registrados.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: MATERIA PRIMA
+═══════════════════════════════════════ -->
+<div id="pantalla-materia-prima" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Control de Materia Prima</div>
+    <div class="flex-gap">
+      <select id="filtro-tipo-mp" class="buscador-input" style="width:auto" onchange="renderMateriaPrima()">
+        <option value="">Todos los tipos</option>
+        <option value="Cemento">Cemento</option>
+        <option value="Arena">Arena</option>
+        <option value="Grava">Grava</option>
+        <option value="Agua">Agua</option>
+        <option value="Aditivo">Aditivo</option>
+        <option value="Otro">Otro</option>
+      </select>
+      <input type="text" id="buscar-materia-prima" class="buscador-input" placeholder="🔍 Buscar proveedor o lote..." oninput="renderMateriaPrima()">
+      <button class="btn btn-primario" onclick="abrirModalMateriaPrima()">+ Registrar Materia Prima</button>
+    </div>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" id="tabla-materia-prima">
+      <thead><tr>
+        <th>TIPO</th><th>PROVEEDOR</th><th>LOTE</th><th>RECEPCIÓN</th><th>VENCIMIENTO</th><th style="text-align:right">CANTIDAD</th><th>ESTADO</th><th style="min-width:150px">ACCIONES</th>
+      </tr></thead>
+      <tbody id="materia-prima-body">
+        <tr><td colspan="8" class="empty-state"><div class="icono">🧱</div><div>No hay materia prima registrada.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: TRAZABILIDAD
+═══════════════════════════════════════ -->
+<div id="pantalla-trazabilidad" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Trazabilidad de Calidad</div>
+    <div class="flex-gap">
+      <input type="text" id="buscar-trazabilidad" class="buscador-input" style="width:320px" placeholder="🔍 N° Ensayo, N° Orden o Código de Diseño..." oninput="buscarTrazabilidad()">
+    </div>
+  </div>
+  <div id="trazabilidad-resultado">
+    <div class="empty-state"><div class="icono">🔗</div><div>Busca por N° de Orden de Producción, N° de Ensayo o Código de Diseño.</div></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: NO CONFORMIDADES
+═══════════════════════════════════════ -->
+<div id="pantalla-no-conformidades" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">No Conformidades de Calidad</div>
+    <div class="flex-gap">
+      <select id="filtro-estado-nc" class="buscador-input" style="width:auto" onchange="renderNoConformidades()">
+        <option value="">Todos los estados</option>
+        <option value="Abierta">Abierta</option>
+        <option value="Cerrada">Cerrada</option>
+      </select>
+      <input type="text" id="buscar-nc" class="buscador-input" placeholder="🔍 Buscar..." oninput="renderNoConformidades()">
+      <button class="btn btn-primario" onclick="abrirModalNC()">+ Nueva No Conformidad</button>
+    </div>
+  </div>
+  <div id="nc-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" id="tabla-no-conformidades">
+      <thead><tr>
+        <th>N°</th><th>FECHA</th><th>TIPO</th><th>DESCRIPCIÓN</th><th>DISPOSICIÓN</th><th>RESPONSABLE</th><th>ESTADO</th><th style="min-width:150px">ACCIONES</th>
+      </tr></thead>
+      <tbody id="no-conformidades-body">
+        <tr><td colspan="8" class="empty-state"><div class="icono">⚠️</div><div>No hay no conformidades registradas.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: CERTIFICADOS DE CALIDAD
+═══════════════════════════════════════ -->
+<div id="pantalla-certificados-calidad" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Certificados de Calidad</div>
+    <div class="flex-gap">
+      <input type="text" id="buscar-certificado" class="buscador-input" placeholder="🔍 Buscar ensayo..." oninput="renderCertificadosCalidad()">
+    </div>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" id="tabla-certificados">
+      <thead><tr>
+        <th>N° ENSAYO</th><th>FECHA</th><th>ELEMENTO</th><th style="text-align:center">RESISTENCIA</th><th>RESULTADO</th><th style="min-width:150px">ACCIONES</th>
+      </tr></thead>
+      <tbody id="certificados-body">
+        <tr><td colspan="6" class="empty-state"><div class="icono">📜</div><div>No hay ensayos con resultados finales para certificar aún.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-diseno">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-titulo" id="modal-diseno-titulo">🧪 Nuevo Diseño de Mezcla</div>
+    <input type="hidden" id="m-diseno-id">
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Código *</label><input type="text" id="m-diseno-codigo" placeholder="DM-001"></div>
+      <div class="form-grupo"><label>Resistencia de diseño f'c (MPa) *</label><input type="number" id="m-diseno-resistencia" min="0" step="0.1"></div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px"><label>Nombre *</label><input type="text" id="m-diseno-nombre" placeholder="Ej: Concreto 21 MPa - Elementos no estructurales"></div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Asentamiento (cm)</label><input type="number" id="m-diseno-asentamiento" min="0" step="0.5"></div>
+      <div class="form-grupo"><label>Relación agua/cemento</label><input type="number" id="m-diseno-relacion" min="0" step="0.01"></div>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:10px 0 8px">MATERIALES POR M³</div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Cemento (kg)</label><input type="number" id="m-diseno-cemento" min="0" step="0.1"></div>
+      <div class="form-grupo"><label>Arena (kg)</label><input type="number" id="m-diseno-arena" min="0" step="0.1"></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Grava (kg)</label><input type="number" id="m-diseno-grava" min="0" step="0.1"></div>
+      <div class="form-grupo"><label>Agua (L)</label><input type="number" id="m-diseno-agua" min="0" step="0.1"></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Aditivo</label><input type="text" id="m-diseno-aditivo" placeholder="Nombre del aditivo"></div>
+      <div class="form-grupo"><label>Dosis aditivo (kg o %)</label><input type="number" id="m-diseno-dosis-aditivo" min="0" step="0.01"></div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px"><label>Estado</label>
+      <select id="m-diseno-estado" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <option value="Activo">Activo</option>
+        <option value="Inactivo">Inactivo</option>
+      </select>
+    </div>
+    <div class="form-grupo" style="margin-bottom:16px"><label>Observaciones</label><textarea id="m-diseno-obs" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical"></textarea></div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-diseno')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarDiseno()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-ensayo">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-titulo" id="modal-ensayo-titulo">📐 Nuevo Ensayo de Calidad</div>
+    <input type="hidden" id="m-ensayo-id">
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>N° Ensayo *</label><input type="text" id="m-ensayo-numero" placeholder="ENS-0001"></div>
+      <div class="form-grupo"><label>Fecha fundida *</label><input type="date" id="m-ensayo-fecha"></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Diseño de mezcla usado</label>
+        <select id="m-ensayo-diseno" onchange="actualizarObjetivoDesdeDiseno()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      </div>
+      <div class="form-grupo"><label>Orden de producción asociada</label>
+        <select id="m-ensayo-orden" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      </div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px"><label>Elemento / Descripción</label><input type="text" id="m-ensayo-elemento" placeholder="Ej: Bordillo A-10, Probetas de control"></div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>N° de probetas</label><input type="number" id="m-ensayo-probetas" min="0"></div>
+      <div class="form-grupo"><label>Resistencia objetivo (MPa)</label><input type="number" id="m-ensayo-objetivo" min="0" step="0.1"></div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px"><label>Responsable</label><input type="text" id="m-ensayo-responsable" placeholder="Nombre del responsable"></div>
+    <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:10px 0 8px;display:flex;justify-content:space-between;align-items:center">
+      <span>RESULTADOS POR EDAD</span>
+      <button class="btn btn-secundario btn-xs" onclick="agregarResultadoEnsayo()">+ Agregar resultado</button>
+    </div>
+    <div style="overflow-x:auto;margin-bottom:10px">
+      <table class="tabla-items" style="width:100%">
+        <thead><tr><th style="width:90px">Edad (días)</th><th style="width:150px">Fecha ensayo</th><th style="width:120px">Resistencia (MPa)</th><th style="width:36px"></th></tr></thead>
+        <tbody id="resultados-ensayo-body"></tbody>
+      </table>
+    </div>
+    <div class="form-grupo" style="margin-bottom:16px"><label>Observaciones</label><textarea id="m-ensayo-obs" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical"></textarea></div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-ensayo')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarEnsayo()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-materia-prima">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-titulo" id="modal-materia-prima-titulo">🧱 Nuevo Registro de Materia Prima</div>
+    <input type="hidden" id="m-mp-id">
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Tipo *</label>
+        <select id="m-mp-tipo" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="Cemento">Cemento</option>
+          <option value="Arena">Arena</option>
+          <option value="Grava">Grava</option>
+          <option value="Agua">Agua</option>
+          <option value="Aditivo">Aditivo</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div class="form-grupo"><label>Proveedor *</label><input type="text" id="m-mp-proveedor"></div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px"><label>Lote *</label><input type="text" id="m-mp-lote" placeholder="N° de lote o remisión"></div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Fecha de recepción</label><input type="date" id="m-mp-fecha-recepcion"></div>
+      <div class="form-grupo"><label>Fecha de vencimiento</label><input type="date" id="m-mp-fecha-vencimiento"></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Cantidad</label><input type="number" id="m-mp-cantidad" min="0" step="0.1"></div>
+      <div class="form-grupo"><label>Unidad</label>
+        <select id="m-mp-unidad" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="kg">kg</option>
+          <option value="ton">ton</option>
+          <option value="m3">m³</option>
+          <option value="L">L</option>
+          <option value="bultos">bultos</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px"><label>Estado</label>
+      <select id="m-mp-estado" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <option value="Pendiente">Pendiente</option>
+        <option value="Aprobado">Aprobado</option>
+        <option value="Rechazado">Rechazado</option>
+      </select>
+    </div>
+    <div class="form-grupo" style="margin-bottom:16px"><label>Observaciones</label><textarea id="m-mp-obs" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical" placeholder="Referencia de certificado, notas de inspección..."></textarea></div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-materia-prima')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarMateriaPrima()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-nc">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-titulo" id="modal-nc-titulo">⚠️ Nueva No Conformidad</div>
+    <input type="hidden" id="m-nc-id">
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>N° *</label><input type="text" id="m-nc-numero" placeholder="NC-0001"></div>
+      <div class="form-grupo"><label>Fecha *</label><input type="date" id="m-nc-fecha"></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Tipo</label>
+        <select id="m-nc-tipo" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="Ensayo fallido">Ensayo fallido</option>
+          <option value="Materia prima rechazada">Materia prima rechazada</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div class="form-grupo"><label>Referencia</label><input type="text" id="m-nc-referencia" placeholder="N° de ensayo o lote afectado"></div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px"><label>Descripción *</label><textarea id="m-nc-descripcion" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical"></textarea></div>
+    <div class="form-grupo" style="margin-bottom:10px"><label>Acción correctiva</label><textarea id="m-nc-accion" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical"></textarea></div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Responsable</label><input type="text" id="m-nc-responsable"></div>
+      <div class="form-grupo"><label>Disposición</label>
+        <select id="m-nc-disposicion" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="Retenido">Retenido</option>
+          <option value="Liberado con concesión">Liberado con concesión</option>
+          <option value="Rechazado">Rechazado</option>
+          <option value="Reprocesado">Reprocesado</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid" style="margin-bottom:16px">
+      <div class="form-grupo"><label>Estado</label>
+        <select id="m-nc-estado" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="Abierta">Abierta</option>
+          <option value="Cerrada">Cerrada</option>
+        </select>
+      </div>
+      <div class="form-grupo"><label>Fecha de cierre</label><input type="date" id="m-nc-fecha-cierre"></div>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-nc')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarNC()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-producto">
   <div class="modal" style="max-width:560px">
     <div class="modal-titulo" id="modal-producto-titulo">📦 Nuevo producto</div>
@@ -802,6 +1139,8 @@
 <script src="js/navegacion.js"></script>
 <script src="js/ordenes-produccion.js"></script>
 <script src="js/produccion-diaria.js"></script>
+<script src="js/calidad-mezclas.js"></script>
+<script src="js/calidad-trazabilidad.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/datos-realtime.js"></script>
 <script src="js/cotizador.js"></script>
@@ -813,4 +1152,3 @@
 <script src="js/pdf.js"></script>
 </body>
 </html>
-
