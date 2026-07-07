@@ -49,11 +49,16 @@ function cargarBaseDesdeDiseno() {
   const d = DISENOS_MEZCLA.find(x => x.codigo === codigo);
   if (!d) return;
   document.getElementById('m-ajuste-resistencia').value = d.resistenciaDiseno || '';
+  document.getElementById('m-ajuste-tamano').value = d.tamanoMaximo || '';
   document.getElementById('m-ajuste-mat-agua').value = d.materiales?.agua || 0;
   document.getElementById('m-ajuste-mat-cemento').value = d.materiales?.cemento || 0;
+  document.getElementById('m-ajuste-mat-adicion').value = d.materiales?.metacaolin || 0;
   document.getElementById('m-ajuste-mat-arena').value = d.materiales?.arena || 0;
   document.getElementById('m-ajuste-mat-triturado').value = d.materiales?.grava || 0;
-  document.getElementById('m-ajuste-mat-plastificante').value = d.materiales?.dosisAditivo || 0;
+  const aditivos = d.materiales?.aditivos || [];
+  const sumaPorTipo = (tipo) => aditivos.filter(a => a.tipo === tipo).reduce((s, a) => s + (Number(a.dosis) || 0), 0);
+  document.getElementById('m-ajuste-mat-plastificante').value = sumaPorTipo('Superplastificante');
+  document.getElementById('m-ajuste-mat-acelerante').value = sumaPorTipo('Acelerante');
   recalcularAjusteMezcla();
 }
 

@@ -17,7 +17,7 @@ function renderDisenosMezcla() {
   if (q) data = data.filter(d => (d.codigo + ' ' + d.nombre).toLowerCase().includes(q));
   data.sort((a, b) => (b.creadoEn || '').localeCompare(a.creadoEn || ''));
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">🧪</div><div>No hay diseños de mezcla registrados.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">🧪</div><div>No hay diseños de mezcla registrados.</div></td></tr>`;
     return;
   }
   tbody.innerHTML = data.map(d => {
@@ -27,6 +27,7 @@ function renderDisenosMezcla() {
       <td style="font-weight:600">${d.nombre}</td>
       <td style="text-align:center;font-weight:700">${d.resistenciaDiseno || '—'} MPa</td>
       <td style="text-align:center">${d.asentamiento || '—'} cm</td>
+      <td style="text-align:center">${d.tamanoMaximo || '—'}</td>
       <td style="text-align:center">${d.relacionAguaCemento || '—'}</td>
       <td><span class="badge" style="background:${inactivo ? '#FFEBEE' : '#E8F5E9'};color:${inactivo ? '#C62828' : '#2E7D32'}">${d.estado || 'Activo'}</span></td>
       <td>
@@ -39,12 +40,47 @@ function renderDisenosMezcla() {
   }).join('');
 }
 
+let _aditivosDisenoActual = [];
+
+function renderAditivosDiseno() {
+  const tbody = document.getElementById('aditivos-diseno-body');
+  if (!tbody) return;
+  if (!_aditivosDisenoActual.length) {
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega los aditivos usados en esta mezcla (opcional)</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = _aditivosDisenoActual.map((a, i) => `
+    <tr>
+      <td>
+        <select onchange="_aditivosDisenoActual[${i}].tipo=this.value">
+          <option value="Superplastificante" ${a.tipo === 'Superplastificante' ? 'selected' : ''}>Superplastificante</option>
+          <option value="Retardante" ${a.tipo === 'Retardante' ? 'selected' : ''}>Retardante</option>
+          <option value="Acelerante" ${a.tipo === 'Acelerante' ? 'selected' : ''}>Acelerante</option>
+        </select>
+      </td>
+      <td><input type="number" value="${a.dosis}" min="0" step="0.01" onchange="_aditivosDisenoActual[${i}].dosis=parseFloat(this.value)||0"></td>
+      <td><button class="btn btn-rojo btn-xs" onclick="eliminarAditivoDiseno(${i})">✕</button></td>
+    </tr>`).join('');
+}
+
+function agregarAditivoDiseno() {
+  _aditivosDisenoActual.push({ tipo: 'Superplastificante', dosis: 0 });
+  renderAditivosDiseno();
+}
+
+function eliminarAditivoDiseno(i) {
+  _aditivosDisenoActual.splice(i, 1);
+  renderAditivosDiseno();
+}
+
 function abrirModalDiseno() {
   document.getElementById('m-diseno-id').value = '';
   document.getElementById('modal-diseno-titulo').textContent = '🧪 Nuevo Diseño de Mezcla';
   document.getElementById('m-diseno-codigo').value = siguienteCodigoDiseno();
-  ['m-diseno-nombre', 'm-diseno-resistencia', 'm-diseno-asentamiento', 'm-diseno-relacion', 'm-diseno-cemento', 'm-diseno-arena', 'm-diseno-grava', 'm-diseno-agua', 'm-diseno-aditivo', 'm-diseno-dosis-aditivo', 'm-diseno-obs'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['m-diseno-nombre', 'm-diseno-resistencia', 'm-diseno-asentamiento', 'm-diseno-tamano', 'm-diseno-relacion', 'm-diseno-cemento', 'm-diseno-metacaolin', 'm-diseno-arena', 'm-diseno-grava', 'm-diseno-agua', 'm-diseno-obs'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('m-diseno-estado').value = 'Activo';
+  _aditivosDisenoActual = [];
+  renderAditivosDiseno();
   document.getElementById('modal-diseno').classList.add('abierto');
 }
 
@@ -57,13 +93,16 @@ function editarDiseno(id) {
   document.getElementById('m-diseno-nombre').value = d.nombre || '';
   document.getElementById('m-diseno-resistencia').value = d.resistenciaDiseno || '';
   document.getElementById('m-diseno-asentamiento').value = d.asentamiento || '';
+  document.getElementById('m-diseno-tamano').value = d.tamanoMaximo || '';
   document.getElementById('m-diseno-relacion').value = d.relacionAguaCemento || '';
   document.getElementById('m-diseno-cemento').value = d.materiales?.cemento || '';
+  document.getElementById('m-diseno-metacaolin').value = d.materiales?.metacaolin || '';
   document.getElementById('m-diseno-arena').value = d.materiales?.arena || '';
   document.getElementById('m-diseno-grava').value = d.materiales?.grava || '';
   document.getElementById('m-diseno-agua').value = d.materiales?.agua || '';
-  document.getElementById('m-diseno-aditivo').value = d.materiales?.aditivo || '';
-  document.getElementById('m-diseno-dosis-aditivo').value = d.materiales?.dosisAditivo || '';
+  // Migración: diseños antiguos con un solo aditivo de texto libre → lista nueva
+  _aditivosDisenoActual = JSON.parse(JSON.stringify(d.materiales?.aditivos || (d.materiales?.aditivo ? [{ tipo: 'Superplastificante', dosis: d.materiales.dosisAditivo || 0 }] : [])));
+  renderAditivosDiseno();
   document.getElementById('m-diseno-estado').value = d.estado || 'Activo';
   document.getElementById('m-diseno-obs').value = d.observaciones || '';
   document.getElementById('modal-diseno').classList.add('abierto');
@@ -73,20 +112,21 @@ function guardarDiseno() {
   const codigo = document.getElementById('m-diseno-codigo').value.trim();
   const nombre = document.getElementById('m-diseno-nombre').value.trim();
   const resistenciaDiseno = parseFloat(document.getElementById('m-diseno-resistencia').value);
-  if (!codigo || !nombre || !(resistenciaDiseno > 0)) { alert('Completa los campos obligatorios: Código, Nombre y Resistencia de diseño.'); return; }
+  const tamanoMaximo = document.getElementById('m-diseno-tamano').value.trim();
+  if (!codigo || !nombre || !(resistenciaDiseno > 0) || !tamanoMaximo) { alert('Completa los campos obligatorios: Código, Nombre, Resistencia de diseño y Tamaño máximo de agregado.'); return; }
   const editId = document.getElementById('m-diseno-id').value;
   const diseno = {
     id: editId || String(Date.now()),
-    codigo, nombre, resistenciaDiseno,
+    codigo, nombre, resistenciaDiseno, tamanoMaximo,
     asentamiento: parseFloat(document.getElementById('m-diseno-asentamiento').value) || 0,
     relacionAguaCemento: parseFloat(document.getElementById('m-diseno-relacion').value) || 0,
     materiales: {
       cemento: parseFloat(document.getElementById('m-diseno-cemento').value) || 0,
+      metacaolin: parseFloat(document.getElementById('m-diseno-metacaolin').value) || 0,
       arena: parseFloat(document.getElementById('m-diseno-arena').value) || 0,
       grava: parseFloat(document.getElementById('m-diseno-grava').value) || 0,
       agua: parseFloat(document.getElementById('m-diseno-agua').value) || 0,
-      aditivo: document.getElementById('m-diseno-aditivo').value.trim(),
-      dosisAditivo: parseFloat(document.getElementById('m-diseno-dosis-aditivo').value) || 0,
+      aditivos: JSON.parse(JSON.stringify(_aditivosDisenoActual)),
     },
     estado: document.getElementById('m-diseno-estado').value,
     observaciones: document.getElementById('m-diseno-obs').value.trim(),
