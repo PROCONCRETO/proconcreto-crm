@@ -97,6 +97,7 @@
 
 <nav class="nav" id="subnav-calidad" style="display:none">
   <button class="nav-btn activo" onclick="ir('diseno-mezcla')">🧪 Diseño de Mezcla</button>
+  <button class="nav-btn" onclick="ir('ajuste-mezcla')">🌡️ Ajuste Diario</button>
   <button class="nav-btn" onclick="ir('control-ensayos')">📐 Control de Ensayos</button>
   <button class="nav-btn" onclick="ir('materia-prima')">🧱 Materia Prima</button>
   <button class="nav-btn" onclick="ir('trazabilidad')">🔗 Trazabilidad</button>
@@ -607,6 +608,29 @@
 </div>
 
 <!-- ═══════════════════════════════════════
+     PANTALLA: AJUSTE DIARIO DE MEZCLA
+═══════════════════════════════════════ -->
+<div id="pantalla-ajuste-mezcla" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Ajuste Diario de Mezcla (Corrección de Humedad)</div>
+    <div class="flex-gap">
+      <input type="text" id="buscar-ajuste" class="buscador-input" placeholder="🔍 Buscar cilindro, cliente..." oninput="renderAjustesMezcla()">
+      <button class="btn btn-primario" onclick="abrirModalAjusteMezcla()">+ Nuevo Ajuste</button>
+    </div>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" id="tabla-ajustes">
+      <thead><tr>
+        <th>CILINDRO N°</th><th>FECHA</th><th>DISEÑO</th><th>CLIENTE / ELEMENTO</th><th style="text-align:center">RESISTENCIA</th><th style="text-align:center">HUM. ARENA</th><th style="text-align:center">HUM. TRITURADO</th><th style="min-width:150px">ACCIONES</th>
+      </tr></thead>
+      <tbody id="ajustes-body">
+        <tr><td colspan="8" class="empty-state"><div class="icono">🌡️</div><div>No hay ajustes diarios registrados.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
      PANTALLA: CONTROL DE ENSAYOS
 ═══════════════════════════════════════ -->
 <div id="pantalla-control-ensayos" class="pantalla">
@@ -774,6 +798,75 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-ajuste-mezcla">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-titulo" id="modal-ajuste-titulo">🌡️ Nuevo Ajuste Diario de Mezcla</div>
+    <input type="hidden" id="m-ajuste-id">
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Cilindro N° *</label><input type="number" id="m-ajuste-cilindro" min="1"></div>
+      <div class="form-grupo"><label>Fecha *</label><input type="date" id="m-ajuste-fecha"></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Diseño de mezcla base</label>
+        <select id="m-ajuste-diseno" onchange="cargarBaseDesdeDiseno()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      </div>
+      <div class="form-grupo"><label>Resistencia de diseño (MPa)</label><input type="number" id="m-ajuste-resistencia" min="0" step="0.1"></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Cliente / Elemento</label><input type="text" id="m-ajuste-cliente-elemento" placeholder="Ej: Prelosa reforzada T1-02"></div>
+      <div class="form-grupo"><label>Tamaño máximo agregado grueso</label><input type="text" id="m-ajuste-tamano" placeholder="Ej: 3/4 Pulgada"></div>
+    </div>
+
+    <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px">CORRECCIÓN DE HUMEDAD DE AGREGADOS</div>
+    <div style="overflow-x:auto;margin-bottom:10px">
+      <table class="tabla-items" style="width:100%">
+        <thead><tr><th>Agregado</th><th>Peso recipiente</th><th>Peso recip.+húmedo</th><th>Peso recip.+seco</th><th>Humedad</th><th>Absorción (%)</th></tr></thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:600">Arena (fino)</td>
+            <td><input type="number" id="m-ajuste-arena-recipiente" value="0" oninput="recalcularAjusteMezcla()"></td>
+            <td><input type="number" id="m-ajuste-arena-humedo" value="0" oninput="recalcularAjusteMezcla()"></td>
+            <td><input type="number" id="m-ajuste-arena-seco" value="0" oninput="recalcularAjusteMezcla()"></td>
+            <td style="text-align:center;font-weight:700" id="m-ajuste-arena-humedad-display">0.0%</td>
+            <td><input type="number" id="m-ajuste-arena-absorcion" value="0" step="0.1" oninput="recalcularAjusteMezcla()"></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600">Triturado (grueso)</td>
+            <td><input type="number" id="m-ajuste-triturado-recipiente" value="0" oninput="recalcularAjusteMezcla()"></td>
+            <td><input type="number" id="m-ajuste-triturado-humedo" value="0" oninput="recalcularAjusteMezcla()"></td>
+            <td><input type="number" id="m-ajuste-triturado-seco" value="0" oninput="recalcularAjusteMezcla()"></td>
+            <td style="text-align:center;font-weight:700" id="m-ajuste-triturado-humedad-display">0.0%</td>
+            <td><input type="number" id="m-ajuste-triturado-absorcion" value="0" step="0.1" oninput="recalcularAjusteMezcla()"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px">MATERIALES POR M³ — DISEÑO vs. AJUSTADO</div>
+    <div style="overflow-x:auto;margin-bottom:10px">
+      <table class="tabla-items" style="width:100%">
+        <thead><tr><th>Insumo</th><th>Cantidad diseño</th><th>Unidad</th><th>Cantidad ajustada</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:600">Agua</td><td><input type="number" id="m-ajuste-mat-agua" value="0" oninput="recalcularAjusteMezcla()"></td><td>Litros</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-agua">0.0 L</td></tr>
+          <tr><td style="font-weight:600">Cemento</td><td><input type="number" id="m-ajuste-mat-cemento" value="0" oninput="recalcularAjusteMezcla()"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-cemento">0.0 kg</td></tr>
+          <tr><td style="font-weight:600">Adición (Metacaolín/puzolana)</td><td><input type="number" id="m-ajuste-mat-adicion" value="0" oninput="recalcularAjusteMezcla()"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-adicion">0.0 kg</td></tr>
+          <tr><td style="font-weight:600">Plastificante</td><td><input type="number" id="m-ajuste-mat-plastificante" value="0" oninput="recalcularAjusteMezcla()"></td><td>gramos</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-plastificante">0.0 g</td></tr>
+          <tr><td style="font-weight:600">Arena</td><td><input type="number" id="m-ajuste-mat-arena" value="0" oninput="recalcularAjusteMezcla()"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-arena">0.0 kg</td></tr>
+          <tr><td style="font-weight:600">Triturado</td><td><input type="number" id="m-ajuste-mat-triturado" value="0" oninput="recalcularAjusteMezcla()"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-triturado">0.0 kg</td></tr>
+          <tr><td style="font-weight:600">Acelerante</td><td><input type="number" id="m-ajuste-mat-acelerante" value="0" oninput="recalcularAjusteMezcla()"></td><td>gramos</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-acelerante">0.0 g</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:11px;color:var(--gris-medio);margin-bottom:12px">* El agua y los agregados se ajustan automáticamente según la humedad medida. Cemento, adición, plastificante y acelerante no varían.</div>
+
+    <div class="form-grupo" style="margin-bottom:16px"><label>Observaciones</label><textarea id="m-ajuste-obs" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical"></textarea></div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-ajuste-mezcla')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarAjusteMezcla()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-ensayo">
   <div class="modal" style="max-width:680px">
     <div class="modal-titulo" id="modal-ensayo-titulo">📐 Nuevo Ensayo de Calidad</div>
@@ -781,6 +874,9 @@
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>N° Ensayo *</label><input type="text" id="m-ensayo-numero" placeholder="ENS-0001"></div>
       <div class="form-grupo"><label>Fecha fundida *</label><input type="date" id="m-ensayo-fecha"></div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px"><label>N° Cilindro (ajuste diario de mezcla)</label>
+      <select id="m-ensayo-cilindro" onchange="cargarDesdeAjusteMezcla()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
     </div>
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Diseño de mezcla usado</label>
@@ -1139,6 +1235,7 @@
 <script src="js/navegacion.js"></script>
 <script src="js/ordenes-produccion.js"></script>
 <script src="js/produccion-diaria.js"></script>
+<script src="js/calidad-ajuste-mezcla.js"></script>
 <script src="js/calidad-mezclas.js"></script>
 <script src="js/calidad-trazabilidad.js"></script>
 <script src="js/auth.js"></script>
