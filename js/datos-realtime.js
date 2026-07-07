@@ -1,5 +1,5 @@
 async function cargarDatosSupabase() {
-  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }, { data: prods, error: e4 }, { data: disenos, error: e5 }, { data: ensayos, error: e6 }, { data: mprima, error: e7 }, { data: nconf, error: e8 }] = await Promise.all([
+  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }, { data: prods, error: e4 }, { data: disenos, error: e5 }, { data: ensayos, error: e6 }, { data: mprima, error: e7 }, { data: nconf, error: e8 }, { data: ajustes, error: e9 }] = await Promise.all([
     sb.from('cotizaciones').select('datos, estado').order('creado', { ascending: true }),
     sb.from('clientes').select('datos').order('creado', { ascending: true }),
     sb.from('ordenes_servicio').select('datos').order('creado', { ascending: false }),
@@ -7,7 +7,8 @@ async function cargarDatosSupabase() {
     sb.from('disenos_mezcla').select('datos').order('creado', { ascending: false }),
     sb.from('ensayos_calidad').select('datos').order('creado', { ascending: false }),
     sb.from('materia_prima').select('datos').order('creado', { ascending: false }),
-    sb.from('no_conformidades').select('datos').order('creado', { ascending: false })
+    sb.from('no_conformidades').select('datos').order('creado', { ascending: false }),
+    sb.from('ajustes_mezcla').select('datos').order('creado', { ascending: false })
   ]);
   if (e3) console.warn('Tabla ordenes_servicio no disponible aún.');
   if (e4) console.warn('Tabla producciones no disponible aún.');
@@ -15,12 +16,14 @@ async function cargarDatosSupabase() {
   if (e6) console.warn('Tabla ensayos_calidad no disponible aún.');
   if (e7) console.warn('Tabla materia_prima no disponible aún.');
   if (e8) console.warn('Tabla no_conformidades no disponible aún.');
+  if (e9) console.warn('Tabla ajustes_mezcla no disponible aún.');
   ORDENES = (ords || []).filter(r => r.datos).map(r => r.datos);
   PRODUCCIONES = (prods || []).filter(r => r.datos).map(r => r.datos);
   DISENOS_MEZCLA = (disenos || []).filter(r => r.datos).map(r => r.datos);
   ENSAYOS_CALIDAD = (ensayos || []).filter(r => r.datos).map(r => r.datos);
   MATERIA_PRIMA = (mprima || []).filter(r => r.datos).map(r => r.datos);
   NO_CONFORMIDADES = (nconf || []).filter(r => r.datos).map(r => r.datos);
+  AJUSTES_MEZCLA = (ajustes || []).filter(r => r.datos).map(r => r.datos);
 
   // Catálogo de productos desde Supabase (con auto-siembra la primera vez)
   await cargarCatalogo();
@@ -92,6 +95,7 @@ function rerenderPantallaActiva() {
     case 'pantalla-inventario': renderInventario(); break;
     case 'pantalla-productos': renderProductosAdmin(); break;
     case 'pantalla-diseno-mezcla': renderDisenosMezcla(); break;
+    case 'pantalla-ajuste-mezcla': renderAjustesMezcla(); break;
     case 'pantalla-control-ensayos': renderEnsayosCalidad(); break;
     case 'pantalla-materia-prima': renderMateriaPrima(); break;
     case 'pantalla-no-conformidades': renderNoConformidades(); break;
@@ -149,6 +153,11 @@ async function recargarNCRT() {
   NO_CONFORMIDADES = (data || []).filter(r => r.datos).map(r => r.datos);
   rerenderPantallaActiva();
 }
+async function recargarAjustesRT() {
+  const { data } = await sb.from('ajustes_mezcla').select('datos').order('creado', { ascending: false });
+  AJUSTES_MEZCLA = (data || []).filter(r => r.datos).map(r => r.datos);
+  rerenderPantallaActiva();
+}
 
 function suscribirRealtime() {
   if (_canalRealtime) return; // evitar suscripciones duplicadas
@@ -162,6 +171,7 @@ function suscribirRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ensayos_calidad' },     () => _rtDebounce('ensayos', recargarEnsayosRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'materia_prima' },       () => _rtDebounce('materiaprima', recargarMateriaPrimaRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'no_conformidades' },    () => _rtDebounce('noconformidades', recargarNCRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ajustes_mezcla' },      () => _rtDebounce('ajustes', recargarAjustesRT))
     .subscribe((status) => {
       const ind = document.getElementById('rt-indicador');
       if (ind) {

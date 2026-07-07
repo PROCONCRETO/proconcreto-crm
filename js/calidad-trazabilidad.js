@@ -232,12 +232,13 @@ function buscarTrazabilidad() {
   const q = (document.getElementById('buscar-trazabilidad')?.value || '').trim().toLowerCase();
   const cont = document.getElementById('trazabilidad-resultado');
   if (!cont) return;
-  if (!q) { cont.innerHTML = `<div class="empty-state"><div class="icono">🔗</div><div>Busca por N° de Orden de Producción, N° de Ensayo o Código de Diseño.</div></div>`; return; }
+  if (!q) { cont.innerHTML = `<div class="empty-state"><div class="icono">🔗</div><div>Busca por N° de Orden de Producción, N° de Ensayo, N° de Cilindro o Código de Diseño.</div></div>`; return; }
 
   const ensayos = ENSAYOS_CALIDAD.filter(e =>
     (e.numero || '').toLowerCase().includes(q) ||
     (e.ordenProduccion || '').toLowerCase().includes(q) ||
-    (e.disenoCodigo || '').toLowerCase().includes(q)
+    (e.disenoCodigo || '').toLowerCase().includes(q) ||
+    String(e.cilindroNo || '').toLowerCase().includes(q)
   );
 
   if (!ensayos.length) { cont.innerHTML = `<div class="empty-state"><div class="icono">🔍</div><div>Sin resultados para "${q}".</div></div>`; return; }
@@ -245,6 +246,7 @@ function buscarTrazabilidad() {
   cont.innerHTML = ensayos.map(e => {
     const diseno = DISENOS_MEZCLA.find(d => d.codigo === e.disenoCodigo);
     const orden = ORDENES.find(o => o.numero === e.ordenProduccion);
+    const ajuste = (AJUSTES_MEZCLA || []).find(a => String(a.cilindroNo) === String(e.cilindroNo));
     const estado = calcularEstadoEnsayo(e);
     const colorEstado = { 'En curado': '#1565C0', 'Cumple': '#2E7D32', 'No cumple': '#C62828' }[estado];
     const bgEstado = { 'En curado': '#E3F2FD', 'Cumple': '#E8F5E9', 'No cumple': '#FFEBEE' }[estado];
@@ -264,6 +266,17 @@ function buscarTrazabilidad() {
         <div><div style="font-size:10px;color:#888">Resistencia diseño</div><div style="font-size:13px;font-weight:600">${e.resistenciaObjetivo || '—'} MPa</div></div>
         <div><div style="font-size:10px;color:#888">N° probetas</div><div style="font-size:13px;font-weight:600">${e.numeroProbetas || '—'}</div></div>
       </div>
+      ${ajuste ? `
+      <div style="padding-top:10px;border-top:1px dashed var(--gris-borde);margin-bottom:10px">
+        <div style="font-size:10px;color:#888;margin-bottom:6px">CORRECCIÓN DE HUMEDAD — CILINDRO ${ajuste.cilindroNo}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span style="background:#F2F4F7;padding:4px 10px;border-radius:4px;font-size:12px"><strong>Hum. arena:</strong> ${(ajuste.humedadArena||0).toFixed(1)}%</span>
+          <span style="background:#F2F4F7;padding:4px 10px;border-radius:4px;font-size:12px"><strong>Hum. triturado:</strong> ${(ajuste.humedadTriturado||0).toFixed(1)}%</span>
+          <span style="background:#F2F4F7;padding:4px 10px;border-radius:4px;font-size:12px"><strong>Agua ajustada:</strong> ${(ajuste.materiales?.agua?.ajustada||0).toFixed(1)} L</span>
+          <span style="background:#F2F4F7;padding:4px 10px;border-radius:4px;font-size:12px"><strong>Arena ajustada:</strong> ${(ajuste.materiales?.arena?.ajustada||0).toFixed(1)} kg</span>
+          <span style="background:#F2F4F7;padding:4px 10px;border-radius:4px;font-size:12px"><strong>Triturado ajustado:</strong> ${(ajuste.materiales?.triturado?.ajustada||0).toFixed(1)} kg</span>
+        </div>
+      </div>` : ''}
       <div style="padding-top:10px;border-top:1px dashed var(--gris-borde)">
         <div style="font-size:10px;color:#888;margin-bottom:6px">RESULTADOS DE RESISTENCIA</div>
         ${(e.resultados || []).length ? `<div style="display:flex;gap:8px;flex-wrap:wrap">${e.resultados.map(r => `<span style="background:#F2F4F7;padding:4px 10px;border-radius:4px;font-size:12px"><strong>${r.edad}d:</strong> ${r.resistencia} MPa</span>`).join('')}</div>` : '<div style="font-size:12px;color:var(--gris-medio)">Sin resultados registrados aún.</div>'}

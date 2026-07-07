@@ -43,6 +43,7 @@ function ir(pantalla) {
   if (pantalla === 'clientes') renderClientes();
   if (pantalla === 'estadisticas') { poblarFiltrosEstadisticas(); renderEstadisticas(); }
   if (pantalla === 'diseno-mezcla') renderDisenosMezcla();
+  if (pantalla === 'ajuste-mezcla') renderAjustesMezcla();
   if (pantalla === 'control-ensayos') renderEnsayosCalidad();
   if (pantalla === 'materia-prima') renderMateriaPrima();
   if (pantalla === 'trazabilidad') { const inp = document.getElementById('buscar-trazabilidad'); if (inp) inp.value = ''; buscarTrazabilidad(); }

@@ -234,6 +234,8 @@ function abrirModalEnsayo() {
   document.getElementById('m-ensayo-fecha').value = new Date().toISOString().split('T')[0];
   poblarSelectDisenos('m-ensayo-diseno');
   poblarSelectOrdenesEnsayo();
+  poblarSelectCilindros();
+  document.getElementById('m-ensayo-cilindro').value = '';
   document.getElementById('m-ensayo-diseno').value = '';
   document.getElementById('m-ensayo-orden').value = '';
   document.getElementById('m-ensayo-elemento').value = '';
@@ -255,6 +257,8 @@ function editarEnsayo(id) {
   document.getElementById('m-ensayo-fecha').value = e.fecha || '';
   poblarSelectDisenos('m-ensayo-diseno');
   poblarSelectOrdenesEnsayo();
+  poblarSelectCilindros();
+  document.getElementById('m-ensayo-cilindro').value = e.cilindroNo || '';
   document.getElementById('m-ensayo-diseno').value = e.disenoCodigo || '';
   if (e.ordenProduccion && !document.querySelector(`#m-ensayo-orden option[value="${e.ordenProduccion}"]`)) {
     const opt = document.createElement('option'); opt.value = e.ordenProduccion; opt.textContent = e.ordenProduccion; document.getElementById('m-ensayo-orden').appendChild(opt);
@@ -278,6 +282,7 @@ function guardarEnsayo() {
   const ensayo = {
     id: editId || String(Date.now()),
     numero, fecha,
+    cilindroNo: document.getElementById('m-ensayo-cilindro').value,
     disenoCodigo: document.getElementById('m-ensayo-diseno').value,
     ordenProduccion: document.getElementById('m-ensayo-orden').value,
     elemento: document.getElementById('m-ensayo-elemento').value.trim(),
