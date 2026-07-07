@@ -769,7 +769,14 @@
     <div class="form-grupo" style="margin-bottom:10px"><label>Nombre *</label><input type="text" id="m-diseno-nombre" placeholder="Ej: Concreto 21 MPa - Elementos no estructurales"></div>
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Asentamiento (cm)</label><input type="number" id="m-diseno-asentamiento" min="0" step="0.5"></div>
-      <div class="form-grupo"><label>Tamaño máximo de agregado *</label><input type="text" id="m-diseno-tamano" placeholder='Ej: 3/4 Pulgada'></div>
+      <div class="form-grupo"><label>Tamaño máximo de agregado *</label>
+        <select id="m-diseno-tamano" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="">— Selecciona —</option>
+          <option value='3/4"'>3/4"</option>
+          <option value='1/2"'>1/2"</option>
+          <option value='3/8"'>3/8"</option>
+        </select>
+      </div>
     </div>
     <div class="form-grupo" style="margin-bottom:10px"><label>Relación agua/cemento</label><input type="number" id="m-diseno-relacion" min="0" step="0.01" style="max-width:calc(50% - 5px)"></div>
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:10px 0 8px">MATERIALES POR M³</div>
@@ -823,7 +830,14 @@
     </div>
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Cliente / Elemento</label><input type="text" id="m-ajuste-cliente-elemento" placeholder="Ej: Prelosa reforzada T1-02"></div>
-      <div class="form-grupo"><label>Tamaño máximo agregado grueso</label><input type="text" id="m-ajuste-tamano" placeholder="Ej: 3/4 Pulgada"></div>
+      <div class="form-grupo"><label>Tamaño máximo agregado grueso</label>
+        <select id="m-ajuste-tamano" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="">— Selecciona —</option>
+          <option value='3/4"'>3/4"</option>
+          <option value='1/2"'>1/2"</option>
+          <option value='3/8"'>3/8"</option>
+        </select>
+      </div>
     </div>
 
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px">CORRECCIÓN DE HUMEDAD DE AGREGADOS</div>
