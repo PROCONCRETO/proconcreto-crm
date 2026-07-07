@@ -1,14 +1,26 @@
 async function cargarDatosSupabase() {
-  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }, { data: prods, error: e4 }] = await Promise.all([
+  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }, { data: prods, error: e4 }, { data: disenos, error: e5 }, { data: ensayos, error: e6 }, { data: mprima, error: e7 }, { data: nconf, error: e8 }] = await Promise.all([
     sb.from('cotizaciones').select('datos, estado').order('creado', { ascending: true }),
     sb.from('clientes').select('datos').order('creado', { ascending: true }),
     sb.from('ordenes_servicio').select('datos').order('creado', { ascending: false }),
-    sb.from('producciones').select('datos').order('creado', { ascending: false })
+    sb.from('producciones').select('datos').order('creado', { ascending: false }),
+    sb.from('disenos_mezcla').select('datos').order('creado', { ascending: false }),
+    sb.from('ensayos_calidad').select('datos').order('creado', { ascending: false }),
+    sb.from('materia_prima').select('datos').order('creado', { ascending: false }),
+    sb.from('no_conformidades').select('datos').order('creado', { ascending: false })
   ]);
   if (e3) console.warn('Tabla ordenes_servicio no disponible aún.');
   if (e4) console.warn('Tabla producciones no disponible aún.');
+  if (e5) console.warn('Tabla disenos_mezcla no disponible aún.');
+  if (e6) console.warn('Tabla ensayos_calidad no disponible aún.');
+  if (e7) console.warn('Tabla materia_prima no disponible aún.');
+  if (e8) console.warn('Tabla no_conformidades no disponible aún.');
   ORDENES = (ords || []).filter(r => r.datos).map(r => r.datos);
   PRODUCCIONES = (prods || []).filter(r => r.datos).map(r => r.datos);
+  DISENOS_MEZCLA = (disenos || []).filter(r => r.datos).map(r => r.datos);
+  ENSAYOS_CALIDAD = (ensayos || []).filter(r => r.datos).map(r => r.datos);
+  MATERIA_PRIMA = (mprima || []).filter(r => r.datos).map(r => r.datos);
+  NO_CONFORMIDADES = (nconf || []).filter(r => r.datos).map(r => r.datos);
 
   // Catálogo de productos desde Supabase (con auto-siembra la primera vez)
   await cargarCatalogo();
@@ -79,6 +91,12 @@ function rerenderPantallaActiva() {
     case 'pantalla-produccion-diaria': renderProduccionDiaria(); break;
     case 'pantalla-inventario': renderInventario(); break;
     case 'pantalla-productos': renderProductosAdmin(); break;
+    case 'pantalla-diseno-mezcla': renderDisenosMezcla(); break;
+    case 'pantalla-control-ensayos': renderEnsayosCalidad(); break;
+    case 'pantalla-materia-prima': renderMateriaPrima(); break;
+    case 'pantalla-no-conformidades': renderNoConformidades(); break;
+    case 'pantalla-certificados-calidad': renderCertificadosCalidad(); break;
+    case 'pantalla-trazabilidad': buscarTrazabilidad(); break;
   }
 }
 
@@ -111,6 +129,26 @@ async function recargarProductosRT() {
   const { data } = await sb.from('productos').select('*').order('grupo', { ascending: true }).order('nombre', { ascending: true });
   if (data) { refrescarCatalogo(data); rerenderPantallaActiva(); }
 }
+async function recargarDisenosRT() {
+  const { data } = await sb.from('disenos_mezcla').select('datos').order('creado', { ascending: false });
+  DISENOS_MEZCLA = (data || []).filter(r => r.datos).map(r => r.datos);
+  rerenderPantallaActiva();
+}
+async function recargarEnsayosRT() {
+  const { data } = await sb.from('ensayos_calidad').select('datos').order('creado', { ascending: false });
+  ENSAYOS_CALIDAD = (data || []).filter(r => r.datos).map(r => r.datos);
+  rerenderPantallaActiva();
+}
+async function recargarMateriaPrimaRT() {
+  const { data } = await sb.from('materia_prima').select('datos').order('creado', { ascending: false });
+  MATERIA_PRIMA = (data || []).filter(r => r.datos).map(r => r.datos);
+  rerenderPantallaActiva();
+}
+async function recargarNCRT() {
+  const { data } = await sb.from('no_conformidades').select('datos').order('creado', { ascending: false });
+  NO_CONFORMIDADES = (data || []).filter(r => r.datos).map(r => r.datos);
+  rerenderPantallaActiva();
+}
 
 function suscribirRealtime() {
   if (_canalRealtime) return; // evitar suscripciones duplicadas
@@ -120,6 +158,10 @@ function suscribirRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes_servicio' },  () => _rtDebounce('ordenes', recargarOrdenesRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'producciones' },      () => _rtDebounce('producciones', recargarProduccionesRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' },          () => _rtDebounce('productos', recargarProductosRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'disenos_mezcla' },      () => _rtDebounce('disenos', recargarDisenosRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ensayos_calidad' },     () => _rtDebounce('ensayos', recargarEnsayosRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'materia_prima' },       () => _rtDebounce('materiaprima', recargarMateriaPrimaRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'no_conformidades' },    () => _rtDebounce('noconformidades', recargarNCRT))
     .subscribe((status) => {
       const ind = document.getElementById('rt-indicador');
       if (ind) {
