@@ -145,9 +145,9 @@ function editarAjusteMezcla(id) {
   document.getElementById('m-ajuste-triturado-seco').value = a.triturado?.pesoSeco || 0;
   document.getElementById('m-ajuste-obs').value = a.observaciones || '';
 
-  // Las cantidades "Cantidad diseño" y la resistencia/tamaño SIEMPRE se traen en vivo
-  // del Diseño de Mezcla base (nunca de lo que haya quedado guardado en el ajuste),
-  // para que jamás queden desactualizadas o editadas manualmente por error.
+  // Las cantidades "Cantidad diseño", la resistencia/tamaño y la absorción SIEMPRE
+  // se traen en vivo del Diseño de Mezcla base (nunca de lo que haya quedado guardado
+  // en el ajuste), para que jamás queden desactualizadas o editadas manualmente por error.
   if (a.disenoCodigo && DISENOS_MEZCLA.find(x => x.codigo === a.disenoCodigo)) {
     cargarBaseDesdeDiseno();
   } else {
@@ -162,10 +162,9 @@ function editarAjusteMezcla(id) {
     document.getElementById('m-ajuste-mat-arena').value = a.materiales?.arena?.diseno || 0;
     document.getElementById('m-ajuste-mat-triturado').value = a.materiales?.triturado?.diseno || 0;
     document.getElementById('m-ajuste-mat-acelerante').value = a.materiales?.acelerante?.diseno || 0;
+    document.getElementById('m-ajuste-arena-absorcion').value = a.arena?.absorcion || 0;
+    document.getElementById('m-ajuste-triturado-absorcion').value = a.triturado?.absorcion || 0;
   }
-  // La absorción sí es propia de cada ajuste (dato de laboratorio del día), se restaura la guardada.
-  document.getElementById('m-ajuste-arena-absorcion').value = a.arena?.absorcion || 0;
-  document.getElementById('m-ajuste-triturado-absorcion').value = a.triturado?.absorcion || 0;
 
   recalcularAjusteMezcla();
   document.getElementById('modal-ajuste-mezcla').classList.add('abierto');
