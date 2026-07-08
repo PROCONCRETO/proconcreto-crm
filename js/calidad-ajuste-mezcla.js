@@ -3,6 +3,21 @@
 // ═══════════════════════════════
 let AJUSTES_MEZCLA = [];
 
+// Agrega un <option> a un <select> si el valor aún no existe entre sus opciones.
+// Compara por igualdad de valores en JS (no arma selectores CSS) para no romperse
+// con valores que contienen comillas, como 3/4", 1/2", etc.
+function agregarOpcionSiNoExiste(selectId, valor) {
+  if (!valor) return;
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const yaExiste = [...sel.options].some(o => o.value === valor);
+  if (!yaExiste) {
+    const opt = document.createElement('option');
+    opt.value = valor; opt.textContent = valor;
+    sel.appendChild(opt);
+  }
+}
+
 function siguienteCilindroNo() {
   const nums = AJUSTES_MEZCLA.map(a => parseInt(a.cilindroNo) || 0);
   return nums.length ? Math.max(...nums) + 1 : '';
@@ -49,12 +64,15 @@ function cargarBaseDesdeDiseno() {
   const d = DISENOS_MEZCLA.find(x => x.codigo === codigo);
   if (!d) return;
   document.getElementById('m-ajuste-resistencia').value = d.resistenciaDiseno || '';
+  agregarOpcionSiNoExiste('m-ajuste-tamano', d.tamanoMaximo);
   document.getElementById('m-ajuste-tamano').value = d.tamanoMaximo || '';
   document.getElementById('m-ajuste-mat-agua').value = d.materiales?.agua || 0;
   document.getElementById('m-ajuste-mat-cemento').value = d.materiales?.cemento || 0;
   document.getElementById('m-ajuste-mat-adicion').value = d.materiales?.metacaolin || 0;
   document.getElementById('m-ajuste-mat-arena').value = d.materiales?.arena || 0;
   document.getElementById('m-ajuste-mat-triturado').value = d.materiales?.grava || 0;
+  document.getElementById('m-ajuste-arena-absorcion').value = d.materiales?.absorcionArena || 0;
+  document.getElementById('m-ajuste-triturado-absorcion').value = d.materiales?.absorcionTriturado || 0;
   const aditivos = d.materiales?.aditivos || [];
   const sumaPorTipo = (tipo) => aditivos.filter(a => a.tipo === tipo).reduce((s, a) => s + (Number(a.dosis) || 0), 0);
   document.getElementById('m-ajuste-mat-plastificante').value = sumaPorTipo('Superplastificante');
@@ -118,25 +136,37 @@ function editarAjusteMezcla(id) {
   document.getElementById('m-ajuste-fecha').value = a.fecha || '';
   poblarSelectDisenos('m-ajuste-diseno');
   document.getElementById('m-ajuste-diseno').value = a.disenoCodigo || '';
-  document.getElementById('m-ajuste-resistencia').value = a.resistenciaDiseno || 0;
   document.getElementById('m-ajuste-cliente-elemento').value = a.clienteElemento || '';
-  document.getElementById('m-ajuste-tamano').value = a.tamanoMaximo || '';
   document.getElementById('m-ajuste-arena-recipiente').value = a.arena?.pesoRecipiente || 0;
   document.getElementById('m-ajuste-arena-humedo').value = a.arena?.pesoHumedo || 0;
   document.getElementById('m-ajuste-arena-seco').value = a.arena?.pesoSeco || 0;
-  document.getElementById('m-ajuste-arena-absorcion').value = a.arena?.absorcion || 0;
   document.getElementById('m-ajuste-triturado-recipiente').value = a.triturado?.pesoRecipiente || 0;
   document.getElementById('m-ajuste-triturado-humedo').value = a.triturado?.pesoHumedo || 0;
   document.getElementById('m-ajuste-triturado-seco').value = a.triturado?.pesoSeco || 0;
-  document.getElementById('m-ajuste-triturado-absorcion').value = a.triturado?.absorcion || 0;
-  document.getElementById('m-ajuste-mat-agua').value = a.materiales?.agua?.diseno || 0;
-  document.getElementById('m-ajuste-mat-cemento').value = a.materiales?.cemento?.diseno || 0;
-  document.getElementById('m-ajuste-mat-adicion').value = a.materiales?.adicion?.diseno || 0;
-  document.getElementById('m-ajuste-mat-plastificante').value = a.materiales?.plastificante?.diseno || 0;
-  document.getElementById('m-ajuste-mat-arena').value = a.materiales?.arena?.diseno || 0;
-  document.getElementById('m-ajuste-mat-triturado').value = a.materiales?.triturado?.diseno || 0;
-  document.getElementById('m-ajuste-mat-acelerante').value = a.materiales?.acelerante?.diseno || 0;
   document.getElementById('m-ajuste-obs').value = a.observaciones || '';
+
+  // Las cantidades "Cantidad diseño" y la resistencia/tamaño SIEMPRE se traen en vivo
+  // del Diseño de Mezcla base (nunca de lo que haya quedado guardado en el ajuste),
+  // para que jamás queden desactualizadas o editadas manualmente por error.
+  if (a.disenoCodigo && DISENOS_MEZCLA.find(x => x.codigo === a.disenoCodigo)) {
+    cargarBaseDesdeDiseno();
+  } else {
+    // El diseño ya no existe: se usa lo que había quedado guardado, como respaldo.
+    agregarOpcionSiNoExiste('m-ajuste-tamano', a.tamanoMaximo);
+    document.getElementById('m-ajuste-tamano').value = a.tamanoMaximo || '';
+    document.getElementById('m-ajuste-resistencia').value = a.resistenciaDiseno || 0;
+    document.getElementById('m-ajuste-mat-agua').value = a.materiales?.agua?.diseno || 0;
+    document.getElementById('m-ajuste-mat-cemento').value = a.materiales?.cemento?.diseno || 0;
+    document.getElementById('m-ajuste-mat-adicion').value = a.materiales?.adicion?.diseno || 0;
+    document.getElementById('m-ajuste-mat-plastificante').value = a.materiales?.plastificante?.diseno || 0;
+    document.getElementById('m-ajuste-mat-arena').value = a.materiales?.arena?.diseno || 0;
+    document.getElementById('m-ajuste-mat-triturado').value = a.materiales?.triturado?.diseno || 0;
+    document.getElementById('m-ajuste-mat-acelerante').value = a.materiales?.acelerante?.diseno || 0;
+  }
+  // La absorción sí es propia de cada ajuste (dato de laboratorio del día), se restaura la guardada.
+  document.getElementById('m-ajuste-arena-absorcion').value = a.arena?.absorcion || 0;
+  document.getElementById('m-ajuste-triturado-absorcion').value = a.triturado?.absorcion || 0;
+
   recalcularAjusteMezcla();
   document.getElementById('modal-ajuste-mezcla').classList.add('abierto');
 }
