@@ -853,7 +853,7 @@
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px">CORRECCIÓN DE HUMEDAD DE AGREGADOS</div>
     <div style="overflow-x:auto;margin-bottom:10px">
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Agregado</th><th>Peso recipiente</th><th>Peso recip.+húmedo</th><th>Peso recip.+seco</th><th>Humedad</th><th>Absorción (%)</th></tr></thead>
+        <thead><tr><th>Agregado</th><th>Peso recipiente</th><th>Peso recip.+húmedo</th><th>Peso recip.+seco</th><th>Humedad</th><th>Absorción (%) <span style="font-weight:400;text-transform:none">(automática)</span></th></tr></thead>
         <tbody>
           <tr>
             <td style="font-weight:600">Arena (fino)</td>
@@ -861,7 +861,7 @@
             <td><input type="number" id="m-ajuste-arena-humedo" value="0" oninput="recalcularAjusteMezcla()"></td>
             <td><input type="number" id="m-ajuste-arena-seco" value="0" oninput="recalcularAjusteMezcla()"></td>
             <td style="text-align:center;font-weight:700" id="m-ajuste-arena-humedad-display">0.0%</td>
-            <td><input type="number" id="m-ajuste-arena-absorcion" value="0" step="0.1" oninput="recalcularAjusteMezcla()"></td>
+            <td><input type="number" id="m-ajuste-arena-absorcion" value="0" step="0.1" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td>
           </tr>
           <tr>
             <td style="font-weight:600">Triturado (grueso)</td>
@@ -869,10 +869,11 @@
             <td><input type="number" id="m-ajuste-triturado-humedo" value="0" oninput="recalcularAjusteMezcla()"></td>
             <td><input type="number" id="m-ajuste-triturado-seco" value="0" oninput="recalcularAjusteMezcla()"></td>
             <td style="text-align:center;font-weight:700" id="m-ajuste-triturado-humedad-display">0.0%</td>
-            <td><input type="number" id="m-ajuste-triturado-absorcion" value="0" step="0.1" oninput="recalcularAjusteMezcla()"></td>
+            <td><input type="number" id="m-ajuste-triturado-absorcion" value="0" step="0.1" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td>
           </tr>
         </tbody>
       </table>
+      <div style="font-size:11px;color:var(--gris-medio);margin-top:4px">* La absorción se trae automáticamente del Diseño de Mezcla base y no se puede editar aquí — si necesitas cambiarla, edítala en el Diseño de Mezcla.</div>
     </div>
 
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px">MATERIALES POR M³ — DISEÑO vs. AJUSTADO</div>
