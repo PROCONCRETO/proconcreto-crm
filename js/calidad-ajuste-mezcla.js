@@ -52,6 +52,7 @@ function renderAjustesMezcla() {
       <td style="text-align:center">${a.humedadTriturado != null ? a.humedadTriturado.toFixed(1) + '%' : '—'}</td>
       <td>
         <div class="flex-gap">
+          <button class="btn btn-secundario btn-xs" onclick="verFormatoProduccionAjuste('${a.id}')">🖨️ Formato</button>
           <button class="btn btn-primario btn-xs" onclick="editarAjusteMezcla('${a.id}')">✏️ Editar</button>
           <button class="btn btn-rojo btn-xs" onclick="eliminarAjusteMezcla('${a.id}')">🗑️</button>
         </div>
@@ -253,4 +254,141 @@ function cargarDesdeAjusteMezcla() {
   actualizarObjetivoDesdeDiseno();
   if (a.resistenciaDiseno) document.getElementById('m-ensayo-objetivo').value = a.resistenciaDiseno;
   if (!document.getElementById('m-ensayo-elemento').value) document.getElementById('m-ensayo-elemento').value = a.clienteElemento || '';
+}
+
+// ── Formato de Producción (PDF para el operario de mezclado) ──
+// Reproduce el formato físico de planta: para cada volumen de concreto a producir,
+// el "Peso a cargar" de Arena y Triturado incluye una compensación por buggy (material
+// que queda pegado en cada buggy al vaciarlo), porque esos dos insumos se cargan a mano
+// en buggies de capacidad fija; los demás insumos se dosifican directo, sin ese ajuste.
+const BUGGY_CAPACIDAD_KG = 150;
+const BUGGY_COMPENSACION_KG = 17;
+const VOLUMENES_FORMATO_PRODUCCION = [0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70];
+
+function _filaFormatoProduccion(nombre, cantidadAjustada, volumen, esAgregado, unidad) {
+  const pesoTeorico = cantidadAjustada * volumen;
+  if (!esAgregado) {
+    return { nombre, pesoACargar: pesoTeorico, cantBuggies: 'N/A', pesoTeorico, pesoBuggies: 'N/A', unidad };
+  }
+  const cantBuggies = Math.ceil(pesoTeorico / BUGGY_CAPACIDAD_KG - 1e-9) || 0;
+  const pesoBuggies = cantBuggies * BUGGY_COMPENSACION_KG;
+  return { nombre, pesoACargar: pesoTeorico + pesoBuggies, cantBuggies, pesoTeorico, pesoBuggies, unidad };
+}
+
+function _tablaVolumenFormatoProduccion(a, volumen) {
+  const m = a.materiales || {};
+  const filas = [
+    _filaFormatoProduccion('Agua', m.agua?.ajustada || 0, volumen, false, 'kg'),
+    _filaFormatoProduccion('Cemento', m.cemento?.ajustada || 0, volumen, false, 'kg'),
+    _filaFormatoProduccion('Adición (Metacaolín/puzolana)', m.adicion?.ajustada || 0, volumen, false, 'kg'),
+    _filaFormatoProduccion('Plastificante', m.plastificante?.ajustada || 0, volumen, false, 'g'),
+    _filaFormatoProduccion('Arena', m.arena?.ajustada || 0, volumen, true, 'kg'),
+    _filaFormatoProduccion('Triturado', m.triturado?.ajustada || 0, volumen, true, 'kg'),
+  ];
+  // El +1e-9 evita que un valor como 365*0.7=255.49999999999997 (imprecisión de punto
+  // flotante) redondee hacia abajo cuando matemáticamente cae justo en 255.5 → 256.
+  const fmt = (v, unidad) => v === 'N/A' ? 'N/A' : Math.round(v + 1e-9) + ' ' + unidad;
+  return `
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead>
+        <tr style="background:#FFC107">
+          <th colspan="2" style="padding:4px 6px;text-align:left;font-weight:700">VOLUMEN DE CONCRETO ${volumen.toFixed(2).replace('.', ',')} m3</th>
+          <th colspan="3" style="padding:4px 6px;text-align:left;font-weight:700">Cantidades</th>
+        </tr>
+        <tr style="background:#f0f0f0">
+          <th style="padding:4px 6px;text-align:left">Material</th>
+          <th style="padding:4px 6px;text-align:center">Peso a cargar</th>
+          <th style="padding:4px 6px;text-align:center">Cant de Buggies</th>
+          <th style="padding:4px 6px;text-align:center">Peso Teórico</th>
+          <th style="padding:4px 6px;text-align:center">Peso buggies</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filas.map(f => `
+          <tr>
+            <td style="padding:3px 6px;border-bottom:1px solid #eee;font-weight:600">${f.nombre}</td>
+            <td style="padding:3px 6px;border-bottom:1px solid #eee;text-align:center;font-weight:700">${fmt(f.pesoACargar, f.unidad)}</td>
+            <td style="padding:3px 6px;border-bottom:1px solid #eee;text-align:center">${f.cantBuggies === 'N/A' ? 'N/A' : f.cantBuggies + ' buggies'}</td>
+            <td style="padding:3px 6px;border-bottom:1px solid #eee;text-align:center;color:#888">${fmt(f.pesoTeorico, f.unidad)}</td>
+            <td style="padding:3px 6px;border-bottom:1px solid #eee;text-align:center;color:#888">${fmt(f.pesoBuggies, f.unidad)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function verFormatoProduccionAjuste(id) {
+  const a = AJUSTES_MEZCLA.find(x => String(x.id) === String(id));
+  if (!a) return;
+  const pares = [];
+  for (let i = 0; i < VOLUMENES_FORMATO_PRODUCCION.length / 2; i++) {
+    pares.push([VOLUMENES_FORMATO_PRODUCCION[i], VOLUMENES_FORMATO_PRODUCCION[i + VOLUMENES_FORMATO_PRODUCCION.length / 2]]);
+  }
+  const html = `
+  <div id="formato-produccion-doc" style="font-family:Arial,sans-serif;max-width:820px;margin:0 auto;padding:0;color:#222;background:#fff">
+    <div style="background:#001F3F;color:white;padding:18px 24px">
+      <div style="font-size:17px;font-weight:700">Proconcreto Prefabricados</div>
+      <div style="font-size:11px;opacity:0.7;margin-top:2px">FORMATO DE PRODUCCIÓN — MEZCLA AJUSTADA POR HUMEDAD</div>
+    </div>
+    <div style="padding:14px 16px;border-bottom:1px solid #eee">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <div style="font-size:15px;font-weight:700">CILINDRO No. ${a.cilindroNo || '—'}</div>
+        <div style="font-size:12px;color:#555">${a.fecha ? new Date(a.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</div>
+      </div>
+      <div style="font-size:13px;font-weight:600;margin-top:4px">${a.clienteElemento || '—'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;font-size:11px">
+        <div><b>RESISTENCIA DE DISEÑO:</b> ${a.resistenciaDiseno || '—'} MPa</div>
+        <div><b>HUMEDAD AGREGADO FINO:</b> ${a.humedadArena != null ? a.humedadArena.toFixed(1) + '%' : '—'}</div>
+        <div><b>TAMAÑO MÁXIMO DE AGREGADO:</b> ${a.tamanoMaximo || '—'}</div>
+        <div><b>TRITURADO AGREGADO GRUESO:</b> ${a.humedadTriturado != null ? a.humedadTriturado.toFixed(1) + '%' : '—'}</div>
+      </div>
+    </div>
+    <div style="padding:14px 16px">
+      ${pares.map(([izq, der]) => `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div style="border:1px solid #ddd;border-radius:4px;overflow:hidden">${_tablaVolumenFormatoProduccion(a, izq)}</div>
+          <div style="border:1px solid #ddd;border-radius:4px;overflow:hidden">${_tablaVolumenFormatoProduccion(a, der)}</div>
+        </div>`).join('')}
+    </div>
+    <div style="background:#f5f5f5;padding:8px 16px;text-align:center;font-size:10px;color:#999">
+      Proconcreto Prefabricados · Autopista del Café Km2, Vía Chinchiná – Santa Rosa · www.proconcreto.com.co
+    </div>
+  </div>`;
+
+  const vistaPrevia = document.getElementById('vista-previa');
+  document.getElementById('contenido-preview').innerHTML = `
+    <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
+      <span style="font-weight:700">Formato de Producción — Cilindro N° ${a.cilindroNo || ''}</span>
+      <div style="flex:1"></div>
+      <button onclick="descargarFormatoProduccionAjuste('${a.id}')" style="background:#1D9E75;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-formato-produccion">⬇️ Descargar PDF</button>
+      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-ajuste-mezcla').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+    </div>
+    <div class="preview-doc" id="formato-produccion-container" style="padding:0">${html}</div>`;
+  vistaPrevia.style.display = 'block';
+  document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+  window.scrollTo(0, 0);
+}
+
+async function descargarFormatoProduccionAjuste(id) {
+  const a = AJUSTES_MEZCLA.find(x => String(x.id) === String(id));
+  if (!a) return;
+  const btn = document.getElementById('btn-pdf-formato-produccion');
+  if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
+  try {
+    const { jsPDF } = window.jspdf;
+    const el = document.getElementById('formato-produccion-doc');
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = 210, pageH = 297;
+    const imgH = (canvas.height * pageW) / canvas.width;
+    let y = 0;
+    while (y < imgH) {
+      if (y > 0) pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, -y, pageW, imgH);
+      y += pageH;
+    }
+    pdf.save(`Formato_Produccion_Cilindro_${a.cilindroNo || a.id}.pdf`);
+  } finally {
+    if (btn) { btn.textContent = '⬇️ Descargar PDF'; btn.disabled = false; }
+  }
 }
