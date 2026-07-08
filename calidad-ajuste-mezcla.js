@@ -3,6 +3,21 @@
 // ═══════════════════════════════
 let AJUSTES_MEZCLA = [];
 
+// Agrega un <option> a un <select> si el valor aún no existe entre sus opciones.
+// Compara por igualdad de valores en JS (no arma selectores CSS) para no romperse
+// con valores que contienen comillas, como 3/4", 1/2", etc.
+function agregarOpcionSiNoExiste(selectId, valor) {
+  if (!valor) return;
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const yaExiste = [...sel.options].some(o => o.value === valor);
+  if (!yaExiste) {
+    const opt = document.createElement('option');
+    opt.value = valor; opt.textContent = valor;
+    sel.appendChild(opt);
+  }
+}
+
 function siguienteCilindroNo() {
   const nums = AJUSTES_MEZCLA.map(a => parseInt(a.cilindroNo) || 0);
   return nums.length ? Math.max(...nums) + 1 : '';
@@ -49,15 +64,15 @@ function cargarBaseDesdeDiseno() {
   const d = DISENOS_MEZCLA.find(x => x.codigo === codigo);
   if (!d) return;
   document.getElementById('m-ajuste-resistencia').value = d.resistenciaDiseno || '';
-  if (d.tamanoMaximo && !document.querySelector(`#m-ajuste-tamano option[value="${d.tamanoMaximo}"]`)) {
-    const opt = document.createElement('option'); opt.value = d.tamanoMaximo; opt.textContent = d.tamanoMaximo; document.getElementById('m-ajuste-tamano').appendChild(opt);
-  }
+  agregarOpcionSiNoExiste('m-ajuste-tamano', d.tamanoMaximo);
   document.getElementById('m-ajuste-tamano').value = d.tamanoMaximo || '';
   document.getElementById('m-ajuste-mat-agua').value = d.materiales?.agua || 0;
   document.getElementById('m-ajuste-mat-cemento').value = d.materiales?.cemento || 0;
   document.getElementById('m-ajuste-mat-adicion').value = d.materiales?.metacaolin || 0;
   document.getElementById('m-ajuste-mat-arena').value = d.materiales?.arena || 0;
   document.getElementById('m-ajuste-mat-triturado').value = d.materiales?.grava || 0;
+  document.getElementById('m-ajuste-arena-absorcion').value = d.materiales?.absorcionArena || 0;
+  document.getElementById('m-ajuste-triturado-absorcion').value = d.materiales?.absorcionTriturado || 0;
   const aditivos = d.materiales?.aditivos || [];
   const sumaPorTipo = (tipo) => aditivos.filter(a => a.tipo === tipo).reduce((s, a) => s + (Number(a.dosis) || 0), 0);
   document.getElementById('m-ajuste-mat-plastificante').value = sumaPorTipo('Superplastificante');
@@ -123,9 +138,7 @@ function editarAjusteMezcla(id) {
   document.getElementById('m-ajuste-diseno').value = a.disenoCodigo || '';
   document.getElementById('m-ajuste-resistencia').value = a.resistenciaDiseno || 0;
   document.getElementById('m-ajuste-cliente-elemento').value = a.clienteElemento || '';
-  if (a.tamanoMaximo && !document.querySelector(`#m-ajuste-tamano option[value="${a.tamanoMaximo}"]`)) {
-    const opt = document.createElement('option'); opt.value = a.tamanoMaximo; opt.textContent = a.tamanoMaximo; document.getElementById('m-ajuste-tamano').appendChild(opt);
-  }
+  agregarOpcionSiNoExiste('m-ajuste-tamano', a.tamanoMaximo);
   document.getElementById('m-ajuste-tamano').value = a.tamanoMaximo || '';
   document.getElementById('m-ajuste-arena-recipiente').value = a.arena?.pesoRecipiente || 0;
   document.getElementById('m-ajuste-arena-humedo').value = a.arena?.pesoHumedo || 0;
