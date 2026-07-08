@@ -878,19 +878,19 @@
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px">MATERIALES POR M³ — DISEÑO vs. AJUSTADO</div>
     <div style="overflow-x:auto;margin-bottom:10px">
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Insumo</th><th>Cantidad diseño</th><th>Unidad</th><th>Cantidad ajustada</th></tr></thead>
+        <thead><tr><th>Insumo</th><th>Cantidad diseño <span style="font-weight:400;text-transform:none">(automática)</span></th><th>Unidad</th><th>Cantidad ajustada</th></tr></thead>
         <tbody>
-          <tr><td style="font-weight:600">Agua</td><td><input type="number" id="m-ajuste-mat-agua" value="0" oninput="recalcularAjusteMezcla()"></td><td>Litros</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-agua">0.0 L</td></tr>
-          <tr><td style="font-weight:600">Cemento</td><td><input type="number" id="m-ajuste-mat-cemento" value="0" oninput="recalcularAjusteMezcla()"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-cemento">0.0 kg</td></tr>
-          <tr><td style="font-weight:600">Adición (Metacaolín/puzolana)</td><td><input type="number" id="m-ajuste-mat-adicion" value="0" oninput="recalcularAjusteMezcla()"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-adicion">0.0 kg</td></tr>
-          <tr><td style="font-weight:600">Plastificante</td><td><input type="number" id="m-ajuste-mat-plastificante" value="0" oninput="recalcularAjusteMezcla()"></td><td>gramos</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-plastificante">0.0 g</td></tr>
-          <tr><td style="font-weight:600">Arena</td><td><input type="number" id="m-ajuste-mat-arena" value="0" oninput="recalcularAjusteMezcla()"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-arena">0.0 kg</td></tr>
-          <tr><td style="font-weight:600">Triturado</td><td><input type="number" id="m-ajuste-mat-triturado" value="0" oninput="recalcularAjusteMezcla()"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-triturado">0.0 kg</td></tr>
-          <tr><td style="font-weight:600">Acelerante</td><td><input type="number" id="m-ajuste-mat-acelerante" value="0" oninput="recalcularAjusteMezcla()"></td><td>gramos</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-acelerante">0.0 g</td></tr>
+          <tr><td style="font-weight:600">Agua</td><td><input type="number" id="m-ajuste-mat-agua" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>Litros</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-agua">0.0 L</td></tr>
+          <tr><td style="font-weight:600">Cemento</td><td><input type="number" id="m-ajuste-mat-cemento" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-cemento">0.0 kg</td></tr>
+          <tr><td style="font-weight:600">Adición (Metacaolín/puzolana)</td><td><input type="number" id="m-ajuste-mat-adicion" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-adicion">0.0 kg</td></tr>
+          <tr><td style="font-weight:600">Plastificante</td><td><input type="number" id="m-ajuste-mat-plastificante" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>gramos</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-plastificante">0.0 g</td></tr>
+          <tr><td style="font-weight:600">Arena</td><td><input type="number" id="m-ajuste-mat-arena" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-arena">0.0 kg</td></tr>
+          <tr><td style="font-weight:600">Triturado</td><td><input type="number" id="m-ajuste-mat-triturado" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-triturado">0.0 kg</td></tr>
+          <tr><td style="font-weight:600">Acelerante</td><td><input type="number" id="m-ajuste-mat-acelerante" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>gramos</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-acelerante">0.0 g</td></tr>
         </tbody>
       </table>
     </div>
-    <div style="font-size:11px;color:var(--gris-medio);margin-bottom:12px">* El agua y los agregados se ajustan automáticamente según la humedad medida. Cemento, adición, plastificante y acelerante no varían.</div>
+    <div style="font-size:11px;color:var(--gris-medio);margin-bottom:12px">* La columna "Cantidad diseño" se trae automáticamente del Diseño de Mezcla seleccionado y no se puede editar aquí — si necesitas cambiar una cantidad, edítala en el Diseño de Mezcla base. El agua y los agregados se ajustan solos según la humedad medida.</div>
 
     <div class="form-grupo" style="margin-bottom:16px"><label>Observaciones</label><textarea id="m-ajuste-obs" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical"></textarea></div>
     <div class="modal-acciones">
