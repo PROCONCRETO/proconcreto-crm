@@ -906,7 +906,7 @@
     <input type="hidden" id="m-ensayo-id">
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>N° Ensayo *</label><input type="text" id="m-ensayo-numero" placeholder="ENS-0001"></div>
-      <div class="form-grupo"><label>Fecha fundida *</label><input type="date" id="m-ensayo-fecha"></div>
+      <div class="form-grupo"><label>Fecha fundida *</label><input type="date" id="m-ensayo-fecha" onchange="renderResultadosEnsayo()"></div>
     </div>
     <div class="form-grupo" style="margin-bottom:10px"><label>N° Cilindro (ajuste diario de mezcla)</label>
       <select id="m-ensayo-cilindro" onchange="cargarDesdeAjusteMezcla()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
@@ -931,7 +931,7 @@
     </div>
     <div style="overflow-x:auto;margin-bottom:10px">
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th style="width:90px">Edad (días)</th><th style="width:150px">Fecha ensayo</th><th style="width:120px">Resistencia (MPa)</th><th style="width:36px"></th></tr></thead>
+        <thead><tr><th style="width:90px">Edad (días) <span style="font-weight:400;text-transform:none">(automática)</span></th><th style="width:150px">Fecha ensayo</th><th style="width:120px">Resistencia (MPa)</th><th style="width:36px"></th></tr></thead>
         <tbody id="resultados-ensayo-body"></tbody>
       </table>
     </div>
