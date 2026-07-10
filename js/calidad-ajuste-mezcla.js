@@ -38,7 +38,7 @@ function renderAjustesMezcla() {
   data.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (Number(b.cilindroNo) || 0) - (Number(a.cilindroNo) || 0));
 
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">🌡️</div><div>No hay ajustes diarios registrados.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">🌡️</div><div>No hay ajustes diarios registrados.</div></td></tr>`;
     return;
   }
   tbody.innerHTML = data.map(a => `
@@ -47,6 +47,7 @@ function renderAjustesMezcla() {
       <td>${a.fecha ? new Date(a.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
       <td>${a.disenoCodigo ? `<span style="font-size:11px;background:var(--gris-borde);color:#333;padding:2px 6px;border-radius:3px;font-weight:600">${a.disenoCodigo}</span>` : '—'}</td>
       <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${a.clienteElemento || ''}">${a.clienteElemento || '—'}</td>
+      <td>${USUARIOS_CRM[a.creadoPor]?.nombre || a.creadoPor || '—'}</td>
       <td style="text-align:center">${a.resistenciaDiseno || '—'} MPa</td>
       <td style="text-align:center">${a.humedadArena != null ? a.humedadArena.toFixed(1) + '%' : '—'}</td>
       <td style="text-align:center">${a.humedadTriturado != null ? a.humedadTriturado.toFixed(1) + '%' : '—'}</td>
