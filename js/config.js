@@ -12,6 +12,7 @@ const USUARIOS_CRM = {
   'departamentotecnico@proconcreto.com.co':{ nombre: 'Ana María Mazuera',             cargo: 'Coordinadora Técnica',   cel: '+57 301 539 0344' },
   'produccion@proconcreto.com.co':        { nombre: 'Jaime Eduardo Franco',           cargo: 'Jefe de Producción',     cel: '+57 311 408 2285' },
   'logistica@proconcreto.com.co':         { nombre: 'Jennifer Lopez',                 cargo: 'Jefe de Logística',      cel: '+57 324 367 8723' },
+  'calidad@proconcreto.com.co':           { nombre: 'Juan Esteban Valencia',          cargo: 'Asistente de Calidad',   cel: '+57 313 709 2049' },
 };
 
 let COTIZACIONES = [];
