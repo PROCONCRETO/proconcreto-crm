@@ -933,7 +933,7 @@ function previsualizarCotizacion() {
       <div class="preview-membrete-footer">
         <div class="pf-arco"></div>
         <div class="pf-datos">
-          <div class="pf-col"><span class="pf-icon">📞</span><span>+57 (6) 887 3839<br>+57 (6) 887 5246</span></div>
+          <div class="pf-col"><span class="pf-icon">📞</span><span>+57 314 620 1650<br>+57 311 408 2285</span></div>
           <div class="pf-col"><span class="pf-icon">🏠</span><span>Autopista del Café Km2<br>Vía Chinchiná – Santa Rosa</span></div>
           <div class="pf-col"><span class="pf-icon">🌐</span><span>www.proconcreto.com.co</span></div>
         </div>
