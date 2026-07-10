@@ -535,7 +535,7 @@ function verFormatoProduccionAjuste(id) {
             <div style="font-size:11px;color:#555">${a.fecha ? new Date(a.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</div>
           </div>
           <div style="font-size:12px;font-weight:600;margin-top:2px">${a.cliente || a.clienteElemento || '—'}${a.proyecto ? ' — ' + a.proyecto : ''}</div>
-          ${(a.clientesAdicionales && a.clientesAdicionales.length) ? `<div style="font-size:10px;color:#777;margin-top:2px">+ ${a.clientesAdicionales.map(c => `${c.cliente}${c.proyecto ? ' (' + c.proyecto + ')' : ''}`).join(', ')}</div>` : ''}
+          ${(a.clientesAdicionales || []).map(c => `<div style="font-size:12px;font-weight:600;margin-top:2px">${c.cliente}${c.proyecto ? ' — ' + c.proyecto : ''}</div>`).join('')}
           <div style="font-size:10.5px;margin-top:6px"><b>PRODUCTO:</b> ${a.productoNombre || '—'}${(a.productosAdicionales && a.productosAdicionales.length) ? ` + ${a.productosAdicionales.map(p => p.nombre).join(', ')}` : ''}</div>
           <div style="font-size:10.5px;margin-top:6px"><b>DISEÑO DE MEZCLA:</b> ${diseno ? `${diseno.codigo} — ${diseno.nombre}` : (a.disenoCodigo || '—')}</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px;font-size:10.5px">
