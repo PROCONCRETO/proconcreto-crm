@@ -2,6 +2,91 @@
 // CALIDAD — AJUSTE DIARIO DE MEZCLA (CORRECCIÓN DE HUMEDAD)
 // ═══════════════════════════════
 let AJUSTES_MEZCLA = [];
+let _clientesAdicionalesAjuste = [];
+
+// Un mismo ajuste (misma mezcla, mismo cilindro) a veces se fabrica para varios
+// clientes/proyectos a la vez; esta tabla solo aparece cuando hay más de un cliente.
+function renderClientesAdicionalesAjuste() {
+  const wrap = document.getElementById('clientes-adicionales-ajuste-wrap');
+  if (!wrap) return;
+  if (!_clientesAdicionalesAjuste.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `
+    <table class="tabla-items" style="width:100%">
+      <thead><tr><th>Cliente adicional</th><th>Proyecto</th><th style="width:36px"></th></tr></thead>
+      <tbody>
+        ${_clientesAdicionalesAjuste.map((c, i) => `
+          <tr>
+            <td><input type="text" value="${c.cliente || ''}" list="datalist-clientes-ajuste" oninput="_clientesAdicionalesAjuste[${i}].cliente=this.value" placeholder="Busca un cliente existente..."></td>
+            <td><input type="text" value="${c.proyecto || ''}" oninput="_clientesAdicionalesAjuste[${i}].proyecto=this.value" placeholder="Ej: Proyecto Villa 86"></td>
+            <td><button class="btn btn-rojo btn-xs" onclick="eliminarClienteAdicionalAjuste(${i})">✕</button></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function agregarClienteAdicionalAjuste() {
+  _clientesAdicionalesAjuste.push({ cliente: '', proyecto: '' });
+  renderClientesAdicionalesAjuste();
+}
+
+function eliminarClienteAdicionalAjuste(i) {
+  _clientesAdicionalesAjuste.splice(i, 1);
+  renderClientesAdicionalesAjuste();
+}
+
+// El cliente se busca contra la base de datos real (tabla de Cotizaciones y Ventas)
+// para no terminar con el mismo cliente escrito de varias formas distintas.
+function poblarDatalistClientes(datalistId) {
+  const dl = document.getElementById(datalistId);
+  if (!dl) return;
+  const ordenados = [...CLIENTES].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  dl.innerHTML = ordenados.map(c => `<option value="${c.nombre}">`).join('');
+}
+
+function _clienteValidoAjuste(nombre) {
+  const t = (nombre || '').trim();
+  if (!t) return true; // el campo es opcional; solo se valida si se llenó
+  return CLIENTES.some(c => c.nombre.trim().toLowerCase() === t.toLowerCase());
+}
+
+let _productosAdicionalesAjuste = []; // cada entrada es el texto tecleado "CODIGO — Nombre"
+
+// Un mismo lote de mezcla a veces alimenta varios moldes/productos distintos a la vez;
+// solo se permiten productos que compartan el mismo Diseño de Mezcla que el producto
+// principal, para no mezclar sin querer dos diseños distintos en un mismo ajuste.
+function renderProductosAdicionalesAjuste() {
+  const wrap = document.getElementById('productos-adicionales-ajuste-wrap');
+  if (!wrap) return;
+  if (!_productosAdicionalesAjuste.length) { wrap.innerHTML = ''; return; }
+  const disenoActual = document.getElementById('m-ajuste-diseno').value;
+  const compatibles = PRODUCTOS.filter(p => p.disenoMezcla === disenoActual);
+  wrap.innerHTML = `
+    <table class="tabla-items" style="width:100%">
+      <thead><tr><th>Producto adicional (mismo diseño de mezcla)</th><th style="width:36px"></th></tr></thead>
+      <tbody>
+        ${_productosAdicionalesAjuste.map((texto, i) => `
+          <tr>
+            <td><input type="text" value="${texto}" list="datalist-productos-adicionales-ajuste" oninput="_productosAdicionalesAjuste[${i}]=this.value" placeholder="Busca por código o nombre..."></td>
+            <td><button class="btn btn-rojo btn-xs" onclick="eliminarProductoAdicionalAjuste(${i})">✕</button></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <datalist id="datalist-productos-adicionales-ajuste">${compatibles.map(p => `<option value="${_textoProducto(p)}">`).join('')}</datalist>`;
+}
+
+function agregarProductoAdicionalAjuste() {
+  if (!document.getElementById('m-ajuste-diseno').value) {
+    alert('Primero elige el Producto a fabricar principal, para saber qué Diseño de Mezcla aplica.');
+    return;
+  }
+  _productosAdicionalesAjuste.push('');
+  renderProductosAdicionalesAjuste();
+}
+
+function eliminarProductoAdicionalAjuste(i) {
+  _productosAdicionalesAjuste.splice(i, 1);
+  renderProductosAdicionalesAjuste();
+}
 
 // Agrega un <option> a un <select> si el valor aún no existe entre sus opciones.
 // Compara por igualdad de valores en JS (no arma selectores CSS) para no romperse
@@ -16,6 +101,15 @@ function agregarOpcionSiNoExiste(selectId, valor) {
     opt.value = valor; opt.textContent = valor;
     sel.appendChild(opt);
   }
+}
+
+// Nombre del cliente principal de un ajuste, con respaldo al campo viejo "clienteElemento"
+// (registros guardados antes de separar Cliente/Proyecto), y aviso si hay clientes adicionales.
+function _clienteResumenAjuste(a) {
+  const principal = a.cliente || a.clienteElemento || '';
+  const extra = (a.clientesAdicionales || []).length;
+  if (!principal && !extra) return '';
+  return principal + (extra ? ` (+${extra} más)` : '');
 }
 
 function siguienteCilindroNo() {
@@ -34,7 +128,7 @@ function renderAjustesMezcla() {
   if (!tbody) return;
   const q = (document.getElementById('buscar-ajuste')?.value || '').toLowerCase();
   let data = [...AJUSTES_MEZCLA];
-  if (q) data = data.filter(a => (String(a.cilindroNo) + ' ' + (a.clienteElemento || '') + ' ' + (a.disenoCodigo || '')).toLowerCase().includes(q));
+  if (q) data = data.filter(a => (String(a.cilindroNo) + ' ' + (a.cliente || a.clienteElemento || '') + ' ' + (a.proyecto || '') + ' ' + (a.disenoCodigo || '')).toLowerCase().includes(q));
   data.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (Number(b.cilindroNo) || 0) - (Number(a.cilindroNo) || 0));
 
   if (!data.length) {
@@ -46,7 +140,7 @@ function renderAjustesMezcla() {
       <td style="font-weight:700;color:var(--azul)">${a.cilindroNo}</td>
       <td>${a.fecha ? new Date(a.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
       <td>${a.disenoCodigo ? `<span style="font-size:11px;background:var(--gris-borde);color:#333;padding:2px 6px;border-radius:3px;font-weight:600">${a.disenoCodigo}</span>` : '—'}</td>
-      <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${a.clienteElemento || ''}">${a.clienteElemento || '—'}</td>
+      <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${_clienteResumenAjuste(a)}">${_clienteResumenAjuste(a) || '—'}</td>
       <td>${USUARIOS_CRM[a.creadoPor]?.nombre || a.creadoPor || '—'}</td>
       <td style="text-align:center">${a.resistenciaDiseno || '—'} MPa</td>
       <td style="text-align:center">${a.humedadArena != null ? a.humedadArena.toFixed(1) + '%' : '—'}</td>
@@ -61,11 +155,21 @@ function renderAjustesMezcla() {
     </tr>`).join('');
 }
 
-function poblarSelectProductos(selectId) {
-  const sel = document.getElementById(selectId);
-  if (!sel) return;
+function _textoProducto(p) { return `${p.codigo} — ${p.nombre}`; }
+
+// El catálogo tiene demasiados productos para un <select> plano, así que se usa un
+// <input> de texto libre con <datalist> — permite buscar por código o por nombre.
+function poblarDatalistProductos(datalistId) {
+  const dl = document.getElementById(datalistId);
+  if (!dl) return;
   const activos = [...PRODUCTOS].sort((a, b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre));
-  sel.innerHTML = '<option value="">— Selecciona un producto —</option>' + activos.map(p => `<option value="${p.codigo}">${p.codigo} — ${p.nombre}</option>`).join('');
+  dl.innerHTML = activos.map(p => `<option value="${_textoProducto(p)}">`).join('');
+}
+
+function _productoDesdeTextoAjuste(texto) {
+  const t = (texto || '').trim();
+  if (!t) return null;
+  return PRODUCTOS.find(p => _textoProducto(p) === t) || null;
 }
 
 // Reinicia los campos que dependen del diseño de mezcla (se usa cuando el producto
@@ -79,20 +183,24 @@ function _limpiarCamposDisenoAjuste() {
 }
 
 function cargarDesdeProducto() {
-  const codigoProducto = document.getElementById('m-ajuste-producto').value;
   const disenoSelect = document.getElementById('m-ajuste-diseno');
-  if (!codigoProducto) { disenoSelect.value = ''; _limpiarCamposDisenoAjuste(); return; }
-  const producto = PRODUCTOS.find(p => p.codigo === codigoProducto);
-  const codigoDiseno = producto?.disenoMezcla;
+  // Cambiar el producto principal invalida los productos adicionales que se
+  // hubieran agregado (podían depender de un diseño de mezcla distinto).
+  _productosAdicionalesAjuste = [];
+  const producto = _productoDesdeTextoAjuste(document.getElementById('m-ajuste-producto').value);
+  if (!producto) { disenoSelect.value = ''; _limpiarCamposDisenoAjuste(); renderProductosAdicionalesAjuste(); return; }
+  const codigoDiseno = producto.disenoMezcla;
   if (!codigoDiseno) {
-    alert(`⚠️ El producto "${producto?.nombre || codigoProducto}" no tiene un Diseño de Mezcla asignado.\nAsígnalo en la ventana de Productos antes de continuar.`);
+    alert(`⚠️ El producto "${producto.nombre}" no tiene un Diseño de Mezcla asignado.\nAsígnalo en la ventana de Productos antes de continuar.`);
     disenoSelect.value = '';
     _limpiarCamposDisenoAjuste();
+    renderProductosAdicionalesAjuste();
     return;
   }
   agregarOpcionSiNoExiste('m-ajuste-diseno', codigoDiseno);
   disenoSelect.value = codigoDiseno;
   cargarBaseDesdeDiseno();
+  renderProductosAdicionalesAjuste();
 }
 
 function cargarBaseDesdeDiseno() {
@@ -100,7 +208,6 @@ function cargarBaseDesdeDiseno() {
   const d = DISENOS_MEZCLA.find(x => x.codigo === codigo);
   if (!d) return;
   document.getElementById('m-ajuste-resistencia').value = d.resistenciaDiseno || '';
-  agregarOpcionSiNoExiste('m-ajuste-tamano', d.tamanoMaximo);
   document.getElementById('m-ajuste-tamano').value = d.tamanoMaximo || '';
   document.getElementById('m-ajuste-mat-agua').value = d.materiales?.agua || 0;
   document.getElementById('m-ajuste-mat-cemento').value = d.materiales?.cemento || 0;
@@ -152,15 +259,20 @@ function abrirModalAjusteMezcla() {
   document.getElementById('m-ajuste-cilindro').value = siguienteCilindroNo();
   document.getElementById('m-ajuste-fecha').value = new Date().toISOString().split('T')[0];
   poblarSelectDisenos('m-ajuste-diseno');
-  poblarSelectProductos('m-ajuste-producto');
+  poblarDatalistProductos('datalist-productos-ajuste');
+  poblarDatalistClientes('datalist-clientes-ajuste');
   document.getElementById('m-ajuste-producto').value = '';
   document.getElementById('m-ajuste-diseno').value = '';
-  ['m-ajuste-resistencia', 'm-ajuste-cliente-elemento', 'm-ajuste-tamano',
+  _clientesAdicionalesAjuste = [];
+  renderClientesAdicionalesAjuste();
+  _productosAdicionalesAjuste = [];
+  renderProductosAdicionalesAjuste();
+  ['m-ajuste-resistencia', 'm-ajuste-cliente', 'm-ajuste-proyecto', 'm-ajuste-tamano',
     'm-ajuste-arena-recipiente', 'm-ajuste-arena-humedo', 'm-ajuste-arena-seco', 'm-ajuste-arena-absorcion',
     'm-ajuste-triturado-recipiente', 'm-ajuste-triturado-humedo', 'm-ajuste-triturado-seco', 'm-ajuste-triturado-absorcion',
     'm-ajuste-mat-agua', 'm-ajuste-mat-cemento', 'm-ajuste-mat-adicion', 'm-ajuste-mat-plastificante',
     'm-ajuste-mat-arena', 'm-ajuste-mat-triturado', 'm-ajuste-mat-acelerante', 'm-ajuste-obs'
-  ].forEach(id => { const el = document.getElementById(id); if (el) el.value = id.includes('obs') || id.includes('cliente') || id.includes('tamano') ? '' : 0; });
+  ].forEach(id => { const el = document.getElementById(id); if (el) el.value = id.includes('obs') || id.includes('cliente') || id.includes('proyecto') || id.includes('tamano') ? '' : 0; });
   recalcularAjusteMezcla();
   document.getElementById('modal-ajuste-mezcla').classList.add('abierto');
 }
@@ -173,16 +285,18 @@ function editarAjusteMezcla(id) {
   document.getElementById('m-ajuste-cilindro').value = a.cilindroNo || '';
   document.getElementById('m-ajuste-fecha').value = a.fecha || '';
   poblarSelectDisenos('m-ajuste-diseno');
-  poblarSelectProductos('m-ajuste-producto');
-  if (a.productoCodigo) {
-    const sel = document.getElementById('m-ajuste-producto');
-    if (![...sel.options].some(o => o.value === a.productoCodigo)) {
-      const opt = document.createElement('option'); opt.value = a.productoCodigo; opt.textContent = `${a.productoCodigo} — ${a.productoNombre || ''}`; sel.appendChild(opt);
-    }
-  }
-  document.getElementById('m-ajuste-producto').value = a.productoCodigo || '';
+  poblarDatalistProductos('datalist-productos-ajuste');
+  poblarDatalistClientes('datalist-clientes-ajuste');
+  document.getElementById('m-ajuste-producto').value = a.productoCodigo
+    ? `${a.productoCodigo} — ${a.productoNombre || PRODUCTOS.find(p => p.codigo === a.productoCodigo)?.nombre || ''}`
+    : '';
   document.getElementById('m-ajuste-diseno').value = a.disenoCodigo || '';
-  document.getElementById('m-ajuste-cliente-elemento').value = a.clienteElemento || '';
+  document.getElementById('m-ajuste-cliente').value = a.cliente || a.clienteElemento || '';
+  document.getElementById('m-ajuste-proyecto').value = a.proyecto || '';
+  _clientesAdicionalesAjuste = JSON.parse(JSON.stringify(a.clientesAdicionales || []));
+  renderClientesAdicionalesAjuste();
+  _productosAdicionalesAjuste = (a.productosAdicionales || []).map(p => `${p.codigo} — ${p.nombre}`);
+  renderProductosAdicionalesAjuste();
   document.getElementById('m-ajuste-arena-recipiente').value = a.arena?.pesoRecipiente || 0;
   document.getElementById('m-ajuste-arena-humedo').value = a.arena?.pesoHumedo || 0;
   document.getElementById('m-ajuste-arena-seco').value = a.arena?.pesoSeco || 0;
@@ -198,7 +312,6 @@ function editarAjusteMezcla(id) {
     cargarBaseDesdeDiseno();
   } else {
     // El diseño ya no existe: se usa lo que había quedado guardado, como respaldo.
-    agregarOpcionSiNoExiste('m-ajuste-tamano', a.tamanoMaximo);
     document.getElementById('m-ajuste-tamano').value = a.tamanoMaximo || '';
     document.getElementById('m-ajuste-resistencia').value = a.resistenciaDiseno || 0;
     document.getElementById('m-ajuste-mat-agua').value = a.materiales?.agua?.diseno || 0;
@@ -219,9 +332,33 @@ function editarAjusteMezcla(id) {
 function guardarAjusteMezcla() {
   const cilindroNo = document.getElementById('m-ajuste-cilindro').value.trim();
   const fecha = document.getElementById('m-ajuste-fecha').value;
-  const productoCodigo = document.getElementById('m-ajuste-producto').value;
-  if (!cilindroNo || !fecha || !productoCodigo) { alert('Completa los campos obligatorios: Cilindro N°, Fecha y Producto a fabricar.'); return; }
+  const producto = _productoDesdeTextoAjuste(document.getElementById('m-ajuste-producto').value);
+  if (!cilindroNo || !fecha || !producto) { alert('Completa los campos obligatorios: Cilindro N°, Fecha y Producto a fabricar (elige uno de la lista).'); return; }
   if (!document.getElementById('m-ajuste-diseno').value) { alert('El producto seleccionado no tiene un Diseño de Mezcla asignado. Asígnalo en la ventana de Productos antes de guardar.'); return; }
+
+  const clientePrincipal = document.getElementById('m-ajuste-cliente').value.trim();
+  if (!_clienteValidoAjuste(clientePrincipal)) {
+    alert(`El cliente "${clientePrincipal}" no existe en la base de datos de Cotizaciones y Ventas.\nCréalo allá primero, o selecciona uno existente de la lista.`);
+    return;
+  }
+  for (const c of _clientesAdicionalesAjuste) {
+    if (!_clienteValidoAjuste(c.cliente)) {
+      alert(`El cliente adicional "${c.cliente}" no existe en la base de datos de Cotizaciones y Ventas.\nCréalo allá primero, o selecciona uno existente de la lista.`);
+      return;
+    }
+  }
+
+  const disenoActual = document.getElementById('m-ajuste-diseno').value;
+  const productosCompatibles = PRODUCTOS.filter(p => p.disenoMezcla === disenoActual);
+  const productosAdicionalesResueltos = [];
+  for (const texto of _productosAdicionalesAjuste) {
+    const t = texto.trim();
+    if (!t) continue;
+    const pAdicional = productosCompatibles.find(pp => _textoProducto(pp) === t);
+    if (!pAdicional) { alert(`El producto adicional "${t}" no es válido, o no comparte el mismo Diseño de Mezcla del producto principal. Elige uno de la lista.`); return; }
+    productosAdicionalesResueltos.push({ codigo: pAdicional.codigo, nombre: pAdicional.nombre });
+  }
+
   if (AJUSTES_MEZCLA.some(a => String(a.cilindroNo) === String(cilindroNo) && String(a.id) !== document.getElementById('m-ajuste-id').value)) {
     if (!confirm(`Ya existe un ajuste con el Cilindro N° ${cilindroNo}. ¿Deseas continuar de todas formas?`)) return;
   }
@@ -244,11 +381,14 @@ function guardarAjusteMezcla() {
   const ajuste = {
     id: editId || String(Date.now()),
     cilindroNo, fecha,
-    productoCodigo: document.getElementById('m-ajuste-producto').value,
-    productoNombre: PRODUCTOS.find(p => p.codigo === document.getElementById('m-ajuste-producto').value)?.nombre || '',
+    productoCodigo: producto.codigo,
+    productoNombre: producto.nombre,
+    productosAdicionales: productosAdicionalesResueltos,
     disenoCodigo: document.getElementById('m-ajuste-diseno').value,
     resistenciaDiseno: g('m-ajuste-resistencia'),
-    clienteElemento: document.getElementById('m-ajuste-cliente-elemento').value.trim(),
+    cliente: document.getElementById('m-ajuste-cliente').value.trim(),
+    proyecto: document.getElementById('m-ajuste-proyecto').value.trim(),
+    clientesAdicionales: _clientesAdicionalesAjuste.filter(c => c.cliente.trim() || c.proyecto.trim()),
     tamanoMaximo: document.getElementById('m-ajuste-tamano').value.trim(),
     arena: { pesoRecipiente: g('m-ajuste-arena-recipiente'), pesoHumedo: g('m-ajuste-arena-humedo'), pesoSeco: g('m-ajuste-arena-seco'), absorcion: absArena },
     triturado: { pesoRecipiente: g('m-ajuste-triturado-recipiente'), pesoHumedo: g('m-ajuste-triturado-humedo'), pesoSeco: g('m-ajuste-triturado-seco'), absorcion: absTriturado },
@@ -291,7 +431,7 @@ function poblarSelectCilindros() {
   const sel = document.getElementById('m-ensayo-cilindro');
   if (!sel) return;
   const ordenados = [...AJUSTES_MEZCLA].sort((a, b) => (Number(b.cilindroNo) || 0) - (Number(a.cilindroNo) || 0));
-  sel.innerHTML = '<option value="">— Sin ajuste diario asociado —</option>' + ordenados.map(a => `<option value="${a.cilindroNo}">Cilindro ${a.cilindroNo} — ${a.fecha ? new Date(a.fecha + 'T12:00').toLocaleDateString('es-CO') : ''} (${a.clienteElemento || ''})</option>`).join('');
+  sel.innerHTML = '<option value="">— Sin ajuste diario asociado —</option>' + ordenados.map(a => `<option value="${a.cilindroNo}">Cilindro ${a.cilindroNo} — ${a.fecha ? new Date(a.fecha + 'T12:00').toLocaleDateString('es-CO') : ''} (${_clienteResumenAjuste(a)})</option>`).join('');
 }
 
 function cargarDesdeAjusteMezcla() {
@@ -305,7 +445,7 @@ function cargarDesdeAjusteMezcla() {
   document.getElementById('m-ensayo-diseno').value = a.disenoCodigo || '';
   actualizarObjetivoDesdeDiseno();
   if (a.resistenciaDiseno) document.getElementById('m-ensayo-objetivo').value = a.resistenciaDiseno;
-  document.getElementById('m-ensayo-elemento').value = a.clienteElemento || '';
+  document.getElementById('m-ensayo-elemento').value = a.productoNombre || a.proyecto || a.clienteElemento || '';
 }
 
 // ── Formato de Producción (PDF para el operario de mezclado) ──
@@ -394,7 +534,9 @@ function verFormatoProduccionAjuste(id) {
             <div style="font-size:14px;font-weight:700;color:#003F7F">CILINDRO No. ${a.cilindroNo || '—'}</div>
             <div style="font-size:11px;color:#555">${a.fecha ? new Date(a.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</div>
           </div>
-          <div style="font-size:12px;font-weight:600;margin-top:2px">${a.clienteElemento || '—'}</div>
+          <div style="font-size:12px;font-weight:600;margin-top:2px">${a.cliente || a.clienteElemento || '—'}${a.proyecto ? ' — ' + a.proyecto : ''}</div>
+          ${(a.clientesAdicionales && a.clientesAdicionales.length) ? `<div style="font-size:10px;color:#777;margin-top:2px">+ ${a.clientesAdicionales.map(c => `${c.cliente}${c.proyecto ? ' (' + c.proyecto + ')' : ''}`).join(', ')}</div>` : ''}
+          <div style="font-size:10.5px;margin-top:6px"><b>PRODUCTO:</b> ${a.productoNombre || '—'}${(a.productosAdicionales && a.productosAdicionales.length) ? ` + ${a.productosAdicionales.map(p => p.nombre).join(', ')}` : ''}</div>
           <div style="font-size:10.5px;margin-top:6px"><b>DISEÑO DE MEZCLA:</b> ${diseno ? `${diseno.codigo} — ${diseno.nombre}` : (a.disenoCodigo || '—')}</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px;font-size:10.5px">
             <div><b>RESISTENCIA DE DISEÑO:</b> ${a.resistenciaDiseno || '—'} MPa</div>
