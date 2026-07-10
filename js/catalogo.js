@@ -254,6 +254,7 @@ function refrescarCatalogo(rows) {
     codigo: p.codigo, nombre: p.nombre, medidas: p.medidas || '', unidad: p.unidad || 'UD',
     peso: (p.peso === null || p.peso === undefined) ? null : Number(p.peso), iva: p.iva || 'NO',
     lista: Number(p.lista) || 0, minimo: Number(p.minimo) || 0, grupo: p.grupo || 'Otros',
+    disenoMezcla: p.diseno_mezcla || '',
     activo: p.activo !== false
   }));
   PRODUCTOS = CATALOGO.filter(p => p.activo !== false);
@@ -342,6 +343,7 @@ function _upsertProducto(p) {
   return sb.from('productos').upsert({
     codigo: p.codigo, nombre: p.nombre, medidas: p.medidas, unidad: p.unidad,
     peso: p.peso, iva: p.iva, lista: p.lista, minimo: p.minimo, grupo: p.grupo,
+    diseno_mezcla: p.disenoMezcla || null,
     activo: p.activo !== false, modificado: new Date().toISOString()
   }, { onConflict: 'codigo' });
 }
@@ -379,6 +381,8 @@ function abrirModalProducto(codigo) {
   document.getElementById('mp-iva').value = p?.iva || 'NO';
   document.getElementById('mp-lista').value = p?.lista ?? '';
   document.getElementById('mp-minimo').value = p?.minimo ?? '';
+  if (typeof poblarSelectDisenos === 'function') poblarSelectDisenos('mp-diseno-mezcla');
+  document.getElementById('mp-diseno-mezcla').value = p?.disenoMezcla || '';
   document.getElementById('modal-producto').classList.add('abierto');
 }
 
@@ -398,7 +402,8 @@ function guardarProducto() {
     unidad: document.getElementById('mp-unidad').value.trim() || 'UD',
     peso: pesoVal === '' ? null : parseFloat(pesoVal),
     iva: document.getElementById('mp-iva').value,
-    lista, minimo, activo: true
+    lista, minimo, activo: true,
+    disenoMezcla: document.getElementById('mp-diseno-mezcla').value || ''
   };
   const idx = CATALOGO.findIndex(x => x.codigo === codigo);
   if (idx >= 0) CATALOGO[idx] = { ...CATALOGO[idx], ...prod }; else CATALOGO.push(prod);

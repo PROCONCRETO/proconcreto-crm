@@ -61,6 +61,40 @@ function renderAjustesMezcla() {
     </tr>`).join('');
 }
 
+function poblarSelectProductos(selectId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const activos = [...PRODUCTOS].sort((a, b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre));
+  sel.innerHTML = '<option value="">— Selecciona un producto —</option>' + activos.map(p => `<option value="${p.codigo}">${p.codigo} — ${p.nombre}</option>`).join('');
+}
+
+// Reinicia los campos que dependen del diseño de mezcla (se usa cuando el producto
+// elegido no tiene diseño asignado, para no dejar en pantalla datos de un producto anterior).
+function _limpiarCamposDisenoAjuste() {
+  ['m-ajuste-resistencia', 'm-ajuste-tamano', 'm-ajuste-arena-absorcion', 'm-ajuste-triturado-absorcion',
+    'm-ajuste-mat-agua', 'm-ajuste-mat-cemento', 'm-ajuste-mat-adicion', 'm-ajuste-mat-plastificante',
+    'm-ajuste-mat-arena', 'm-ajuste-mat-triturado', 'm-ajuste-mat-acelerante'
+  ].forEach(id => { const el = document.getElementById(id); if (el) el.value = id.includes('tamano') ? '' : 0; });
+  recalcularAjusteMezcla();
+}
+
+function cargarDesdeProducto() {
+  const codigoProducto = document.getElementById('m-ajuste-producto').value;
+  const disenoSelect = document.getElementById('m-ajuste-diseno');
+  if (!codigoProducto) { disenoSelect.value = ''; _limpiarCamposDisenoAjuste(); return; }
+  const producto = PRODUCTOS.find(p => p.codigo === codigoProducto);
+  const codigoDiseno = producto?.disenoMezcla;
+  if (!codigoDiseno) {
+    alert(`⚠️ El producto "${producto?.nombre || codigoProducto}" no tiene un Diseño de Mezcla asignado.\nAsígnalo en la ventana de Productos antes de continuar.`);
+    disenoSelect.value = '';
+    _limpiarCamposDisenoAjuste();
+    return;
+  }
+  agregarOpcionSiNoExiste('m-ajuste-diseno', codigoDiseno);
+  disenoSelect.value = codigoDiseno;
+  cargarBaseDesdeDiseno();
+}
+
 function cargarBaseDesdeDiseno() {
   const codigo = document.getElementById('m-ajuste-diseno').value;
   const d = DISENOS_MEZCLA.find(x => x.codigo === codigo);
@@ -118,6 +152,8 @@ function abrirModalAjusteMezcla() {
   document.getElementById('m-ajuste-cilindro').value = siguienteCilindroNo();
   document.getElementById('m-ajuste-fecha').value = new Date().toISOString().split('T')[0];
   poblarSelectDisenos('m-ajuste-diseno');
+  poblarSelectProductos('m-ajuste-producto');
+  document.getElementById('m-ajuste-producto').value = '';
   document.getElementById('m-ajuste-diseno').value = '';
   ['m-ajuste-resistencia', 'm-ajuste-cliente-elemento', 'm-ajuste-tamano',
     'm-ajuste-arena-recipiente', 'm-ajuste-arena-humedo', 'm-ajuste-arena-seco', 'm-ajuste-arena-absorcion',
@@ -137,6 +173,14 @@ function editarAjusteMezcla(id) {
   document.getElementById('m-ajuste-cilindro').value = a.cilindroNo || '';
   document.getElementById('m-ajuste-fecha').value = a.fecha || '';
   poblarSelectDisenos('m-ajuste-diseno');
+  poblarSelectProductos('m-ajuste-producto');
+  if (a.productoCodigo) {
+    const sel = document.getElementById('m-ajuste-producto');
+    if (![...sel.options].some(o => o.value === a.productoCodigo)) {
+      const opt = document.createElement('option'); opt.value = a.productoCodigo; opt.textContent = `${a.productoCodigo} — ${a.productoNombre || ''}`; sel.appendChild(opt);
+    }
+  }
+  document.getElementById('m-ajuste-producto').value = a.productoCodigo || '';
   document.getElementById('m-ajuste-diseno').value = a.disenoCodigo || '';
   document.getElementById('m-ajuste-cliente-elemento').value = a.clienteElemento || '';
   document.getElementById('m-ajuste-arena-recipiente').value = a.arena?.pesoRecipiente || 0;
@@ -175,7 +219,9 @@ function editarAjusteMezcla(id) {
 function guardarAjusteMezcla() {
   const cilindroNo = document.getElementById('m-ajuste-cilindro').value.trim();
   const fecha = document.getElementById('m-ajuste-fecha').value;
-  if (!cilindroNo || !fecha) { alert('Completa los campos obligatorios: Cilindro N° y Fecha.'); return; }
+  const productoCodigo = document.getElementById('m-ajuste-producto').value;
+  if (!cilindroNo || !fecha || !productoCodigo) { alert('Completa los campos obligatorios: Cilindro N°, Fecha y Producto a fabricar.'); return; }
+  if (!document.getElementById('m-ajuste-diseno').value) { alert('El producto seleccionado no tiene un Diseño de Mezcla asignado. Asígnalo en la ventana de Productos antes de guardar.'); return; }
   if (AJUSTES_MEZCLA.some(a => String(a.cilindroNo) === String(cilindroNo) && String(a.id) !== document.getElementById('m-ajuste-id').value)) {
     if (!confirm(`Ya existe un ajuste con el Cilindro N° ${cilindroNo}. ¿Deseas continuar de todas formas?`)) return;
   }
@@ -198,6 +244,8 @@ function guardarAjusteMezcla() {
   const ajuste = {
     id: editId || String(Date.now()),
     cilindroNo, fecha,
+    productoCodigo: document.getElementById('m-ajuste-producto').value,
+    productoNombre: PRODUCTOS.find(p => p.codigo === document.getElementById('m-ajuste-producto').value)?.nombre || '',
     disenoCodigo: document.getElementById('m-ajuste-diseno').value,
     resistenciaDiseno: g('m-ajuste-resistencia'),
     clienteElemento: document.getElementById('m-ajuste-cliente-elemento').value.trim(),
