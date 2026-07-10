@@ -23,8 +23,10 @@ function activarModulo(modulo) {
   }
   if (modulo === 'calidad') {
     document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
-    document.getElementById('pantalla-diseno-mezcla').classList.add('activa');
-    renderDisenosMezcla();
+    document.getElementById('pantalla-ajuste-mezcla').classList.add('activa');
+    document.querySelectorAll('#subnav-calidad .nav-btn').forEach(b => b.classList.remove('activo'));
+    document.querySelector('#subnav-calidad .nav-btn[onclick*="ajuste-mezcla"]')?.classList.add('activo');
+    renderAjustesMezcla();
   }
 }
 
