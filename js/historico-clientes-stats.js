@@ -644,8 +644,9 @@ function renderPipeline() {
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
               <div class="kc-fecha">${new Date(c.fecha+'T12:00').toLocaleDateString('es-CO',{day:'2-digit',month:'short'})}</div>
               <div class="flex-gap">
-                ${col.id === 'Negociación' ? `<button class="btn btn-secundario btn-xs" onclick="abrirModalNotas(${c.id})" title="Notas de seguimiento">📝${c.notasSeguimiento?.length ? ' ' + c.notasSeguimiento.length : ''}</button>` : ''}
-                <button class="btn btn-primario btn-xs" onclick="cargarCotizacion(${c.id})">✏️</button>
+                <button class="btn btn-secundario btn-xs" onclick="abrirModalNotas(${c.id})" title="Notas de seguimiento">📝${c.notasSeguimiento?.length ? ' ' + c.notasSeguimiento.length : ''}</button>
+                <button class="btn btn-secundario btn-xs" onclick="previsualizarCotizacionById(${c.id})" title="Ver PDF">👁️</button>
+                <button class="btn btn-primario btn-xs" onclick="cargarCotizacion(${c.id})" title="Editar">✏️</button>
               </div>
             </div>
           </div>`).join('')
