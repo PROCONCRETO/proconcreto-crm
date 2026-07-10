@@ -832,27 +832,34 @@
       <div class="form-grupo"><label>Cilindro N° *</label><input type="number" id="m-ajuste-cilindro" min="1"></div>
       <div class="form-grupo"><label>Fecha *</label><input type="date" id="m-ajuste-fecha"></div>
       <div class="form-grupo"><label>Producto a fabricar *</label>
-        <select id="m-ajuste-producto" onchange="cargarDesdeProducto()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+        <input type="text" id="m-ajuste-producto" list="datalist-productos-ajuste" onchange="cargarDesdeProducto()" placeholder="Busca por código o nombre..." style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <datalist id="datalist-productos-ajuste"></datalist>
       </div>
     </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:2px 0 8px">
+      <span style="font-size:11px;color:var(--gris-medio)">¿Se aprovecha esta misma mezcla para fabricar otro(s) producto(s) al tiempo (mismo diseño, molde distinto)?</span>
+      <button class="btn btn-secundario btn-xs" onclick="agregarProductoAdicionalAjuste()">+ Agregar producto</button>
+    </div>
+    <div id="productos-adicionales-ajuste-wrap" style="margin-bottom:10px"></div>
     <div class="form-grid-3" style="margin-bottom:10px">
       <div class="form-grupo"><label>Diseño de mezcla asignado <span style="font-weight:400;text-transform:none">(automático)</span></label>
         <select id="m-ajuste-diseno" disabled style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;background:#F7FAFC;color:var(--gris-medio)"></select>
       </div>
+      <input type="hidden" id="m-ajuste-tamano">
     </div>
     <div class="form-grid-3" style="margin-bottom:10px">
       <div class="form-grupo"><label>Resistencia de diseño (MPa)</label><input type="number" id="m-ajuste-resistencia" min="0" step="0.1"></div>
-      <div class="form-grupo"><label>Cliente / Elemento</label><input type="text" id="m-ajuste-cliente-elemento" placeholder="Ej: Prelosa reforzada T1-02"></div>
-      <div class="form-grupo"><label>Tamaño máximo agregado grueso</label>
-        <select id="m-ajuste-tamano" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
-          <option value="">— Selecciona —</option>
-          <option value='1"'>1"</option>
-          <option value='3/4"'>3/4"</option>
-          <option value='1/2"'>1/2"</option>
-          <option value='3/8"'>3/8"</option>
-        </select>
+      <div class="form-grupo"><label>Cliente</label>
+        <input type="text" id="m-ajuste-cliente" list="datalist-clientes-ajuste" placeholder="Busca un cliente existente...">
+        <datalist id="datalist-clientes-ajuste"></datalist>
       </div>
+      <div class="form-grupo"><label>Proyecto</label><input type="text" id="m-ajuste-proyecto" placeholder="Ej: Prelosa T1-02"></div>
     </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:2px 0 8px">
+      <span style="font-size:11px;color:var(--gris-medio)">¿Se fabrica para más de un cliente/proyecto en este mismo ajuste?</span>
+      <button class="btn btn-secundario btn-xs" onclick="agregarClienteAdicionalAjuste()">+ Agregar cliente</button>
+    </div>
+    <div id="clientes-adicionales-ajuste-wrap" style="margin-bottom:6px"></div>
 
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px">CORRECCIÓN DE HUMEDAD DE AGREGADOS</div>
     <div style="overflow-x:auto;margin-bottom:10px">
