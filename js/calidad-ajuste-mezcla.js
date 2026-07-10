@@ -251,10 +251,13 @@ function cargarDesdeAjusteMezcla() {
   if (!cilindroNo) return;
   const a = AJUSTES_MEZCLA.find(x => String(x.cilindroNo) === String(cilindroNo));
   if (!a) return;
+  // Al relacionar el cilindro, se arrastran automáticamente los datos que ya se conocen
+  // desde el Ajuste Diario de Mezcla, en vez de pedirlos de nuevo en el ensayo.
+  if (a.fecha) document.getElementById('m-ensayo-fecha').value = a.fecha;
   document.getElementById('m-ensayo-diseno').value = a.disenoCodigo || '';
   actualizarObjetivoDesdeDiseno();
   if (a.resistenciaDiseno) document.getElementById('m-ensayo-objetivo').value = a.resistenciaDiseno;
-  if (!document.getElementById('m-ensayo-elemento').value) document.getElementById('m-ensayo-elemento').value = a.clienteElemento || '';
+  document.getElementById('m-ensayo-elemento').value = a.clienteElemento || '';
 }
 
 // ── Formato de Producción (PDF para el operario de mezclado) ──
