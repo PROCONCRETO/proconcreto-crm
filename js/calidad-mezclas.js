@@ -245,24 +245,39 @@ function poblarSelectOrdenesEnsayo() {
   sel.innerHTML = html;
 }
 
+// La edad de un resultado no la digita nadie: es simplemente la cantidad de días
+// entre la fecha fundida (fecha del ajuste diario/diseño ajustado por humedad) y la
+// fecha en que se falló ese cilindro, ya que un mismo ensayo puede tener resultados
+// a distintas edades (7, 14, 28 días...) antes de la evaluación final a los 28 días.
+function _calcularEdadEnsayo(fechaFundida, fechaResultado) {
+  if (!fechaFundida || !fechaResultado) return null;
+  const msPorDia = 24 * 60 * 60 * 1000;
+  const dias = Math.round((new Date(fechaResultado + 'T12:00') - new Date(fechaFundida + 'T12:00')) / msPorDia);
+  return dias;
+}
+
 function renderResultadosEnsayo() {
   const tbody = document.getElementById('resultados-ensayo-body');
   if (!tbody) return;
+  const fechaFundida = document.getElementById('m-ensayo-fecha')?.value || '';
   if (!_resultadosEnsayoActual.length) {
     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega resultados de ensayo por edad (7, 14, 28 días...)</td></tr>`;
     return;
   }
-  tbody.innerHTML = _resultadosEnsayoActual.map((r, i) => `
+  tbody.innerHTML = _resultadosEnsayoActual.map((r, i) => {
+    const edad = _calcularEdadEnsayo(fechaFundida, r.fecha);
+    return `
     <tr>
-      <td><input type="number" value="${r.edad}" min="1" onchange="_resultadosEnsayoActual[${i}].edad=parseInt(this.value)||0"></td>
-      <td><input type="date" value="${r.fecha || ''}" onchange="_resultadosEnsayoActual[${i}].fecha=this.value"></td>
+      <td style="text-align:center;font-weight:700">${edad != null ? edad + ' d' : '—'}</td>
+      <td><input type="date" value="${r.fecha || ''}" onchange="_resultadosEnsayoActual[${i}].fecha=this.value;renderResultadosEnsayo()"></td>
       <td><input type="number" value="${r.resistencia}" min="0" step="0.1" onchange="_resultadosEnsayoActual[${i}].resistencia=parseFloat(this.value)||0"></td>
       <td><button class="btn btn-rojo btn-xs" onclick="eliminarResultadoEnsayo(${i})">✕</button></td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function agregarResultadoEnsayo() {
-  _resultadosEnsayoActual.push({ edad: 28, fecha: '', resistencia: 0 });
+  _resultadosEnsayoActual.push({ fecha: '', resistencia: 0 });
   renderResultadosEnsayo();
 }
 
@@ -340,7 +355,7 @@ function guardarEnsayo() {
     resistenciaObjetivo: parseFloat(document.getElementById('m-ensayo-objetivo').value) || 0,
     responsable: document.getElementById('m-ensayo-responsable').value.trim(),
     observaciones: document.getElementById('m-ensayo-obs').value.trim(),
-    resultados: JSON.parse(JSON.stringify(_resultadosEnsayoActual)),
+    resultados: _resultadosEnsayoActual.map(r => ({ ...r, edad: _calcularEdadEnsayo(fecha, r.fecha) })),
     creadoPor: USUARIO_ACTUAL?.email,
     creadoEn: editId ? (ENSAYOS_CALIDAD.find(x => String(x.id) === String(editId))?.creadoEn || new Date().toISOString()) : new Date().toISOString(),
   };
