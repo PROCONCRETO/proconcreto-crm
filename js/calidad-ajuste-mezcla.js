@@ -356,6 +356,9 @@ function verFormatoProduccionAjuste(id) {
             <div style="border:1px solid #ddd;border-radius:4px;overflow:hidden">${_tablaVolumenFormatoProduccion(a, izq)}</div>
             <div style="border:1px solid #ddd;border-radius:4px;overflow:hidden">${_tablaVolumenFormatoProduccion(a, der)}</div>
           </div>`).join('')}
+        <div style="margin-top:6px;font-size:10.5px;color:#555">
+          <b>Elaborado por:</b> ${USUARIOS_CRM[a.creadoPor]?.nombre || a.creadoPor || '—'}
+        </div>
       </div>
       <div class="preview-membrete-footer" id="formato-produccion-footer">
         <div class="pf-arco"></div>
