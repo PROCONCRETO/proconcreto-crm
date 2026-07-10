@@ -188,6 +188,63 @@ function cambiarEstado(estado) {
   renderEstadisticas();
 }
 
+// ═══════════════════════════════
+// NOTAS DE SEGUIMIENTO (PIPELINE — NEGOCIACIÓN)
+// ═══════════════════════════════
+function abrirModalNotas(id) {
+  const cot = COTIZACIONES.find(c => String(c.id) === String(id));
+  if (!cot) return;
+  document.getElementById('notas-cot-id').value = id;
+  document.getElementById('modal-notas-titulo').textContent = `📝 Notas de Seguimiento — ${cot.numero} ${cot.version || ''}`;
+  document.getElementById('nueva-nota-texto').value = '';
+  renderNotasSeguimiento();
+  document.getElementById('modal-notas-seguimiento').classList.add('abierto');
+}
+
+function renderNotasSeguimiento() {
+  const id = document.getElementById('notas-cot-id').value;
+  const cot = COTIZACIONES.find(c => String(c.id) === String(id));
+  const cont = document.getElementById('notas-seguimiento-lista');
+  const notas = [...(cot?.notasSeguimiento || [])].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  if (!notas.length) {
+    cont.innerHTML = `<div style="text-align:center;padding:16px;color:var(--gris-medio);font-size:13px">Aún no hay notas de seguimiento para esta cotización.</div>`;
+    return;
+  }
+  cont.innerHTML = notas.map(n => `
+    <div style="background:#F8F9FB;border-left:3px solid var(--azul);border-radius:4px;padding:8px 12px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;gap:8px">
+        <span style="font-size:11px;font-weight:700;color:var(--azul)">${new Date(n.fecha).toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+        <span style="font-size:10px;color:var(--gris-medio)">${USUARIOS_CRM[n.autor]?.nombre || n.autor || ''}</span>
+      </div>
+      <div style="font-size:13px;white-space:pre-wrap">${n.texto}</div>
+    </div>`).join('');
+}
+
+function agregarNotaSeguimiento() {
+  const id = document.getElementById('notas-cot-id').value;
+  const texto = document.getElementById('nueva-nota-texto').value.trim();
+  if (!texto) { alert('Escribe una nota antes de agregarla.'); return; }
+  const cot = COTIZACIONES.find(c => String(c.id) === String(id));
+  if (!cot) return;
+  if (!cot.notasSeguimiento) cot.notasSeguimiento = [];
+  cot.notasSeguimiento.push({ fecha: new Date().toISOString(), texto, autor: USUARIO_ACTUAL?.email });
+  document.getElementById('nueva-nota-texto').value = '';
+  renderNotasSeguimiento();
+  renderPipeline();
+  sb.from('cotizaciones').upsert({
+    numero: cot.numero,
+    version: cot.version || 'V1',
+    estado: cot.estado,
+    cliente: cot.cliente,
+    items: cot.items,
+    condiciones: cot.condiciones,
+    datos: cot,
+    modificado: new Date().toISOString()
+  }, { onConflict: 'numero,version' }).then(({ error }) => {
+    if (error) console.error('Error guardando nota de seguimiento:', error.message);
+  });
+}
+
 function siguienteNumeroOS() {
   const nums = ORDENES.map(o => parseInt((o.numero || '').replace(/\D/g, '')) || 0);
   const max = nums.length ? Math.max(...nums) : 0;
@@ -586,7 +643,10 @@ function renderPipeline() {
             <div class="kc-total">$${c.totales.total.toLocaleString()}</div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
               <div class="kc-fecha">${new Date(c.fecha+'T12:00').toLocaleDateString('es-CO',{day:'2-digit',month:'short'})}</div>
-              <button class="btn btn-primario btn-xs" onclick="cargarCotizacion(${c.id})">✏️</button>
+              <div class="flex-gap">
+                ${col.id === 'Negociación' ? `<button class="btn btn-secundario btn-xs" onclick="abrirModalNotas(${c.id})" title="Notas de seguimiento">📝${c.notasSeguimiento?.length ? ' ' + c.notasSeguimiento.length : ''}</button>` : ''}
+                <button class="btn btn-primario btn-xs" onclick="cargarCotizacion(${c.id})">✏️</button>
+              </div>
             </div>
           </div>`).join('')
       : `<div class="kanban-drop-hint">Arrastra aquí</div>`;
