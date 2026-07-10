@@ -7,7 +7,7 @@ function renderHistorico(lista) {
   const data = lista || COTIZACIONES;
   const tbody = document.getElementById('historico-body');
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">📋</div><div>No hay cotizaciones guardadas aún.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">📋</div><div>No hay cotizaciones guardadas aún.</div></td></tr>`;
     return;
   }
   // Agrupar por número, orden descendente por número
@@ -54,6 +54,7 @@ function renderHistorico(lista) {
       <td>${new Date(latest.fecha+'T12:00').toLocaleDateString('es-CO')}</td>
       <td style="font-weight:600">${latest.cliente.nombre}</td>
       <td style="color:var(--gris-medio)">${latest.cliente.proyecto||'—'}</td>
+      <td style="color:var(--gris-medio)">${latest.vendedor?.nombre||'—'}</td>
       <td style="font-weight:700">$${(numOps > 1 ? menorVal : latest.totales.total).toLocaleString()}${numOps > 1 ? `<div style="font-size:10px;color:var(--gris-medio);font-weight:400">desde (menor opción)</div>` : ''}</td>
       <td><span class="badge badge-${latest.estado.toLowerCase()}">${latest.estado}</span></td>
       <td>
@@ -78,6 +79,7 @@ function renderHistorico(lista) {
         <td style="color:var(--gris-medio);font-size:13px">${new Date(v.fecha+'T12:00').toLocaleDateString('es-CO')}</td>
         <td style="color:var(--gris-medio);font-size:13px">${v.cliente.nombre}</td>
         <td style="color:var(--gris-medio);font-size:13px">${v.cliente.proyecto||'—'}</td>
+        <td style="color:var(--gris-medio);font-size:13px">${v.vendedor?.nombre||'—'}</td>
         <td style="color:var(--gris-medio);font-size:13px">$${v.totales.total.toLocaleString()}</td>
         <td><span class="badge badge-${v.estado.toLowerCase()}" style="opacity:0.7">${v.estado}</span></td>
         <td>
