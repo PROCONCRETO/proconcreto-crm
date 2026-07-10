@@ -1245,6 +1245,22 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-notas-seguimiento">
+  <div class="modal" style="width:520px;max-width:95vw">
+    <div class="modal-titulo" id="modal-notas-titulo">📝 Notas de Seguimiento</div>
+    <input type="hidden" id="notas-cot-id">
+    <div id="notas-seguimiento-lista" style="max-height:320px;overflow-y:auto;margin-bottom:14px;display:flex;flex-direction:column;gap:10px"></div>
+    <div class="form-grupo" style="margin-bottom:12px">
+      <label>Nueva nota</label>
+      <textarea id="nueva-nota-texto" rows="3" placeholder="Escribe el seguimiento realizado..." style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical"></textarea>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-notas-seguimiento')">Cerrar</button>
+      <button class="btn btn-primario" onclick="agregarNotaSeguimiento()">+ Agregar nota</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-estado-os">
   <div class="modal" style="width:340px">
     <div class="modal-titulo">Cambiar estado</div>
