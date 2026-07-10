@@ -22,13 +22,16 @@ function renderDisenosMezcla() {
   }
   tbody.innerHTML = data.map(d => {
     const inactivo = d.estado === 'Inactivo';
+    const ultimoActor = d.modificadoPor || d.creadoPor;
+    const nombreActor = USUARIOS_CRM[ultimoActor]?.nombre || ultimoActor || '—';
+    const etiquetaActor = d.modificadoPor ? 'Modificó' : 'Elaboró';
     return `<tr style="border-top:2px solid var(--azul-oscuro);${inactivo ? 'opacity:.55' : ''}">
       <td style="font-weight:700;color:var(--azul)">${d.codigo}</td>
       <td style="font-weight:600">${d.nombre}</td>
       <td style="text-align:center;font-weight:700">${d.resistenciaDiseno || '—'} MPa</td>
       <td style="text-align:center">${d.asentamiento || '—'} cm</td>
       <td style="text-align:center">${d.tamanoMaximo || '—'}</td>
-      <td style="text-align:center">${d.relacionAguaCemento || '—'}</td>
+      <td><span style="font-size:11px;color:var(--gris-medio)">${etiquetaActor}:</span> ${nombreActor}</td>
       <td><span class="badge" style="background:${inactivo ? '#FFEBEE' : '#E8F5E9'};color:${inactivo ? '#C62828' : '#2E7D32'}">${d.estado || 'Activo'}</span></td>
       <td>
         <div class="flex-gap">
@@ -118,6 +121,7 @@ function guardarDiseno() {
   const tamanoMaximo = document.getElementById('m-diseno-tamano').value.trim();
   if (!codigo || !nombre || !(resistenciaDiseno > 0) || !tamanoMaximo) { alert('Completa los campos obligatorios: Código, Nombre, Resistencia de diseño y Tamaño máximo de agregado.'); return; }
   const editId = document.getElementById('m-diseno-id').value;
+  const existente = editId ? DISENOS_MEZCLA.find(x => String(x.id) === String(editId)) : null;
   const diseno = {
     id: editId || String(Date.now()),
     codigo, nombre, resistenciaDiseno, tamanoMaximo,
@@ -135,8 +139,9 @@ function guardarDiseno() {
     },
     estado: document.getElementById('m-diseno-estado').value,
     observaciones: document.getElementById('m-diseno-obs').value.trim(),
-    creadoPor: USUARIO_ACTUAL?.email,
-    creadoEn: editId ? (DISENOS_MEZCLA.find(x => String(x.id) === String(editId))?.creadoEn || new Date().toISOString()) : new Date().toISOString(),
+    creadoPor: existente ? existente.creadoPor : USUARIO_ACTUAL?.email,
+    modificadoPor: existente ? USUARIO_ACTUAL?.email : undefined,
+    creadoEn: existente ? (existente.creadoEn || new Date().toISOString()) : new Date().toISOString(),
   };
   const idx = DISENOS_MEZCLA.findIndex(x => String(x.id) === String(diseno.id));
   if (idx >= 0) DISENOS_MEZCLA[idx] = diseno; else DISENOS_MEZCLA.unshift(diseno);
