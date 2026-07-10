@@ -916,7 +916,15 @@ function previsualizarCotizacion() {
           <div style="border-top:1px solid #333;width:260px;padding-top:6px;margin-top:32px">
             <div style="font-weight:700;font-size:13px">${document.getElementById('vendedor-nombre').value}</div>
             <div style="font-size:11px;color:#555">${document.getElementById('vendedor-cargo').value}</div>
-            ${(()=>{ const p = USUARIOS_CRM[USUARIO_ACTUAL?.email]; return p ? `<div style="font-size:11px;color:#555">${p.cel}</div><div style="font-size:11px;color:#555">${USUARIO_ACTUAL.email}</div>` : ''; })()}
+            ${(()=>{
+              // El cel/correo deben ser los de quien aparece como nombre del firmante (puede no
+              // ser quien tiene la sesión abierta, ej. al reimprimir una cotización de otro vendedor),
+              // así que se busca el perfil por nombre en vez de usar el usuario actualmente logueado.
+              const nombreFirmante = document.getElementById('vendedor-nombre').value.trim().toLowerCase();
+              const entry = Object.entries(USUARIOS_CRM).find(([, v]) => v.nombre.trim().toLowerCase() === nombreFirmante);
+              const [email, p] = entry || [];
+              return p ? `<div style="font-size:11px;color:#555">${p.cel}</div><div style="font-size:11px;color:#555">${email}</div>` : '';
+            })()}
           </div>
         </div>
       </div>
@@ -937,3 +945,4 @@ function previsualizarCotizacion() {
   document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
   window.scrollTo(0, 0);
 }
+
