@@ -144,7 +144,7 @@
   /* ── MODAL ── */
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; }
   .modal-overlay.abierto { display: flex; }
-  .modal { background: white; border-radius: 8px; padding: 24px; width: 480px; max-width: 95vw; box-shadow: var(--sombra-md); }
+  .modal { background: white; border-radius: 8px; padding: 24px; width: 480px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: var(--sombra-md); }
   .modal-titulo { font-size: 16px; font-weight: 700; color: var(--azul); margin-bottom: 16px; }
   .modal-acciones { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 
