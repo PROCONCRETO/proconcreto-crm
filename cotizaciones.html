@@ -831,8 +831,13 @@
     <div class="form-grid-3" style="margin-bottom:10px">
       <div class="form-grupo"><label>Cilindro N° *</label><input type="number" id="m-ajuste-cilindro" min="1"></div>
       <div class="form-grupo"><label>Fecha *</label><input type="date" id="m-ajuste-fecha"></div>
-      <div class="form-grupo"><label>Diseño de mezcla base</label>
-        <select id="m-ajuste-diseno" onchange="cargarBaseDesdeDiseno()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      <div class="form-grupo"><label>Producto a fabricar *</label>
+        <select id="m-ajuste-producto" onchange="cargarDesdeProducto()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      </div>
+    </div>
+    <div class="form-grid-3" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Diseño de mezcla asignado <span style="font-weight:400;text-transform:none">(automático)</span></label>
+        <select id="m-ajuste-diseno" disabled style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;background:#F7FAFC;color:var(--gris-medio)"></select>
       </div>
     </div>
     <div class="form-grid-3" style="margin-bottom:10px">
@@ -1057,9 +1062,13 @@
       <div class="form-grupo"><label>Peso (kg)</label><input type="number" id="mp-peso" step="0.01" min="0"></div>
       <div class="form-grupo"><label>IVA</label><select id="mp-iva"><option value="NO">NO</option><option value="SI">SI</option></select></div>
     </div>
-    <div class="form-grid" style="margin-bottom:16px">
+    <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Precio Lista *</label><input type="number" id="mp-lista" min="0"></div>
       <div class="form-grupo"><label>Precio Mínimo *</label><input type="number" id="mp-minimo" min="0"></div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:16px"><label>Diseño de Mezcla</label>
+      <select id="mp-diseno-mezcla" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"><option value="">— Sin asignar —</option></select>
+      <div style="font-size:11px;color:var(--gris-medio);margin-top:4px">Se usa para resolver automáticamente la mezcla al elegir este producto en Ajuste Diario.</div>
     </div>
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-producto')">Cancelar</button>
