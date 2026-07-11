@@ -916,25 +916,38 @@
   <div class="modal" style="width:680px;max-width:95vw">
     <div class="modal-titulo" id="modal-ensayo-titulo">📐 Nuevo Ensayo de Calidad</div>
     <input type="hidden" id="m-ensayo-id">
-    <div class="form-grid" style="margin-bottom:10px">
-      <div class="form-grupo"><label>N° Ensayo *</label><input type="text" id="m-ensayo-numero" placeholder="ENS-0001"></div>
-      <div class="form-grupo"><label>Fecha fundida *</label><input type="date" id="m-ensayo-fecha" onchange="renderResultadosEnsayo()"></div>
-    </div>
     <div class="form-grupo" style="margin-bottom:10px"><label>N° Cilindro (ajuste diario de mezcla)</label>
-      <select id="m-ensayo-cilindro" onchange="cargarDesdeAjusteMezcla()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      <input type="text" id="m-ensayo-cilindro" list="datalist-cilindros-ensayo" onchange="cargarDesdeAjusteMezcla()" placeholder="Busca por número de cilindro..." style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+      <datalist id="datalist-cilindros-ensayo"></datalist>
+    </div>
+    <div class="form-grid-3" style="margin-bottom:10px">
+      <div class="form-grupo"><label style="display:block;min-height:2.4em">Fecha fundida * <span style="font-weight:400;text-transform:none">(automático)</span></label><input type="date" id="m-ensayo-fecha" readonly onchange="renderResultadosEnsayo()" style="background:#F7FAFC;color:var(--gris-medio)"></div>
+      <div class="form-grupo"><label style="display:block;min-height:2.4em">Diseño de mezcla usado <span style="font-weight:400;text-transform:none">(automático)</span></label>
+        <select id="m-ensayo-diseno" disabled style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;background:#F7FAFC;color:var(--gris-medio)"></select>
+      </div>
+      <div class="form-grupo"><label style="display:block;min-height:2.4em">Resistencia objetivo (MPa) <span style="font-weight:400;text-transform:none">(automático)</span></label><input type="number" id="m-ensayo-objetivo" readonly min="0" step="0.1" style="background:#F7FAFC;color:var(--gris-medio)"></div>
+    </div>
+    <div class="form-grid-3" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Producto <span style="font-weight:400;text-transform:none">(automático)</span></label><input type="text" id="m-ensayo-producto" readonly style="background:#F7FAFC;color:var(--gris-medio)"></div>
+      <div class="form-grupo"><label>Cliente <span style="font-weight:400;text-transform:none">(automático)</span></label><input type="text" id="m-ensayo-cliente" readonly style="background:#F7FAFC;color:var(--gris-medio)"></div>
+      <div class="form-grupo"><label>Proyecto <span style="font-weight:400;text-transform:none">(automático)</span></label><input type="text" id="m-ensayo-proyecto" readonly style="background:#F7FAFC;color:var(--gris-medio)"></div>
     </div>
     <div class="form-grid" style="margin-bottom:10px">
-      <div class="form-grupo"><label>Diseño de mezcla usado</label>
-        <select id="m-ensayo-diseno" onchange="actualizarObjetivoDesdeDiseno()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      <div class="form-grupo"><label>Laboratorio</label>
+        <select id="m-ensayo-laboratorio" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="">— Selecciona —</option>
+          <option value="CONSUAS INGENIERÍA">CONSUAS INGENIERÍA</option>
+          <option value="ASPRECON INGENIERÍA">ASPRECON INGENIERÍA</option>
+          <option value="ENSAYOS INTERNOS">ENSAYOS INTERNOS</option>
+        </select>
       </div>
+      <div class="form-grupo"><label>N° Ensayo *</label><input type="text" id="m-ensayo-numero" placeholder="ENS-0001"></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Orden de producción asociada</label>
         <select id="m-ensayo-orden" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
       </div>
-    </div>
-    <div class="form-grupo" style="margin-bottom:10px"><label>Elemento / Descripción</label><input type="text" id="m-ensayo-elemento" placeholder="Ej: Bordillo A-10, Probetas de control"></div>
-    <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>N° de probetas</label><input type="number" id="m-ensayo-probetas" min="0"></div>
-      <div class="form-grupo"><label>Resistencia objetivo (MPa)</label><input type="number" id="m-ensayo-objetivo" min="0" step="0.1"></div>
     </div>
     <div class="form-grupo" style="margin-bottom:10px"><label>Responsable</label><input type="text" id="m-ensayo-responsable" placeholder="Nombre del responsable"></div>
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:10px 0 8px;display:flex;justify-content:space-between;align-items:center">
