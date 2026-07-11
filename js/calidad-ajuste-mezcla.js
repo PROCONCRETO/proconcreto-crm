@@ -112,6 +112,15 @@ function _clienteResumenAjuste(a) {
   return principal + (extra ? ` (+${extra} más)` : '');
 }
 
+// Nombre del producto principal de un ajuste, con aviso si se aprovechó la misma
+// mezcla para fabricar productos adicionales al tiempo.
+function _productoResumenAjuste(a) {
+  const principal = a.productoNombre || '';
+  const extra = (a.productosAdicionales || []).length;
+  if (!principal && !extra) return '';
+  return principal + (extra ? ` (+${extra} más)` : '');
+}
+
 function siguienteCilindroNo() {
   const nums = AJUSTES_MEZCLA.map(a => parseInt(a.cilindroNo) || 0);
   return nums.length ? Math.max(...nums) + 1 : '';
@@ -143,8 +152,8 @@ function renderAjustesMezcla() {
       <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${_clienteResumenAjuste(a)}">${_clienteResumenAjuste(a) || '—'}</td>
       <td>${USUARIOS_CRM[a.creadoPor]?.nombre || a.creadoPor || '—'}</td>
       <td style="text-align:center">${a.resistenciaDiseno || '—'} MPa</td>
-      <td style="text-align:center">${a.humedadArena != null ? a.humedadArena.toFixed(1) + '%' : '—'}</td>
-      <td style="text-align:center">${a.humedadTriturado != null ? a.humedadTriturado.toFixed(1) + '%' : '—'}</td>
+      <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${_productoResumenAjuste(a)}">${_productoResumenAjuste(a) || '—'}</td>
+      <td>${a.proyecto || '—'}</td>
       <td>
         <div class="flex-gap">
           <button class="btn btn-secundario btn-xs" onclick="verFormatoProduccionAjuste('${a.id}')">🖨️ Formato</button>
