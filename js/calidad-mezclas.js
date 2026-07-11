@@ -296,14 +296,15 @@ function abrirModalEnsayo() {
   document.getElementById('m-ensayo-id').value = '';
   document.getElementById('modal-ensayo-titulo').textContent = '📐 Nuevo Ensayo de Calidad';
   document.getElementById('m-ensayo-numero').value = siguienteNumeroEnsayo();
+  document.getElementById('m-ensayo-laboratorio').value = '';
   document.getElementById('m-ensayo-fecha').value = new Date().toISOString().split('T')[0];
   poblarSelectDisenos('m-ensayo-diseno');
   poblarSelectOrdenesEnsayo();
-  poblarSelectCilindros();
+  poblarDatalistCilindros('datalist-cilindros-ensayo');
   document.getElementById('m-ensayo-cilindro').value = '';
+  _poblarProductoClienteProyectoEnsayo('');
   document.getElementById('m-ensayo-diseno').value = '';
   document.getElementById('m-ensayo-orden').value = '';
-  document.getElementById('m-ensayo-elemento').value = '';
   document.getElementById('m-ensayo-probetas').value = '';
   document.getElementById('m-ensayo-objetivo').value = '';
   document.getElementById('m-ensayo-responsable').value = '';
@@ -319,19 +320,29 @@ function editarEnsayo(id) {
   document.getElementById('m-ensayo-id').value = e.id;
   document.getElementById('modal-ensayo-titulo').textContent = '✏️ Editar Ensayo de Calidad';
   document.getElementById('m-ensayo-numero').value = e.numero || '';
+  document.getElementById('m-ensayo-laboratorio').value = e.laboratorio || '';
   document.getElementById('m-ensayo-fecha').value = e.fecha || '';
   poblarSelectDisenos('m-ensayo-diseno');
   poblarSelectOrdenesEnsayo();
-  poblarSelectCilindros();
-  document.getElementById('m-ensayo-cilindro').value = e.cilindroNo || '';
-  document.getElementById('m-ensayo-diseno').value = e.disenoCodigo || '';
+  poblarDatalistCilindros('datalist-cilindros-ensayo');
+  const ajusteVinculado = AJUSTES_MEZCLA.find(x => String(x.cilindroNo) === String(e.cilindroNo));
+  document.getElementById('m-ensayo-cilindro').value = e.cilindroNo ? (ajusteVinculado ? _textoCilindroEnsayo(ajusteVinculado) : `Cilindro ${e.cilindroNo}`) : '';
+  // Fecha, Diseño, Resistencia, Producto, Cliente y Proyecto son "automáticos": si el
+  // ajuste vinculado sigue existiendo, se recalculan en vivo (igual que al elegir el
+  // cilindro por primera vez); si ya no existe, se usa lo que había quedado guardado.
+  if (ajusteVinculado) {
+    cargarDesdeAjusteMezcla();
+  } else {
+    _poblarProductoClienteProyectoEnsayo(e.cilindroNo);
+    agregarOpcionSiNoExiste('m-ensayo-diseno', e.disenoCodigo);
+    document.getElementById('m-ensayo-diseno').value = e.disenoCodigo || '';
+    document.getElementById('m-ensayo-objetivo').value = e.resistenciaObjetivo || '';
+  }
   if (e.ordenProduccion && !document.querySelector(`#m-ensayo-orden option[value="${e.ordenProduccion}"]`)) {
     const opt = document.createElement('option'); opt.value = e.ordenProduccion; opt.textContent = e.ordenProduccion; document.getElementById('m-ensayo-orden').appendChild(opt);
   }
   document.getElementById('m-ensayo-orden').value = e.ordenProduccion || '';
-  document.getElementById('m-ensayo-elemento').value = e.elemento || '';
   document.getElementById('m-ensayo-probetas').value = e.numeroProbetas || '';
-  document.getElementById('m-ensayo-objetivo').value = e.resistenciaObjetivo || '';
   document.getElementById('m-ensayo-responsable').value = e.responsable || '';
   document.getElementById('m-ensayo-obs').value = e.observaciones || '';
   _resultadosEnsayoActual = JSON.parse(JSON.stringify(e.resultados || []));
@@ -343,14 +354,20 @@ function guardarEnsayo() {
   const numero = document.getElementById('m-ensayo-numero').value.trim();
   const fecha = document.getElementById('m-ensayo-fecha').value;
   if (!numero || !fecha) { alert('Completa los campos obligatorios: N° Ensayo y Fecha.'); return; }
+  const cilindroTexto = document.getElementById('m-ensayo-cilindro').value.trim();
+  const ajusteVinculado = _ajusteDesdeTextoCilindroEnsayo(cilindroTexto);
+  if (cilindroTexto && !ajusteVinculado) { alert('El cilindro escrito no corresponde a ningún Ajuste Diario. Elige uno de la lista, o borra el campo si el ensayo no tiene ajuste asociado.'); return; }
   const editId = document.getElementById('m-ensayo-id').value;
   const ensayo = {
     id: editId || String(Date.now()),
     numero, fecha,
-    cilindroNo: document.getElementById('m-ensayo-cilindro').value,
+    laboratorio: document.getElementById('m-ensayo-laboratorio').value.trim(),
+    cilindroNo: ajusteVinculado?.cilindroNo || '',
     disenoCodigo: document.getElementById('m-ensayo-diseno').value,
     ordenProduccion: document.getElementById('m-ensayo-orden').value,
-    elemento: document.getElementById('m-ensayo-elemento').value.trim(),
+    // "Elemento" ya no se digita aparte: se toma del Producto que se resolvió arriba
+    // en automático (a partir del cilindro), para no duplicar el mismo dato dos veces.
+    elemento: document.getElementById('m-ensayo-producto').value.trim(),
     numeroProbetas: parseInt(document.getElementById('m-ensayo-probetas').value) || 0,
     resistenciaObjetivo: parseFloat(document.getElementById('m-ensayo-objetivo').value) || 0,
     responsable: document.getElementById('m-ensayo-responsable').value.trim(),

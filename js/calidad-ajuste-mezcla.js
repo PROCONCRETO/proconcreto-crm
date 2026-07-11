@@ -436,17 +436,38 @@ function eliminarAjusteMezcla(id) {
 }
 
 // ── Integración con Control de Ensayos ──
-function poblarSelectCilindros() {
-  const sel = document.getElementById('m-ensayo-cilindro');
-  if (!sel) return;
+function _textoCilindroEnsayo(a) {
+  return `Cilindro ${a.cilindroNo} — ${a.fecha ? new Date(a.fecha + 'T12:00').toLocaleDateString('es-CO') : ''} (${_clienteResumenAjuste(a)})`;
+}
+
+// Igual que Producto/Cliente en Ajuste Diario: con muchos cilindros un <select> plano
+// se vuelve difícil de recorrer, así que se busca por texto contra un <datalist>.
+function poblarDatalistCilindros(datalistId) {
+  const dl = document.getElementById(datalistId);
+  if (!dl) return;
   const ordenados = [...AJUSTES_MEZCLA].sort((a, b) => (Number(b.cilindroNo) || 0) - (Number(a.cilindroNo) || 0));
-  sel.innerHTML = '<option value="">— Sin ajuste diario asociado —</option>' + ordenados.map(a => `<option value="${a.cilindroNo}">Cilindro ${a.cilindroNo} — ${a.fecha ? new Date(a.fecha + 'T12:00').toLocaleDateString('es-CO') : ''} (${_clienteResumenAjuste(a)})</option>`).join('');
+  dl.innerHTML = ordenados.map(a => `<option value="${_textoCilindroEnsayo(a)}">`).join('');
+}
+
+function _ajusteDesdeTextoCilindroEnsayo(texto) {
+  const t = (texto || '').trim();
+  if (!t) return null;
+  return AJUSTES_MEZCLA.find(a => _textoCilindroEnsayo(a) === t) || null;
+}
+
+// Producto, Cliente y Proyecto del ensayo son solo un reflejo de lo que ya quedó
+// registrado en el Ajuste Diario de ese cilindro — no se guardan aparte, se recalculan
+// siempre en vivo a partir del cilindroNo para no duplicar ni desactualizar el dato.
+function _poblarProductoClienteProyectoEnsayo(cilindroNo) {
+  const a = AJUSTES_MEZCLA.find(x => String(x.cilindroNo) === String(cilindroNo));
+  document.getElementById('m-ensayo-producto').value = a?.productoNombre || '';
+  document.getElementById('m-ensayo-cliente').value = a ? (a.cliente || a.clienteElemento || '') : '';
+  document.getElementById('m-ensayo-proyecto').value = a?.proyecto || '';
 }
 
 function cargarDesdeAjusteMezcla() {
-  const cilindroNo = document.getElementById('m-ensayo-cilindro').value;
-  if (!cilindroNo) return;
-  const a = AJUSTES_MEZCLA.find(x => String(x.cilindroNo) === String(cilindroNo));
+  const a = _ajusteDesdeTextoCilindroEnsayo(document.getElementById('m-ensayo-cilindro').value);
+  _poblarProductoClienteProyectoEnsayo(a?.cilindroNo || '');
   if (!a) return;
   // Al relacionar el cilindro, se arrastran automáticamente los datos que ya se conocen
   // desde el Ajuste Diario de Mezcla, en vez de pedirlos de nuevo en el ensayo.
@@ -454,7 +475,6 @@ function cargarDesdeAjusteMezcla() {
   document.getElementById('m-ensayo-diseno').value = a.disenoCodigo || '';
   actualizarObjetivoDesdeDiseno();
   if (a.resistenciaDiseno) document.getElementById('m-ensayo-objetivo').value = a.resistenciaDiseno;
-  document.getElementById('m-ensayo-elemento').value = a.productoNombre || a.proyecto || a.clienteElemento || '';
 }
 
 // ── Formato de Producción (PDF para el operario de mezclado) ──
