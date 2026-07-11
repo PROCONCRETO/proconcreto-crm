@@ -465,6 +465,13 @@ function _poblarProductoClienteProyectoEnsayo(cilindroNo) {
   document.getElementById('m-ensayo-proyecto').value = a?.proyecto || '';
 }
 
+// Diseño de mezcla usado se muestra como texto plano (no como un desplegable activo),
+// ya que es un valor automático que no se puede escoger manualmente en este formulario.
+function _textoDisenoEnsayo(codigo) {
+  const d = DISENOS_MEZCLA.find(x => x.codigo === codigo);
+  return d ? `${d.codigo} — ${d.nombre} (${d.resistenciaDiseno} MPa)` : (codigo || '');
+}
+
 function cargarDesdeAjusteMezcla() {
   const a = _ajusteDesdeTextoCilindroEnsayo(document.getElementById('m-ensayo-cilindro').value);
   _poblarProductoClienteProyectoEnsayo(a?.cilindroNo || '');
@@ -473,6 +480,7 @@ function cargarDesdeAjusteMezcla() {
   // desde el Ajuste Diario de Mezcla, en vez de pedirlos de nuevo en el ensayo.
   if (a.fecha) document.getElementById('m-ensayo-fecha').value = a.fecha;
   document.getElementById('m-ensayo-diseno').value = a.disenoCodigo || '';
+  document.getElementById('m-ensayo-diseno-display').value = _textoDisenoEnsayo(a.disenoCodigo);
   actualizarObjetivoDesdeDiseno();
   if (a.resistenciaDiseno) document.getElementById('m-ensayo-objetivo').value = a.resistenciaDiseno;
 }

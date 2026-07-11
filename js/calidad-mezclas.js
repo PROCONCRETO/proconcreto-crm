@@ -237,14 +237,6 @@ function renderEnsayosCalidad() {
   }).join('');
 }
 
-function poblarSelectOrdenesEnsayo() {
-  const sel = document.getElementById('m-ensayo-orden');
-  if (!sel) return;
-  let html = '<option value="">— Sin orden asociada —</option>';
-  (ORDENES || []).forEach(o => { html += `<option value="${o.numero}">${o.numero} — ${o.cliente || ''}</option>`; });
-  sel.innerHTML = html;
-}
-
 // La edad de un resultado no la digita nadie: es simplemente la cantidad de días
 // entre la fecha fundida (fecha del ajuste diario/diseño ajustado por humedad) y la
 // fecha en que se falló ese cilindro, ya que un mismo ensayo puede tener resultados
@@ -298,16 +290,12 @@ function abrirModalEnsayo() {
   document.getElementById('m-ensayo-numero').value = siguienteNumeroEnsayo();
   document.getElementById('m-ensayo-laboratorio').value = '';
   document.getElementById('m-ensayo-fecha').value = new Date().toISOString().split('T')[0];
-  poblarSelectDisenos('m-ensayo-diseno');
-  poblarSelectOrdenesEnsayo();
   poblarDatalistCilindros('datalist-cilindros-ensayo');
   document.getElementById('m-ensayo-cilindro').value = '';
   _poblarProductoClienteProyectoEnsayo('');
   document.getElementById('m-ensayo-diseno').value = '';
-  document.getElementById('m-ensayo-orden').value = '';
-  document.getElementById('m-ensayo-probetas').value = '';
+  document.getElementById('m-ensayo-diseno-display').value = '';
   document.getElementById('m-ensayo-objetivo').value = '';
-  document.getElementById('m-ensayo-responsable').value = '';
   document.getElementById('m-ensayo-obs').value = '';
   _resultadosEnsayoActual = [];
   renderResultadosEnsayo();
@@ -322,8 +310,6 @@ function editarEnsayo(id) {
   document.getElementById('m-ensayo-numero').value = e.numero || '';
   document.getElementById('m-ensayo-laboratorio').value = e.laboratorio || '';
   document.getElementById('m-ensayo-fecha').value = e.fecha || '';
-  poblarSelectDisenos('m-ensayo-diseno');
-  poblarSelectOrdenesEnsayo();
   poblarDatalistCilindros('datalist-cilindros-ensayo');
   const ajusteVinculado = AJUSTES_MEZCLA.find(x => String(x.cilindroNo) === String(e.cilindroNo));
   document.getElementById('m-ensayo-cilindro').value = e.cilindroNo ? (ajusteVinculado ? _textoCilindroEnsayo(ajusteVinculado) : `Cilindro ${e.cilindroNo}`) : '';
@@ -334,16 +320,10 @@ function editarEnsayo(id) {
     cargarDesdeAjusteMezcla();
   } else {
     _poblarProductoClienteProyectoEnsayo(e.cilindroNo);
-    agregarOpcionSiNoExiste('m-ensayo-diseno', e.disenoCodigo);
     document.getElementById('m-ensayo-diseno').value = e.disenoCodigo || '';
+    document.getElementById('m-ensayo-diseno-display').value = _textoDisenoEnsayo(e.disenoCodigo);
     document.getElementById('m-ensayo-objetivo').value = e.resistenciaObjetivo || '';
   }
-  if (e.ordenProduccion && !document.querySelector(`#m-ensayo-orden option[value="${e.ordenProduccion}"]`)) {
-    const opt = document.createElement('option'); opt.value = e.ordenProduccion; opt.textContent = e.ordenProduccion; document.getElementById('m-ensayo-orden').appendChild(opt);
-  }
-  document.getElementById('m-ensayo-orden').value = e.ordenProduccion || '';
-  document.getElementById('m-ensayo-probetas').value = e.numeroProbetas || '';
-  document.getElementById('m-ensayo-responsable').value = e.responsable || '';
   document.getElementById('m-ensayo-obs').value = e.observaciones || '';
   _resultadosEnsayoActual = JSON.parse(JSON.stringify(e.resultados || []));
   renderResultadosEnsayo();
@@ -364,13 +344,10 @@ function guardarEnsayo() {
     laboratorio: document.getElementById('m-ensayo-laboratorio').value.trim(),
     cilindroNo: ajusteVinculado?.cilindroNo || '',
     disenoCodigo: document.getElementById('m-ensayo-diseno').value,
-    ordenProduccion: document.getElementById('m-ensayo-orden').value,
     // "Elemento" ya no se digita aparte: se toma del Producto que se resolvió arriba
     // en automático (a partir del cilindro), para no duplicar el mismo dato dos veces.
     elemento: document.getElementById('m-ensayo-producto').value.trim(),
-    numeroProbetas: parseInt(document.getElementById('m-ensayo-probetas').value) || 0,
     resistenciaObjetivo: parseFloat(document.getElementById('m-ensayo-objetivo').value) || 0,
-    responsable: document.getElementById('m-ensayo-responsable').value.trim(),
     observaciones: document.getElementById('m-ensayo-obs').value.trim(),
     resultados: _resultadosEnsayoActual.map(r => ({ ...r, edad: _calcularEdadEnsayo(fecha, r.fecha) })),
     creadoPor: USUARIO_ACTUAL?.email,
