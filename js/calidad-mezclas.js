@@ -190,16 +190,75 @@ function calcularEstadoEnsayo(ensayo) {
   return cumpleTodos ? 'Cumple' : 'No cumple';
 }
 
+// Resuelve el ajuste diario (y por tanto cliente/proyecto) vinculado a un ensayo, vía su cilindro.
+function _ajusteDeEnsayo(e) {
+  return AJUSTES_MEZCLA.find(x => String(x.cilindroNo) === String(e.cilindroNo));
+}
+
+// Clientes y proyectos de un ensayo (cliente/proyecto principal + adicionales del ajuste vinculado).
+function _clientesProyectosEnsayo(e) {
+  const a = _ajusteDeEnsayo(e);
+  const clientes = new Set(), proyectos = new Set();
+  if (a) {
+    if (a.cliente) clientes.add(a.cliente);
+    if (a.proyecto) proyectos.add(a.proyecto);
+    (a.clientesAdicionales || []).forEach(c => { if (c.cliente) clientes.add(c.cliente); if (c.proyecto) proyectos.add(c.proyecto); });
+  }
+  return { clientes: [...clientes], proyectos: [...proyectos] };
+}
+
+function poblarFiltrosEnsayosLista() {
+  const selCliente = document.getElementById('ensayos-filtro-cliente');
+  const selProyecto = document.getElementById('ensayos-filtro-proyecto');
+  const selResistencia = document.getElementById('ensayos-filtro-resistencia');
+  if (!selCliente || !selProyecto || !selResistencia) return;
+
+  const clientes = new Set(), proyectos = new Set();
+  ENSAYOS_CALIDAD.forEach(e => {
+    const ctx = _clientesProyectosEnsayo(e);
+    ctx.clientes.forEach(c => clientes.add(c));
+    ctx.proyectos.forEach(p => proyectos.add(p));
+  });
+  const prevCliente = selCliente.value, prevProyecto = selProyecto.value;
+  selCliente.innerHTML = '<option value="">Todos los clientes</option>' +
+    [...clientes].sort().map(c => `<option value="${c}">${c}</option>`).join('');
+  selProyecto.innerHTML = '<option value="">Todos los proyectos</option>' +
+    [...proyectos].sort().map(p => `<option value="${p}">${p}</option>`).join('');
+  if (prevCliente) selCliente.value = prevCliente;
+  if (prevProyecto) selProyecto.value = prevProyecto;
+
+  const disenosConEnsayo = [...new Set(ENSAYOS_CALIDAD.map(e => e.disenoCodigo).filter(Boolean))]
+    .map(c => DISENOS_MEZCLA.find(d => d.codigo === c) || { codigo: c, nombre: '' })
+    .sort((a, b) => a.codigo.localeCompare(b.codigo));
+  const prevResistencia = selResistencia.value;
+  selResistencia.innerHTML = '<option value="">Todas las resistencias</option>' +
+    disenosConEnsayo.map(d => `<option value="${d.codigo}">${d.codigo}${d.nombre ? ' — ' + d.nombre : ''}</option>`).join('');
+  if (prevResistencia) selResistencia.value = prevResistencia;
+}
+
+// Aplica los filtros de la pantalla de Control de Ensayos (búsqueda, estado, cliente, proyecto, resistencia).
+function _ensayosFiltrados() {
+  const q = (document.getElementById('buscar-ensayo')?.value || '').toLowerCase();
+  const fEstado = document.getElementById('filtro-estado-ensayo')?.value || '';
+  const fCliente = document.getElementById('ensayos-filtro-cliente')?.value || '';
+  const fProyecto = document.getElementById('ensayos-filtro-proyecto')?.value || '';
+  const fResistencia = document.getElementById('ensayos-filtro-resistencia')?.value || '';
+  let data = ENSAYOS_CALIDAD.map(e => ({ ...e, _estado: calcularEstadoEnsayo(e) }));
+  if (q) data = data.filter(e => (e.numero + ' ' + String(e.cilindroNo || '') + ' ' + (e.elemento || '') + ' ' + (e.disenoCodigo || '')).toLowerCase().includes(q));
+  if (fEstado) data = data.filter(e => e._estado === fEstado);
+  if (fCliente) data = data.filter(e => _clientesProyectosEnsayo(e).clientes.includes(fCliente));
+  if (fProyecto) data = data.filter(e => _clientesProyectosEnsayo(e).proyectos.includes(fProyecto));
+  if (fResistencia) data = data.filter(e => e.disenoCodigo === fResistencia);
+  data.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  return data;
+}
+
 function renderEnsayosCalidad() {
   const tbody = document.getElementById('ensayos-body');
   const resumen = document.getElementById('ensayos-resumen');
   if (!tbody) return;
-  const q = (document.getElementById('buscar-ensayo')?.value || '').toLowerCase();
-  const fEstado = document.getElementById('filtro-estado-ensayo')?.value || '';
-  let data = ENSAYOS_CALIDAD.map(e => ({ ...e, _estado: calcularEstadoEnsayo(e) }));
-  if (q) data = data.filter(e => (e.numero + ' ' + (e.elemento || '') + ' ' + (e.disenoCodigo || '')).toLowerCase().includes(q));
-  if (fEstado) data = data.filter(e => e._estado === fEstado);
-  data.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  poblarFiltrosEnsayosLista();
+  const data = _ensayosFiltrados();
 
   if (resumen) {
     const enCurado = ENSAYOS_CALIDAD.filter(e => calcularEstadoEnsayo(e) === 'En curado').length;
@@ -212,7 +271,8 @@ function renderEnsayosCalidad() {
   }
 
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">📐</div><div>No hay ensayos registrados.</div></td></tr>`;
+    const hayFiltros = document.getElementById('buscar-ensayo')?.value || document.getElementById('filtro-estado-ensayo')?.value || document.getElementById('ensayos-filtro-cliente')?.value || document.getElementById('ensayos-filtro-proyecto')?.value || document.getElementById('ensayos-filtro-resistencia')?.value;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">📐</div><div>${hayFiltros ? 'No hay ensayos que coincidan con los filtros seleccionados.' : 'No hay ensayos registrados.'}</div></td></tr>`;
     return;
   }
   const colorEstado = { 'En curado': '#1565C0', 'Cumple': '#2E7D32', 'No cumple': '#C62828' };
@@ -220,13 +280,14 @@ function renderEnsayosCalidad() {
   tbody.innerHTML = data.map(e => {
     const ultimaResistencia = (e.resultados || []).length ? e.resultados[e.resultados.length - 1] : null;
     return `<tr style="border-top:2px solid var(--azul-oscuro)">
-      <td style="font-weight:700;color:var(--azul)">${e.numero}</td>
+      <td style="font-weight:700;color:var(--azul)">${e.cilindroNo || '—'}</td>
       <td>${e.fecha ? new Date(e.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
       <td>${e.disenoCodigo ? `<span style="font-size:11px;background:var(--gris-borde);color:#333;padding:2px 6px;border-radius:3px;font-weight:600">${e.disenoCodigo}</span>` : '—'}</td>
       <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e.elemento || ''}">${e.elemento || '—'}</td>
       <td style="text-align:center">${e.resistenciaObjetivo || '—'} MPa</td>
-      <td style="text-align:center">${ultimaResistencia ? ultimaResistencia.resistencia + ' MPa (' + ultimaResistencia.edad + 'd)' : '—'}</td>
+      <td style="text-align:center">${ultimaResistencia ? Number(ultimaResistencia.resistencia).toFixed(1) + ' MPa (' + ultimaResistencia.edad + 'd)' : '—'}</td>
       <td><span class="badge" style="background:${bgEstado[e._estado]};color:${colorEstado[e._estado]}">${e._estado}</span></td>
+      <td>${USUARIOS_CRM[e.creadoPor]?.nombre || e.creadoPor || '—'}</td>
       <td>
         <div class="flex-gap">
           <button class="btn btn-primario btn-xs" onclick="editarEnsayo('${e.id}')">✏️ Editar</button>
@@ -235,6 +296,134 @@ function renderEnsayosCalidad() {
       </td>
     </tr>`;
   }).join('');
+}
+
+// Genera un reporte imprimible (mismo membrete de las cotizaciones/certificados) con los
+// ensayos que cumplen los filtros activos de Control de Ensayos, para entregar al cliente.
+function verReporteEnsayosPDF() {
+  const data = _ensayosFiltrados();
+  if (!data.length) { alert('No hay ensayos que coincidan con los filtros para incluir en el reporte.'); return; }
+
+  const fCliente = document.getElementById('ensayos-filtro-cliente')?.value || '';
+  const fProyecto = document.getElementById('ensayos-filtro-proyecto')?.value || '';
+  const fResistencia = document.getElementById('ensayos-filtro-resistencia')?.value || '';
+  const filtrosTxt = [
+    fCliente ? `Cliente: ${fCliente}` : '',
+    fProyecto ? `Proyecto: ${fProyecto}` : '',
+    fResistencia ? `Resistencia: ${fResistencia}` : '',
+  ].filter(Boolean).join(' · ');
+  const fechaHoy = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  const colorEstado = { 'En curado': '#1565C0', 'Cumple': '#2E7D32', 'No cumple': '#C62828' };
+  const bgEstado = { 'En curado': '#E3F2FD', 'Cumple': '#E8F5E9', 'No cumple': '#FFEBEE' };
+
+  const filas = data.map(e => {
+    const ultimaResistencia = (e.resultados || []).length ? e.resultados[e.resultados.length - 1] : null;
+    const ctx = _clientesProyectosEnsayo(e);
+    return `<tr>
+      <td style="padding:5px 6px;font-weight:700;color:#003F7F">${e.cilindroNo || '—'}</td>
+      <td style="padding:5px 6px">${e.fecha ? new Date(e.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
+      <td style="padding:5px 6px">${ctx.clientes.join(', ') || '—'}</td>
+      <td style="padding:5px 6px">${ctx.proyectos.join(', ') || '—'}</td>
+      <td style="padding:5px 6px">${e.disenoCodigo || '—'}</td>
+      <td style="padding:5px 6px">${e.elemento || '—'}</td>
+      <td style="padding:5px 6px;text-align:center">${e.resistenciaObjetivo || '—'} MPa</td>
+      <td style="padding:5px 6px;text-align:center">${ultimaResistencia ? Number(ultimaResistencia.resistencia).toFixed(1) + ' MPa (' + ultimaResistencia.edad + 'd)' : '—'}</td>
+      <td style="padding:5px 6px;text-align:center"><span style="background:${bgEstado[e._estado]};color:${colorEstado[e._estado]};padding:2px 6px;border-radius:3px;font-size:9.5px;font-weight:700">${e._estado}</span></td>
+    </tr>`;
+  }).join('');
+
+  const html = `
+    <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
+      <span style="font-weight:700">Reporte de Resultados de Ensayos${fCliente ? ' — ' + fCliente : ''}</span>
+      <div style="flex:1"></div>
+      <button onclick="descargarReporteEnsayosPDF()" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700">⬇️ Descargar PDF</button>
+      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-control-ensayos').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+    </div>
+    <div class="preview-doc" id="reporte-ensayos-doc">
+      <div class="preview-membrete-header">
+        <img src="membrete-top.jpg" alt="">
+      </div>
+      <div class="preview-content" id="reporte-ensayos-content" style="padding-top:6px">
+        <div style="text-align:center;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:700;color:#003F7F;letter-spacing:0.03em">REPORTE DE RESULTADOS DE ENSAYOS DE RESISTENCIA</div>
+          ${filtrosTxt ? `<div style="font-size:10.5px;color:#555;margin-top:2px">${filtrosTxt}</div>` : ''}
+          <div style="font-size:10px;color:#777">${data.length} ensayo${data.length === 1 ? '' : 's'} · Generado el ${fechaHoy}</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:10.5px;border:1px solid #ddd">
+          <thead>
+            <tr style="background:#ECEFF1">
+              <th style="padding:5px 6px;text-align:left">CILINDRO</th>
+              <th style="padding:5px 6px;text-align:left">FECHA</th>
+              <th style="padding:5px 6px;text-align:left">CLIENTE</th>
+              <th style="padding:5px 6px;text-align:left">PROYECTO</th>
+              <th style="padding:5px 6px;text-align:left">DISEÑO</th>
+              <th style="padding:5px 6px;text-align:left">ELEMENTO</th>
+              <th style="padding:5px 6px;text-align:center">OBJETIVO</th>
+              <th style="padding:5px 6px;text-align:center">RESULTADO</th>
+              <th style="padding:5px 6px;text-align:center">ESTADO</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+      <div class="preview-membrete-footer" id="reporte-ensayos-footer">
+        <div class="pf-arco"></div>
+        <div class="pf-datos">
+          <div class="pf-col"><span class="pf-icon">📞</span><span>+57 314 620 1650<br>+57 311 408 2285</span></div>
+          <div class="pf-col"><span class="pf-icon">🏠</span><span>Autopista del Café Km2<br>Vía Chinchiná – Santa Rosa</span></div>
+          <div class="pf-col"><span class="pf-icon">🌐</span><span>www.proconcreto.com.co</span></div>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('contenido-preview').innerHTML = html;
+  document.getElementById('vista-previa').style.display = 'block';
+  document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+  window.scrollTo(0, 0);
+}
+
+async function descargarReporteEnsayosPDF() {
+  const btn = document.querySelector('.no-print button[onclick*="descargarReporteEnsayosPDF"]');
+  if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
+  try {
+    const { jsPDF } = window.jspdf;
+    const pageW = 210, pageH = 297;
+    const topImg = await cargarImagen('membrete-top.jpg');
+    const headerH = pageW * (topImg.naturalHeight / topImg.naturalWidth);
+    const contentEl = document.getElementById('reporte-ensayos-content');
+    const contentCanvas = await html2canvas(contentEl, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    const pxToMm = pageW / contentCanvas.width;
+    const contentH_px = _alturaContenidoReal(contentCanvas);
+    const footerEl = document.getElementById('reporte-ensayos-footer');
+    const footerCanvas = await html2canvas(footerEl, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    const footerH = footerCanvas.height * pxToMm;
+    const availH = pageH - headerH - footerH - 6;
+    const pageH_px = availH / pxToMm;
+    const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    const footerData = footerCanvas.toDataURL('image/jpeg', 0.95);
+    let cursorY = 0, pageIndex = 0, guard = 0;
+    while (cursorY < contentH_px - 1 && guard < 60) {
+      guard++;
+      let bottom = Math.min(contentH_px, cursorY + pageH_px);
+      if (bottom < contentH_px) bottom = _filaBlancaCerca(contentCanvas, Math.floor(bottom), cursorY + pageH_px * 0.55);
+      const sliceH_px = bottom - cursorY;
+      if (sliceH_px <= 1) break;
+      if (pageIndex > 0) pdf.addPage();
+      pdf.addImage(topImg, 'JPEG', 0, 0, pageW, headerH);
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = contentCanvas.width;
+      sliceCanvas.height = Math.ceil(sliceH_px);
+      sliceCanvas.getContext('2d').drawImage(contentCanvas, 0, Math.floor(cursorY), contentCanvas.width, Math.ceil(sliceH_px), 0, 0, contentCanvas.width, Math.ceil(sliceH_px));
+      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, headerH + 2, pageW, sliceH_px * pxToMm);
+      pdf.addImage(footerData, 'JPEG', 0, pageH - footerH, pageW, footerH);
+      cursorY = bottom;
+      pageIndex++;
+    }
+    pdf.save(`Reporte_Ensayos_${new Date().toISOString().slice(0, 10)}.pdf`);
+  } finally {
+    if (btn) { btn.textContent = '⬇️ Descargar PDF'; btn.disabled = false; }
+  }
 }
 
 // La edad de un resultado no la digita nadie: es simplemente la cantidad de días

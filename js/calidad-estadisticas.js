@@ -141,9 +141,12 @@ function renderAnalisisEstadistico() {
 
   const _limpiarChart = () => { if (_chartEstadistica) { _chartEstadistica.destroy(); _chartEstadistica = null; } };
 
+  const acciones = document.getElementById('est-acciones');
+
   if (!codigo) {
     _limpiarChart();
     cont.innerHTML = `<div class="card" style="padding:40px;text-align:center;color:var(--gris-medio)"><div style="font-size:40px;margin-bottom:8px">📊</div><div>Selecciona un <b>tipo de mezcla</b> para ver su análisis estadístico.</div></div>`;
+    if (acciones) acciones.innerHTML = '';
     return;
   }
 
@@ -165,6 +168,7 @@ function renderAnalisisEstadistico() {
   if (n === 0) {
     _limpiarChart();
     cont.innerHTML = `<div class="card" style="padding:40px;text-align:center;color:var(--gris-medio)"><div style="font-size:40px;margin-bottom:8px">🔍</div><div>No hay ensayos con resultado a <b>${edad} días</b> para el tipo de mezcla y filtros seleccionados.</div></div>`;
+    if (acciones) acciones.innerHTML = '';
     return;
   }
 
@@ -272,4 +276,105 @@ function renderAnalisisEstadistico() {
       },
     },
   });
+
+  _estadisticaActual = { codigo, nombreDiseno: diseno?.nombre || '', edad, proyectoF, productoF, fc };
+
+  if (acciones) {
+    acciones.innerHTML = `<button class="btn btn-verde" onclick="verAnalisisEstadisticoPDF()">🖨️ Imprimir Análisis</button>`;
+  }
+}
+
+let _estadisticaActual = null;
+
+function verAnalisisEstadisticoPDF() {
+  if (!_estadisticaActual || !_chartEstadistica) { alert('No hay un análisis para imprimir.'); return; }
+  const est = _estadisticaActual;
+  const contOriginal = document.getElementById('est-contenido');
+  if (!contOriginal) return;
+
+  const chartImg = _chartEstadistica.toBase64Image();
+  const clone = contOriginal.cloneNode(true);
+  const canvasWrap = clone.querySelector('#est-chart')?.parentElement;
+  if (canvasWrap) canvasWrap.innerHTML = `<img src="${chartImg}" style="width:100%;height:auto;display:block">`;
+
+  const fechaHoy = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+  const filtrosTxt = [est.proyectoF ? `Proyecto: ${est.proyectoF}` : '', est.productoF ? `Producto: ${est.productoF}` : ''].filter(Boolean).join(' · ');
+
+  const html = `
+    <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
+      <span style="font-weight:700">Análisis Estadístico — ${est.codigo}${est.nombreDiseno ? ' — ' + est.nombreDiseno : ''}</span>
+      <div style="flex:1"></div>
+      <button onclick="descargarAnalisisEstadisticoPDF()" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700">⬇️ Descargar PDF</button>
+      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-analisis-estadistico').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+    </div>
+    <div class="preview-doc" id="est-pdf-doc">
+      <div class="preview-membrete-header">
+        <img src="membrete-top.jpg" alt="">
+      </div>
+      <div class="preview-content" id="est-pdf-content" style="padding-top:6px">
+        <div style="text-align:center;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:700;color:#003F7F;letter-spacing:0.03em">ANÁLISIS ESTADÍSTICO DE RESISTENCIAS</div>
+          <div style="font-size:10.5px;color:#555;margin-top:2px">Diseño de mezcla ${est.codigo}${est.nombreDiseno ? ' — ' + est.nombreDiseno : ''}</div>
+          <div style="font-size:10px;color:#777">${filtrosTxt ? filtrosTxt + ' · ' : ''}Generado el ${fechaHoy}</div>
+        </div>
+        ${clone.innerHTML}
+      </div>
+      <div class="preview-membrete-footer" id="est-pdf-footer">
+        <div class="pf-arco"></div>
+        <div class="pf-datos">
+          <div class="pf-col"><span class="pf-icon">📞</span><span>+57 314 620 1650<br>+57 311 408 2285</span></div>
+          <div class="pf-col"><span class="pf-icon">🏠</span><span>Autopista del Café Km2<br>Vía Chinchiná – Santa Rosa</span></div>
+          <div class="pf-col"><span class="pf-icon">🌐</span><span>www.proconcreto.com.co</span></div>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('contenido-preview').innerHTML = html;
+  document.getElementById('vista-previa').style.display = 'block';
+  document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+  window.scrollTo(0, 0);
+}
+
+async function descargarAnalisisEstadisticoPDF() {
+  const est = _estadisticaActual;
+  const btn = document.querySelector('.no-print button[onclick*="descargarAnalisisEstadisticoPDF"]');
+  if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
+  try {
+    const { jsPDF } = window.jspdf;
+    const pageW = 210, pageH = 297;
+    const topImg = await cargarImagen('membrete-top.jpg');
+    const headerH = pageW * (topImg.naturalHeight / topImg.naturalWidth);
+    const contentEl = document.getElementById('est-pdf-content');
+    const contentCanvas = await html2canvas(contentEl, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    const pxToMm = pageW / contentCanvas.width;
+    const contentH_px = _alturaContenidoReal(contentCanvas);
+    const footerEl = document.getElementById('est-pdf-footer');
+    const footerCanvas = await html2canvas(footerEl, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    const footerH = footerCanvas.height * pxToMm;
+    const availH = pageH - headerH - footerH - 6;
+    const pageH_px = availH / pxToMm;
+    const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    const footerData = footerCanvas.toDataURL('image/jpeg', 0.95);
+    let cursorY = 0, pageIndex = 0, guard = 0;
+    while (cursorY < contentH_px - 1 && guard < 60) {
+      guard++;
+      let bottom = Math.min(contentH_px, cursorY + pageH_px);
+      if (bottom < contentH_px) bottom = _filaBlancaCerca(contentCanvas, Math.floor(bottom), cursorY + pageH_px * 0.55);
+      const sliceH_px = bottom - cursorY;
+      if (sliceH_px <= 1) break;
+      if (pageIndex > 0) pdf.addPage();
+      pdf.addImage(topImg, 'JPEG', 0, 0, pageW, headerH);
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = contentCanvas.width;
+      sliceCanvas.height = Math.ceil(sliceH_px);
+      sliceCanvas.getContext('2d').drawImage(contentCanvas, 0, Math.floor(cursorY), contentCanvas.width, Math.ceil(sliceH_px), 0, 0, contentCanvas.width, Math.ceil(sliceH_px));
+      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, headerH + 2, pageW, sliceH_px * pxToMm);
+      pdf.addImage(footerData, 'JPEG', 0, pageH - footerH, pageW, footerH);
+      cursorY = bottom;
+      pageIndex++;
+    }
+    pdf.save(`Analisis_Estadistico_${est?.codigo || 'mezcla'}.pdf`);
+  } finally {
+    if (btn) { btn.textContent = '⬇️ Descargar PDF'; btn.disabled = false; }
+  }
 }
