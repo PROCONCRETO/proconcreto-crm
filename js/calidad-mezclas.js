@@ -248,28 +248,159 @@ function _calcularEdadEnsayo(fechaFundida, fechaResultado) {
   return dias;
 }
 
+// Cada probeta es un objeto { resistencia, diametro, longitud, carga }.
+//  · Laboratorio externo: se digita "resistencia" directamente.
+//  · Ensayos internos: se digitan diámetro/longitud/carga y la resistencia se calcula.
+// Un ensayo de resistencia (NSR-10 C.5.6.2.4) es el promedio de 2 o 3 probetas.
+function _esEnsayoInterno() {
+  return (document.getElementById('m-ensayo-laboratorio')?.value || '') === 'ENSAYOS INTERNOS';
+}
+
+// Factor de corrección por relación longitud/diámetro (ASTM C39 / NTC 673).
+function _factorCorreccionLD(ld) {
+  if (!(ld > 0) || ld >= 2.0) return 1.00;
+  const tabla = [[1.00, 0.87], [1.25, 0.93], [1.50, 0.96], [1.75, 0.98], [2.00, 1.00]];
+  if (ld <= 1.0) return 0.87;
+  for (let i = 0; i < tabla.length - 1; i++) {
+    const [x1, y1] = tabla[i], [x2, y2] = tabla[i + 1];
+    if (ld >= x1 && ld <= x2) return y1 + (y2 - y1) * (ld - x1) / (x2 - x1);
+  }
+  return 1.00;
+}
+
+// Resistencia de una probeta interna: carga(kN) / área(mm²), corregida por L/D.
+function _resistenciaProbetaInterna(diametro, longitud, carga) {
+  const d = parseFloat(diametro), l = parseFloat(longitud), c = parseFloat(carga);
+  if (!(d > 0) || !(c > 0)) return null;
+  const area = Math.PI * d * d / 4;                 // mm²
+  const factor = _factorCorreccionLD((l > 0) ? l / d : 2);
+  return Math.round((c * 1000 / area) * factor * 10) / 10;  // MPa, a 1 decimal (convención de laboratorio)
+}
+
+function _promedioProbetas(probetas) {
+  const vals = (probetas || [])
+    .map(p => (p && typeof p === 'object') ? parseFloat(p.resistencia) : parseFloat(p))
+    .filter(v => !isNaN(v) && v > 0);
+  if (!vals.length) return 0;
+  return vals.reduce((s, v) => s + v, 0) / vals.length;
+}
+
+// Normaliza cada probeta a objeto (migra formatos viejos: número suelto o resistencia única).
+function _normalizarProbeta(p) {
+  if (p == null || p === '') return { resistencia: null, diametro: null, longitud: null, carga: null };
+  if (typeof p === 'object') return { resistencia: (p.resistencia ?? null), diametro: (p.diametro ?? null), longitud: (p.longitud ?? null), carga: (p.carga ?? null) };
+  return { resistencia: (parseFloat(p) || null), diametro: null, longitud: null, carga: null };
+}
+
+function _normalizarResultado(r) {
+  if (!r.probetas) r.probetas = (Number(r.resistencia) > 0) ? [{ resistencia: Number(r.resistencia) }] : [];
+  r.probetas = r.probetas.map(_normalizarProbeta);
+  while (r.probetas.length < 3) r.probetas.push({ resistencia: null, diametro: null, longitud: null, carga: null });
+  r.resistencia = _promedioProbetas(r.probetas);
+  return r;
+}
+
 function renderResultadosEnsayo() {
-  const tbody = document.getElementById('resultados-ensayo-body');
-  if (!tbody) return;
+  const cont = document.getElementById('resultados-ensayo-cont');
+  const nota = document.getElementById('resultados-ensayo-nota');
+  if (!cont) return;
+  const interno = _esEnsayoInterno();
+  if (nota) nota.textContent = interno
+    ? 'Ensayo interno: ingresa diámetro, longitud y carga de 2 o 3 probetas; la resistencia se calcula (carga ÷ área, corregida por L/D). El resultado válido es el promedio (NSR-10 C.5.6.2.4).'
+    : 'Falla 2 o 3 probetas de la misma muestra y edad; el resultado válido es el promedio (NSR-10 C.5.6.2.4).';
   const fechaFundida = document.getElementById('m-ensayo-fecha')?.value || '';
   if (!_resultadosEnsayoActual.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega resultados de ensayo por edad (7, 14, 28 días...)</td></tr>`;
+    cont.innerHTML = `<div style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega resultados de ensayo por edad (7, 14, 28 días...)</div>`;
     return;
   }
-  tbody.innerHTML = _resultadosEnsayoActual.map((r, i) => {
+  _resultadosEnsayoActual.forEach(_normalizarResultado);
+  cont.innerHTML = interno ? _renderResultadosInterno(fechaFundida) : _renderResultadosExterno(fechaFundida);
+}
+
+function _renderResultadosExterno(fechaFundida) {
+  const filas = _resultadosEnsayoActual.map((r, i) => {
     const edad = _calcularEdadEnsayo(fechaFundida, r.fecha);
+    const prom = _promedioProbetas(r.probetas);
+    const inputProbeta = (j) => `<input type="number" value="${r.probetas[j].resistencia != null ? r.probetas[j].resistencia : ''}" min="0" step="0.1" placeholder="—" oninput="_setProbetaResistencia(${i},${j},this.value)" style="width:68px">`;
     return `
     <tr>
       <td style="text-align:center;font-weight:700">${edad != null ? edad + ' d' : '—'}</td>
       <td><input type="date" value="${r.fecha || ''}" onchange="_resultadosEnsayoActual[${i}].fecha=this.value;renderResultadosEnsayo()"></td>
-      <td><input type="number" value="${r.resistencia}" min="0" step="0.1" onchange="_resultadosEnsayoActual[${i}].resistencia=parseFloat(this.value)||0"></td>
+      <td>${inputProbeta(0)}</td>
+      <td>${inputProbeta(1)}</td>
+      <td>${inputProbeta(2)}</td>
+      <td style="text-align:center;font-weight:800;color:var(--azul)" id="prom-cell-${i}">${prom ? prom.toFixed(1) : '—'}</td>
       <td><button class="btn btn-rojo btn-xs" onclick="eliminarResultadoEnsayo(${i})">✕</button></td>
     </tr>`;
   }).join('');
+  return `<table class="tabla-items" style="width:100%">
+    <thead><tr><th style="width:60px">Edad <span style="font-weight:400;text-transform:none">(auto)</span></th><th style="width:130px">Fecha ensayo</th><th style="text-align:center">Probeta 1</th><th style="text-align:center">Probeta 2</th><th style="text-align:center">Probeta 3</th><th style="width:80px;text-align:center">Promedio (MPa)</th><th style="width:36px"></th></tr></thead>
+    <tbody>${filas}</tbody></table>`;
+}
+
+function _renderResultadosInterno(fechaFundida) {
+  return _resultadosEnsayoActual.map((r, i) => {
+    const edad = _calcularEdadEnsayo(fechaFundida, r.fecha);
+    const prom = _promedioProbetas(r.probetas);
+    const filas = r.probetas.map((p, j) => `
+      <tr>
+        <td style="text-align:center;font-weight:600">${j + 1}</td>
+        <td><input type="number" value="${p.diametro != null ? p.diametro : ''}" min="0" step="0.1" placeholder="mm" oninput="_setProbetaCampo(${i},${j},'diametro',this.value)" style="width:70px"></td>
+        <td><input type="number" value="${p.longitud != null ? p.longitud : ''}" min="0" step="0.1" placeholder="mm" oninput="_setProbetaCampo(${i},${j},'longitud',this.value)" style="width:70px"></td>
+        <td><input type="number" value="${p.carga != null ? p.carga : ''}" min="0" step="0.1" placeholder="kN" oninput="_setProbetaCampo(${i},${j},'carga',this.value)" style="width:80px"></td>
+        <td style="text-align:center;font-weight:700;color:var(--azul)" id="res-cell-${i}-${j}">${p.resistencia ? Number(p.resistencia).toFixed(1) : '—'}</td>
+      </tr>`).join('');
+    return `
+      <div style="border:1px solid var(--gris-borde);border-radius:6px;padding:10px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+          <div class="form-grupo" style="margin:0"><label style="font-size:11px">Fecha ensayo</label><input type="date" value="${r.fecha || ''}" onchange="_resultadosEnsayoActual[${i}].fecha=this.value;renderResultadosEnsayo()"></div>
+          <div style="font-size:12px"><span style="color:var(--gris-medio)">Edad:</span> <b>${edad != null ? edad + ' d' : '—'}</b></div>
+          <div style="flex:1"></div>
+          <button class="btn btn-rojo btn-xs" onclick="eliminarResultadoEnsayo(${i})">✕ Quitar</button>
+        </div>
+        <table class="tabla-items" style="width:100%">
+          <thead><tr><th style="width:60px">Probeta</th><th style="text-align:center">Diámetro (mm)</th><th style="text-align:center">Longitud (mm)</th><th style="text-align:center">Carga (kN)</th><th style="text-align:center">Resistencia (MPa)</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+        <div style="text-align:right;font-size:13px;margin-top:6px">Promedio del ensayo: <b style="color:var(--azul);font-size:15px" id="prom-cell-${i}">${prom ? prom.toFixed(1) : '—'}</b> MPa</div>
+      </div>`;
+  }).join('');
+}
+
+function _ensureProbeta(i, j) {
+  const r = _resultadosEnsayoActual[i];
+  if (!r.probetas) r.probetas = [];
+  while (r.probetas.length <= j) r.probetas.push({ resistencia: null, diametro: null, longitud: null, carga: null });
+  r.probetas[j] = _normalizarProbeta(r.probetas[j]);
+}
+
+function _actualizarPromedioResultado(i) {
+  const prom = _promedioProbetas(_resultadosEnsayoActual[i].probetas);
+  _resultadosEnsayoActual[i].resistencia = prom;
+  const cell = document.getElementById('prom-cell-' + i);
+  if (cell) cell.textContent = prom ? prom.toFixed(1) : '—';
+}
+
+// Externo: se digita la resistencia directamente.
+function _setProbetaResistencia(i, j, val) {
+  _ensureProbeta(i, j);
+  _resultadosEnsayoActual[i].probetas[j].resistencia = (val === '' ? null : (parseFloat(val) || 0));
+  _actualizarPromedioResultado(i);
+}
+
+// Interno: se digita diámetro/longitud/carga y la resistencia se calcula.
+function _setProbetaCampo(i, j, campo, val) {
+  _ensureProbeta(i, j);
+  const p = _resultadosEnsayoActual[i].probetas[j];
+  p[campo] = (val === '' ? null : (parseFloat(val) || 0));
+  p.resistencia = _resistenciaProbetaInterna(p.diametro, p.longitud, p.carga);
+  const rc = document.getElementById(`res-cell-${i}-${j}`);
+  if (rc) rc.textContent = p.resistencia ? Number(p.resistencia).toFixed(1) : '—';
+  _actualizarPromedioResultado(i);
 }
 
 function agregarResultadoEnsayo() {
-  _resultadosEnsayoActual.push({ fecha: '', resistencia: 0 });
+  _resultadosEnsayoActual.push({ fecha: '', probetas: [{ resistencia: null, diametro: null, longitud: null, carga: null }, { resistencia: null, diametro: null, longitud: null, carga: null }, { resistencia: null, diametro: null, longitud: null, carga: null }], resistencia: 0 });
   renderResultadosEnsayo();
 }
 
@@ -325,7 +456,7 @@ function editarEnsayo(id) {
     document.getElementById('m-ensayo-objetivo').value = e.resistenciaObjetivo || '';
   }
   document.getElementById('m-ensayo-obs').value = e.observaciones || '';
-  _resultadosEnsayoActual = JSON.parse(JSON.stringify(e.resultados || []));
+  _resultadosEnsayoActual = JSON.parse(JSON.stringify(e.resultados || [])).map(_normalizarResultado);
   renderResultadosEnsayo();
   document.getElementById('modal-ensayo').classList.add('abierto');
 }
@@ -349,7 +480,12 @@ function guardarEnsayo() {
     elemento: document.getElementById('m-ensayo-producto').value.trim(),
     resistenciaObjetivo: parseFloat(document.getElementById('m-ensayo-objetivo').value) || 0,
     observaciones: document.getElementById('m-ensayo-obs').value.trim(),
-    resultados: _resultadosEnsayoActual.map(r => ({ ...r, edad: _calcularEdadEnsayo(fecha, r.fecha) })),
+    laboratorioTipo: _esEnsayoInterno() ? 'interno' : 'externo',
+    resultados: _resultadosEnsayoActual.map(r => {
+      const probetas = (r.probetas || []).map(_normalizarProbeta)
+        .filter(p => p.resistencia != null || p.diametro != null || p.longitud != null || p.carga != null);
+      return { fecha: r.fecha || '', probetas, resistencia: _promedioProbetas(probetas), edad: _calcularEdadEnsayo(fecha, r.fecha) };
+    }),
     creadoPor: USUARIO_ACTUAL?.email,
     creadoEn: editId ? (ENSAYOS_CALIDAD.find(x => String(x.id) === String(editId))?.creadoEn || new Date().toISOString()) : new Date().toISOString(),
   };
