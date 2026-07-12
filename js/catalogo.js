@@ -406,9 +406,21 @@ function guardarProducto() {
     disenoMezcla: document.getElementById('mp-diseno-mezcla').value || ''
   };
   const idx = CATALOGO.findIndex(x => x.codigo === codigo);
+  const esNuevo = idx < 0;
+  const anterior = esNuevo ? null : { ...CATALOGO[idx] };
   if (idx >= 0) CATALOGO[idx] = { ...CATALOGO[idx], ...prod }; else CATALOGO.push(prod);
   PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
-  _upsertProducto(prod).then(({ error }) => { if (error) alert('Error al guardar: ' + error.message); });
+  _upsertProducto(prod).then(({ error }) => {
+    if (error) {
+      // Si el guardado falla, se revierte el cambio local para no dejar un producto
+      // "fantasma" (o un edit fantasma) que bloquee futuros intentos con ese código.
+      if (esNuevo) CATALOGO = CATALOGO.filter(x => x.codigo !== codigo);
+      else { const i2 = CATALOGO.findIndex(x => x.codigo === codigo); if (i2 >= 0) CATALOGO[i2] = anterior; }
+      PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
+      renderProductosAdmin();
+      alert('Error al guardar: ' + error.message);
+    }
+  });
   cerrarModal('modal-producto');
   renderProductosAdmin();
 }
