@@ -1,10 +1,78 @@
 // ═══════════════════════════════
+// FILTROS COMPARTIDOS: PERÍODO (todo/anual/mensual) + VENDEDOR
+// Mismo patrón que Estadísticas, reutilizado en Histórico y Pipeline.
+// ═══════════════════════════════
+function _setPeriodoBotones(prefijo, periodo) {
+  ['todo', 'anual', 'mensual'].forEach(k => {
+    const btn = document.getElementById(`${prefijo}-btn-${k}`);
+    if (!btn) return;
+    btn.style.background = k === periodo ? 'var(--azul)' : 'white';
+    btn.style.color = k === periodo ? 'white' : 'var(--gris-medio)';
+  });
+  const selAnio = document.getElementById(`${prefijo}-filtro-anio`);
+  const selMes = document.getElementById(`${prefijo}-filtro-mes`);
+  if (selAnio) selAnio.style.display = periodo === 'todo' ? 'none' : '';
+  if (selMes) selMes.style.display = periodo === 'mensual' ? '' : 'none';
+}
+
+// Repuebla los <select> de año y vendedor a partir de COTIZACIONES, preservando
+// lo ya seleccionado, para no perder el filtro activo cada vez que se re-renderiza.
+function _poblarFiltrosPeriodoVendedor(prefijo) {
+  const selAnio = document.getElementById(`${prefijo}-filtro-anio`);
+  const selMes = document.getElementById(`${prefijo}-filtro-mes`);
+  const selVendedor = document.getElementById(`${prefijo}-filtro-vendedor`);
+  if (!selAnio || !selVendedor) return;
+
+  const anios = [...new Set(COTIZACIONES.map(c => c.fecha ? c.fecha.substring(0, 4) : null).filter(Boolean))].sort().reverse();
+  const anioActual = new Date().getFullYear().toString();
+  const prevAnio = selAnio.value;
+  selAnio.innerHTML = anios.map(a => `<option value="${a}">${a}</option>`).join('');
+  selAnio.value = anios.includes(prevAnio) ? prevAnio : (anios.includes(anioActual) ? anioActual : (anios[0] || ''));
+  if (selMes && !selMes.value) selMes.value = new Date().getMonth() + 1;
+
+  const vendedores = [...new Set(COTIZACIONES.map(c => c.vendedor?.nombre).filter(Boolean))].sort();
+  const prevVendedor = selVendedor.value;
+  selVendedor.innerHTML = '<option value="">Todos los vendedores</option>' + vendedores.map(v => `<option value="${v}">${v}</option>`).join('');
+  selVendedor.value = prevVendedor;
+}
+
+function _filtrarPorPeriodoVendedor(datos, prefijo, periodo) {
+  const anio = document.getElementById(`${prefijo}-filtro-anio`)?.value || '';
+  const mes = document.getElementById(`${prefijo}-filtro-mes`)?.value || '';
+  const vendedor = document.getElementById(`${prefijo}-filtro-vendedor`)?.value || '';
+  let res = datos;
+  if (vendedor) res = res.filter(c => c.vendedor?.nombre === vendedor);
+  if (periodo !== 'todo' && anio) {
+    res = res.filter(c => c.fecha && c.fecha.startsWith(anio));
+    if (periodo === 'mensual' && mes) {
+      const mesStr = String(mes).padStart(2, '0');
+      res = res.filter(c => c.fecha && c.fecha.substring(5, 7) === mesStr);
+    }
+  }
+  return res;
+}
+
+// ═══════════════════════════════
 // HISTÓRICO
 // ═══════════════════════════════
-let filtroTexto = '', filtroEstado = '';
+let filtroTexto = '', filtroEstado = '', _periodoHistorico = 'todo';
 
-function renderHistorico(lista) {
-  const data = lista || COTIZACIONES;
+function setPeriodoHistorico(p) {
+  _periodoHistorico = p;
+  _setPeriodoBotones('hist', p);
+  renderHistorico();
+}
+
+function renderHistorico() {
+  _poblarFiltrosPeriodoVendedor('hist');
+  let data = COTIZACIONES;
+  if (filtroTexto) data = data.filter(c =>
+    c.numero.toLowerCase().includes(filtroTexto) ||
+    c.cliente.nombre.toLowerCase().includes(filtroTexto) ||
+    (c.cliente.proyecto || '').toLowerCase().includes(filtroTexto)
+  );
+  if (filtroEstado) data = data.filter(c => c.estado === filtroEstado);
+  data = _filtrarPorPeriodoVendedor(data, 'hist', _periodoHistorico);
   const tbody = document.getElementById('historico-body');
   if (!data.length) {
     tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">📋</div><div>No hay cotizaciones guardadas aún.</div></td></tr>`;
@@ -103,21 +171,11 @@ function toggleVersiones(num) {
 
 function filtrarHistorico(q) {
   filtroTexto = q.toLowerCase();
-  aplicarFiltros();
+  renderHistorico();
 }
 function filtrarHistoricoEstado(e) {
   filtroEstado = e;
-  aplicarFiltros();
-}
-function aplicarFiltros() {
-  let res = COTIZACIONES;
-  if (filtroTexto) res = res.filter(c =>
-    c.numero.toLowerCase().includes(filtroTexto) ||
-    c.cliente.nombre.toLowerCase().includes(filtroTexto) ||
-    (c.cliente.proyecto||'').toLowerCase().includes(filtroTexto)
-  );
-  if (filtroEstado) res = res.filter(c => c.estado === filtroEstado);
-  renderHistorico(res);
+  renderHistorico();
 }
 
 function eliminarCotizacion(id) {
@@ -406,7 +464,7 @@ function verCotizacionesCliente(nombre) {
   const input = document.querySelector('#pantalla-historico input[type="text"]');
   if (input) { input.value = nombre; }
   filtroTexto = nombre.toLowerCase();
-  aplicarFiltros();
+  renderHistorico();
 }
 
 function eliminarCliente(id) {
@@ -612,6 +670,13 @@ const COLUMNAS = [
 ];
 
 let dragId = null;
+let _periodoPipeline = 'todo';
+
+function setPeriodoPipeline(p) {
+  _periodoPipeline = p;
+  _setPeriodoBotones('pipe', p);
+  renderPipeline();
+}
 
 function versionesLatest() {
   const map = {};
@@ -623,9 +688,10 @@ function versionesLatest() {
 }
 
 function renderPipeline() {
+  _poblarFiltrosPeriodoVendedor('pipe');
   const board = document.getElementById('kanban-board');
   const resumen = document.getElementById('pipeline-resumen');
-  const latest = versionesLatest();
+  const latest = _filtrarPorPeriodoVendedor(versionesLatest(), 'pipe', _periodoPipeline);
 
   board.innerHTML = COLUMNAS.map(col => {
     const cards = latest.filter(c => c.estado === col.id);
@@ -668,9 +734,9 @@ function renderPipeline() {
       </div>`;
   }).join('');
 
-  // Resumen de valores por columna
+  // Resumen de valores por columna (respeta los mismos filtros de período/vendedor que el tablero)
   resumen.innerHTML = COLUMNAS.map(col => {
-    const cards = COTIZACIONES.filter(c => c.estado === col.id);
+    const cards = latest.filter(c => c.estado === col.id);
     const total = cards.reduce((s, c) => s + c.totales.total, 0);
     if (!cards.length) return '';
     return `<div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid ${col.color};min-width:130px">
