@@ -47,6 +47,7 @@ function ir(pantalla) {
   if (pantalla === 'diseno-mezcla') renderDisenosMezcla();
   if (pantalla === 'ajuste-mezcla') renderAjustesMezcla();
   if (pantalla === 'control-ensayos') renderEnsayosCalidad();
+  if (pantalla === 'analisis-estadistico') renderAnalisisEstadistico();
   if (pantalla === 'materia-prima') renderMateriaPrima();
   if (pantalla === 'trazabilidad') { const inp = document.getElementById('buscar-trazabilidad'); if (inp) inp.value = ''; buscarTrazabilidad(); }
   if (pantalla === 'no-conformidades') renderNoConformidades();

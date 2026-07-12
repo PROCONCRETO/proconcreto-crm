@@ -97,6 +97,7 @@ function rerenderPantallaActiva() {
     case 'pantalla-diseno-mezcla': renderDisenosMezcla(); break;
     case 'pantalla-ajuste-mezcla': renderAjustesMezcla(); break;
     case 'pantalla-control-ensayos': renderEnsayosCalidad(); break;
+    case 'pantalla-analisis-estadistico': renderAnalisisEstadistico(); break;
     case 'pantalla-materia-prima': renderMateriaPrima(); break;
     case 'pantalla-no-conformidades': renderNoConformidades(); break;
     case 'pantalla-certificados-calidad': renderCertificadosCalidad(); break;
