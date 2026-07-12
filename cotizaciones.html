@@ -350,6 +350,23 @@
       <button class="btn btn-primario btn-sm" onclick="ir('nueva-cotizacion')">➕ Nueva Cotización</button>
     </div>
   </div>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <div style="display:flex;border:1px solid var(--gris-borde);border-radius:var(--radio);overflow:hidden">
+      <button id="pipe-btn-todo" onclick="setPeriodoPipeline('todo')" style="padding:6px 14px;border:none;background:var(--azul);color:white;font-size:12px;font-weight:600;cursor:pointer">Todo el tiempo</button>
+      <button id="pipe-btn-anual" onclick="setPeriodoPipeline('anual')" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">Anual</button>
+      <button id="pipe-btn-mensual" onclick="setPeriodoPipeline('mensual')" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">Mensual</button>
+    </div>
+    <select id="pipe-filtro-anio" onchange="renderPipeline()" style="padding:6px 10px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;display:none"></select>
+    <select id="pipe-filtro-mes" onchange="renderPipeline()" style="padding:6px 10px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;display:none">
+      <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+      <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+      <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+      <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+    </select>
+    <select id="pipe-filtro-vendedor" onchange="renderPipeline()" style="padding:6px 10px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;min-width:160px">
+      <option value="">Todos los vendedores</option>
+    </select>
+  </div>
   <!-- Totales por columna -->
   <div id="pipeline-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
   <!-- Tablero -->
@@ -372,6 +389,23 @@
         <option value="Rechazada">Rechazada</option>
       </select>
     </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <div style="display:flex;border:1px solid var(--gris-borde);border-radius:var(--radio);overflow:hidden">
+      <button id="hist-btn-todo" onclick="setPeriodoHistorico('todo')" style="padding:6px 14px;border:none;background:var(--azul);color:white;font-size:12px;font-weight:600;cursor:pointer">Todo el tiempo</button>
+      <button id="hist-btn-anual" onclick="setPeriodoHistorico('anual')" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">Anual</button>
+      <button id="hist-btn-mensual" onclick="setPeriodoHistorico('mensual')" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">Mensual</button>
+    </div>
+    <select id="hist-filtro-anio" onchange="renderHistorico()" style="padding:6px 10px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;display:none"></select>
+    <select id="hist-filtro-mes" onchange="renderHistorico()" style="padding:6px 10px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;display:none">
+      <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+      <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+      <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+      <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+    </select>
+    <select id="hist-filtro-vendedor" onchange="renderHistorico()" style="padding:6px 10px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;min-width:160px">
+      <option value="">Todos los vendedores</option>
+    </select>
   </div>
   <div class="card" style="padding:0;overflow:hidden">
     <table class="tabla-cots" id="tabla-historico">
