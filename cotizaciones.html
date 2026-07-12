@@ -967,7 +967,7 @@
     </div>
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Laboratorio</label>
-        <select id="m-ensayo-laboratorio" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <select id="m-ensayo-laboratorio" onchange="renderResultadosEnsayo()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
           <option value="">— Selecciona —</option>
           <option value="CONSUAS INGENIERÍA">CONSUAS INGENIERÍA</option>
           <option value="ASPRECON INGENIERÍA">ASPRECON INGENIERÍA</option>
@@ -976,16 +976,12 @@
       </div>
       <div class="form-grupo"><label>N° Ensayo *</label><input type="text" id="m-ensayo-numero" placeholder="ENS-0001"></div>
     </div>
-    <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:10px 0 8px;display:flex;justify-content:space-between;align-items:center">
+    <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:10px 0 4px;display:flex;justify-content:space-between;align-items:center">
       <span>RESULTADOS POR EDAD</span>
       <button class="btn btn-secundario btn-xs" onclick="agregarResultadoEnsayo()">+ Agregar resultado</button>
     </div>
-    <div style="overflow-x:auto;margin-bottom:10px">
-      <table class="tabla-items" style="width:100%">
-        <thead><tr><th style="width:90px">Edad (días) <span style="font-weight:400;text-transform:none">(automática)</span></th><th style="width:150px">Fecha ensayo</th><th style="width:120px">Resistencia (MPa)</th><th style="width:36px"></th></tr></thead>
-        <tbody id="resultados-ensayo-body"></tbody>
-      </table>
-    </div>
+    <div id="resultados-ensayo-nota" style="font-size:11px;color:var(--gris-medio);margin-bottom:6px">Falla 2 o 3 probetas de la misma muestra y edad; el resultado válido es el promedio (NSR-10 C.5.6.2.4).</div>
+    <div id="resultados-ensayo-cont" style="overflow-x:auto;margin-bottom:10px"></div>
     <div class="form-grupo" style="margin-bottom:16px"><label>Observaciones</label><textarea id="m-ensayo-obs" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical"></textarea></div>
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-ensayo')">Cancelar</button>
