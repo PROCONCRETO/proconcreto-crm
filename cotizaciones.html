@@ -98,6 +98,7 @@
 <nav class="nav" id="subnav-calidad" style="display:none">
   <button class="nav-btn activo" onclick="ir('ajuste-mezcla')">🌡️ Ajuste Diario</button>
   <button class="nav-btn" onclick="ir('control-ensayos')">📐 Control de Ensayos</button>
+  <button class="nav-btn" onclick="ir('analisis-estadistico')">📊 Análisis Estadístico</button>
   <button class="nav-btn" onclick="ir('materia-prima')">🧱 Materia Prima</button>
   <button class="nav-btn" onclick="ir('trazabilidad')">🔗 Trazabilidad</button>
   <button class="nav-btn" onclick="ir('no-conformidades')">⚠️ No Conformidades</button>
@@ -659,6 +660,37 @@
       </tbody>
     </table>
   </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: ANÁLISIS ESTADÍSTICO
+═══════════════════════════════════════ -->
+<div id="pantalla-analisis-estadistico" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Análisis Estadístico de Resistencias <span style="font-size:12px;font-weight:400;color:var(--gris-medio)">(NTC 673 / NTC 2275)</span></div>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="form-grid-3" style="margin-bottom:0">
+      <div class="form-grupo"><label>Tipo de mezcla *</label>
+        <select id="est-filtro-mezcla" onchange="renderAnalisisEstadistico()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      </div>
+      <div class="form-grupo"><label>Proyecto</label>
+        <select id="est-filtro-proyecto" onchange="renderAnalisisEstadistico()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      </div>
+      <div class="form-grupo"><label>Producto</label>
+        <select id="est-filtro-producto" onchange="renderAnalisisEstadistico()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      </div>
+    </div>
+    <div class="form-grupo" style="margin-top:10px;max-width:200px"><label>Edad de análisis</label>
+      <select id="est-filtro-edad" onchange="renderAnalisisEstadistico()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <option value="3">3 días</option>
+        <option value="7">7 días</option>
+        <option value="14">14 días</option>
+        <option value="28" selected>28 días</option>
+      </select>
+    </div>
+  </div>
+  <div id="est-contenido"></div>
 </div>
 
 <!-- ═══════════════════════════════════════
@@ -1309,6 +1341,7 @@
 <script src="js/produccion-diaria.js?v=20260711a"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260711a"></script>
 <script src="js/calidad-mezclas.js?v=20260711a"></script>
+<script src="js/calidad-estadisticas.js?v=20260711a"></script>
 <script src="js/calidad-trazabilidad.js?v=20260711a"></script>
 <script src="js/auth.js?v=20260711a"></script>
 <script src="js/datos-realtime.js?v=20260711a"></script>
