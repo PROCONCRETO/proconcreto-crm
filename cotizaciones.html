@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260711a">
+<link rel="stylesheet" href="css/estilos.css?v=20260712b">
 </head>
 <body>
 
@@ -683,14 +683,30 @@
       <button class="btn btn-primario" onclick="abrirModalEnsayo()">+ Nuevo Ensayo</button>
     </div>
   </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="form-grid-3" style="margin-bottom:0">
+      <div class="form-grupo"><label>Cliente</label>
+        <select id="ensayos-filtro-cliente" onchange="renderEnsayosCalidad()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      </div>
+      <div class="form-grupo"><label>Proyecto</label>
+        <select id="ensayos-filtro-proyecto" onchange="renderEnsayosCalidad()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      </div>
+      <div class="form-grupo"><label>Resistencia (tipo de mezcla)</label>
+        <select id="ensayos-filtro-resistencia" onchange="renderEnsayosCalidad()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px">
+      <button class="btn btn-verde" onclick="verReporteEnsayosPDF()">🖨️ Imprimir Reporte</button>
+    </div>
+  </div>
   <div id="ensayos-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
   <div class="card" style="padding:0;overflow:hidden">
     <table class="tabla-cots" id="tabla-ensayos">
       <thead><tr>
-        <th>N° ENSAYO</th><th>FECHA</th><th>DISEÑO</th><th>ELEMENTO</th><th style="text-align:center">OBJETIVO</th><th style="text-align:center">ÚLTIMO RESULTADO</th><th>ESTADO</th><th style="min-width:150px">ACCIONES</th>
+        <th>N° CILINDRO</th><th>FECHA</th><th>DISEÑO</th><th>ELEMENTO</th><th style="text-align:center">OBJETIVO</th><th style="text-align:center">ÚLTIMO RESULTADO</th><th>ESTADO</th><th>INGRESADO POR</th><th style="min-width:150px">ACCIONES</th>
       </tr></thead>
       <tbody id="ensayos-body">
-        <tr><td colspan="8" class="empty-state"><div class="icono">📐</div><div>No hay ensayos registrados.</div></td></tr>
+        <tr><td colspan="9" class="empty-state"><div class="icono">📐</div><div>No hay ensayos registrados.</div></td></tr>
       </tbody>
     </table>
   </div>
@@ -725,6 +741,7 @@
     </div>
   </div>
   <div id="est-contenido"></div>
+  <div id="est-acciones" style="display:flex;justify-content:flex-end;margin-top:14px"></div>
 </div>
 
 <!-- ═══════════════════════════════════════
@@ -1364,23 +1381,23 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260711a"></script>
-<script src="js/catalogo.js?v=20260711a"></script>
-<script src="js/navegacion.js?v=20260711a"></script>
-<script src="js/ordenes-produccion.js?v=20260711a"></script>
-<script src="js/produccion-diaria.js?v=20260711a"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260711a"></script>
-<script src="js/calidad-mezclas.js?v=20260711a"></script>
-<script src="js/calidad-estadisticas.js?v=20260711a"></script>
-<script src="js/calidad-trazabilidad.js?v=20260711a"></script>
-<script src="js/auth.js?v=20260711a"></script>
-<script src="js/datos-realtime.js?v=20260711a"></script>
-<script src="js/cotizador.js?v=20260711a"></script>
-<script src="js/historico-clientes-stats.js?v=20260711a"></script>
+<script src="js/config.js?v=20260712b"></script>
+<script src="js/catalogo.js?v=20260712b"></script>
+<script src="js/navegacion.js?v=20260712b"></script>
+<script src="js/ordenes-produccion.js?v=20260712b"></script>
+<script src="js/produccion-diaria.js?v=20260712b"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260712b"></script>
+<script src="js/calidad-mezclas.js?v=20260712b"></script>
+<script src="js/calidad-estadisticas.js?v=20260712b"></script>
+<script src="js/calidad-trazabilidad.js?v=20260712b"></script>
+<script src="js/auth.js?v=20260712b"></script>
+<script src="js/datos-realtime.js?v=20260712b"></script>
+<script src="js/cotizador.js?v=20260712b"></script>
+<script src="js/historico-clientes-stats.js?v=20260712b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="js/pdf.js?v=20260711a"></script>
+<script src="js/pdf.js?v=20260712b"></script>
 </body>
 </html>
