@@ -175,4 +175,20 @@ function suscribirRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' },     () => _rtDebounce('cotizaciones', recargarCotizacionesRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'clientes' },          () => _rtDebounce('clientes', recargarClientesRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes_servicio' },  () => _rtDebounce('ordenes', recargarOrdenesRT))
-    .on('postgres_changes', { event: '*', 
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'producciones' },      () => _rtDebounce('producciones', recargarProduccionesRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' },          () => _rtDebounce('productos', recargarProductosRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'disenos_mezcla' },      () => _rtDebounce('disenos', recargarDisenosRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ensayos_calidad' },     () => _rtDebounce('ensayos', recargarEnsayosRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'materia_prima' },       () => _rtDebounce('materiaprima', recargarMateriaPrimaRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'no_conformidades' },    () => _rtDebounce('noconformidades', recargarNCRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ajustes_mezcla' },      () => _rtDebounce('ajustes', recargarAjustesRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'entregas_programadas' }, () => _rtDebounce('entregas', recargarEntregasRT))
+    .subscribe((status) => {
+      const ind = document.getElementById('rt-indicador');
+      if (ind) {
+        if (status === 'SUBSCRIBED') { ind.textContent = '🟢 En vivo'; ind.title = 'Sincronización en tiempo real activa'; ind.style.color = '#2E7D32'; }
+        else { ind.textContent = '🔴 Sin conexión'; ind.title = 'Sincronización inactiva — refresca la página'; ind.style.color = '#C62828'; }
+      }
+    });
+}
+
