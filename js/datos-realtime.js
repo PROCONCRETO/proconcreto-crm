@@ -1,5 +1,5 @@
 async function cargarDatosSupabase() {
-  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }, { data: prods, error: e4 }, { data: disenos, error: e5 }, { data: ensayos, error: e6 }, { data: mprima, error: e7 }, { data: nconf, error: e8 }, { data: ajustes, error: e9 }] = await Promise.all([
+  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }, { data: prods, error: e4 }, { data: disenos, error: e5 }, { data: ensayos, error: e6 }, { data: mprima, error: e7 }, { data: nconf, error: e8 }, { data: ajustes, error: e9 }, { data: entregas, error: e10 }] = await Promise.all([
     sb.from('cotizaciones').select('datos, estado').order('creado', { ascending: true }),
     sb.from('clientes').select('datos').order('creado', { ascending: true }),
     sb.from('ordenes_servicio').select('datos').order('creado', { ascending: false }),
@@ -8,7 +8,8 @@ async function cargarDatosSupabase() {
     sb.from('ensayos_calidad').select('datos').order('creado', { ascending: false }),
     sb.from('materia_prima').select('datos').order('creado', { ascending: false }),
     sb.from('no_conformidades').select('datos').order('creado', { ascending: false }),
-    sb.from('ajustes_mezcla').select('datos').order('creado', { ascending: false })
+    sb.from('ajustes_mezcla').select('datos').order('creado', { ascending: false }),
+    sb.from('entregas_programadas').select('datos').order('creado', { ascending: false })
   ]);
   if (e3) console.warn('Tabla ordenes_servicio no disponible aún.');
   if (e4) console.warn('Tabla producciones no disponible aún.');
@@ -17,6 +18,7 @@ async function cargarDatosSupabase() {
   if (e7) console.warn('Tabla materia_prima no disponible aún.');
   if (e8) console.warn('Tabla no_conformidades no disponible aún.');
   if (e9) console.warn('Tabla ajustes_mezcla no disponible aún.');
+  if (e10) console.warn('Tabla entregas_programadas no disponible aún.');
   ORDENES = (ords || []).filter(r => r.datos).map(r => r.datos);
   PRODUCCIONES = (prods || []).filter(r => r.datos).map(r => r.datos);
   DISENOS_MEZCLA = (disenos || []).filter(r => r.datos).map(r => r.datos);
@@ -24,6 +26,7 @@ async function cargarDatosSupabase() {
   MATERIA_PRIMA = (mprima || []).filter(r => r.datos).map(r => r.datos);
   NO_CONFORMIDADES = (nconf || []).filter(r => r.datos).map(r => r.datos);
   AJUSTES_MEZCLA = (ajustes || []).filter(r => r.datos).map(r => r.datos);
+  ENTREGAS_PROGRAMADAS = (entregas || []).filter(r => r.datos).map(r => r.datos);
 
   // Catálogo de productos desde Supabase (con auto-siembra la primera vez)
   await cargarCatalogo();
@@ -102,6 +105,7 @@ function rerenderPantallaActiva() {
     case 'pantalla-no-conformidades': renderNoConformidades(); break;
     case 'pantalla-certificados-calidad': renderCertificadosCalidad(); break;
     case 'pantalla-trazabilidad': buscarTrazabilidad(); break;
+    case 'pantalla-logistica': renderCalendarioLogistica(); break;
   }
 }
 
@@ -159,6 +163,11 @@ async function recargarAjustesRT() {
   AJUSTES_MEZCLA = (data || []).filter(r => r.datos).map(r => r.datos);
   rerenderPantallaActiva();
 }
+async function recargarEntregasRT() {
+  const { data } = await sb.from('entregas_programadas').select('datos').order('creado', { ascending: false });
+  ENTREGAS_PROGRAMADAS = (data || []).filter(r => r.datos).map(r => r.datos);
+  rerenderPantallaActiva();
+}
 
 function suscribirRealtime() {
   if (_canalRealtime) return; // evitar suscripciones duplicadas
@@ -166,19 +175,4 @@ function suscribirRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' },     () => _rtDebounce('cotizaciones', recargarCotizacionesRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'clientes' },          () => _rtDebounce('clientes', recargarClientesRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes_servicio' },  () => _rtDebounce('ordenes', recargarOrdenesRT))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'producciones' },      () => _rtDebounce('producciones', recargarProduccionesRT))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' },          () => _rtDebounce('productos', recargarProductosRT))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'disenos_mezcla' },      () => _rtDebounce('disenos', recargarDisenosRT))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'ensayos_calidad' },     () => _rtDebounce('ensayos', recargarEnsayosRT))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'materia_prima' },       () => _rtDebounce('materiaprima', recargarMateriaPrimaRT))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'no_conformidades' },    () => _rtDebounce('noconformidades', recargarNCRT))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'ajustes_mezcla' },      () => _rtDebounce('ajustes', recargarAjustesRT))
-    .subscribe((status) => {
-      const ind = document.getElementById('rt-indicador');
-      if (ind) {
-        if (status === 'SUBSCRIBED') { ind.textContent = '🟢 En vivo'; ind.title = 'Sincronización en tiempo real activa'; ind.style.color = '#2E7D32'; }
-        else { ind.textContent = '🔴 Sin conexión'; ind.title = 'Sincronización inactiva — refresca la página'; ind.style.color = '#C62828'; }
-      }
-    });
-}
-
+    .on('postgres_changes', { event: '*', 
