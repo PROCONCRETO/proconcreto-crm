@@ -122,21 +122,35 @@ function guardarDiseno() {
   if (!codigo || !nombre || !(resistenciaDiseno > 0) || !tamanoMaximo) { alert('Completa los campos obligatorios: Código, Nombre, Resistencia de diseño y Tamaño máximo de agregado.'); return; }
   const editId = document.getElementById('m-diseno-id').value;
   const existente = editId ? DISENOS_MEZCLA.find(x => String(x.id) === String(editId)) : null;
+  const materialesNuevos = {
+    cemento: parseFloat(document.getElementById('m-diseno-cemento').value) || 0,
+    metacaolin: parseFloat(document.getElementById('m-diseno-metacaolin').value) || 0,
+    arena: parseFloat(document.getElementById('m-diseno-arena').value) || 0,
+    grava: parseFloat(document.getElementById('m-diseno-grava').value) || 0,
+    absorcionArena: parseFloat(document.getElementById('m-diseno-absorcion-arena').value) || 0,
+    absorcionTriturado: parseFloat(document.getElementById('m-diseno-absorcion-triturado').value) || 0,
+    agua: parseFloat(document.getElementById('m-diseno-agua').value) || 0,
+    aditivos: JSON.parse(JSON.stringify(_aditivosDisenoActual)),
+  };
+  // Un diseño se va ajustando con el tiempo (materiales, resistencia, consumo de cemento).
+  // Cada vez que un cambio así se guarda sobre un diseño existente, queda una marca de
+  // revisión (fecha + quién la hizo) para poder avisar en Ajustes de Humedad y en el
+  // Análisis Estadístico que, a partir de esa fecha, aplica una versión distinta.
+  const huboCambioDeReceta = existente && (
+    JSON.stringify(existente.materiales || {}) !== JSON.stringify(materialesNuevos) ||
+    Number(existente.resistenciaDiseno) !== Number(resistenciaDiseno)
+  );
+  const revisiones = existente ? [...(existente.revisiones || [])] : [];
+  if (huboCambioDeReceta) {
+    revisiones.push({ fecha: new Date().toISOString().split('T')[0], modificadoPor: USUARIO_ACTUAL?.email });
+  }
   const diseno = {
     id: editId || String(Date.now()),
     codigo, nombre, resistenciaDiseno, tamanoMaximo,
     asentamiento: parseFloat(document.getElementById('m-diseno-asentamiento').value) || 0,
     relacionAguaCemento: parseFloat(document.getElementById('m-diseno-relacion').value) || 0,
-    materiales: {
-      cemento: parseFloat(document.getElementById('m-diseno-cemento').value) || 0,
-      metacaolin: parseFloat(document.getElementById('m-diseno-metacaolin').value) || 0,
-      arena: parseFloat(document.getElementById('m-diseno-arena').value) || 0,
-      grava: parseFloat(document.getElementById('m-diseno-grava').value) || 0,
-      absorcionArena: parseFloat(document.getElementById('m-diseno-absorcion-arena').value) || 0,
-      absorcionTriturado: parseFloat(document.getElementById('m-diseno-absorcion-triturado').value) || 0,
-      agua: parseFloat(document.getElementById('m-diseno-agua').value) || 0,
-      aditivos: JSON.parse(JSON.stringify(_aditivosDisenoActual)),
-    },
+    materiales: materialesNuevos,
+    revisiones,
     estado: document.getElementById('m-diseno-estado').value,
     observaciones: document.getElementById('m-diseno-obs').value.trim(),
     creadoPor: existente ? existente.creadoPor : USUARIO_ACTUAL?.email,
@@ -167,6 +181,26 @@ function poblarSelectDisenos(selectId) {
   if (!sel) return;
   const activos = DISENOS_MEZCLA.filter(d => d.estado !== 'Inactivo').sort((a, b) => a.codigo.localeCompare(b.codigo));
   sel.innerHTML = '<option value="">— Selecciona un diseño —</option>' + activos.map(d => `<option value="${d.codigo}">${d.codigo} — ${d.nombre} (${d.resistenciaDiseno} MPa)</option>`).join('');
+}
+
+// La revisión más próxima (la primera) que ocurrió DESPUÉS de una fecha dada — se usa
+// para avisar en pantalla (nunca en los PDF) que un registro quedó "desactualizado"
+// frente a la receta vigente hoy del diseño de mezcla.
+function _proximaRevisionDiseno(disenoCodigo, fecha) {
+  if (!disenoCodigo || !fecha) return null;
+  const d = DISENOS_MEZCLA.find(x => x.codigo === disenoCodigo);
+  const posteriores = (d?.revisiones || []).filter(r => r.fecha > fecha).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  return posteriores[0] || null;
+}
+
+// Índice de "versión" del diseño vigente en una fecha dada (0 = receta original,
+// 1 = después de la primera revisión, 2 = después de la segunda, etc.).
+function _segmentoRevisionDiseno(disenoCodigo, fecha) {
+  const d = DISENOS_MEZCLA.find(x => x.codigo === disenoCodigo);
+  const revisiones = (d?.revisiones || []).slice().sort((a, b) => a.fecha.localeCompare(b.fecha));
+  let idx = 0;
+  for (const r of revisiones) { if (fecha >= r.fecha) idx++; else break; }
+  return idx;
 }
 
 // ═══════════════════════════════

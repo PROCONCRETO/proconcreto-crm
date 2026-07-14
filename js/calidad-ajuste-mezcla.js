@@ -144,11 +144,16 @@ function renderAjustesMezcla() {
     tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">🌡️</div><div>No hay ajustes diarios registrados.</div></td></tr>`;
     return;
   }
-  tbody.innerHTML = data.map(a => `
+  tbody.innerHTML = data.map(a => {
+    const revision = _proximaRevisionDiseno(a.disenoCodigo, a.fecha);
+    const notaRevision = revision
+      ? `<span title="Diseño revisado el ${new Date(revision.fecha + 'T12:00').toLocaleDateString('es-CO')}${revision.modificadoPor ? ' por ' + (USUARIOS_CRM[revision.modificadoPor]?.nombre || revision.modificadoPor) : ''} — este ajuste usa la versión anterior de la receta." style="cursor:help;margin-left:5px">🔄</span>`
+      : '';
+    return `
     <tr style="border-top:2px solid var(--azul-oscuro)">
       <td style="font-weight:700;color:var(--azul)">${a.cilindroNo}</td>
       <td>${a.fecha ? new Date(a.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
-      <td>${a.disenoCodigo ? `<span style="font-size:11px;background:var(--gris-borde);color:#333;padding:2px 6px;border-radius:3px;font-weight:600">${a.disenoCodigo}</span>` : '—'}</td>
+      <td>${a.disenoCodigo ? `<span style="font-size:11px;background:var(--gris-borde);color:#333;padding:2px 6px;border-radius:3px;font-weight:600">${a.disenoCodigo}</span>` : '—'}${notaRevision}</td>
       <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${_clienteResumenAjuste(a)}">${_clienteResumenAjuste(a) || '—'}</td>
       <td>${USUARIOS_CRM[a.creadoPor]?.nombre || a.creadoPor || '—'}</td>
       <td style="text-align:center">${a.resistenciaDiseno || '—'} MPa</td>
@@ -161,7 +166,8 @@ function renderAjustesMezcla() {
           <button class="btn btn-rojo btn-xs" onclick="eliminarAjusteMezcla('${a.id}')">🗑️</button>
         </div>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function _textoProducto(p) { return `${p.codigo} — ${p.nombre}`; }
@@ -314,25 +320,25 @@ function editarAjusteMezcla(id) {
   document.getElementById('m-ajuste-triturado-seco').value = a.triturado?.pesoSeco || 0;
   document.getElementById('m-ajuste-obs').value = a.observaciones || '';
 
-  // Las cantidades "Cantidad diseño", la resistencia/tamaño y la absorción SIEMPRE
-  // se traen en vivo del Diseño de Mezcla base (nunca de lo que haya quedado guardado
-  // en el ajuste), para que jamás queden desactualizadas o editadas manualmente por error.
-  if (a.disenoCodigo && DISENOS_MEZCLA.find(x => x.codigo === a.disenoCodigo)) {
-    cargarBaseDesdeDiseno();
-  } else {
-    // El diseño ya no existe: se usa lo que había quedado guardado, como respaldo.
-    document.getElementById('m-ajuste-tamano').value = a.tamanoMaximo || '';
-    document.getElementById('m-ajuste-resistencia').value = a.resistenciaDiseno || 0;
-    document.getElementById('m-ajuste-mat-agua').value = a.materiales?.agua?.diseno || 0;
-    document.getElementById('m-ajuste-mat-cemento').value = a.materiales?.cemento?.diseno || 0;
-    document.getElementById('m-ajuste-mat-adicion').value = a.materiales?.adicion?.diseno || 0;
-    document.getElementById('m-ajuste-mat-plastificante').value = a.materiales?.plastificante?.diseno || 0;
-    document.getElementById('m-ajuste-mat-arena').value = a.materiales?.arena?.diseno || 0;
-    document.getElementById('m-ajuste-mat-triturado').value = a.materiales?.triturado?.diseno || 0;
-    document.getElementById('m-ajuste-mat-acelerante').value = a.materiales?.acelerante?.diseno || 0;
-    document.getElementById('m-ajuste-arena-absorcion').value = a.arena?.absorcion || 0;
-    document.getElementById('m-ajuste-triturado-absorcion').value = a.triturado?.absorcion || 0;
-  }
+  // Un Diseño de Mezcla se va ajustando con el tiempo (disponibilidad y calidad de
+  // materiales), así que las cantidades "Cantidad diseño", la resistencia/tamaño y la
+  // absorción de un ajuste ya guardado SIEMPRE se cargan desde lo que quedó congelado
+  // en el propio ajuste — nunca en vivo desde el Diseño de Mezcla actual — para que un
+  // ajuste histórico no cambie retroactivamente solo por abrirlo y volver a guardarlo.
+  // Si el usuario cambia el Producto durante la edición, ahí sí se vuelve a traer en
+  // vivo (cargarDesdeProducto → cargarBaseDesdeDiseno), porque esa es una decisión
+  // explícita de aplicar un diseño distinto.
+  document.getElementById('m-ajuste-tamano').value = a.tamanoMaximo || '';
+  document.getElementById('m-ajuste-resistencia').value = a.resistenciaDiseno || 0;
+  document.getElementById('m-ajuste-mat-agua').value = a.materiales?.agua?.diseno || 0;
+  document.getElementById('m-ajuste-mat-cemento').value = a.materiales?.cemento?.diseno || 0;
+  document.getElementById('m-ajuste-mat-adicion').value = a.materiales?.adicion?.diseno || 0;
+  document.getElementById('m-ajuste-mat-plastificante').value = a.materiales?.plastificante?.diseno || 0;
+  document.getElementById('m-ajuste-mat-arena').value = a.materiales?.arena?.diseno || 0;
+  document.getElementById('m-ajuste-mat-triturado').value = a.materiales?.triturado?.diseno || 0;
+  document.getElementById('m-ajuste-mat-acelerante').value = a.materiales?.acelerante?.diseno || 0;
+  document.getElementById('m-ajuste-arena-absorcion').value = a.arena?.absorcion || 0;
+  document.getElementById('m-ajuste-triturado-absorcion').value = a.triturado?.absorcion || 0;
 
   recalcularAjusteMezcla();
   document.getElementById('modal-ajuste-mezcla').classList.add('abierto');

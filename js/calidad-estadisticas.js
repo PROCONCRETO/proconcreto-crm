@@ -160,7 +160,7 @@ function renderAnalisisEstadistico() {
     const ctx = _contextoEnsayo(e);
     if (proyectoF && !ctx.proyectos.includes(proyectoF)) return;
     if (productoF && !ctx.productos.includes(productoF)) return;
-    muestras.push({ fecha: r.fecha || e.fecha, resistencia: Number(r.resistencia), numero: e.numero, edad: Number(r.edad) });
+    muestras.push({ fecha: r.fecha || e.fecha, fechaFundida: e.fecha, resistencia: Number(r.resistencia), numero: e.numero, edad: Number(r.edad) });
   });
   muestras.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
 
@@ -206,6 +206,32 @@ function renderAnalisisEstadistico() {
       : `<span class="badge" style="background:#FFEBEE;color:#C62828">✘ ${txtNo}</span>`;
   };
 
+  // Un diseño de mezcla se revisa con el tiempo (materiales, resistencia, consumo de
+  // cemento). Cada punto de la gráfica se colorea según qué versión de la receta estaba
+  // vigente el día que se FUNDIÓ esa muestra (no el día que se rompió el cilindro), para
+  // que un cambio de diseño quede evidente en el histórico — solo en pantalla, nunca en
+  // el PDF imprimible (ver _generarImagenChartLimpia).
+  const revisionesDiseno = (diseno?.revisiones || []).slice().sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const PALETA_REVISION = ['#1565C0', '#8E24AA', '#00897B', '#D84315', '#5D4037'];
+  const colorPorSegmento = idx => PALETA_REVISION[idx % PALETA_REVISION.length];
+  const segmentos = muestras.map(m => _segmentoRevisionDiseno(codigo, m.fechaFundida || m.fecha));
+  const pointColors = segmentos.map(s => colorPorSegmento(s));
+  const fmtFecha = f => f ? new Date(f + 'T12:00').toLocaleDateString('es-CO') : '';
+
+  let leyendaRevisionHTML = '';
+  if (revisionesDiseno.length) {
+    const fechas = revisionesDiseno.map(r => r.fecha);
+    const rangos = [{ label: `Original (hasta ${fmtFecha(fechas[0])})`, color: colorPorSegmento(0) }];
+    fechas.forEach((f, i) => {
+      const hasta = fechas[i + 1] ? ` hasta ${fmtFecha(fechas[i + 1])}` : ' en adelante';
+      rangos.push({ label: `Revisión ${i + 1} (desde ${fmtFecha(f)}${hasta})`, color: colorPorSegmento(i + 1) });
+    });
+    leyendaRevisionHTML = `
+      <div id="est-leyenda-revision" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;padding-top:8px;border-top:1px dashed var(--gris-borde);font-size:11px;color:var(--gris-medio)">
+        ${rangos.map(r => `<span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${r.color};margin-right:4px"></span>${r.label}</span>`).join('')}
+      </div>`;
+  }
+
   cont.innerHTML = `
     <div class="card" style="margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:4px">
@@ -250,6 +276,7 @@ function renderAnalisisEstadistico() {
     <div class="card">
       <div style="font-size:13px;font-weight:700;color:var(--azul);margin-bottom:10px">Resistencia a ${edad} días vs. muestras fundidas</div>
       <div style="height:360px;position:relative"><canvas id="est-chart"></canvas></div>
+      ${leyendaRevisionHTML}
     </div>`;
 
   const ctx2d = document.getElementById('est-chart').getContext('2d');
@@ -259,7 +286,7 @@ function renderAnalisisEstadistico() {
     data: {
       labels: muestras.map((_, i) => i + 1),
       datasets: [
-        { label: `Resistencia a ${edad} días`, data: valores, borderColor: '#1565C0', backgroundColor: '#1565C0', pointRadius: 3, borderWidth: 1.5, tension: 0.1 },
+        { label: `Resistencia a ${edad} días`, data: valores, borderColor: '#1565C0', backgroundColor: '#1565C0', pointBackgroundColor: pointColors, pointBorderColor: pointColors, pointRadius: 3, borderWidth: 1.5, tension: 0.1 },
         { label: 'Promedio móvil 3 consecutivos', data: movil3, borderColor: '#E65100', backgroundColor: '#E65100', pointRadius: 0, borderWidth: 2, tension: 0.2, spanGaps: false },
         { label: `f'c = ${fc} MPa`, data: valores.map(() => fc), borderColor: '#2E7D32', pointRadius: 0, borderWidth: 2, borderDash: [6, 4] },
         { label: `f'c − ${(fc - limiteB).toFixed(1)} MPa = ${limiteB.toFixed(1)} MPa`, data: valores.map(() => limiteB), borderColor: '#C62828', pointRadius: 0, borderWidth: 1.5, borderDash: [3, 3] },
@@ -269,7 +296,20 @@ function renderAnalisisEstadistico() {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, font: { size: 11 } } } },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 14, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            afterLabel: (item) => {
+              if (item.datasetIndex !== 0 || !revisionesDiseno.length) return '';
+              const seg = segmentos[item.dataIndex];
+              return seg === 0
+                ? `⚠️ Diseño original — revisado después, el ${fmtFecha(revisionesDiseno[0].fecha)}`
+                : `⚠️ Corresponde a la versión del diseño vigente desde ${fmtFecha(revisionesDiseno[seg - 1].fecha)}`;
+            },
+          },
+        },
+      },
       scales: {
         y: { title: { display: true, text: 'Resistencia (MPa)' } },
         x: { title: { display: true, text: 'Muestra (orden cronológico)' } },
@@ -277,7 +317,7 @@ function renderAnalisisEstadistico() {
     },
   });
 
-  _estadisticaActual = { codigo, nombreDiseno: diseno?.nombre || '', edad, proyectoF, productoF, fc };
+  _estadisticaActual = { codigo, nombreDiseno: diseno?.nombre || '', edad, proyectoF, productoF, fc, valores, movil3, limiteB };
 
   if (acciones) {
     acciones.innerHTML = `<button class="btn btn-verde" onclick="verAnalisisEstadisticoPDF()">🖨️ Imprimir Análisis</button>`;
@@ -286,16 +326,58 @@ function renderAnalisisEstadistico() {
 
 let _estadisticaActual = null;
 
-function verAnalisisEstadisticoPDF() {
+// El PDF entregable al cliente nunca debe evidenciar las revisiones del diseño de mezcla
+// (ni el color por punto ni la leyenda) — solo son una ayuda de análisis en pantalla. Por
+// eso el PDF no reutiliza el canvas interactivo: renderiza una gráfica limpia aparte,
+// con un único color, a partir de los mismos datos.
+function _generarImagenChartLimpia(est) {
+  return new Promise(resolve => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 900; canvas.height = 400;
+    canvas.style.position = 'fixed';
+    canvas.style.left = '-9999px';
+    document.body.appendChild(canvas);
+    const chart = new Chart(canvas.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: est.valores.map((_, i) => i + 1),
+        datasets: [
+          { label: `Resistencia a ${est.edad} días`, data: est.valores, borderColor: '#1565C0', backgroundColor: '#1565C0', pointRadius: 3, borderWidth: 1.5, tension: 0.1 },
+          { label: 'Promedio móvil 3 consecutivos', data: est.movil3, borderColor: '#E65100', backgroundColor: '#E65100', pointRadius: 0, borderWidth: 2, tension: 0.2, spanGaps: false },
+          { label: `f'c = ${est.fc} MPa`, data: est.valores.map(() => est.fc), borderColor: '#2E7D32', pointRadius: 0, borderWidth: 2, borderDash: [6, 4] },
+          { label: `f'c − ${(est.fc - est.limiteB).toFixed(1)} MPa = ${est.limiteB.toFixed(1)} MPa`, data: est.valores.map(() => est.limiteB), borderColor: '#C62828', pointRadius: 0, borderWidth: 1.5, borderDash: [3, 3] },
+        ],
+      },
+      options: {
+        responsive: false,
+        animation: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, font: { size: 11 } } } },
+        scales: {
+          y: { title: { display: true, text: 'Resistencia (MPa)' } },
+          x: { title: { display: true, text: 'Muestra (orden cronológico)' } },
+        },
+      },
+    });
+    requestAnimationFrame(() => {
+      const img = chart.toBase64Image();
+      chart.destroy();
+      document.body.removeChild(canvas);
+      resolve(img);
+    });
+  });
+}
+
+async function verAnalisisEstadisticoPDF() {
   if (!_estadisticaActual || !_chartEstadistica) { alert('No hay un análisis para imprimir.'); return; }
   const est = _estadisticaActual;
   const contOriginal = document.getElementById('est-contenido');
   if (!contOriginal) return;
 
-  const chartImg = _chartEstadistica.toBase64Image();
+  const chartImg = await _generarImagenChartLimpia(est);
   const clone = contOriginal.cloneNode(true);
   const canvasWrap = clone.querySelector('#est-chart')?.parentElement;
   if (canvasWrap) canvasWrap.innerHTML = `<img src="${chartImg}" style="width:100%;height:auto;display:block">`;
+  clone.querySelector('#est-leyenda-revision')?.remove();
 
   const fechaHoy = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
   const filtrosTxt = [est.proyectoF ? `Proyecto: ${est.proyectoF}` : '', est.productoF ? `Producto: ${est.productoF}` : ''].filter(Boolean).join(' · ');
