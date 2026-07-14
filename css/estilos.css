@@ -258,4 +258,20 @@
   .login-sub { font-size: 13px; color: var(--gris-medio); text-align: center; margin-bottom: 28px; }
   .login-error { color: #C62828; font-size: 12px; margin-top: 10px; text-align: center; min-height: 18px; }
   #nav-usuario { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+  /* ── LOGÍSTICA: CALENDARIO DE ENTREGAS ── */
+  .log-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .log-cal-dia-nombre { padding: 8px 6px; font-size: 11px; font-weight: 700; color: var(--gris-medio); text-transform: uppercase; text-align: center; background: var(--gris-claro); border-bottom: 1px solid var(--gris-borde); }
+  .log-cal-celda { min-height: 96px; border: 1px solid var(--gris-claro); padding: 6px; cursor: pointer; transition: background .15s; display: flex; flex-direction: column; gap: 3px; }
+  .log-cal-celda:hover { background: var(--azul-suave); }
+  .log-cal-vacia { background: #FAFBFC; cursor: default; }
+  .log-cal-vacia:hover { background: #FAFBFC; }
+  .log-cal-finde { background: #F5F5F5; }
+  .log-cal-festivo { background: #FFF3F0; }
+  .log-cal-hoy { box-shadow: inset 0 0 0 2px var(--azul-claro); }
+  .log-cal-dia-num { font-size: 12px; font-weight: 700; color: var(--gris-oscuro); }
+  .log-cal-hoy-badge { font-size: 8px; background: var(--azul-claro); color: white; padding: 1px 4px; border-radius: 3px; font-weight: 700; vertical-align: middle; }
+  .log-cal-festivo-nombre { font-size: 9.5px; color: #C62828; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log-cal-entregas { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+  .log-cal-entrega { font-size: 10px; color: white; padding: 1px 5px; border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
   #usuario-email { font-size: 12px; color: rgba(255,255,255,0.65); }
