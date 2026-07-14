@@ -11,6 +11,11 @@ function activarModulo(modulo) {
   document.getElementById('subnav-cotizaciones').style.display = modulo === 'cotizaciones' ? 'flex' : 'none';
   document.getElementById('subnav-produccion').style.display = modulo === 'produccion' ? 'flex' : 'none';
   document.getElementById('subnav-calidad').style.display = modulo === 'calidad' ? 'flex' : 'none';
+  if (modulo === 'logistica') {
+    document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+    document.getElementById('pantalla-logistica').classList.add('activa');
+    renderCalendarioLogistica();
+  }
   if (modulo === 'produccion') {
     document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
     document.getElementById('pantalla-ordenes-servicio').classList.add('activa');
