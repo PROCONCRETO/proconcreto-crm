@@ -199,18 +199,18 @@ function renderClientesDespacho() {
         <div class="form-grupo"><label>Cliente</label><input type="text" value="${c.cliente || ''}" list="datalist-clientes-despacho" oninput="_clientesDespachoActual[${ci}].cliente=this.value" placeholder="Busca un cliente existente..."></div>
         <div class="form-grupo"><label>Destino específico / Proyecto</label><input type="text" value="${c.destino || ''}" oninput="_clientesDespachoActual[${ci}].destino=this.value" placeholder="Ej: Proyecto Villa 86"></div>
       </div>
-      <table class="tabla-items" style="width:100%;margin-bottom:6px">
-        <thead><tr><th>Producto</th><th style="width:80px">Cantidad</th><th style="width:95px">Peso</th><th style="width:32px"></th></tr></thead>
-        <tbody>
-          ${c.productos.map((p, pi) => `
-            <tr>
-              <td><input type="text" value="${p.producto || ''}" title="${p.producto || ''}" list="datalist-productos-despacho" oninput="_actualizarProductoDespacho(${ci},${pi},'producto',this.value)" placeholder="Busca por código o nombre..." style="text-overflow:ellipsis"></td>
-              <td><input type="number" min="0" step="1" value="${p.cantidad || ''}" oninput="_actualizarProductoDespacho(${ci},${pi},'cantidad',this.value)"></td>
-              <td id="despacho-peso-${ci}-${pi}" style="font-size:11px;color:var(--gris-medio);white-space:nowrap">${p.peso ? p.peso.toFixed(2) + ' ton' : '—'}</td>
-              <td><button type="button" class="btn btn-rojo btn-xs" onclick="eliminarProductoDespacho(${ci},${pi})">✕</button></td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
+      <div style="margin-bottom:6px">
+        ${c.productos.map((p, pi) => `
+          <div style="border:1px solid var(--gris-borde);border-radius:var(--radio);padding:8px;margin-bottom:6px;background:white">
+            <input type="text" value="${p.producto || ''}" title="${p.producto || ''}" list="datalist-productos-despacho" oninput="_actualizarProductoDespacho(${ci},${pi},'producto',this.value)" placeholder="Busca por código o nombre..." style="width:100%;margin-bottom:6px;border:1px solid var(--gris-borde);border-radius:4px;padding:6px 8px;font-size:13px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <input type="number" min="0" step="1" value="${p.cantidad || ''}" oninput="_actualizarProductoDespacho(${ci},${pi},'cantidad',this.value)" placeholder="Cantidad" style="width:100px;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:13px">
+              <span id="despacho-peso-${ci}-${pi}" style="font-size:11px;color:var(--gris-medio);white-space:nowrap">${p.peso ? p.peso.toFixed(2) + ' ton' : '—'}</span>
+              <div style="flex:1"></div>
+              <button type="button" class="btn btn-rojo btn-xs" onclick="eliminarProductoDespacho(${ci},${pi})">✕</button>
+            </div>
+          </div>`).join('')}
+      </div>
       <div class="flex-gap" style="justify-content:space-between">
         <button type="button" class="btn btn-secundario btn-xs" onclick="agregarProductoDespacho(${ci})">+ Agregar producto</button>
         <button type="button" class="btn btn-rojo btn-xs" onclick="eliminarClienteDespacho(${ci})">🗑️ Quitar cliente</button>
