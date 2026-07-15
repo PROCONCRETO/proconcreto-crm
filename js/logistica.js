@@ -155,7 +155,7 @@ function renderCalendarioLogistica() {
 
     celdas += `
       <div class="${clases}" onclick="abrirModalDespacho('${fechaStr}')">
-        <div class="log-cal-dia-num">${dia}${esHoy ? ' <span class="log-cal-hoy-badge">HOY</span>' : ''}</div>
+        <div class="log-cal-dia-num">${dia}${esHoy ? ' <span class="log-cal-hoy-badge">HOY</span>' : ''}${despachosDia.length ? `<span onclick="event.stopPropagation();imprimirProgramacionDia('${fechaStr}')" title="Imprimir programación del día" style="float:right;cursor:pointer">🖨️</span>` : ''}</div>
         ${festivoNombre ? `<div class="log-cal-festivo-nombre" title="${festivoNombre}">🎉 ${festivoNombre}</div>` : ''}
         <div class="log-cal-entregas">
           ${despachosDia.map(d => {
@@ -188,7 +188,7 @@ function renderCalendarioLogistica() {
 let _clientesDespachoActual = [];
 
 function _lineaVaciaDespacho() { return { producto: '', cantidad: 0, peso: 0 }; }
-function _clienteVacioDespacho() { return { cliente: '', destino: '', productos: [_lineaVaciaDespacho()] }; }
+function _clienteVacioDespacho() { return { cliente: '', destino: '', contactoObraNombre: '', contactoObraTelefono: '', productos: [_lineaVaciaDespacho()] }; }
 
 function renderClientesDespacho() {
   const wrap = document.getElementById('despacho-clientes-wrap');
@@ -198,6 +198,10 @@ function renderClientesDespacho() {
       <div class="form-grid" style="margin-bottom:8px">
         <div class="form-grupo"><label>Cliente</label><input type="text" value="${c.cliente || ''}" list="datalist-clientes-despacho" oninput="_clientesDespachoActual[${ci}].cliente=this.value" placeholder="Busca un cliente existente..."></div>
         <div class="form-grupo"><label>Destino específico / Proyecto</label><input type="text" value="${c.destino || ''}" oninput="_clientesDespachoActual[${ci}].destino=this.value" placeholder="Ej: Proyecto Villa 86"></div>
+      </div>
+      <div class="form-grid" style="margin-bottom:8px">
+        <div class="form-grupo"><label>Contacto en obra <span style="font-weight:400;text-transform:none">(si es distinto al del cliente)</span></label><input type="text" value="${c.contactoObraNombre || ''}" oninput="_clientesDespachoActual[${ci}].contactoObraNombre=this.value" placeholder="Nombre de quien recibe en obra"></div>
+        <div class="form-grupo"><label>Teléfono contacto en obra</label><input type="text" value="${c.contactoObraTelefono || ''}" oninput="_clientesDespachoActual[${ci}].contactoObraTelefono=this.value" placeholder="Ej: 3101234567"></div>
       </div>
       <div style="margin-bottom:6px">
         ${c.productos.map((p, pi) => `
@@ -355,6 +359,8 @@ function guardarDespacho() {
     .map(c => ({
       cliente: (c.cliente || '').trim(),
       destino: (c.destino || '').trim(),
+      contactoObraNombre: (c.contactoObraNombre || '').trim(),
+      contactoObraTelefono: (c.contactoObraTelefono || '').trim(),
       productos: (c.productos || [])
         .filter(p => (p.producto || '').trim())
         .map(p => ({ producto: p.producto.trim(), cantidad: Number(p.cantidad) || 0, peso: Number(p.peso) || 0 })),
@@ -403,4 +409,123 @@ function eliminarDespacho() {
     .then(({ error }) => {
       if (error) { console.error('Error eliminando despacho:', error.message); alert('Error al eliminar: ' + error.message); DESPACHOS.push(d); renderCalendarioLogistica(); }
     });
+}
+
+// ── Imprimible del día (para el área de despachos, que no tiene acceso al aplicativo) ──
+// Mismo membrete que el resto de documentos de la app. Se genera un documento por día,
+// con el detalle de cada despacho: vehículo, destino, clientes, contacto en obra y
+// productos — todo lo que necesita quien carga los camiones.
+let _progDiaFechaActual = null;
+
+function imprimirProgramacionDia(fechaStr) {
+  const despachosDia = DESPACHOS.filter(d => d.fecha === fechaStr && d.estado !== 'Cancelada');
+  if (!despachosDia.length) { alert('No hay despachos programados (sin contar cancelados) para esa fecha.'); return; }
+  _progDiaFechaActual = fechaStr;
+
+  const fechaLegible = new Date(fechaStr + 'T12:00').toLocaleDateString('es-CO', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  const fechaHoy = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+  despachosDia.sort((a, b) => (a.vehiculo || '').localeCompare(b.vehiculo || ''));
+
+  const bloques = despachosDia.map(d => {
+    const capacidad = CAPACIDAD_VEHICULO[d.vehiculo];
+    const peso = Number(d.pesoTotal) || 0;
+    const excedido = capacidad && peso > capacidad;
+    const clientesHTML = (d.clientes || []).map(c => `
+      <div style="margin:8px 0;padding:8px;border:1px solid #eee;border-radius:5px">
+        <div style="font-size:12px;font-weight:700">${c.cliente || '—'}${c.destino ? ' — ' + c.destino : ''}</div>
+        <div style="font-size:10.5px;color:#555;margin-bottom:4px">Contacto en obra: ${c.contactoObraNombre ? c.contactoObraNombre + (c.contactoObraTelefono ? ' — ' + c.contactoObraTelefono : '') : '—'}</div>
+        <table style="width:100%;border-collapse:collapse;font-size:10.5px">
+          ${(c.productos || []).map(p => `<tr><td style="padding:2px 0">• ${p.producto || ''}</td><td style="padding:2px 0;text-align:center;width:70px">${p.cantidad || 0}</td><td style="padding:2px 0;text-align:right;width:80px">${(Number(p.peso) || 0).toFixed(2)} ton</td></tr>`).join('')}
+        </table>
+      </div>`).join('');
+    return `
+      <div style="margin-bottom:16px">
+        <div style="background:#003F7F;color:white;padding:6px 10px;border-radius:5px 5px 0 0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:12px;font-weight:700">
+          <span>🚛 ${d.vehiculo || '—'}</span>
+          <span>Destino: ${d.destino || '—'}</span>
+          <span style="color:${excedido ? '#FFCDD2' : 'white'}">${peso.toFixed(2)}${capacidad ? ' / ' + capacidad : ''} ton${excedido ? ' ⚠' : ''}</span>
+        </div>
+        <div style="border:1px solid #ddd;border-top:none;padding:6px 10px 10px">
+          ${clientesHTML}
+          ${d.observaciones ? `<div style="font-size:10px;color:#777;margin-top:4px"><b>Obs:</b> ${d.observaciones}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  const html = `
+    <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
+      <span style="font-weight:700">Programación de Despachos — ${fechaStr}</span>
+      <div style="flex:1"></div>
+      <button onclick="descargarProgramacionDiaPDF()" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700">⬇️ Descargar PDF</button>
+      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-logistica').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+    </div>
+    <div class="preview-doc" id="prog-dia-doc">
+      <div class="preview-membrete-header">
+        <img src="membrete-top.jpg" alt="">
+      </div>
+      <div class="preview-content" id="prog-dia-content" style="padding-top:6px">
+        <div style="text-align:center;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700;color:#003F7F;letter-spacing:0.03em">PROGRAMACIÓN DE DESPACHOS</div>
+          <div style="font-size:11.5px;color:#333;text-transform:capitalize">${fechaLegible}</div>
+          <div style="font-size:10px;color:#777">${despachosDia.length} despacho${despachosDia.length === 1 ? '' : 's'} · Generado el ${fechaHoy}</div>
+        </div>
+        ${bloques}
+      </div>
+      <div class="preview-membrete-footer" id="prog-dia-footer">
+        <div class="pf-arco"></div>
+        <div class="pf-datos">
+          <div class="pf-col"><span class="pf-icon">📞</span><span>+57 314 620 1650<br>+57 311 408 2285</span></div>
+          <div class="pf-col"><span class="pf-icon">🏠</span><span>Autopista del Café Km2<br>Vía Chinchiná – Santa Rosa</span></div>
+          <div class="pf-col"><span class="pf-icon">🌐</span><span>www.proconcreto.com.co</span></div>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('contenido-preview').innerHTML = html;
+  document.getElementById('vista-previa').style.display = 'block';
+  document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+  window.scrollTo(0, 0);
+}
+
+async function descargarProgramacionDiaPDF() {
+  const btn = document.querySelector('.no-print button[onclick*="descargarProgramacionDiaPDF"]');
+  if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
+  try {
+    const { jsPDF } = window.jspdf;
+    const pageW = 210, pageH = 297;
+    const topImg = await cargarImagen('membrete-top.jpg');
+    const headerH = pageW * (topImg.naturalHeight / topImg.naturalWidth);
+    const contentEl = document.getElementById('prog-dia-content');
+    const contentCanvas = await html2canvas(contentEl, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    const pxToMm = pageW / contentCanvas.width;
+    const contentH_px = _alturaContenidoReal(contentCanvas);
+    const footerEl = document.getElementById('prog-dia-footer');
+    const footerCanvas = await html2canvas(footerEl, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    const footerH = footerCanvas.height * pxToMm;
+    const availH = pageH - headerH - footerH - 6;
+    const pageH_px = availH / pxToMm;
+    const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    const footerData = footerCanvas.toDataURL('image/jpeg', 0.95);
+    let cursorY = 0, pageIndex = 0, guard = 0;
+    while (cursorY < contentH_px - 1 && guard < 60) {
+      guard++;
+      let bottom = Math.min(contentH_px, cursorY + pageH_px);
+      if (bottom < contentH_px) bottom = _filaBlancaCerca(contentCanvas, Math.floor(bottom), cursorY + pageH_px * 0.55);
+      const sliceH_px = bottom - cursorY;
+      if (sliceH_px <= 1) break;
+      if (pageIndex > 0) pdf.addPage();
+      pdf.addImage(topImg, 'JPEG', 0, 0, pageW, headerH);
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = contentCanvas.width;
+      sliceCanvas.height = Math.ceil(sliceH_px);
+      sliceCanvas.getContext('2d').drawImage(contentCanvas, 0, Math.floor(cursorY), contentCanvas.width, Math.ceil(sliceH_px), 0, 0, contentCanvas.width, Math.ceil(sliceH_px));
+      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, headerH + 2, pageW, sliceH_px * pxToMm);
+      pdf.addImage(footerData, 'JPEG', 0, pageH - footerH, pageW, footerH);
+      cursorY = bottom;
+      pageIndex++;
+    }
+    pdf.save(`Programacion_Despachos_${_progDiaFechaActual || 'dia'}.pdf`);
+  } finally {
+    if (btn) { btn.textContent = '⬇️ Descargar PDF'; btn.disabled = false; }
+  }
 }
