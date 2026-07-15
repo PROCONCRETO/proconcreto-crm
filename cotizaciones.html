@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260714b">
+<link rel="stylesheet" href="css/estilos.css?v=20260715b">
 </head>
 <body>
 
@@ -621,17 +621,17 @@
 </div>
 
 <!-- ═══════════════════════════════════════
-     PANTALLA: LOGÍSTICA — PROGRAMACIÓN DE ENTREGAS
+     PANTALLA: LOGÍSTICA — PROGRAMACIÓN DE DESPACHOS
 ═══════════════════════════════════════ -->
 <div id="pantalla-logistica" class="pantalla">
   <div class="acciones-row">
-    <div style="font-size:18px;font-weight:700;color:var(--azul)">Programación de Entregas</div>
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Programación de Despachos</div>
     <div class="flex-gap">
       <button class="btn btn-secundario btn-sm" onclick="cambiarMesLogistica(-1)">◀</button>
       <div id="log-mes-titulo" style="font-weight:700;min-width:150px;text-align:center;text-transform:capitalize"></div>
       <button class="btn btn-secundario btn-sm" onclick="cambiarMesLogistica(1)">▶</button>
       <button class="btn btn-secundario btn-sm" onclick="irHoyLogistica()">Hoy</button>
-      <button class="btn btn-primario" onclick="abrirModalEntrega()">+ Nueva Entrega</button>
+      <button class="btn btn-primario" onclick="abrirModalDespacho()">+ Nuevo Despacho</button>
     </div>
   </div>
   <div class="card" style="padding:0;overflow:hidden">
@@ -640,10 +640,10 @@
   <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--gris-medio)">
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#FFF3F0;border:1px solid #FFCDD2;margin-right:4px"></span>Festivo</span>
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#F5F5F5;border:1px solid #E0E0E0;margin-right:4px"></span>Fin de semana (sábado normalmente no laboral)</span>
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1565C0;margin-right:4px"></span>Camión 1</span>
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#00838F;margin-right:4px"></span>Camión 2</span>
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#E65100;margin-right:4px"></span>Tercero</span>
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#6A1B9A;margin-right:4px"></span>Tractomula</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1565C0;margin-right:4px"></span>GTV044 / Jorge James Álvarez (11 ton)</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#00838F;margin-right:4px"></span>GTU668 / José Ramiro Ciro (11 ton)</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#E65100;margin-right:4px"></span>Camión sencillo tercerizado (11 ton)</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#6A1B9A;margin-right:4px"></span>Tractocamión tercerizado (34 ton)</span>
   </div>
 </div>
 
@@ -934,31 +934,25 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-entrega">
-  <div class="modal" style="width:520px">
-    <div class="modal-titulo" id="modal-entrega-titulo">🚛 Nueva Entrega</div>
-    <input type="hidden" id="m-entrega-id">
+<div class="modal-overlay" id="modal-despacho">
+  <div class="modal" style="width:640px;max-width:95vw">
+    <div class="modal-titulo" id="modal-despacho-titulo">🚛 Nuevo Despacho</div>
+    <input type="hidden" id="m-despacho-id">
     <div class="form-grid" style="margin-bottom:10px">
-      <div class="form-grupo"><label>Fecha *</label><input type="date" id="m-entrega-fecha"></div>
-      <div class="form-grupo"><label>Hora estimada</label><input type="time" id="m-entrega-hora"></div>
+      <div class="form-grupo"><label>Fecha *</label><input type="date" id="m-despacho-fecha"></div>
+      <div class="form-grupo"><label>Destino *</label><input type="text" id="m-despacho-destino" placeholder="Ej: Manizales"></div>
     </div>
-    <div class="form-grupo" style="margin-bottom:10px"><label>Cliente</label><input type="text" id="m-entrega-cliente" list="datalist-clientes-entrega" placeholder="Busca un cliente existente..."></div>
-    <div class="form-grupo" style="margin-bottom:10px"><label>Destino / Proyecto *</label><input type="text" id="m-entrega-destino" placeholder="Ej: Manizales — Proyecto Villa 86"></div>
-    <div class="form-grid" style="margin-bottom:10px">
-      <div class="form-grupo"><label>Producto</label><input type="text" id="m-entrega-producto" placeholder="Ej: Bloque 10x20x40"></div>
-      <div class="form-grupo"><label>Peso aprox. (ton)</label><input type="number" id="m-entrega-peso" min="0" step="0.1"></div>
-    </div>
-    <div class="form-grid" style="margin-bottom:10px">
+    <div class="form-grid" style="margin-bottom:16px">
       <div class="form-grupo"><label>Vehículo</label>
-        <select id="m-entrega-vehiculo">
-          <option value="Camión 1">Camión 1 (propio)</option>
-          <option value="Camión 2">Camión 2 (propio)</option>
-          <option value="Tercero">Vehículo de tercero</option>
-          <option value="Tractomula">Tractomula (tercerizada)</option>
+        <select id="m-despacho-vehiculo" onchange="actualizarPesoTotalDespacho()">
+          <option value="GTV044 / JORGE JAMES ALVAREZ">GTV044 / JORGE JAMES ALVAREZ</option>
+          <option value="GTU668 / JOSE RAMIRO CIRO">GTU668 / JOSE RAMIRO CIRO</option>
+          <option value="CAMION SENCILLO / TERCERIZADO">CAMION SENCILLO / TERCERIZADO</option>
+          <option value="TRACTO CAMION / TERCERIZADO">TRACTO CAMION / TERCERIZADO</option>
         </select>
       </div>
       <div class="form-grupo"><label>Estado</label>
-        <select id="m-entrega-estado">
+        <select id="m-despacho-estado">
           <option value="Programada">Programada</option>
           <option value="En ruta">En ruta</option>
           <option value="Entregada">Entregada</option>
@@ -966,15 +960,28 @@
         </select>
       </div>
     </div>
-    <div class="form-grupo" style="margin-bottom:6px"><label>Observaciones</label><textarea id="m-entrega-obs" rows="2"></textarea></div>
+
+    <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+      <span>CLIENTES DE ESTE DESPACHO</span>
+      <button type="button" class="btn btn-secundario btn-xs" onclick="agregarClienteDespacho()">+ Agregar cliente</button>
+    </div>
+    <div id="despacho-clientes-wrap"></div>
+
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:12px 0;padding-top:10px;border-top:1px solid var(--gris-borde)">
+      <span style="font-size:12px;font-weight:700;color:var(--gris-medio)">PESO TOTAL DEL DESPACHO:</span>
+      <span id="despacho-peso-total" style="font-size:15px;font-weight:800;color:var(--azul)">0.00 ton</span>
+    </div>
+
+    <div class="form-grupo" style="margin-bottom:6px"><label>Observaciones</label><textarea id="m-despacho-obs" rows="2"></textarea></div>
     <div class="modal-acciones">
-      <button class="btn btn-rojo" id="btn-eliminar-entrega" onclick="eliminarEntrega()" style="display:none;margin-right:auto">🗑️ Eliminar</button>
-      <button class="btn btn-secundario" onclick="cerrarModal('modal-entrega')">Cancelar</button>
-      <button class="btn btn-primario" onclick="guardarEntrega()">Guardar</button>
+      <button class="btn btn-rojo" id="btn-eliminar-despacho" onclick="eliminarDespacho()" style="display:none;margin-right:auto">🗑️ Eliminar</button>
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-despacho')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarDespacho()">Guardar</button>
     </div>
   </div>
 </div>
-<datalist id="datalist-clientes-entrega"></datalist>
+<datalist id="datalist-clientes-despacho"></datalist>
+<datalist id="datalist-productos-despacho"></datalist>
 
 <div class="modal-overlay" id="modal-ajuste-mezcla">
   <div class="modal" style="width:1080px;max-width:95vw">
@@ -1450,24 +1457,24 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260714b"></script>
-<script src="js/catalogo.js?v=20260714b"></script>
-<script src="js/navegacion.js?v=20260714b"></script>
-<script src="js/ordenes-produccion.js?v=20260714b"></script>
-<script src="js/produccion-diaria.js?v=20260714b"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260714b"></script>
-<script src="js/calidad-mezclas.js?v=20260714b"></script>
-<script src="js/calidad-estadisticas.js?v=20260714b"></script>
-<script src="js/calidad-trazabilidad.js?v=20260714b"></script>
-<script src="js/logistica.js?v=20260714b"></script>
-<script src="js/auth.js?v=20260714b"></script>
-<script src="js/datos-realtime.js?v=20260714b"></script>
-<script src="js/cotizador.js?v=20260714b"></script>
-<script src="js/historico-clientes-stats.js?v=20260714b"></script>
+<script src="js/config.js?v=20260715b"></script>
+<script src="js/catalogo.js?v=20260715b"></script>
+<script src="js/navegacion.js?v=20260715b"></script>
+<script src="js/ordenes-produccion.js?v=20260715b"></script>
+<script src="js/produccion-diaria.js?v=20260715b"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260715b"></script>
+<script src="js/calidad-mezclas.js?v=20260715b"></script>
+<script src="js/calidad-estadisticas.js?v=20260715b"></script>
+<script src="js/calidad-trazabilidad.js?v=20260715b"></script>
+<script src="js/logistica.js?v=20260715b"></script>
+<script src="js/auth.js?v=20260715b"></script>
+<script src="js/datos-realtime.js?v=20260715b"></script>
+<script src="js/cotizador.js?v=20260715b"></script>
+<script src="js/historico-clientes-stats.js?v=20260715b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="js/pdf.js?v=20260714b"></script>
+<script src="js/pdf.js?v=20260715b"></script>
 </body>
 </html>
