@@ -202,7 +202,10 @@ function renderClientesDespacho() {
       <div style="margin-bottom:6px">
         ${c.productos.map((p, pi) => `
           <div style="border:1px solid var(--gris-borde);border-radius:var(--radio);padding:8px;margin-bottom:6px;background:white">
-            <input type="text" value="${p.producto || ''}" title="${p.producto || ''}" list="datalist-productos-despacho" oninput="_actualizarProductoDespacho(${ci},${pi},'producto',this.value)" placeholder="Busca por código o nombre..." style="width:100%;margin-bottom:6px;border:1px solid var(--gris-borde);border-radius:4px;padding:6px 8px;font-size:13px">
+            <div class="despacho-prod-buscador" style="position:relative;margin-bottom:6px">
+              <input type="text" id="despacho-prod-input-${ci}-${pi}" value="${p.producto || ''}" title="${p.producto || ''}" oninput="filtrarProductosDespacho(${ci},${pi})" placeholder="Buscar por nombre o código..." style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:6px 8px;font-size:13px">
+              <div id="despacho-prod-resultados-${ci}-${pi}" style="display:none;position:absolute;z-index:50;left:0;right:0;margin-top:2px;border:1.5px solid #93C5FD;border-radius:8px;background:#fff;max-height:220px;overflow-y:auto;box-shadow:var(--sombra-md)"></div>
+            </div>
             <div style="display:flex;align-items:center;gap:10px">
               <input type="number" min="0" step="1" value="${p.cantidad || ''}" oninput="_actualizarProductoDespacho(${ci},${pi},'cantidad',this.value)" placeholder="Cantidad" style="width:100px;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:13px">
               <span id="despacho-peso-${ci}-${pi}" style="font-size:11px;color:var(--gris-medio);white-space:nowrap">${p.peso ? p.peso.toFixed(2) + ' ton' : '—'}</span>
@@ -217,9 +220,47 @@ function renderClientesDespacho() {
       </div>
     </div>`).join('');
   if (typeof poblarDatalistClientes === 'function') poblarDatalistClientes('datalist-clientes-despacho');
-  if (typeof poblarDatalistProductos === 'function') poblarDatalistProductos('datalist-productos-despacho');
   actualizarPesoTotalDespacho();
 }
+
+// Buscador de producto estilo "Nueva Cotización": nombre en negrita + código en gris debajo,
+// en vez del <datalist> nativo del navegador (que no se puede rediseñar y por eso el nombre
+// largo quedaba ilegible). Cada línea de producto tiene su propio buscador independiente.
+function filtrarProductosDespacho(ci, pi) {
+  const inputEl = document.getElementById(`despacho-prod-input-${ci}-${pi}`);
+  const div = document.getElementById(`despacho-prod-resultados-${ci}-${pi}`);
+  if (!inputEl || !div) return;
+  inputEl.title = inputEl.value;
+  _actualizarProductoDespacho(ci, pi, 'producto', inputEl.value);
+  const q = inputEl.value.toLowerCase().trim();
+  if (q.length < 2) { div.style.display = 'none'; return; }
+  const res = (typeof PRODUCTOS !== 'undefined' ? PRODUCTOS : []).filter(p => (p.nombre + ' ' + p.codigo).toLowerCase().includes(q)).slice(0, 18);
+  div.innerHTML = res.length
+    ? res.map(p => `
+      <div onclick="elegirProductoDespacho(${ci},${pi},'${p.codigo}')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
+        <div style="font-weight:600;font-size:13px;color:#1e293b">${p.nombre}</div>
+        <div style="font-size:11px;color:#64748b">${p.codigo}</div>
+      </div>`).join('')
+    : '<div style="padding:10px 14px;color:#888;font-size:12px">Sin resultados para esta búsqueda.</div>';
+  div.style.display = 'block';
+}
+
+function elegirProductoDespacho(ci, pi, codigo) {
+  const prod = (typeof PRODUCTOS !== 'undefined' ? PRODUCTOS : []).find(p => p.codigo === codigo);
+  if (!prod || typeof _textoProducto !== 'function') return;
+  const texto = _textoProducto(prod);
+  const inputEl = document.getElementById(`despacho-prod-input-${ci}-${pi}`);
+  if (inputEl) { inputEl.value = texto; inputEl.title = texto; }
+  _actualizarProductoDespacho(ci, pi, 'producto', texto);
+  const div = document.getElementById(`despacho-prod-resultados-${ci}-${pi}`);
+  if (div) div.style.display = 'none';
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.despacho-prod-buscador')) {
+    document.querySelectorAll('[id^="despacho-prod-resultados-"]').forEach(d => { d.style.display = 'none'; });
+  }
+});
 
 function agregarClienteDespacho() {
   _clientesDespachoActual.push(_clienteVacioDespacho());
@@ -249,7 +290,7 @@ function eliminarProductoDespacho(ci, pi) {
 function _actualizarProductoDespacho(ci, pi, campo, valor) {
   const p = _clientesDespachoActual[ci].productos[pi];
   if (campo === 'cantidad') p.cantidad = parseFloat(valor) || 0;
-  else { p.producto = valor; if (event?.target) event.target.title = valor; }
+  else p.producto = valor;
   const prodCat = typeof _productoDesdeTextoAjuste === 'function' ? _productoDesdeTextoAjuste(p.producto) : null;
   const pesoUnitario = prodCat ? (Number(prodCat.peso) || 0) : 0;
   p.peso = (p.cantidad * pesoUnitario) / 1000;
