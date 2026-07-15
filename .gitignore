@@ -6,6 +6,16 @@ cotizaciones.html.tmp.*
 # Cotizaciones generadas localmente (datos de runtime, no código)
 cotizaciones-guardadas/
 
+# Archivos intermedios del agente (capa de ejecución, ver CLAUDE.md)
+.tmp/*
+!.tmp/.gitkeep
+
+# Variables de entorno / credenciales del agente (si se llegan a usar)
+.env
+.env.local
+credentials.json
+token.json
+
 # Sistema
 Thumbs.db
 .DS_Store
