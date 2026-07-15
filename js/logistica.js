@@ -200,11 +200,11 @@ function renderClientesDespacho() {
         <div class="form-grupo"><label>Destino específico / Proyecto</label><input type="text" value="${c.destino || ''}" oninput="_clientesDespachoActual[${ci}].destino=this.value" placeholder="Ej: Proyecto Villa 86"></div>
       </div>
       <table class="tabla-items" style="width:100%;margin-bottom:6px">
-        <thead><tr><th>Producto</th><th style="width:90px">Cantidad</th><th style="width:110px">Peso</th><th style="width:32px"></th></tr></thead>
+        <thead><tr><th>Producto</th><th style="width:80px">Cantidad</th><th style="width:95px">Peso</th><th style="width:32px"></th></tr></thead>
         <tbody>
           ${c.productos.map((p, pi) => `
             <tr>
-              <td><input type="text" value="${p.producto || ''}" list="datalist-productos-despacho" oninput="_actualizarProductoDespacho(${ci},${pi},'producto',this.value)" placeholder="Busca por código o nombre..."></td>
+              <td><input type="text" value="${p.producto || ''}" title="${p.producto || ''}" list="datalist-productos-despacho" oninput="_actualizarProductoDespacho(${ci},${pi},'producto',this.value)" placeholder="Busca por código o nombre..." style="text-overflow:ellipsis"></td>
               <td><input type="number" min="0" step="1" value="${p.cantidad || ''}" oninput="_actualizarProductoDespacho(${ci},${pi},'cantidad',this.value)"></td>
               <td id="despacho-peso-${ci}-${pi}" style="font-size:11px;color:var(--gris-medio);white-space:nowrap">${p.peso ? p.peso.toFixed(2) + ' ton' : '—'}</td>
               <td><button type="button" class="btn btn-rojo btn-xs" onclick="eliminarProductoDespacho(${ci},${pi})">✕</button></td>
@@ -249,7 +249,7 @@ function eliminarProductoDespacho(ci, pi) {
 function _actualizarProductoDespacho(ci, pi, campo, valor) {
   const p = _clientesDespachoActual[ci].productos[pi];
   if (campo === 'cantidad') p.cantidad = parseFloat(valor) || 0;
-  else p.producto = valor;
+  else { p.producto = valor; if (event?.target) event.target.title = valor; }
   const prodCat = typeof _productoDesdeTextoAjuste === 'function' ? _productoDesdeTextoAjuste(p.producto) : null;
   const pesoUnitario = prodCat ? (Number(prodCat.peso) || 0) : 0;
   p.peso = (p.cantidad * pesoUnitario) / 1000;
