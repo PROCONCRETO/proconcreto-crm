@@ -5,7 +5,7 @@
 | Capa | Tecnología | Notas |
 |---|---|---|
 | Frontend | HTML + CSS + JavaScript vanilla, sin framework ni build step | Todo cuelga de un único `cotizaciones.html` (~1,500 líneas) que carga 13 archivos JS por `<script src>` con cache-busting manual (`?v=YYYYMMDDx`) |
-| Backend | [Supabase](https://supabase.com) (Postgres + Auth + Realtime), cliente cargado por CDN | No hay servidor de aplicación propio |
+| Backend | [Supabase](https://supabase.com) (Postgres + Auth + Realtime), cliente cargado por CDN | Proyecto `wyfjmgywyqluzoymxoyp` (`https://wyfjmgywyqluzoymxoyp.supabase.co`), configurado en `js/config.js` con la key pública/anon. No hay servidor de aplicación propio. |
 | Hosting | GitHub Pages, repo `proconcreto/proconcreto-crm`, rama `main` | Sitio estático — Pages sirve directo lo que hay en el repo |
 | Librerías de terceros (CDN) | Chart.js, jsPDF, html2canvas, SheetJS (xlsx.js) | Gráficos, generación de PDF de cotizaciones/certificados, e importación/exportación de Excel |
 | Dev local | `serve.ps1` (servidor HTTP casero en PowerShell, puerto 8080) | Sirve los estáticos y expone `POST /guardar-cotizacion` para respaldar cotizaciones como JSON en `cotizaciones-guardadas/` (local, fuera del repo) |
