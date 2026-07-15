@@ -1,0 +1,11 @@
+# Archivos de respaldo y temporales
+cotizaciones.html.backup-monolito
+cotizaciones.html.tmp.*
+*.tmp.*
+
+# Cotizaciones generadas localmente (datos de runtime, no código)
+cotizaciones-guardadas/
+
+# Sistema
+Thumbs.db
+.DS_Store
