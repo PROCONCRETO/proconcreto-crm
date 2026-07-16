@@ -62,7 +62,32 @@ function abrirModalOrden() {
   ['m-orden-num','m-orden-cot','m-orden-cliente','m-orden-descripcion','m-orden-cantidad','m-orden-obs'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('m-orden-fecha').value = '';
   document.getElementById('m-orden-estado').value = 'Pendiente';
+  document.getElementById('orden-saldo-wrap').style.display = 'none';
   document.getElementById('modal-orden').classList.add('abierto');
+}
+
+// Pedido/entregado/saldo por producto de la orden, cruzando con las entregas de Logística
+// vinculadas a ella (ver aplicarOrdenAEntrega() y _cantidadEntregadaPorProducto() en logistica.js).
+function renderSaldoOrden(orden) {
+  const wrap = document.getElementById('orden-saldo-wrap');
+  const body = document.getElementById('orden-saldo-body');
+  if (!wrap || !body) return;
+  const items = typeof _itemsDeOrden === 'function' ? _itemsDeOrden(orden) : [];
+  if (!items.length) { wrap.style.display = 'none'; return; }
+  const entregadoPorClave = typeof _cantidadEntregadaPorProducto === 'function' ? _cantidadEntregadaPorProducto(orden.id) : {};
+  body.innerHTML = items.map(it => {
+    const clave = typeof _claveItemOrden === 'function' ? _claveItemOrden(it) : (it.nombre || '');
+    const pedido = Number(it.cantidad) || 0;
+    const entregado = entregadoPorClave[clave] || 0;
+    const saldo = Math.max(0, pedido - entregado);
+    return `<tr>
+      <td>${it.nombre || ''}${it.unidad ? ' (' + it.unidad + ')' : ''}</td>
+      <td style="text-align:right">${pedido}</td>
+      <td style="text-align:right">${entregado}</td>
+      <td style="text-align:right;font-weight:700;color:${saldo > 0 ? 'var(--naranja)' : 'var(--verde)'}">${saldo}</td>
+    </tr>`;
+  }).join('');
+  wrap.style.display = 'block';
 }
 
 function editarOrden(id) {
@@ -78,6 +103,7 @@ function editarOrden(id) {
   document.getElementById('m-orden-fecha').value = o.fechaEntrega || '';
   document.getElementById('m-orden-estado').value = o.estado || 'Pendiente';
   document.getElementById('m-orden-obs').value = o.observaciones || '';
+  renderSaldoOrden(o);
   document.getElementById('modal-orden').classList.add('abierto');
 }
 

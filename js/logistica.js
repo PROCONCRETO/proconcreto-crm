@@ -229,9 +229,80 @@ let _entregasViajeActual = [];
 let _viajeBloqueadoActual = false;
 
 function _lineaVaciaEntrega() { return { producto: '', cantidad: 0, peso: 0 }; }
-function _entregaVaciaViaje() { return { cliente: '', destino: '', contactoObraNombre: '', contactoObraTelefono: '', productos: [_lineaVaciaEntrega()], cumplido: { estado: 'pendiente' } }; }
+function _entregaVaciaViaje() { return { ordenId: '', ordenNumero: '', cliente: '', destino: '', contactoObraNombre: '', contactoObraTelefono: '', productos: [_lineaVaciaEntrega()], cumplido: { estado: 'pendiente' } }; }
 
 const _ETIQUETA_CUMPLIDO = { pendiente: '⏳ Pendiente', hecha: '✅ Hecha', reprogramada: '🔁 Reprogramada', cancelada: '❌ Cancelada' };
+
+// ── Encadenamiento con Órdenes de Producción ──
+// Una orden puede traer un desglose por producto (`items[]`, cuando viene de una cotización
+// aceptada) o solo una cantidad genérica (órdenes creadas a mano) — este helper unifica ambos
+// casos en una sola lista de "renglones pedidos".
+function _itemsDeOrden(orden) {
+  if (orden.items && orden.items.length) return orden.items;
+  if (orden.cantidad) return [{ nombre: orden.descripcion || 'Producto', cantidad: Number(orden.cantidad) || 0, unidad: '' }];
+  return [];
+}
+
+// Texto de producto que identifica un renglón de la orden, en el mismo formato que usa el
+// catálogo (`_textoProducto`, de calidad-ajuste-mezcla.js) — así una entrega que se autocompleta
+// desde la orden queda con el peso calculado igual que cualquier otro producto del catálogo.
+function _claveItemOrden(item) {
+  return item.codigo && typeof _textoProducto === 'function' ? _textoProducto(item) : (item.nombre || '');
+}
+
+// Suma, por producto, lo ya entregado (entregas de cualquier viaje vinculadas a esta orden y
+// marcadas "hecha" en Cumplidos) — es lo que alimenta el saldo pendiente de la orden y el
+// valor por defecto al vincular una nueva entrega a la misma orden.
+function _cantidadEntregadaPorProducto(ordenId) {
+  const mapa = {};
+  VIAJES.forEach(v => {
+    _entregasDeViaje(v).forEach(e => {
+      if (!ordenId || String(e.ordenId) !== String(ordenId)) return;
+      if (_cumplidoDeEntrega(e).estado !== 'hecha') return;
+      (e.productos || []).forEach(p => { mapa[p.producto] = (mapa[p.producto] || 0) + (Number(p.cantidad) || 0); });
+    });
+  });
+  return mapa;
+}
+
+// Al vincular una entrega a una orden: trae cliente/destino/contacto de la orden, y arma las
+// líneas de producto con el SALDO pendiente de cada una (pedido - ya entregado a la fecha), no
+// la cantidad pedida completa — para que una entrega parcial parta de lo que de verdad falta.
+function aplicarOrdenAEntrega(ei, ordenId) {
+  const e = _entregasViajeActual[ei];
+  if (!e) return;
+  e.ordenId = ordenId || '';
+  if (!ordenId) { e.ordenNumero = ''; renderEntregasViaje(); return; }
+
+  const orden = (typeof ORDENES !== 'undefined' ? ORDENES : []).find(o => String(o.id) === String(ordenId));
+  if (!orden) { renderEntregasViaje(); return; }
+
+  e.ordenNumero = orden.numero || '';
+  e.cliente = orden.cliente || orden.clienteData?.nombre || e.cliente;
+  e.destino = orden.clienteData?.proyecto || e.destino;
+  e.contactoObraNombre = orden.clienteData?.contacto || e.contactoObraNombre;
+  e.contactoObraTelefono = orden.clienteData?.cel || e.contactoObraTelefono;
+
+  const entregadoPorClave = _cantidadEntregadaPorProducto(ordenId);
+  const items = _itemsDeOrden(orden);
+  e.productos = items.length ? items.map(it => {
+    const clave = _claveItemOrden(it);
+    const saldo = Math.max(0, (Number(it.cantidad) || 0) - (entregadoPorClave[clave] || 0));
+    const prodCat = it.codigo && typeof PRODUCTOS !== 'undefined' ? PRODUCTOS.find(p => p.codigo === it.codigo) : null;
+    const pesoUnitario = prodCat ? (Number(prodCat.peso) || 0) : 0;
+    return { producto: clave, cantidad: saldo, peso: (saldo * pesoUnitario) / 1000 };
+  }) : [_lineaVaciaEntrega()];
+
+  // La ciudad de destino del viaje se autocompleta solo si todavía está sin elegir — no se
+  // sobreescribe si el viaje ya tenía una (puede tener varias entregas de órdenes distintas).
+  const selDestino = document.getElementById('m-viaje-destino');
+  if (selDestino && !selDestino.value) {
+    const ciudad = orden.transporte?.destino === 'Otro' ? (orden.transporte?.destinoNombre || '') : (orden.transporte?.destino || '');
+    if (ciudad) _fijarCiudadDestino(ciudad);
+  }
+
+  renderEntregasViaje();
+}
 
 function renderEntregasViaje() {
   const wrap = document.getElementById('viaje-entregas-wrap');
@@ -247,6 +318,7 @@ function renderEntregasViaje() {
           <div style="font-size:13px;font-weight:700">${e.cliente || 'Sin cliente'}${e.destino ? ' — ' + e.destino : ''}</div>
           <div style="font-size:11px;font-weight:700">${_ETIQUETA_CUMPLIDO[c.estado] || _ETIQUETA_CUMPLIDO.pendiente}${c.estado === 'reprogramada' && c.nuevaFecha ? ` → ${c.nuevaFecha}` : ''}</div>
         </div>
+        <div style="font-size:11px;color:var(--gris-medio);margin-bottom:2px">Orden: ${e.ordenNumero || 'N/A — sin orden asociada'}</div>
         <div style="font-size:11px;color:var(--gris-medio);margin-bottom:6px">Contacto en obra: ${e.contactoObraNombre ? e.contactoObraNombre + (e.contactoObraTelefono ? ' — ' + e.contactoObraTelefono : '') : '—'}</div>
         ${(e.productos || []).map(p => `<div style="font-size:12px;padding:3px 0;border-top:1px solid #eee">• ${p.producto || ''} — ${p.cantidad || 0} (${(Number(p.peso) || 0).toFixed(2)} ton)</div>`).join('')}
       </div>`;
@@ -254,8 +326,16 @@ function renderEntregasViaje() {
     return;
   }
 
+  const _opcionesOrdenes = (typeof ORDENES !== 'undefined' ? ORDENES : []).filter(o => o.estado !== 'Cancelado');
   wrap.innerHTML = _entregasViajeActual.map((e, ei) => `
     <div class="card" style="padding:12px;margin-bottom:10px;background:#FAFBFC;box-shadow:none;border:1px solid var(--gris-borde)">
+      <div class="form-grupo" style="margin-bottom:8px">
+        <label>Orden de Producción asociada</label>
+        <select onchange="aplicarOrdenAEntrega(${ei},this.value)" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="">N/A — sin orden asociada</option>
+          ${_opcionesOrdenes.map(o => `<option value="${o.id}" ${String(e.ordenId || '') === String(o.id) ? 'selected' : ''}>${o.numero} — ${o.cliente || ''} — ${(o.descripcion || '').slice(0, 40)}</option>`).join('')}
+        </select>
+      </div>
       <div class="form-grid" style="margin-bottom:8px">
         <div class="form-grupo"><label>Cliente</label><input type="text" value="${e.cliente || ''}" list="datalist-clientes-viaje" oninput="_entregasViajeActual[${ei}].cliente=this.value" placeholder="Busca un cliente existente..."></div>
         <div class="form-grupo"><label>Destino específico / Proyecto</label><input type="text" value="${e.destino || ''}" oninput="_entregasViajeActual[${ei}].destino=this.value" placeholder="Ej: Proyecto Villa 86"></div>
@@ -451,7 +531,7 @@ function editarViaje(id) {
   // un viaje ya programado no debe cambiar solo porque un producto se actualizó después).
   const entregasPrevias = _entregasDeViaje(v);
   _entregasViajeActual = JSON.parse(JSON.stringify(entregasPrevias.length ? entregasPrevias : [_entregaVaciaViaje()]));
-  _entregasViajeActual.forEach(e => { if (!e.productos || !e.productos.length) e.productos = [_lineaVaciaEntrega()]; if (!e.cumplido) e.cumplido = { estado: 'pendiente' }; });
+  _entregasViajeActual.forEach(e => { if (!e.productos || !e.productos.length) e.productos = [_lineaVaciaEntrega()]; if (!e.cumplido) e.cumplido = { estado: 'pendiente' }; if (e.ordenId === undefined) e.ordenId = ''; if (e.ordenNumero === undefined) e.ordenNumero = ''; });
   renderEntregasViaje();
   document.getElementById('modal-viaje').classList.add('abierto');
 }
@@ -463,6 +543,8 @@ function guardarViaje() {
 
   const entregasLimpias = _entregasViajeActual
     .map(e => ({
+      ordenId: e.ordenId || '',
+      ordenNumero: e.ordenNumero || '',
       cliente: (e.cliente || '').trim(),
       destino: (e.destino || '').trim(),
       contactoObraNombre: (e.contactoObraNombre || '').trim(),

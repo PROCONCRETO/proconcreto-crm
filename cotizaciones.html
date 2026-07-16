@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260716e">
+<link rel="stylesheet" href="css/estilos.css?v=20260716f">
 </head>
 <body>
 
@@ -1442,6 +1442,14 @@
       <label>Observaciones</label>
       <textarea id="m-orden-obs" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical" placeholder="Notas adicionales..."></textarea>
     </div>
+    <div id="orden-saldo-wrap" style="display:none;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin-bottom:8px">CANTIDAD PEDIDA / ENTREGADA / SALDO</div>
+      <table class="tabla-cots" style="font-size:12px">
+        <thead><tr><th>Producto</th><th style="text-align:right">Pedido</th><th style="text-align:right">Entregado</th><th style="text-align:right">Saldo</th></tr></thead>
+        <tbody id="orden-saldo-body"></tbody>
+      </table>
+      <div style="font-size:10.5px;color:var(--gris-medio);margin-top:4px">"Entregado" suma las entregas de Logística vinculadas a esta orden y marcadas como "Hecha" en Cumplidos.</div>
+    </div>
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-orden')">Cancelar</button>
       <button class="btn btn-primario" onclick="guardarOrden()">Guardar</button>
@@ -1548,25 +1556,25 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260716e"></script>
-<script src="js/catalogo.js?v=20260716e"></script>
-<script src="js/navegacion.js?v=20260716e"></script>
-<script src="js/ordenes-produccion.js?v=20260716e"></script>
-<script src="js/produccion-diaria.js?v=20260716e"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260716e"></script>
-<script src="js/calidad-mezclas.js?v=20260716e"></script>
-<script src="js/calidad-estadisticas.js?v=20260716e"></script>
-<script src="js/calidad-trazabilidad.js?v=20260716e"></script>
-<script src="js/logistica.js?v=20260716e"></script>
-<script src="js/estadisticas-logistica.js?v=20260716e"></script>
-<script src="js/auth.js?v=20260716e"></script>
-<script src="js/datos-realtime.js?v=20260716e"></script>
-<script src="js/cotizador.js?v=20260716e"></script>
-<script src="js/historico-clientes-stats.js?v=20260716e"></script>
+<script src="js/config.js?v=20260716f"></script>
+<script src="js/catalogo.js?v=20260716f"></script>
+<script src="js/navegacion.js?v=20260716f"></script>
+<script src="js/ordenes-produccion.js?v=20260716f"></script>
+<script src="js/produccion-diaria.js?v=20260716f"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260716f"></script>
+<script src="js/calidad-mezclas.js?v=20260716f"></script>
+<script src="js/calidad-estadisticas.js?v=20260716f"></script>
+<script src="js/calidad-trazabilidad.js?v=20260716f"></script>
+<script src="js/logistica.js?v=20260716f"></script>
+<script src="js/estadisticas-logistica.js?v=20260716f"></script>
+<script src="js/auth.js?v=20260716f"></script>
+<script src="js/datos-realtime.js?v=20260716f"></script>
+<script src="js/cotizador.js?v=20260716f"></script>
+<script src="js/historico-clientes-stats.js?v=20260716f"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="js/pdf.js?v=20260716e"></script>
+<script src="js/pdf.js?v=20260716f"></script>
 </body>
 </html>

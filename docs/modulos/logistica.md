@@ -18,6 +18,7 @@
 - **Entrega**: dentro de un viaje, puede haber una o varias entregas — una entrega es el viaje completo para un cliente, o una porción de él si el camión se completa con otra(s) entrega(s) para otro(s) cliente(s). Cada entrega tiene su propio cliente, **destino específico/proyecto** (el sitio puntual dentro de la ciudad — no confundir con la Ciudad de Destino del viaje), contacto en obra y lista de productos.
 - El peso total del viaje es la suma de todas las líneas de producto de todas sus entregas, comparado contra la capacidad del vehículo seleccionado (`CAPACIDAD_VEHICULO`).
 - **Cumplido**: cada entrega tiene `entrega.cumplido = { estado, nuevaFecha?, fechaConfirmacion, confirmadoPor }`. `estado` es uno de `pendiente` (default), `hecha`, `reprogramada` o `cancelada`. El cumplimiento de un viaje es proporcional: entregas `hecha` / total de entregas programadas (`pctCumplidoViaje()`).
+- **Orden de Producción asociada**: cada entrega puede vincularse a una orden (`entrega.ordenId`/`ordenNumero`, o "N/A" si no aplica — órdenes viejas no cargadas en el aplicativo, o entregas sin orden). Al elegir una orden se autocompletan cliente/destino/contacto y las líneas de producto con el **saldo pendiente** de cada una (pedido − ya entregado a la fecha en otras entregas "hecha" de esa orden), no la cantidad pedida completa — pensado para entregas parciales. Ver `aplicarOrdenAEntrega()`, `_itemsDeOrden()`, `_cantidadEntregadaPorProducto()`.
 
 ## Bloqueo de fechas pasadas
 
