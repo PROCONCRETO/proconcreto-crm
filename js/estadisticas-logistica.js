@@ -89,10 +89,12 @@ function renderEstadisticasLogistica() {
   const pctCapacidadProm = viajesCumplidosConCapacidad.length
     ? Math.round(viajesCumplidosConCapacidad.reduce((s, vv) => s + vv.pesoHecho / CAPACIDAD_VEHICULO[vv.vehiculo], 0) / viajesCumplidosConCapacidad.length * 100)
     : 0;
-  // Reprogramada = cambió de día de verdad (fechaOriginal != fecha actual). Un movimiento
-  // dentro del mismo día no cuenta, sin importar si vino de arrastrar el viaje en el
-  // calendario o de "Reprogramar" en Cumplidos.
-  const entregasReprogramadas = entregas.filter(e => e.fechaOriginal && e.fechaOriginal !== e.fecha).length;
+  // Mismo bucket que la dona de cumplimiento (cumplido.estado === 'reprogramada') — tanto
+  // "Reprogramar" en Cumplidos como arrastrar un viaje de hoy a otro día dejan la entrega
+  // original marcada así, así que ambos caminos quedan contados igual. Un cambio dentro del
+  // mismo día nunca llega a marcarse "reprogramada" (ver confirmarReprogramacion() y
+  // soltarViajeEnDia()), así que no hace falta excluirlo aparte.
+  const entregasReprogramadas = entregas.filter(e => e.cumplido === 'reprogramada').length;
 
   const tarjetas = document.getElementById('est-log-tarjetas');
   if (tarjetas) {

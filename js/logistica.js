@@ -217,14 +217,57 @@ function soltarViajeEnDia(event, fechaDestino) {
   const v = VIAJES.find(x => String(x.id) === String(id));
   if (!v || v.fecha === fechaDestino) return; // mismo día: no se mueve nada, no cuenta como reprogramación
   if (esFechaBloqueada(fechaDestino)) { alert('No se puede mover un viaje a una fecha que ya pasó.'); return; }
-  // fechaOriginal se conserva tal cual estaba (o se fija por primera vez a la fecha vieja del
-  // viaje) — así queda registrado que esta entrega se reprogramó a un día distinto, para las
-  // estadísticas de Entregas Reprogramadas.
-  _entregasDeViaje(v).forEach(e => { if (!e.fechaOriginal) e.fechaOriginal = v.fecha; });
-  v.fecha = fechaDestino;
-  v.orden = Date.now();
-  sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' })
-    .then(({ error }) => { if (error) console.error('Error moviendo viaje de fecha:', error.message); });
+
+  const hoy = _fmtISO(new Date());
+  if (v.fecha <= hoy) {
+    // El viaje es de hoy (no puede ser de antes: eso ya está bloqueado para arrastrar) y por lo
+    // tanto ya cuenta en las estadísticas de "hasta hoy". Si simplemente le cambiáramos la
+    // fecha, la entrega desaparecería de esas estadísticas en vez de contar como reprogramada
+    // — así que se deja el mismo rastro que "Reprogramar" en Cumplidos: las entregas pendientes
+    // del viaje original quedan marcadas "reprogramada" (se quedan hoy, contando), y se crea un
+    // viaje nuevo en la fecha destino con copias frescas ("pendiente") de esas entregas.
+    const entregasNuevas = [];
+    _entregasDeViaje(v).forEach(e => {
+      if (!e.fechaOriginal) e.fechaOriginal = v.fecha;
+      if (_cumplidoDeEntrega(e).estado !== 'pendiente') return; // ya tiene un resultado real, no se toca
+      e.cumplido = { estado: 'reprogramada', nuevaFecha: fechaDestino, fechaConfirmacion: new Date().toISOString(), confirmadoPor: USUARIO_ACTUAL?.email };
+      entregasNuevas.push({
+        ordenId: e.ordenId || '', ordenNumero: e.ordenNumero || '',
+        cliente: e.cliente, destino: e.destino,
+        contactoObraNombre: e.contactoObraNombre, contactoObraTelefono: e.contactoObraTelefono,
+        productos: JSON.parse(JSON.stringify(e.productos || [])),
+        fechaOriginal: e.fechaOriginal,
+        cumplido: { estado: 'pendiente' },
+      });
+    });
+    if (!entregasNuevas.length) { alert('Las entregas de este viaje ya tienen un resultado registrado (Hecha/Cancelada) — no hay nada pendiente que mover.'); renderCalendarioLogistica(); return; }
+    const guardados = [sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' })];
+    const pesoNuevo = entregasNuevas.reduce((s, e) => s + e.productos.reduce((s2, p) => s2 + (Number(p.peso) || 0), 0), 0);
+    const viajeNuevo = {
+      id: String(Date.now()) + '-r',
+      fecha: fechaDestino,
+      destino: v.destino,
+      vehiculo: v.vehiculo,
+      estado: 'Programada',
+      observaciones: `Movido desde el viaje del ${v.fecha}.`,
+      entregas: entregasNuevas,
+      pesoTotal: pesoNuevo,
+      creadoPor: USUARIO_ACTUAL?.email,
+      creadoEn: new Date().toISOString(),
+    };
+    VIAJES.unshift(viajeNuevo);
+    guardados.push(sb.from('entregas_programadas').upsert({ id: viajeNuevo.id, datos: viajeNuevo, modificado: new Date().toISOString() }, { onConflict: 'id' }));
+    Promise.all(guardados).then(rs => rs.forEach(({ error }) => { if (error) console.error('Error moviendo viaje de fecha:', error.message); }));
+  } else {
+    // El viaje es de un día futuro moviéndose a otro día futuro — no entra en ninguna ventana
+    // de estadísticas "hasta hoy" ni antes ni después del cambio, así que se puede mover en el
+    // mismo sitio sin duplicar nada.
+    _entregasDeViaje(v).forEach(e => { if (!e.fechaOriginal) e.fechaOriginal = v.fecha; });
+    v.fecha = fechaDestino;
+    v.orden = Date.now();
+    sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' })
+      .then(({ error }) => { if (error) console.error('Error moviendo viaje de fecha:', error.message); });
+  }
   renderCalendarioLogistica();
 }
 
