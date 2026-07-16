@@ -19,6 +19,7 @@
 - El peso total del viaje es la suma de todas las líneas de producto de todas sus entregas, comparado contra la capacidad del vehículo seleccionado (`CAPACIDAD_VEHICULO`).
 - **Cumplido**: cada entrega tiene `entrega.cumplido = { estado, nuevaFecha?, fechaConfirmacion, confirmadoPor }`. `estado` es uno de `pendiente` (default), `hecha`, `reprogramada` o `cancelada`. El cumplimiento de un viaje es proporcional: entregas `hecha` / total de entregas programadas (`pctCumplidoViaje()`).
 - **Orden de Producción asociada**: cada entrega puede vincularse a una orden (`entrega.ordenId`/`ordenNumero`, o "N/A" si no aplica — órdenes viejas no cargadas en el aplicativo, o entregas sin orden). Al elegir una orden se autocompletan cliente/destino/contacto y las líneas de producto con el **saldo pendiente** de cada una (pedido − ya entregado a la fecha en otras entregas "hecha" de esa orden), no la cantidad pedida completa — pensado para entregas parciales. Ver `aplicarOrdenAEntrega()`, `_itemsDeOrden()`, `_cantidadEntregadaPorProducto()`.
+- **Prioridad dentro del día**: los viajes de un mismo día se ordenan por `viaje.orden` (si no está definido, se usa el id/timestamp de creación como respaldo — orden cronológico). Las flechas ▲▼ en cada chip del calendario (`moverViajeOrden()`) intercambian el `orden` con el vecino inmediato, para reflejar prioridad real de despacho y no solo el orden en que se cargaron.
 
 ## Bloqueo de fechas pasadas
 

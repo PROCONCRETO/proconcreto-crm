@@ -156,6 +156,30 @@ function pctCumplidoViaje(v) {
   return Math.round((hechas / entregas.length) * 100);
 }
 
+// ── Orden/prioridad de los viajes dentro de un mismo día ──
+// Por defecto los viajes de un día se ven en el orden en que se crearon (más viejo primero),
+// no necesariamente el orden de prioridad real de despacho. `orden` es opcional: si no está
+// definido, se usa el id (que es un timestamp) como respaldo. Las flechas ▲▼ del calendario
+// intercambian el valor de `orden` con el vecino inmediato para subir/bajar prioridad.
+function _claveOrdenViaje(v) { return (v.orden !== undefined && v.orden !== null) ? v.orden : Number(v.id); }
+
+function moverViajeOrden(id, direccion) {
+  const v = VIAJES.find(x => String(x.id) === String(id));
+  if (!v) return;
+  const viajesDia = VIAJES.filter(x => x.fecha === v.fecha).sort((a, b) => _claveOrdenViaje(a) - _claveOrdenViaje(b));
+  const idx = viajesDia.findIndex(x => String(x.id) === String(id));
+  const vecino = viajesDia[idx + direccion];
+  if (!vecino) return;
+  const ordenV = _claveOrdenViaje(v), ordenVecino = _claveOrdenViaje(vecino);
+  v.orden = ordenVecino;
+  vecino.orden = ordenV;
+  [v, vecino].forEach(x => {
+    sb.from('entregas_programadas').upsert({ id: x.id, datos: x, modificado: new Date().toISOString() }, { onConflict: 'id' })
+      .then(({ error }) => { if (error) console.error('Error guardando orden de viaje:', error.message); });
+  });
+  renderCalendarioLogistica();
+}
+
 function renderCalendarioLogistica() {
   const cont = document.getElementById('log-calendario');
   if (!cont) return;
@@ -182,7 +206,7 @@ function renderCalendarioLogistica() {
     const dow = fechaObj.getDay();
     const festivoNombre = festivosMap[fechaStr];
     const esHoy = fechaStr === hoyStr;
-    const viajesDia = VIAJES.filter(v => v.fecha === fechaStr);
+    const viajesDia = VIAJES.filter(v => v.fecha === fechaStr).sort((a, b) => _claveOrdenViaje(a) - _claveOrdenViaje(b));
 
     let clases = 'log-cal-celda';
     if (festivoNombre) clases += ' log-cal-festivo';
@@ -194,15 +218,20 @@ function renderCalendarioLogistica() {
         <div class="log-cal-dia-num">${dia}${esHoy ? ' <span class="log-cal-hoy-badge">HOY</span>' : ''}${viajesDia.length ? `<span onclick="event.stopPropagation();imprimirProgramacionDia('${fechaStr}')" title="Imprimir programación del día" style="float:right;cursor:pointer">🖨️</span>` : ''}</div>
         ${festivoNombre ? `<div class="log-cal-festivo-nombre" title="${festivoNombre}">🎉 ${festivoNombre}</div>` : ''}
         <div class="log-cal-viajes">
-          ${viajesDia.map(v => {
+          ${viajesDia.map((v, idxViaje) => {
             const nEntregas = _entregasDeViaje(v).length;
             const peso = Number(v.pesoTotal) || 0;
             const pct = pctCumplidoViaje(v);
             const pctTxt = (fechaStr <= hoyStr && pct !== null) ? ` — ${pct}% cumplido` : '';
             const tituloTip = `${v.destino || ''}${v.vehiculo ? ' — ' + v.vehiculo : ''} — ${nEntregas} entrega${nEntregas === 1 ? '' : 's'} — ${peso.toFixed(2)} ton${v.estado ? ' — ' + v.estado : ''}${pctTxt}`;
+            const flechas = viajesDia.length > 1 ? `
+              <span class="log-cal-viaje-flechas">
+                ${idxViaje > 0 ? `<span onclick="event.stopPropagation();moverViajeOrden('${v.id}',-1)" title="Subir prioridad">▲</span>` : ''}
+                ${idxViaje < viajesDia.length - 1 ? `<span onclick="event.stopPropagation();moverViajeOrden('${v.id}',1)" title="Bajar prioridad">▼</span>` : ''}
+              </span>` : '';
             return `
             <div class="log-cal-viaje" style="background:${COLOR_VEHICULO_VIAJE[v.vehiculo] || '#607D8B'}${v.estado === 'Cancelada' ? ';opacity:.5;text-decoration:line-through' : ''}" onclick="event.stopPropagation();editarViaje('${v.id}')" title="${tituloTip}">
-              ${v.destino || 'Viaje'} · ${nEntregas} ent · ${peso.toFixed(1)}t${fechaStr <= hoyStr && pct !== null ? ` · ${pct}%` : ''}
+              <span class="log-cal-viaje-texto">${v.destino || 'Viaje'} · ${nEntregas} ent · ${peso.toFixed(1)}t${fechaStr <= hoyStr && pct !== null ? ` · ${pct}%` : ''}</span>${flechas}
             </div>`;
           }).join('')}
         </div>
