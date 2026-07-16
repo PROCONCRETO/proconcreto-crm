@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260716d">
+<link rel="stylesheet" href="css/estilos.css?v=20260716e">
 </head>
 <body>
 
@@ -671,9 +671,15 @@
 
   <div class="form-grid" id="est-log-tarjetas" style="margin-bottom:16px"></div>
 
-  <div class="card">
-    <div class="card-titulo">Cumplimiento de entregas</div>
-    <div style="max-width:340px;margin:0 auto"><canvas id="chart-log-cumplimiento"></canvas></div>
+  <div class="form-grid">
+    <div class="card">
+      <div class="card-titulo">Cumplimiento de entregas</div>
+      <div style="max-width:300px;margin:0 auto"><canvas id="chart-log-cumplimiento"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-titulo">Cumplimiento de viajes</div>
+      <div style="max-width:300px;margin:0 auto"><canvas id="chart-log-cumplimiento-viajes"></canvas></div>
+    </div>
   </div>
 
   <div class="card">
@@ -987,7 +993,35 @@
     <input type="hidden" id="m-viaje-id">
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Fecha *</label><input type="date" id="m-viaje-fecha"></div>
-      <div class="form-grupo"><label>Destino *</label><input type="text" id="m-viaje-destino" placeholder="Ej: Manizales"></div>
+      <div class="form-grupo">
+        <label>Ciudad de Destino *</label>
+        <select id="m-viaje-destino" onchange="toggleCiudadDestinoOtro()">
+          <option value="" disabled>Selecciona la ciudad...</option>
+          <optgroup label="Caldas">
+            <option value="Manizales">Manizales</option>
+            <option value="Chinchiná">Chinchiná</option>
+            <option value="Villamaría">Villamaría</option>
+            <option value="Palestina">Palestina</option>
+            <option value="Neira">Neira</option>
+          </optgroup>
+          <optgroup label="Risaralda">
+            <option value="Pereira">Pereira</option>
+            <option value="Dosquebradas">Dosquebradas</option>
+            <option value="Santa Rosa de Cabal">Santa Rosa de Cabal</option>
+            <option value="La Virginia">La Virginia</option>
+            <option value="Marsella">Marsella</option>
+          </optgroup>
+          <optgroup label="Quindío">
+            <option value="Armenia">Armenia</option>
+            <option value="Calarcá">Calarcá</option>
+            <option value="La Tebaida">La Tebaida</option>
+            <option value="Montenegro">Montenegro</option>
+            <option value="Circasia">Circasia</option>
+          </optgroup>
+          <option value="__otro__">Otros (escribir manualmente)</option>
+        </select>
+        <input type="text" id="m-viaje-destino-otro" placeholder="Escribe la ciudad" style="display:none;margin-top:6px;width:100%;border:1px solid var(--gris-borde);border-radius:var(--radio);padding:8px 10px;font-size:13px">
+      </div>
     </div>
     <div class="form-grid" style="margin-bottom:16px">
       <div class="form-grupo"><label>Vehículo</label>
@@ -1514,25 +1548,25 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260716d"></script>
-<script src="js/catalogo.js?v=20260716d"></script>
-<script src="js/navegacion.js?v=20260716d"></script>
-<script src="js/ordenes-produccion.js?v=20260716d"></script>
-<script src="js/produccion-diaria.js?v=20260716d"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260716d"></script>
-<script src="js/calidad-mezclas.js?v=20260716d"></script>
-<script src="js/calidad-estadisticas.js?v=20260716d"></script>
-<script src="js/calidad-trazabilidad.js?v=20260716d"></script>
-<script src="js/logistica.js?v=20260716d"></script>
-<script src="js/estadisticas-logistica.js?v=20260716d"></script>
-<script src="js/auth.js?v=20260716d"></script>
-<script src="js/datos-realtime.js?v=20260716d"></script>
-<script src="js/cotizador.js?v=20260716d"></script>
-<script src="js/historico-clientes-stats.js?v=20260716d"></script>
+<script src="js/config.js?v=20260716e"></script>
+<script src="js/catalogo.js?v=20260716e"></script>
+<script src="js/navegacion.js?v=20260716e"></script>
+<script src="js/ordenes-produccion.js?v=20260716e"></script>
+<script src="js/produccion-diaria.js?v=20260716e"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260716e"></script>
+<script src="js/calidad-mezclas.js?v=20260716e"></script>
+<script src="js/calidad-estadisticas.js?v=20260716e"></script>
+<script src="js/calidad-trazabilidad.js?v=20260716e"></script>
+<script src="js/logistica.js?v=20260716e"></script>
+<script src="js/estadisticas-logistica.js?v=20260716e"></script>
+<script src="js/auth.js?v=20260716e"></script>
+<script src="js/datos-realtime.js?v=20260716e"></script>
+<script src="js/cotizador.js?v=20260716e"></script>
+<script src="js/historico-clientes-stats.js?v=20260716e"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="js/pdf.js?v=20260716d"></script>
+<script src="js/pdf.js?v=20260716e"></script>
 </body>
 </html>

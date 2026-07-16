@@ -14,8 +14,8 @@
 
 ## Conceptos del dominio
 
-- **Viaje**: una salida de camión de planta. Tiene fecha, destino general (ej. Manizales), vehículo y estado. Es la entidad principal del módulo (variable `VIAJES`, tabla Supabase `entregas_programadas`).
-- **Entrega**: dentro de un viaje, puede haber una o varias entregas — una entrega es el viaje completo para un cliente, o una porción de él si el camión se completa con otra(s) entrega(s) para otro(s) cliente(s). Cada entrega tiene su propio cliente, destino específico/proyecto, contacto en obra y lista de productos.
+- **Viaje**: una salida de camión de planta. Tiene fecha, **Ciudad de Destino** (desplegable curado con municipios de Caldas/Risaralda/Quindío + "Otros" para texto libre — ver `toggleCiudadDestinoOtro()`/`_valorCiudadDestino()`/`_fijarCiudadDestino()`), vehículo y estado. Es la entidad principal del módulo (variable `VIAJES`, tabla Supabase `entregas_programadas`).
+- **Entrega**: dentro de un viaje, puede haber una o varias entregas — una entrega es el viaje completo para un cliente, o una porción de él si el camión se completa con otra(s) entrega(s) para otro(s) cliente(s). Cada entrega tiene su propio cliente, **destino específico/proyecto** (el sitio puntual dentro de la ciudad — no confundir con la Ciudad de Destino del viaje), contacto en obra y lista de productos.
 - El peso total del viaje es la suma de todas las líneas de producto de todas sus entregas, comparado contra la capacidad del vehículo seleccionado (`CAPACIDAD_VEHICULO`).
 - **Cumplido**: cada entrega tiene `entrega.cumplido = { estado, nuevaFecha?, fechaConfirmacion, confirmadoPor }`. `estado` es uno de `pendiente` (default), `hecha`, `reprogramada` o `cancelada`. El cumplimiento de un viaje es proporcional: entregas `hecha` / total de entregas programadas (`pctCumplidoViaje()`).
 
@@ -36,7 +36,12 @@ Botón "✅ Cumplidos" en la barra de Programación de Viajes, con contador de e
 
 ## Estadísticas (dashboard)
 
-`renderEstadisticasLogistica()`, filtrable por periodo (7/30/90 días o todo). KPIs: viajes en el periodo, peso transportado, % cumplimiento, % capacidad promedio. Gráficas: dona de cumplimiento (colores de estado: verde=hecha, ámbar=reprogramada, rojo=cancelada, gris=pendiente), barras de peso transportado por vehículo (con tabla de apoyo de N° de viajes y % capacidad — evita mezclar métricas de distinta escala en un mismo eje), tendencia de viajes por día, y ranking de destinos más frecuentes.
+`renderEstadisticasLogistica()`, filtrable por periodo (7/30/90 días o todo). KPIs: viajes en el periodo, entregas programadas, peso transportado, % cumplimiento, % capacidad promedio. Gráficas:
+- Dona de **cumplimiento de entregas** (verde=hecha, ámbar=reprogramada, rojo=cancelada, gris=pendiente).
+- Dona de **cumplimiento de viajes** (`_categoriaCumplidoViaje()`: completo=100% de sus entregas hechas, parcial=algunas, sin_cumplir=ninguna, pendiente=todavía hay entregas sin marcar).
+- Barras de peso transportado por vehículo, **etiquetadas por placa** (propios) **o tipo de camión** (tercerizados — "CAMION SENCILLO" vs "TRACTO CAMION", nunca el nombre del conductor ni un genérico "TERCERIZADO" que los mezclaría), con tabla de apoyo de N° de viajes y % capacidad debajo (evita mezclar métricas de distinta escala en un mismo eje).
+- Tendencia de viajes por día.
+- Ranking de destinos más frecuentes — cuenta la **Ciudad de Destino del viaje**, no el destino específico/proyecto de la entrega.
 
 ## Qué hace
 

@@ -13,6 +13,25 @@ const _COLOR_CUMPLIDO = {
   pendiente:    { color: '#b0aea6', icono: '⏳', etiqueta: 'Pendiente' },
 };
 
+// Cumplimiento a nivel de VIAJE (no de entrega individual): un viaje puede tener varias
+// entregas con resultados distintos, así que se resume en 4 categorías con la misma lógica
+// de colores de estado (verde=bien, ámbar=a medias, rojo=mal, gris=todavía sin resolver).
+const _COLOR_CUMPLIDO_VIAJE = {
+  completo:     { color: '#0ca30c', icono: '✅', etiqueta: 'Completo (100%)' },
+  parcial:      { color: '#fab219', icono: '🔶', etiqueta: 'Parcial' },
+  sin_cumplir:  { color: '#d03b3b', icono: '❌', etiqueta: 'Sin cumplir (0%)' },
+  pendiente:    { color: '#b0aea6', icono: '⏳', etiqueta: 'Pendiente' },
+};
+
+function _categoriaCumplidoViaje(v) {
+  const estados = _entregasDeViaje(v).map(e => _cumplidoDeEntrega(e).estado);
+  if (!estados.length || estados.some(s => s === 'pendiente')) return 'pendiente';
+  const hechas = estados.filter(s => s === 'hecha').length;
+  if (hechas === estados.length) return 'completo';
+  if (hechas > 0) return 'parcial';
+  return 'sin_cumplir';
+}
+
 // Junta viajes + entregas del periodo seleccionado (solo hoy y hacia atrás; el futuro no
 // tiene cumplimiento que medir todavía).
 function _datosEstadisticasLogistica(periodoDias) {
@@ -26,7 +45,9 @@ function _datosEstadisticasLogistica(periodoDias) {
     viajesEnPeriodo.push(v);
     _entregasDeViaje(v).forEach(e => {
       const pesoEntrega = (e.productos || []).reduce((s, p) => s + (Number(p.peso) || 0), 0);
-      entregas.push({ fecha: v.fecha, vehiculo: v.vehiculo, destino: (e.destino || v.destino || '').trim() || 'Sin destino', cumplido: _cumplidoDeEntrega(e).estado, pesoEntrega });
+      // La ciudad de destino es la del viaje (Ciudad de Destino), no el "Destino específico /
+      // Proyecto" de la entrega — ese es el sitio puntual dentro de la ciudad, no la ciudad.
+      entregas.push({ fecha: v.fecha, vehiculo: v.vehiculo, destino: (v.destino || '').trim() || 'Sin destino', cumplido: _cumplidoDeEntrega(e).estado, pesoEntrega });
     });
   });
   return { viajesEnPeriodo, entregas };
@@ -56,12 +77,14 @@ function renderEstadisticasLogistica() {
   const tarjetas = document.getElementById('est-log-tarjetas');
   if (tarjetas) {
     tarjetas.innerHTML = _tarjetaKPI('Viajes en el periodo', totalViajes)
+      + _tarjetaKPI('Entregas programadas', entregas.length)
       + _tarjetaKPI('Peso transportado', pesoTotal.toFixed(1) + ' ton')
       + _tarjetaKPI('% Cumplimiento', pctCumplimiento + '%')
       + _tarjetaKPI('% Capacidad promedio', pctCapacidadProm + '%');
   }
 
   _chartCumplimiento(entregas);
+  _chartCumplimientoViajes(viajesEnPeriodo);
   _chartVehiculos(viajesEnPeriodo);
   _chartTendencia(viajesEnPeriodo, periodo);
   _chartDestinos(entregas);
@@ -97,8 +120,41 @@ function _chartCumplimiento(entregas) {
   });
 }
 
+// ── Cumplimiento de viajes (dona, mismos colores de estado a nivel de viaje completo) ──
+let _chartCumplimientoViajesInst = null;
+function _chartCumplimientoViajes(viajesEnPeriodo) {
+  const ctx = document.getElementById('chart-log-cumplimiento-viajes');
+  if (!ctx) return;
+  const categorias = ['completo', 'parcial', 'sin_cumplir', 'pendiente'];
+  const counts = categorias.map(c => viajesEnPeriodo.filter(v => _categoriaCumplidoViaje(v) === c).length);
+  const total = counts.reduce((a, b) => a + b, 0);
+  if (_chartCumplimientoViajesInst) _chartCumplimientoViajesInst.destroy();
+  _chartCumplimientoViajesInst = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: categorias.map(c => `${_COLOR_CUMPLIDO_VIAJE[c].icono} ${_COLOR_CUMPLIDO_VIAJE[c].etiqueta}`),
+      datasets: [{
+        data: counts,
+        backgroundColor: categorias.map(c => _COLOR_CUMPLIDO_VIAJE[c].color),
+        borderColor: '#fcfcfb',
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      cutout: '62%',
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#52514e', boxWidth: 12, padding: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: (c) => { const pct = total ? Math.round(c.parsed / total * 100) : 0; return ` ${c.label}: ${c.parsed} (${pct}%)`; } } },
+      },
+    },
+  });
+}
+
 // ── Desempeño por vehículo (peso transportado; viajes y % capacidad van en la tabla de
-// apoyo debajo, para no mezclar tres métricas de distinta escala en un solo eje) ──
+// apoyo debajo, para no mezclar tres métricas de distinta escala en un solo eje).
+// La etiqueta es la placa (vehículos propios) o el tipo de camión (tercerizados) — nunca el
+// nombre del conductor, y así los dos tercerizados (camión sencillo vs. tractocamión) quedan
+// diferenciados en vez de aparecer los dos como "TERCERIZADO". ──
 let _chartVehiculosInst = null;
 function _chartVehiculos(viajesEnPeriodo) {
   const ctx = document.getElementById('chart-log-vehiculos');
@@ -106,12 +162,13 @@ function _chartVehiculos(viajesEnPeriodo) {
   const vehiculos = Object.keys(CAPACIDAD_VEHICULO);
   const pesos = vehiculos.map(veh => viajesEnPeriodo.filter(v => v.vehiculo === veh).reduce((s, v) => s + (Number(v.pesoTotal) || 0), 0));
   const viajesCount = vehiculos.map(veh => viajesEnPeriodo.filter(v => v.vehiculo === veh).length);
+  const etiquetas = vehiculos.map(v => (v.split(' / ')[0] || v).trim());
 
   if (_chartVehiculosInst) _chartVehiculosInst.destroy();
   _chartVehiculosInst = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: vehiculos.map(v => (v.split(' / ')[1] || v).trim()),
+      labels: etiquetas,
       datasets: [{ data: pesos, backgroundColor: vehiculos.map(v => COLOR_VEHICULO_VIAJE[v] || '#607D8B'), borderRadius: 4, maxBarThickness: 24 }],
     },
     options: {
@@ -133,8 +190,8 @@ function _chartVehiculos(viajesEnPeriodo) {
       const cap = CAPACIDAD_VEHICULO[veh];
       const esPropio = VEHICULO_ES_PROPIO[veh];
       const pctCap = viajesCount[i] ? Math.round((pesos[i] / (cap * viajesCount[i])) * 100) : 0;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:7px 0;border-top:1px solid var(--gris-borde)">
-        <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${COLOR_VEHICULO_VIAJE[veh]};margin-right:6px"></span>${veh} <span style="color:var(--gris-medio)">(${esPropio ? 'propio' : 'tercerizado'})</span></span>
+      return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:7px 0;border-top:1px solid var(--gris-borde)" title="${veh}">
+        <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${COLOR_VEHICULO_VIAJE[veh]};margin-right:6px"></span>${etiquetas[i]} <span style="color:var(--gris-medio)">(${esPropio ? 'propio' : 'tercerizado'})</span></span>
         <span style="color:var(--gris-medio)">${viajesCount[i]} viaje${viajesCount[i] === 1 ? '' : 's'} · ${pctCap}% de capacidad prom.</span>
       </div>`;
     }).join('');

@@ -377,13 +377,39 @@ function actualizarPesoTotalViaje() {
   return total;
 }
 
-const _CAMPOS_VIAJE_BLOQUEABLES = ['m-viaje-fecha', 'm-viaje-destino', 'm-viaje-vehiculo', 'm-viaje-estado', 'm-viaje-obs'];
+const _CAMPOS_VIAJE_BLOQUEABLES = ['m-viaje-fecha', 'm-viaje-destino', 'm-viaje-destino-otro', 'm-viaje-vehiculo', 'm-viaje-estado', 'm-viaje-obs'];
 
 function _aplicarBloqueoModalViaje(bloqueado) {
   _CAMPOS_VIAJE_BLOQUEABLES.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = bloqueado; });
   document.getElementById('viaje-bloqueado-banner').style.display = bloqueado ? 'block' : 'none';
   document.getElementById('btn-agregar-entrega').style.display = bloqueado ? 'none' : 'inline-flex';
   document.getElementById('btn-guardar-viaje').style.display = bloqueado ? 'none' : 'inline-flex';
+}
+
+// La ciudad de destino es un desplegable curado (Caldas/Risaralda/Quindío) con "Otros" para
+// texto libre. Estos tres helpers son el único punto que lee/escribe ese campo, para que un
+// destino viejo que no esté en la lista (dato histórico) no se pierda silenciosamente: si el
+// valor guardado no coincide con ninguna opción, cae en "Otros" con el texto original intacto.
+function toggleCiudadDestinoOtro() {
+  const sel = document.getElementById('m-viaje-destino');
+  const otro = document.getElementById('m-viaje-destino-otro');
+  otro.style.display = sel.value === '__otro__' ? 'block' : 'none';
+}
+
+function _valorCiudadDestino() {
+  const sel = document.getElementById('m-viaje-destino');
+  if (sel.value === '__otro__') return (document.getElementById('m-viaje-destino-otro').value || '').trim();
+  return sel.value;
+}
+
+function _fijarCiudadDestino(valor) {
+  const sel = document.getElementById('m-viaje-destino');
+  const otro = document.getElementById('m-viaje-destino-otro');
+  if (!valor) { sel.value = ''; otro.style.display = 'none'; otro.value = ''; return; }
+  const esConocida = Array.from(sel.options).some(o => o.value === valor);
+  sel.value = esConocida ? valor : '__otro__';
+  otro.style.display = esConocida ? 'none' : 'block';
+  otro.value = esConocida ? '' : valor;
 }
 
 function abrirModalViaje(fecha) {
@@ -396,7 +422,7 @@ function abrirModalViaje(fecha) {
   document.getElementById('m-viaje-id').value = '';
   document.getElementById('modal-viaje-titulo').textContent = '🚛 Nuevo Viaje';
   document.getElementById('m-viaje-fecha').value = f;
-  document.getElementById('m-viaje-destino').value = '';
+  _fijarCiudadDestino('');
   document.getElementById('m-viaje-vehiculo').value = 'GTV044 / JORGE JAMES ALVAREZ';
   document.getElementById('m-viaje-estado').value = 'Programada';
   document.getElementById('m-viaje-obs').value = '';
@@ -414,7 +440,7 @@ function editarViaje(id) {
   document.getElementById('m-viaje-id').value = v.id;
   document.getElementById('modal-viaje-titulo').textContent = _viajeBloqueadoActual ? '🔒 Viaje (solo lectura)' : '✏️ Editar Viaje';
   document.getElementById('m-viaje-fecha').value = v.fecha || '';
-  document.getElementById('m-viaje-destino').value = v.destino || '';
+  _fijarCiudadDestino(v.destino || '');
   document.getElementById('m-viaje-vehiculo').value = v.vehiculo || 'GTV044 / JORGE JAMES ALVAREZ';
   document.getElementById('m-viaje-estado').value = v.estado || 'Programada';
   document.getElementById('m-viaje-obs').value = v.observaciones || '';
@@ -432,8 +458,8 @@ function editarViaje(id) {
 
 function guardarViaje() {
   const fecha = document.getElementById('m-viaje-fecha').value;
-  const destino = document.getElementById('m-viaje-destino').value.trim();
-  if (!fecha || !destino) { alert('Completa los campos obligatorios: Fecha y Destino.'); return; }
+  const destino = _valorCiudadDestino();
+  if (!fecha || !destino) { alert('Completa los campos obligatorios: Fecha y Ciudad de Destino.'); return; }
 
   const entregasLimpias = _entregasViajeActual
     .map(e => ({
