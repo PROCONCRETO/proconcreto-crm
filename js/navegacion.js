@@ -59,5 +59,6 @@ function ir(pantalla) {
   if (pantalla === 'no-conformidades') renderNoConformidades();
   if (pantalla === 'certificados-calidad') renderCertificadosCalidad();
   if (pantalla === 'logistica') renderCalendarioLogistica();
+  if (pantalla === 'logistica-estadisticas') renderEstadisticasLogistica();
 }
 

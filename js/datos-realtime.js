@@ -106,6 +106,7 @@ function rerenderPantallaActiva() {
     case 'pantalla-certificados-calidad': renderCertificadosCalidad(); break;
     case 'pantalla-trazabilidad': buscarTrazabilidad(); break;
     case 'pantalla-logistica': renderCalendarioLogistica(); break;
+    case 'pantalla-logistica-estadisticas': renderEstadisticasLogistica(); break;
   }
 }
 

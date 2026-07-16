@@ -10,6 +10,11 @@
 // Compatibilidad: los viajes guardados antes de este cambio tienen el arreglo de entregas en
 // el campo `clientes` (nombre viejo). Al leer se usa `entregas || clientes`; al guardar
 // siempre se escribe en `entregas`, así que un viaje viejo se migra solo la próxima vez que se edite.
+//
+// Cumplidos: cada entrega tiene un campo `cumplido` = { estado, nuevaFecha?, fechaConfirmacion,
+// confirmadoPor }. `estado` es 'pendiente' (default, incluye entregas viejas sin este campo),
+// 'hecha', 'reprogramada' o 'cancelada'. El cumplimiento de un viaje es proporcional a sus
+// entregas marcadas 'hecha' sobre el total de entregas programadas (ver pctCumplidoViaje).
 let VIAJES = [];
 
 // ── Festivos de Colombia ──
@@ -107,6 +112,13 @@ const CAPACIDAD_VEHICULO = {
   'CAMION SENCILLO / TERCERIZADO': 11,
   'TRACTO CAMION / TERCERIZADO': 34,
 };
+// Vehículos propios vs. tercerizados, para el dashboard de Estadísticas.
+const VEHICULO_ES_PROPIO = {
+  'GTV044 / JORGE JAMES ALVAREZ': true,
+  'GTU668 / JOSE RAMIRO CIRO': true,
+  'CAMION SENCILLO / TERCERIZADO': false,
+  'TRACTO CAMION / TERCERIZADO': false,
+};
 
 const _hoyIni = new Date();
 let _logAnio = _hoyIni.getFullYear();
@@ -124,6 +136,24 @@ function irHoyLogistica() {
   _logAnio = hoy.getFullYear();
   _logMes = hoy.getMonth();
   renderCalendarioLogistica();
+}
+
+// ── Entregas / cumplidos: helpers compartidos ──
+function _entregasDeViaje(v) { return v.entregas || v.clientes || []; }
+
+function _cumplidoDeEntrega(e) { return (e && e.cumplido) || { estado: 'pendiente' }; }
+
+// Cualquier fecha antes de hoy queda bloqueada para edición estructural del viaje
+// (fecha, destino, vehículo, entregas). Marcar cumplidos sigue permitido sobre esas fechas.
+function esFechaBloqueada(fechaStr) { return fechaStr < _fmtISO(new Date()); }
+
+// Cumplimiento de un viaje = entregas marcadas "hecha" / total de entregas programadas.
+// null si el viaje no tiene entregas (no debería pasar, pero por seguridad).
+function pctCumplidoViaje(v) {
+  const entregas = _entregasDeViaje(v);
+  if (!entregas.length) return null;
+  const hechas = entregas.filter(e => _cumplidoDeEntrega(e).estado === 'hecha').length;
+  return Math.round((hechas / entregas.length) * 100);
 }
 
 function renderCalendarioLogistica() {
@@ -165,12 +195,14 @@ function renderCalendarioLogistica() {
         ${festivoNombre ? `<div class="log-cal-festivo-nombre" title="${festivoNombre}">🎉 ${festivoNombre}</div>` : ''}
         <div class="log-cal-viajes">
           ${viajesDia.map(v => {
-            const nEntregas = (v.entregas || v.clientes || []).length;
+            const nEntregas = _entregasDeViaje(v).length;
             const peso = Number(v.pesoTotal) || 0;
-            const tituloTip = `${v.destino || ''}${v.vehiculo ? ' — ' + v.vehiculo : ''} — ${nEntregas} entrega${nEntregas === 1 ? '' : 's'} — ${peso.toFixed(2)} ton${v.estado ? ' — ' + v.estado : ''}`;
+            const pct = pctCumplidoViaje(v);
+            const pctTxt = (fechaStr <= hoyStr && pct !== null) ? ` — ${pct}% cumplido` : '';
+            const tituloTip = `${v.destino || ''}${v.vehiculo ? ' — ' + v.vehiculo : ''} — ${nEntregas} entrega${nEntregas === 1 ? '' : 's'} — ${peso.toFixed(2)} ton${v.estado ? ' — ' + v.estado : ''}${pctTxt}`;
             return `
             <div class="log-cal-viaje" style="background:${COLOR_VEHICULO_VIAJE[v.vehiculo] || '#607D8B'}${v.estado === 'Cancelada' ? ';opacity:.5;text-decoration:line-through' : ''}" onclick="event.stopPropagation();editarViaje('${v.id}')" title="${tituloTip}">
-              ${v.destino || 'Viaje'} · ${nEntregas} ent · ${peso.toFixed(1)}t
+              ${v.destino || 'Viaje'} · ${nEntregas} ent · ${peso.toFixed(1)}t${fechaStr <= hoyStr && pct !== null ? ` · ${pct}%` : ''}
             </div>`;
           }).join('')}
         </div>
@@ -184,6 +216,8 @@ function renderCalendarioLogistica() {
   cont.innerHTML = `
     <div class="log-cal-grid">${DIAS_SEMANA_ES.map(d => `<div class="log-cal-dia-nombre">${d}</div>`).join('')}</div>
     <div class="log-cal-grid">${celdas}</div>`;
+
+  actualizarBadgeCumplidos();
 }
 
 // ── Modal de Viaje ──
@@ -192,13 +226,34 @@ function renderCalendarioLogistica() {
 // del viaje es la suma de todas las líneas de todas las entregas. Reutiliza los mismos
 // helpers de búsqueda de cliente/producto que Ajuste Diario de Mezcla.
 let _entregasViajeActual = [];
+let _viajeBloqueadoActual = false;
 
 function _lineaVaciaEntrega() { return { producto: '', cantidad: 0, peso: 0 }; }
-function _entregaVaciaViaje() { return { cliente: '', destino: '', contactoObraNombre: '', contactoObraTelefono: '', productos: [_lineaVaciaEntrega()] }; }
+function _entregaVaciaViaje() { return { cliente: '', destino: '', contactoObraNombre: '', contactoObraTelefono: '', productos: [_lineaVaciaEntrega()], cumplido: { estado: 'pendiente' } }; }
+
+const _ETIQUETA_CUMPLIDO = { pendiente: '⏳ Pendiente', hecha: '✅ Hecha', reprogramada: '🔁 Reprogramada', cancelada: '❌ Cancelada' };
 
 function renderEntregasViaje() {
   const wrap = document.getElementById('viaje-entregas-wrap');
   if (!wrap) return;
+
+  if (_viajeBloqueadoActual) {
+    // Modo lectura: solo se muestra el resumen de cada entrega y su cumplido, sin poder editar nada.
+    wrap.innerHTML = _entregasViajeActual.map(e => {
+      const c = _cumplidoDeEntrega(e);
+      return `
+      <div class="card" style="padding:12px;margin-bottom:10px;background:#FAFBFC;box-shadow:none;border:1px solid var(--gris-borde)">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+          <div style="font-size:13px;font-weight:700">${e.cliente || 'Sin cliente'}${e.destino ? ' — ' + e.destino : ''}</div>
+          <div style="font-size:11px;font-weight:700">${_ETIQUETA_CUMPLIDO[c.estado] || _ETIQUETA_CUMPLIDO.pendiente}${c.estado === 'reprogramada' && c.nuevaFecha ? ` → ${c.nuevaFecha}` : ''}</div>
+        </div>
+        <div style="font-size:11px;color:var(--gris-medio);margin-bottom:6px">Contacto en obra: ${e.contactoObraNombre ? e.contactoObraNombre + (e.contactoObraTelefono ? ' — ' + e.contactoObraTelefono : '') : '—'}</div>
+        ${(e.productos || []).map(p => `<div style="font-size:12px;padding:3px 0;border-top:1px solid #eee">• ${p.producto || ''} — ${p.cantidad || 0} (${(Number(p.peso) || 0).toFixed(2)} ton)</div>`).join('')}
+      </div>`;
+    }).join('');
+    return;
+  }
+
   wrap.innerHTML = _entregasViajeActual.map((e, ei) => `
     <div class="card" style="padding:12px;margin-bottom:10px;background:#FAFBFC;box-shadow:none;border:1px solid var(--gris-borde)">
       <div class="form-grid" style="margin-bottom:8px">
@@ -322,15 +377,31 @@ function actualizarPesoTotalViaje() {
   return total;
 }
 
+const _CAMPOS_VIAJE_BLOQUEABLES = ['m-viaje-fecha', 'm-viaje-destino', 'm-viaje-vehiculo', 'm-viaje-estado', 'm-viaje-obs'];
+
+function _aplicarBloqueoModalViaje(bloqueado) {
+  _CAMPOS_VIAJE_BLOQUEABLES.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = bloqueado; });
+  document.getElementById('viaje-bloqueado-banner').style.display = bloqueado ? 'block' : 'none';
+  document.getElementById('btn-agregar-entrega').style.display = bloqueado ? 'none' : 'inline-flex';
+  document.getElementById('btn-guardar-viaje').style.display = bloqueado ? 'none' : 'inline-flex';
+}
+
 function abrirModalViaje(fecha) {
+  const f = fecha || _fmtISO(new Date());
+  if (esFechaBloqueada(f)) {
+    alert('No se puede programar un viaje en una fecha que ya pasó.\nUsa el botón "✅ Cumplidos" para registrar qué pasó con la programación de días anteriores.');
+    return;
+  }
+  _viajeBloqueadoActual = false;
   document.getElementById('m-viaje-id').value = '';
   document.getElementById('modal-viaje-titulo').textContent = '🚛 Nuevo Viaje';
-  document.getElementById('m-viaje-fecha').value = fecha || _fmtISO(new Date());
+  document.getElementById('m-viaje-fecha').value = f;
   document.getElementById('m-viaje-destino').value = '';
   document.getElementById('m-viaje-vehiculo').value = 'GTV044 / JORGE JAMES ALVAREZ';
   document.getElementById('m-viaje-estado').value = 'Programada';
   document.getElementById('m-viaje-obs').value = '';
   document.getElementById('btn-eliminar-viaje').style.display = 'none';
+  _aplicarBloqueoModalViaje(false);
   _entregasViajeActual = [_entregaVaciaViaje()];
   renderEntregasViaje();
   document.getElementById('modal-viaje').classList.add('abierto');
@@ -339,21 +410,22 @@ function abrirModalViaje(fecha) {
 function editarViaje(id) {
   const v = VIAJES.find(x => String(x.id) === String(id));
   if (!v) return;
+  _viajeBloqueadoActual = esFechaBloqueada(v.fecha);
   document.getElementById('m-viaje-id').value = v.id;
-  document.getElementById('modal-viaje-titulo').textContent = '✏️ Editar Viaje';
+  document.getElementById('modal-viaje-titulo').textContent = _viajeBloqueadoActual ? '🔒 Viaje (solo lectura)' : '✏️ Editar Viaje';
   document.getElementById('m-viaje-fecha').value = v.fecha || '';
   document.getElementById('m-viaje-destino').value = v.destino || '';
   document.getElementById('m-viaje-vehiculo').value = v.vehiculo || 'GTV044 / JORGE JAMES ALVAREZ';
   document.getElementById('m-viaje-estado').value = v.estado || 'Programada';
   document.getElementById('m-viaje-obs').value = v.observaciones || '';
-  document.getElementById('btn-eliminar-viaje').style.display = 'inline-flex';
+  document.getElementById('btn-eliminar-viaje').style.display = _viajeBloqueadoActual ? 'none' : 'inline-flex';
+  _aplicarBloqueoModalViaje(_viajeBloqueadoActual);
   // El peso de cada línea queda congelado con lo que se guardó en su momento — no se
   // recalcula en vivo contra el catálogo actual (mismo criterio que los Ajustes de Mezcla:
   // un viaje ya programado no debe cambiar solo porque un producto se actualizó después).
-  // `entregas` es el campo nuevo; `clientes` es el nombre viejo (viajes guardados antes de este cambio).
-  const entregasPrevias = (v.entregas && v.entregas.length) ? v.entregas : (v.clientes || []);
+  const entregasPrevias = _entregasDeViaje(v);
   _entregasViajeActual = JSON.parse(JSON.stringify(entregasPrevias.length ? entregasPrevias : [_entregaVaciaViaje()]));
-  _entregasViajeActual.forEach(e => { if (!e.productos || !e.productos.length) e.productos = [_lineaVaciaEntrega()]; });
+  _entregasViajeActual.forEach(e => { if (!e.productos || !e.productos.length) e.productos = [_lineaVaciaEntrega()]; if (!e.cumplido) e.cumplido = { estado: 'pendiente' }; });
   renderEntregasViaje();
   document.getElementById('modal-viaje').classList.add('abierto');
 }
@@ -372,6 +444,7 @@ function guardarViaje() {
       productos: (e.productos || [])
         .filter(p => (p.producto || '').trim())
         .map(p => ({ producto: p.producto.trim(), cantidad: Number(p.cantidad) || 0, peso: Number(p.peso) || 0 })),
+      cumplido: _cumplidoDeEntrega(e),
     }))
     .filter(e => e.cliente || e.productos.length);
 
@@ -419,6 +492,138 @@ function eliminarViaje() {
     });
 }
 
+// ── Cumplidos: backlog acumulado de entregas sin confirmar ──
+// Se acumulan TODAS las entregas de hoy o de cualquier día anterior que sigan en estado
+// "pendiente" — no solo las del día inmediatamente anterior — hasta que alguien las marque.
+function entregasPendientesAcumuladas() {
+  const hoy = _fmtISO(new Date());
+  const filas = [];
+  VIAJES.forEach(v => {
+    if (v.fecha > hoy) return;
+    _entregasDeViaje(v).forEach((e, ei) => {
+      if (_cumplidoDeEntrega(e).estado === 'pendiente') {
+        filas.push({ viajeId: v.id, entregaIndex: ei, fecha: v.fecha, destinoViaje: v.destino, vehiculo: v.vehiculo, entrega: e });
+      }
+    });
+  });
+  filas.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  return filas;
+}
+
+function actualizarBadgeCumplidos() {
+  const n = entregasPendientesAcumuladas().length;
+  const el = document.getElementById('btn-cumplidos-texto');
+  if (el) el.textContent = n ? `✅ Cumplidos (${n})` : '✅ Cumplidos';
+}
+
+function abrirModalCumplidos() {
+  _reprogramarAbiertoKey = null;
+  renderListaCumplidos();
+  document.getElementById('modal-cumplidos').classList.add('abierto');
+}
+
+let _reprogramarAbiertoKey = null; // `${viajeId}-${entregaIndex}` de la fila con el selector de nueva fecha abierto
+
+function renderListaCumplidos() {
+  const cont = document.getElementById('cumplidos-lista');
+  if (!cont) return;
+  const filas = entregasPendientesAcumuladas();
+  if (!filas.length) {
+    cont.innerHTML = '<div class="empty-state"><div class="icono">✅</div><div>No hay entregas pendientes de confirmar. ¡Al día!</div></div>';
+    return;
+  }
+  cont.innerHTML = filas.map(f => {
+    const key = `${f.viajeId}-${f.entregaIndex}`;
+    const pesoEntrega = (f.entrega.productos || []).reduce((s, p) => s + (Number(p.peso) || 0), 0);
+    const fechaLegible = new Date(f.fecha + 'T12:00').toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short' });
+    return `
+    <div class="card" style="padding:10px 12px;margin-bottom:8px;border:1px solid var(--gris-borde);box-shadow:none">
+      <div style="margin-bottom:8px">
+        <div style="font-size:12.5px;font-weight:700;text-transform:capitalize">${fechaLegible} — ${f.entrega.cliente || 'Sin cliente'}</div>
+        <div style="font-size:11px;color:var(--gris-medio)">${f.entrega.destino || f.destinoViaje || ''} · ${f.vehiculo || ''} · ${pesoEntrega.toFixed(2)} ton</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-primario btn-xs" onclick="marcarCumplidoEntrega('${f.viajeId}',${f.entregaIndex},'hecha')">✅ Hecha</button>
+        <button class="btn btn-secundario btn-xs" onclick="toggleReprogramarCumplido('${f.viajeId}',${f.entregaIndex})">🔁 Reprogramar</button>
+        <button class="btn btn-rojo btn-xs" onclick="marcarCumplidoEntrega('${f.viajeId}',${f.entregaIndex},'cancelada')">❌ Cancelada</button>
+        ${_reprogramarAbiertoKey === key ? `
+          <input type="date" id="reprogramar-fecha-${key}" min="${_fmtISO(new Date())}" style="margin-left:4px;padding:5px 7px;border:1px solid var(--gris-borde);border-radius:4px;font-size:12px">
+          <button class="btn btn-primario btn-xs" onclick="confirmarReprogramacion('${f.viajeId}',${f.entregaIndex})">Confirmar nueva fecha</button>
+        ` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleReprogramarCumplido(viajeId, entregaIndex) {
+  const key = `${viajeId}-${entregaIndex}`;
+  _reprogramarAbiertoKey = _reprogramarAbiertoKey === key ? null : key;
+  renderListaCumplidos();
+}
+
+function confirmarReprogramacion(viajeId, entregaIndex) {
+  const key = `${viajeId}-${entregaIndex}`;
+  const input = document.getElementById(`reprogramar-fecha-${key}`);
+  const nuevaFecha = input ? input.value : '';
+  if (!nuevaFecha) { alert('Elige la nueva fecha.'); return; }
+  marcarCumplidoEntrega(viajeId, entregaIndex, 'reprogramada', nuevaFecha);
+}
+
+// Marca el resultado de una entrega. Si es "reprogramada", además crea un viaje nuevo en la
+// fecha nueva con una copia de esa entrega (en estado "pendiente" de nuevo) — así aparece
+// programada en el día al que se movió, y el viaje original conserva el rastro de que esa
+// entrega se reprogramó (para las estadísticas), en vez de simplemente desaparecer.
+function marcarCumplidoEntrega(viajeId, entregaIndex, estado, nuevaFecha) {
+  const v = VIAJES.find(x => String(x.id) === String(viajeId));
+  if (!v) return;
+  if (!v.entregas) v.entregas = _entregasDeViaje(v);
+  const e = v.entregas[entregaIndex];
+  if (!e) return;
+
+  e.cumplido = {
+    estado,
+    nuevaFecha: estado === 'reprogramada' ? nuevaFecha : '',
+    fechaConfirmacion: new Date().toISOString(),
+    confirmadoPor: USUARIO_ACTUAL?.email,
+  };
+
+  const guardados = [
+    sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' }),
+  ];
+
+  if (estado === 'reprogramada') {
+    const entregaNueva = {
+      cliente: e.cliente, destino: e.destino,
+      contactoObraNombre: e.contactoObraNombre, contactoObraTelefono: e.contactoObraTelefono,
+      productos: JSON.parse(JSON.stringify(e.productos || [])),
+      cumplido: { estado: 'pendiente' },
+    };
+    const pesoNuevo = entregaNueva.productos.reduce((s, p) => s + (Number(p.peso) || 0), 0);
+    const viajeNuevo = {
+      id: String(Date.now()) + '-r',
+      fecha: nuevaFecha,
+      destino: e.destino || v.destino,
+      vehiculo: v.vehiculo,
+      estado: 'Programada',
+      observaciones: `Reprogramado desde el viaje del ${v.fecha}.`,
+      entregas: [entregaNueva],
+      pesoTotal: pesoNuevo,
+      creadoPor: USUARIO_ACTUAL?.email,
+      creadoEn: new Date().toISOString(),
+    };
+    VIAJES.unshift(viajeNuevo);
+    guardados.push(sb.from('entregas_programadas').upsert({ id: viajeNuevo.id, datos: viajeNuevo, modificado: new Date().toISOString() }, { onConflict: 'id' }));
+  }
+
+  Promise.all(guardados).then(resultados => {
+    resultados.forEach(({ error }) => { if (error) console.error('Error guardando cumplido:', error.message); });
+  });
+
+  _reprogramarAbiertoKey = null;
+  renderListaCumplidos();
+  renderCalendarioLogistica();
+}
+
 // ── Imprimible del día (para el área de logística, que no tiene acceso al aplicativo) ──
 // Mismo membrete que el resto de documentos de la app. Se genera un documento por día,
 // con el detalle de cada viaje: vehículo, destino, entregas, contacto en obra y
@@ -438,7 +643,7 @@ function imprimirProgramacionDia(fechaStr) {
     const capacidad = CAPACIDAD_VEHICULO[v.vehiculo];
     const peso = Number(v.pesoTotal) || 0;
     const excedido = capacidad && peso > capacidad;
-    const entregasHTML = (v.entregas || v.clientes || []).map(e => `
+    const entregasHTML = _entregasDeViaje(v).map(e => `
       <div style="margin:8px 0;padding:8px;border:1px solid #eee;border-radius:5px">
         <div style="font-size:12px;font-weight:700">${e.cliente || '—'}${e.destino ? ' — ' + e.destino : ''}</div>
         <div style="font-size:10.5px;color:#555;margin-bottom:4px">Contacto en obra: ${e.contactoObraNombre ? e.contactoObraNombre + (e.contactoObraTelefono ? ' — ' + e.contactoObraTelefono : '') : '—'}</div>
@@ -537,3 +742,5 @@ async function descargarProgramacionDiaPDF() {
     if (btn) { btn.textContent = '⬇️ Descargar PDF'; btn.disabled = false; }
   }
 }
+
+// ── Estadísticas de Logística ── (ver estadisticas-logistica.js)

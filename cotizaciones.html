@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260716c">
+<link rel="stylesheet" href="css/estilos.css?v=20260716d">
 </head>
 <body>
 
@@ -97,6 +97,7 @@
 
 <nav class="nav" id="subnav-logistica" style="display:none">
   <button class="nav-btn activo" onclick="ir('logistica')">🚛 Programación de Viajes</button>
+  <button class="nav-btn" onclick="ir('logistica-estadisticas')">📊 Estadísticas</button>
 </nav>
 
 <nav class="nav" id="subnav-calidad" style="display:none">
@@ -635,6 +636,7 @@
       <div id="log-mes-titulo" style="font-weight:700;min-width:150px;text-align:center;text-transform:capitalize"></div>
       <button class="btn btn-secundario btn-sm" onclick="cambiarMesLogistica(1)">▶</button>
       <button class="btn btn-secundario btn-sm" onclick="irHoyLogistica()">Hoy</button>
+      <button class="btn btn-secundario" onclick="abrirModalCumplidos()"><span id="btn-cumplidos-texto">✅ Cumplidos</span></button>
       <button class="btn btn-primario" onclick="abrirModalViaje()">+ Nuevo Viaje</button>
     </div>
   </div>
@@ -648,6 +650,46 @@
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#00838F;margin-right:4px"></span>GTU668 / José Ramiro Ciro (11 ton)</span>
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#E65100;margin-right:4px"></span>Camión sencillo tercerizado (11 ton)</span>
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#6A1B9A;margin-right:4px"></span>Tractocamión tercerizado (34 ton)</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: LOGÍSTICA — ESTADÍSTICAS
+═══════════════════════════════════════ -->
+<div id="pantalla-logistica-estadisticas" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Estadísticas de Logística</div>
+    <div class="flex-gap">
+      <select id="est-log-periodo" onchange="renderEstadisticasLogistica()" style="padding:7px 10px;border:1px solid var(--gris-borde);border-radius:6px;font-size:13px">
+        <option value="30">Últimos 30 días</option>
+        <option value="7">Últimos 7 días</option>
+        <option value="90">Últimos 90 días</option>
+        <option value="0">Todo</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-grid" id="est-log-tarjetas" style="margin-bottom:16px"></div>
+
+  <div class="card">
+    <div class="card-titulo">Cumplimiento de entregas</div>
+    <div style="max-width:340px;margin:0 auto"><canvas id="chart-log-cumplimiento"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-titulo">Desempeño por vehículo</div>
+    <canvas id="chart-log-vehiculos" style="max-height:220px"></canvas>
+    <div id="tabla-log-vehiculos"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-titulo">Tendencia de viajes en el tiempo</div>
+    <canvas id="chart-log-tendencia" style="max-height:280px"></canvas>
+  </div>
+
+  <div class="card">
+    <div class="card-titulo">Destinos más frecuentes</div>
+    <canvas id="chart-log-destinos" style="max-height:300px"></canvas>
   </div>
 </div>
 
@@ -941,6 +983,7 @@
 <div class="modal-overlay" id="modal-viaje">
   <div class="modal" style="width:820px;max-width:95vw">
     <div class="modal-titulo" id="modal-viaje-titulo">🚛 Nuevo Viaje</div>
+    <div id="viaje-bloqueado-banner" style="display:none;background:#FFF3E0;border:1px solid #FFB74D;color:#8A5300;border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:12px">🔒 Este viaje ya pasó y está bloqueado para edición. Usa "✅ Cumplidos" para registrar qué pasó.</div>
     <input type="hidden" id="m-viaje-id">
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Fecha *</label><input type="date" id="m-viaje-fecha"></div>
@@ -967,7 +1010,7 @@
 
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
       <span>ENTREGAS DE ESTE VIAJE</span>
-      <button type="button" class="btn btn-secundario btn-xs" onclick="agregarEntregaViaje()">+ Agregar entrega</button>
+      <button type="button" class="btn btn-secundario btn-xs" id="btn-agregar-entrega" onclick="agregarEntregaViaje()">+ Agregar entrega</button>
     </div>
     <div id="viaje-entregas-wrap"></div>
 
@@ -980,11 +1023,22 @@
     <div class="modal-acciones">
       <button class="btn btn-rojo" id="btn-eliminar-viaje" onclick="eliminarViaje()" style="display:none;margin-right:auto">🗑️ Eliminar</button>
       <button class="btn btn-secundario" onclick="cerrarModal('modal-viaje')">Cancelar</button>
-      <button class="btn btn-primario" onclick="guardarViaje()">Guardar</button>
+      <button class="btn btn-primario" id="btn-guardar-viaje" onclick="guardarViaje()">Guardar</button>
     </div>
   </div>
 </div>
 <datalist id="datalist-clientes-viaje"></datalist>
+
+<div class="modal-overlay" id="modal-cumplidos">
+  <div class="modal" style="width:760px;max-width:95vw">
+    <div class="modal-titulo">✅ Cumplidos pendientes</div>
+    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:12px">Entregas programadas hasta hoy que todavía no tienen un resultado registrado. Se van acumulando aquí (no solo las de ayer) hasta que las marques.</div>
+    <div id="cumplidos-lista" style="max-height:60vh;overflow-y:auto"></div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-cumplidos')">Cerrar</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal-overlay" id="modal-ajuste-mezcla">
   <div class="modal" style="width:1080px;max-width:95vw">
@@ -1460,24 +1514,25 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260716c"></script>
-<script src="js/catalogo.js?v=20260716c"></script>
-<script src="js/navegacion.js?v=20260716c"></script>
-<script src="js/ordenes-produccion.js?v=20260716c"></script>
-<script src="js/produccion-diaria.js?v=20260716c"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260716c"></script>
-<script src="js/calidad-mezclas.js?v=20260716c"></script>
-<script src="js/calidad-estadisticas.js?v=20260716c"></script>
-<script src="js/calidad-trazabilidad.js?v=20260716c"></script>
-<script src="js/logistica.js?v=20260716c"></script>
-<script src="js/auth.js?v=20260716c"></script>
-<script src="js/datos-realtime.js?v=20260716c"></script>
-<script src="js/cotizador.js?v=20260716c"></script>
-<script src="js/historico-clientes-stats.js?v=20260716c"></script>
+<script src="js/config.js?v=20260716d"></script>
+<script src="js/catalogo.js?v=20260716d"></script>
+<script src="js/navegacion.js?v=20260716d"></script>
+<script src="js/ordenes-produccion.js?v=20260716d"></script>
+<script src="js/produccion-diaria.js?v=20260716d"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260716d"></script>
+<script src="js/calidad-mezclas.js?v=20260716d"></script>
+<script src="js/calidad-estadisticas.js?v=20260716d"></script>
+<script src="js/calidad-trazabilidad.js?v=20260716d"></script>
+<script src="js/logistica.js?v=20260716d"></script>
+<script src="js/estadisticas-logistica.js?v=20260716d"></script>
+<script src="js/auth.js?v=20260716d"></script>
+<script src="js/datos-realtime.js?v=20260716d"></script>
+<script src="js/cotizador.js?v=20260716d"></script>
+<script src="js/historico-clientes-stats.js?v=20260716d"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="js/pdf.js?v=20260716c"></script>
+<script src="js/pdf.js?v=20260716d"></script>
 </body>
 </html>
