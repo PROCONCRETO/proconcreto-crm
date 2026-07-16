@@ -180,6 +180,50 @@ function moverViajeOrden(id, direccion) {
   renderCalendarioLogistica();
 }
 
+// ── Arrastrar un viaje a otro día (drag & drop nativo, sin librerías) ──
+// Solo los viajes en fecha no bloqueada se pueden arrastrar (ver esFechaBloqueada) — un viaje
+// que ya pasó se reprograma desde "✅ Cumplidos", no arrastrándolo. El día destino tampoco
+// puede estar bloqueado. Al soltar, el viaje queda al final de la lista del día destino.
+let _viajeArrastradoId = null;
+
+function iniciarArrastreViaje(event, id) {
+  _viajeArrastradoId = id;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', id);
+  event.currentTarget.classList.add('log-cal-viaje-arrastrando');
+}
+
+function terminarArrastreViaje(event) {
+  event.currentTarget.classList.remove('log-cal-viaje-arrastrando');
+  _viajeArrastradoId = null;
+}
+
+function permitirSoltarViaje(event) {
+  if (!_viajeArrastradoId) return;
+  event.preventDefault();
+  event.currentTarget.classList.add('log-cal-dragover');
+}
+
+function quitarResaltadoSoltar(event) {
+  event.currentTarget.classList.remove('log-cal-dragover');
+}
+
+function soltarViajeEnDia(event, fechaDestino) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('log-cal-dragover');
+  const id = _viajeArrastradoId;
+  _viajeArrastradoId = null;
+  if (!id) return;
+  const v = VIAJES.find(x => String(x.id) === String(id));
+  if (!v || v.fecha === fechaDestino) return;
+  if (esFechaBloqueada(fechaDestino)) { alert('No se puede mover un viaje a una fecha que ya pasó.'); return; }
+  v.fecha = fechaDestino;
+  v.orden = Date.now();
+  sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' })
+    .then(({ error }) => { if (error) console.error('Error moviendo viaje de fecha:', error.message); });
+  renderCalendarioLogistica();
+}
+
 function renderCalendarioLogistica() {
   const cont = document.getElementById('log-calendario');
   if (!cont) return;
@@ -207,6 +251,7 @@ function renderCalendarioLogistica() {
     const festivoNombre = festivosMap[fechaStr];
     const esHoy = fechaStr === hoyStr;
     const viajesDia = VIAJES.filter(v => v.fecha === fechaStr).sort((a, b) => _claveOrdenViaje(a) - _claveOrdenViaje(b));
+    const diaBloqueado = esFechaBloqueada(fechaStr);
 
     let clases = 'log-cal-celda';
     if (festivoNombre) clases += ' log-cal-festivo';
@@ -214,7 +259,7 @@ function renderCalendarioLogistica() {
     if (esHoy) clases += ' log-cal-hoy';
 
     celdas += `
-      <div class="${clases}" onclick="abrirModalViaje('${fechaStr}')">
+      <div class="${clases}" onclick="abrirModalViaje('${fechaStr}')" ondragover="permitirSoltarViaje(event)" ondragleave="quitarResaltadoSoltar(event)" ondrop="soltarViajeEnDia(event,'${fechaStr}')">
         <div class="log-cal-dia-num">${dia}${esHoy ? ' <span class="log-cal-hoy-badge">HOY</span>' : ''}${viajesDia.length ? `<span onclick="event.stopPropagation();imprimirProgramacionDia('${fechaStr}')" title="Imprimir programación del día" style="float:right;cursor:pointer">🖨️</span>` : ''}</div>
         ${festivoNombre ? `<div class="log-cal-festivo-nombre" title="${festivoNombre}">🎉 ${festivoNombre}</div>` : ''}
         <div class="log-cal-viajes">
@@ -230,7 +275,7 @@ function renderCalendarioLogistica() {
                 ${idxViaje < viajesDia.length - 1 ? `<span onclick="event.stopPropagation();moverViajeOrden('${v.id}',1)" title="Bajar prioridad">▼</span>` : ''}
               </span>` : '';
             return `
-            <div class="log-cal-viaje" style="background:${COLOR_VEHICULO_VIAJE[v.vehiculo] || '#607D8B'}${v.estado === 'Cancelada' ? ';opacity:.5;text-decoration:line-through' : ''}" onclick="event.stopPropagation();editarViaje('${v.id}')" title="${tituloTip}">
+            <div class="log-cal-viaje" draggable="${!diaBloqueado}" ondragstart="iniciarArrastreViaje(event,'${v.id}')" ondragend="terminarArrastreViaje(event)" style="background:${COLOR_VEHICULO_VIAJE[v.vehiculo] || '#607D8B'}${v.estado === 'Cancelada' ? ';opacity:.5;text-decoration:line-through' : ''}" onclick="event.stopPropagation();editarViaje('${v.id}')" title="${tituloTip}${diaBloqueado ? '' : ' — arrastra para mover a otro día'}">
               <span class="log-cal-viaje-texto">${v.destino || 'Viaje'} · ${nEntregas} ent · ${peso.toFixed(1)}t${fechaStr <= hoyStr && pct !== null ? ` · ${pct}%` : ''}</span>${flechas}
             </div>`;
           }).join('')}

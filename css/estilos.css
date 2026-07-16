@@ -264,6 +264,9 @@
   .log-cal-dia-nombre { padding: 8px 6px; font-size: 11px; font-weight: 700; color: var(--gris-medio); text-transform: uppercase; text-align: center; background: var(--gris-claro); border-bottom: 1px solid var(--gris-borde); }
   .log-cal-celda { min-height: 96px; border: 1px solid var(--gris-claro); padding: 6px; cursor: pointer; transition: background .15s; display: flex; flex-direction: column; gap: 3px; }
   .log-cal-celda:hover { background: var(--azul-suave); }
+  .log-cal-dragover { background: var(--azul-suave); outline: 2px dashed var(--azul-claro); outline-offset: -2px; }
+  .log-cal-viaje[draggable="true"] { cursor: grab; }
+  .log-cal-viaje-arrastrando { opacity: 0.4; }
   .log-cal-vacia { background: #FAFBFC; cursor: default; }
   .log-cal-vacia:hover { background: #FAFBFC; }
   .log-cal-finde { background: #F5F5F5; }
