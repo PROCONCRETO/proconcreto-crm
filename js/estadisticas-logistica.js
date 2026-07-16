@@ -47,7 +47,9 @@ function _datosEstadisticasLogistica(periodoDias) {
       const pesoEntrega = (e.productos || []).reduce((s, p) => s + (Number(p.peso) || 0), 0);
       // La ciudad de destino es la del viaje (Ciudad de Destino), no el "Destino específico /
       // Proyecto" de la entrega — ese es el sitio puntual dentro de la ciudad, no la ciudad.
-      entregas.push({ fecha: v.fecha, vehiculo: v.vehiculo, destino: (v.destino || '').trim() || 'Sin destino', cumplido: _cumplidoDeEntrega(e).estado, pesoEntrega });
+      // `viajeId` se guarda para poder agrupar por viaje real (no por entrega) en los cálculos
+      // de desempeño por vehículo — un viaje con 2 entregas cuenta como 1 viaje, no como 2.
+      entregas.push({ viajeId: v.id, vehiculo: v.vehiculo, fecha: v.fecha, destino: (v.destino || '').trim() || 'Sin destino', cumplido: _cumplidoDeEntrega(e).estado, pesoEntrega });
     });
   });
   return { viajesEnPeriodo, entregas };
@@ -65,27 +67,38 @@ function renderEstadisticasLogistica() {
   const periodo = Number(document.getElementById('est-log-periodo')?.value || 30);
   const { viajesEnPeriodo, entregas } = _datosEstadisticasLogistica(periodo);
 
+  // "Peso transportado" y desempeño por vehículo son sobre lo que REALMENTE se cumplió, no
+  // sobre lo programado — así que se agrupan las entregas "hecha" por viaje real (un viaje con
+  // 2 entregas hechas sigue siendo 1 viaje, no 2, y una entrega todavía pendiente no cuenta
+  // como peso ya transportado).
+  const entregasHechas = entregas.filter(e => e.cumplido === 'hecha');
+  const viajesPorId = {};
+  entregasHechas.forEach(e => {
+    if (!viajesPorId[e.viajeId]) viajesPorId[e.viajeId] = { vehiculo: e.vehiculo, pesoHecho: 0 };
+    viajesPorId[e.viajeId].pesoHecho += e.pesoEntrega;
+  });
+  const viajesCumplidos = Object.values(viajesPorId);
+
   const totalViajes = viajesEnPeriodo.length;
-  const pesoTotal = viajesEnPeriodo.reduce((s, v) => s + (Number(v.pesoTotal) || 0), 0);
-  const hechas = entregas.filter(e => e.cumplido === 'hecha').length;
-  const pctCumplimiento = entregas.length ? Math.round((hechas / entregas.length) * 100) : 0;
-  const viajesConCapacidad = viajesEnPeriodo.filter(v => CAPACIDAD_VEHICULO[v.vehiculo]);
-  const pctCapacidadProm = viajesConCapacidad.length
-    ? Math.round(viajesConCapacidad.reduce((s, v) => s + (Number(v.pesoTotal) || 0) / CAPACIDAD_VEHICULO[v.vehiculo], 0) / viajesConCapacidad.length * 100)
+  const pesoTransportado = entregasHechas.reduce((s, e) => s + e.pesoEntrega, 0);
+  const pctCumplimiento = entregas.length ? Math.round((entregasHechas.length / entregas.length) * 100) : 0;
+  const viajesCumplidosConCapacidad = viajesCumplidos.filter(vv => CAPACIDAD_VEHICULO[vv.vehiculo]);
+  const pctCapacidadProm = viajesCumplidosConCapacidad.length
+    ? Math.round(viajesCumplidosConCapacidad.reduce((s, vv) => s + vv.pesoHecho / CAPACIDAD_VEHICULO[vv.vehiculo], 0) / viajesCumplidosConCapacidad.length * 100)
     : 0;
 
   const tarjetas = document.getElementById('est-log-tarjetas');
   if (tarjetas) {
     tarjetas.innerHTML = _tarjetaKPI('Viajes en el periodo', totalViajes)
       + _tarjetaKPI('Entregas programadas', entregas.length)
-      + _tarjetaKPI('Peso transportado', pesoTotal.toFixed(1) + ' ton')
+      + _tarjetaKPI('Peso transportado', pesoTransportado.toFixed(1) + ' ton')
       + _tarjetaKPI('% Cumplimiento', pctCumplimiento + '%')
       + _tarjetaKPI('% Capacidad promedio', pctCapacidadProm + '%');
   }
 
   _chartCumplimiento(entregas);
   _chartCumplimientoViajes(viajesEnPeriodo);
-  _chartVehiculos(viajesEnPeriodo);
+  _chartVehiculos(viajesCumplidos);
   _chartTendencia(viajesEnPeriodo, periodo);
   _chartDestinos(entregas);
 }
@@ -150,18 +163,20 @@ function _chartCumplimientoViajes(viajesEnPeriodo) {
   });
 }
 
-// ── Desempeño por vehículo (peso transportado; viajes y % capacidad van en la tabla de
-// apoyo debajo, para no mezclar tres métricas de distinta escala en un solo eje).
+// ── Desempeño por vehículo (peso REALMENTE transportado — solo viajes con al menos una
+// entrega marcada "Hecha"; un viaje con 2 entregas hechas cuenta como 1 viaje, no como 2, y
+// una entrega todavía pendiente no suma peso ni viaje. Viajes y % capacidad van en la tabla de
+// apoyo debajo, para no mezclar tres métricas de distinta escala en un solo eje.
 // La etiqueta es la placa (vehículos propios) o el tipo de camión (tercerizados) — nunca el
 // nombre del conductor, y así los dos tercerizados (camión sencillo vs. tractocamión) quedan
 // diferenciados en vez de aparecer los dos como "TERCERIZADO". ──
 let _chartVehiculosInst = null;
-function _chartVehiculos(viajesEnPeriodo) {
+function _chartVehiculos(viajesCumplidos) {
   const ctx = document.getElementById('chart-log-vehiculos');
   if (!ctx) return;
   const vehiculos = Object.keys(CAPACIDAD_VEHICULO);
-  const pesos = vehiculos.map(veh => viajesEnPeriodo.filter(v => v.vehiculo === veh).reduce((s, v) => s + (Number(v.pesoTotal) || 0), 0));
-  const viajesCount = vehiculos.map(veh => viajesEnPeriodo.filter(v => v.vehiculo === veh).length);
+  const pesos = vehiculos.map(veh => viajesCumplidos.filter(vv => vv.vehiculo === veh).reduce((s, vv) => s + vv.pesoHecho, 0));
+  const viajesCount = vehiculos.map(veh => viajesCumplidos.filter(vv => vv.vehiculo === veh).length);
   const etiquetas = vehiculos.map(v => (v.split(' / ')[0] || v).trim());
 
   if (_chartVehiculosInst) _chartVehiculosInst.destroy();

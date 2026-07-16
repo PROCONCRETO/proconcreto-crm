@@ -37,7 +37,7 @@ Botón "✅ Cumplidos" en la barra de Programación de Viajes, con contador de e
 
 ## Estadísticas (dashboard)
 
-`renderEstadisticasLogistica()`, filtrable por periodo (7/30/90 días o todo). KPIs: viajes en el periodo, entregas programadas, peso transportado, % cumplimiento, % capacidad promedio. Gráficas:
+`renderEstadisticasLogistica()`, filtrable por periodo (7/30/90 días o todo). "Viajes en el periodo" y "Entregas programadas" cuentan todo lo programado; **"Peso transportado", "% Capacidad promedio" y "Desempeño por vehículo" solo cuentan entregas marcadas "Hecha"** (agrupadas por viaje real — un viaje con 2 entregas hechas es 1 viaje, no 2), para no mezclar lo programado con lo realmente cumplido. Gráficas:
 - Dona de **cumplimiento de entregas** (verde=hecha, ámbar=reprogramada, rojo=cancelada, gris=pendiente).
 - Dona de **cumplimiento de viajes** (`_categoriaCumplidoViaje()`: completo=100% de sus entregas hechas, parcial=algunas, sin_cumplir=ninguna, pendiente=todavía hay entregas sin marcar).
 - Barras de peso transportado por vehículo, **etiquetadas por placa** (propios) **o tipo de camión** (tercerizados — "CAMION SENCILLO" vs "TRACTO CAMION", nunca el nombre del conductor ni un genérico "TERCERIZADO" que los mezclaría), con tabla de apoyo de N° de viajes y % capacidad debajo (evita mezclar métricas de distinta escala en un mismo eje).
