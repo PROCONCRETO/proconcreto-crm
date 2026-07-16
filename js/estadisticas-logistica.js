@@ -1,10 +1,13 @@
 // ═══════════════════════════════
 // LOGÍSTICA — ESTADÍSTICAS (DASHBOARD)
 // ═══════════════════════════════
-// Se alimenta de VIAJES y del campo `cumplido` de cada entrega (ver logistica.js).
-// Colores de estado (hecha/reprogramada/cancelada/pendiente) usan la paleta de estado fija
-// de la skill de dataviz — nunca se reusan para otra cosa. El resto de gráficas usa un solo
-// color/eje por gráfica (nunca doble eje).
+// Se alimenta de VIAJES y del campo `cumplido` de cada entrega (ver logistica.js). Sigue el
+// mismo lenguaje visual que Cotizaciones→Estadísticas y Calidad→Análisis Estadístico:
+// tarjetas .stat-card con acento de color, selector de período en botones segmentados, y cada
+// gráfica en un contenedor de alto fijo (maintainAspectRatio:false) para que el tamaño no
+// dependa de cuántos datos haya. Colores de estado (hecha/reprogramada/cancelada/pendiente)
+// usan la paleta de estado fija de la skill de dataviz — nunca se reusan para otra cosa. El
+// resto de gráficas usa un solo color/eje por gráfica (nunca doble eje).
 
 const _COLOR_CUMPLIDO = {
   hecha:        { color: '#0ca30c', icono: '✅', etiqueta: 'Hecha' },
@@ -72,16 +75,45 @@ function _datosEstadisticasLogistica(periodoDias) {
   return { viajesEnPeriodo, entregas };
 }
 
-function _tarjetaKPI(label, valor) {
-  return `<div class="card" style="padding:14px 16px;text-align:center;margin-bottom:0">
-    <div style="font-size:11px;font-weight:600;color:var(--gris-medio);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">${label}</div>
-    <div style="font-size:26px;font-weight:700;color:var(--azul)">${valor}</div>
+// ── Tarjetas KPI (.stat-card, mismo componente que Cotizaciones→Estadísticas) ──
+function _tarjetaKPI(valor, etiqueta, color) {
+  return `<div class="stat-card"${color ? ` style="border-color:${color}"` : ''}>
+    <div class="valor"${color ? ` style="color:${color}"` : ''}>${valor}</div>
+    <div class="etiqueta">${etiqueta}</div>
   </div>`;
+}
+
+// Semáforo genérico: verde si ya alcanzó la meta, ámbar a medias, rojo si va mal.
+function _colorSemaforo(pct, buenoDesde = 80, regularDesde = 50) {
+  if (pct >= buenoDesde) return 'var(--verde)';
+  if (pct >= regularDesde) return 'var(--naranja)';
+  return 'var(--rojo)';
+}
+
+// La capacidad es distinta: pasarse de 100% es sobrecarga (rojo), no una meta superada.
+function _colorCapacidad(pct) {
+  if (pct > 100) return 'var(--rojo)';
+  if (pct >= 70) return 'var(--verde)';
+  return 'var(--naranja)';
+}
+
+// ── Selector de período (botones segmentados, igual patrón que setPeriodo() en Cotizaciones) ──
+let _periodoLogistica = 30;
+
+function setPeriodoLogistica(dias) {
+  _periodoLogistica = dias;
+  [7, 30, 90, 0].forEach(d => {
+    const btn = document.getElementById(`est-log-btn-${d}`);
+    if (!btn) return;
+    btn.style.background = d === dias ? 'var(--azul)' : 'white';
+    btn.style.color = d === dias ? 'white' : 'var(--gris-medio)';
+  });
+  renderEstadisticasLogistica();
 }
 
 function renderEstadisticasLogistica() {
   if (typeof Chart === 'undefined') return; // Chart.js aún no cargó (pantalla no visible todavía)
-  const periodo = Number(document.getElementById('est-log-periodo')?.value || 30);
+  const periodo = _periodoLogistica;
   const { viajesEnPeriodo, entregas } = _datosEstadisticasLogistica(periodo);
 
   // "Peso transportado" y desempeño por vehículo son sobre lo que REALMENTE se cumplió, no
@@ -103,21 +135,19 @@ function renderEstadisticasLogistica() {
   const pctCapacidadProm = viajesCumplidosConCapacidad.length
     ? Math.round(viajesCumplidosConCapacidad.reduce((s, vv) => s + vv.pesoHecho / CAPACIDAD_VEHICULO[vv.vehiculo], 0) / viajesCumplidosConCapacidad.length * 100)
     : 0;
-  // Mismo bucket que la dona de cumplimiento (cumplido.estado === 'reprogramada') — tanto
-  // "Reprogramar" en Cumplidos como arrastrar un viaje de hoy a otro día dejan la entrega
-  // original marcada así, así que ambos caminos quedan contados igual. Un cambio dentro del
-  // mismo día nunca llega a marcarse "reprogramada" (ver confirmarReprogramacion() y
-  // soltarViajeEnDia()), así que no hace falta excluirlo aparte.
+  // Mismo bucket que la dona de cumplimiento (estado efectivo === 'reprogramada') — tanto
+  // "Reprogramar" en Cumplidos como arrastrar un viaje a otro día quedan contados igual, en
+  // vivo (ver _cumplidoEfectivo).
   const entregasReprogramadas = entregas.filter(e => e.cumplido === 'reprogramada').length;
 
   const tarjetas = document.getElementById('est-log-tarjetas');
   if (tarjetas) {
-    tarjetas.innerHTML = _tarjetaKPI('Viajes en el periodo', totalViajes)
-      + _tarjetaKPI('Entregas programadas', entregas.length)
-      + _tarjetaKPI('Entregas reprogramadas', entregasReprogramadas)
-      + _tarjetaKPI('Peso transportado', pesoTransportado.toFixed(1) + ' ton')
-      + _tarjetaKPI('% Cumplimiento', pctCumplimiento + '%')
-      + _tarjetaKPI('% Capacidad promedio', pctCapacidadProm + '%');
+    tarjetas.innerHTML = _tarjetaKPI(totalViajes, 'Viajes en el periodo')
+      + _tarjetaKPI(entregas.length, 'Entregas programadas')
+      + _tarjetaKPI(entregasReprogramadas, 'Entregas reprogramadas', entregasReprogramadas ? 'var(--naranja)' : null)
+      + _tarjetaKPI(pesoTransportado.toFixed(1) + ' ton', 'Peso transportado')
+      + _tarjetaKPI(pctCumplimiento + '%', '% Cumplimiento', entregas.length ? _colorSemaforo(pctCumplimiento) : null)
+      + _tarjetaKPI(pctCapacidadProm + '%', '% Capacidad promedio', viajesCumplidosConCapacidad.length ? _colorCapacidad(pctCapacidadProm) : null);
   }
 
   _chartCumplimiento(entregas);
@@ -148,6 +178,8 @@ function _chartCumplimiento(entregas) {
       }],
     },
     options: {
+      responsive: true,
+      maintainAspectRatio: false,
       cutout: '62%',
       plugins: {
         legend: { position: 'bottom', labels: { color: '#52514e', boxWidth: 12, padding: 12, font: { size: 11 } } },
@@ -178,6 +210,8 @@ function _chartCumplimientoViajes(viajesEnPeriodo) {
       }],
     },
     options: {
+      responsive: true,
+      maintainAspectRatio: false,
       cutout: '62%',
       plugins: {
         legend: { position: 'bottom', labels: { color: '#52514e', boxWidth: 12, padding: 12, font: { size: 11 } } },
@@ -211,6 +245,8 @@ function _chartVehiculos(viajesCumplidos) {
       datasets: [{ data: pesos, backgroundColor: vehiculos.map(v => COLOR_VEHICULO_VIAJE[v] || '#607D8B'), borderRadius: 4, maxBarThickness: 24 }],
     },
     options: {
+      responsive: true,
+      maintainAspectRatio: false,
       indexAxis: 'y',
       plugins: {
         legend: { display: false },
@@ -273,6 +309,8 @@ function _chartTendencia(viajesEnPeriodo, periodoDias) {
       }],
     },
     options: {
+      responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: { callbacks: { label: (c) => ` ${c.parsed.y} viaje${c.parsed.y === 1 ? '' : 's'}` } },
@@ -298,6 +336,8 @@ function _chartDestinos(entregas) {
     type: 'bar',
     data: { labels: top.map(([d]) => d), datasets: [{ data: top.map(([, n]) => n), backgroundColor: '#2a78d6', borderRadius: 4, maxBarThickness: 20 }] },
     options: {
+      responsive: true,
+      maintainAspectRatio: false,
       indexAxis: 'y',
       plugins: {
         legend: { display: false },

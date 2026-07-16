@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260716m">
+<link rel="stylesheet" href="css/estilos.css?v=20260716n">
 </head>
 <body>
 
@@ -657,45 +657,44 @@
      PANTALLA: LOGÍSTICA — ESTADÍSTICAS
 ═══════════════════════════════════════ -->
 <div id="pantalla-logistica-estadisticas" class="pantalla">
-  <div class="acciones-row">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
     <div style="font-size:18px;font-weight:700;color:var(--azul)">Estadísticas de Logística</div>
-    <div class="flex-gap">
-      <select id="est-log-periodo" onchange="renderEstadisticasLogistica()" style="padding:7px 10px;border:1px solid var(--gris-borde);border-radius:6px;font-size:13px">
-        <option value="30">Últimos 30 días</option>
-        <option value="7">Últimos 7 días</option>
-        <option value="90">Últimos 90 días</option>
-        <option value="0">Todo</option>
-      </select>
+    <div style="display:flex;border:1px solid var(--gris-borde);border-radius:var(--radio);overflow:hidden">
+      <button id="est-log-btn-7" onclick="setPeriodoLogistica(7)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">7 días</button>
+      <button id="est-log-btn-30" onclick="setPeriodoLogistica(30)" style="padding:6px 14px;border:none;background:var(--azul);color:white;font-size:12px;font-weight:600;cursor:pointer">30 días</button>
+      <button id="est-log-btn-90" onclick="setPeriodoLogistica(90)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">90 días</button>
+      <button id="est-log-btn-0" onclick="setPeriodoLogistica(0)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">Todo</button>
     </div>
   </div>
 
-  <div class="form-grid" id="est-log-tarjetas" style="margin-bottom:16px"></div>
+  <div class="stats-grid" id="est-log-tarjetas"></div>
 
-  <div class="form-grid">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div class="card">
       <div class="card-titulo">Cumplimiento de entregas</div>
-      <div style="max-width:300px;margin:0 auto"><canvas id="chart-log-cumplimiento"></canvas></div>
+      <div style="height:260px;position:relative"><canvas id="chart-log-cumplimiento"></canvas></div>
     </div>
     <div class="card">
       <div class="card-titulo">Cumplimiento de viajes</div>
-      <div style="max-width:300px;margin:0 auto"><canvas id="chart-log-cumplimiento-viajes"></canvas></div>
+      <div style="height:260px;position:relative"><canvas id="chart-log-cumplimiento-viajes"></canvas></div>
     </div>
   </div>
 
   <div class="card">
     <div class="card-titulo">Desempeño por vehículo</div>
-    <canvas id="chart-log-vehiculos" style="max-height:220px"></canvas>
-    <div id="tabla-log-vehiculos"></div>
+    <div style="height:220px;position:relative"><canvas id="chart-log-vehiculos"></canvas></div>
+    <div id="tabla-log-vehiculos" style="margin-top:8px"></div>
   </div>
 
-  <div class="card">
-    <div class="card-titulo">Tendencia de viajes en el tiempo</div>
-    <canvas id="chart-log-tendencia" style="max-height:280px"></canvas>
-  </div>
-
-  <div class="card">
-    <div class="card-titulo">Destinos más frecuentes</div>
-    <canvas id="chart-log-destinos" style="max-height:300px"></canvas>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card">
+      <div class="card-titulo">Tendencia de viajes en el tiempo</div>
+      <div style="height:280px;position:relative"><canvas id="chart-log-tendencia"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-titulo">Destinos más frecuentes</div>
+      <div style="height:280px;position:relative"><canvas id="chart-log-destinos"></canvas></div>
+    </div>
   </div>
 </div>
 
@@ -1556,25 +1555,25 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260716m"></script>
-<script src="js/catalogo.js?v=20260716m"></script>
-<script src="js/navegacion.js?v=20260716m"></script>
-<script src="js/ordenes-produccion.js?v=20260716m"></script>
-<script src="js/produccion-diaria.js?v=20260716m"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260716m"></script>
-<script src="js/calidad-mezclas.js?v=20260716m"></script>
-<script src="js/calidad-estadisticas.js?v=20260716m"></script>
-<script src="js/calidad-trazabilidad.js?v=20260716m"></script>
-<script src="js/logistica.js?v=20260716m"></script>
-<script src="js/estadisticas-logistica.js?v=20260716m"></script>
-<script src="js/auth.js?v=20260716m"></script>
-<script src="js/datos-realtime.js?v=20260716m"></script>
-<script src="js/cotizador.js?v=20260716m"></script>
-<script src="js/historico-clientes-stats.js?v=20260716m"></script>
+<script src="js/config.js?v=20260716n"></script>
+<script src="js/catalogo.js?v=20260716n"></script>
+<script src="js/navegacion.js?v=20260716n"></script>
+<script src="js/ordenes-produccion.js?v=20260716n"></script>
+<script src="js/produccion-diaria.js?v=20260716n"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260716n"></script>
+<script src="js/calidad-mezclas.js?v=20260716n"></script>
+<script src="js/calidad-estadisticas.js?v=20260716n"></script>
+<script src="js/calidad-trazabilidad.js?v=20260716n"></script>
+<script src="js/logistica.js?v=20260716n"></script>
+<script src="js/estadisticas-logistica.js?v=20260716n"></script>
+<script src="js/auth.js?v=20260716n"></script>
+<script src="js/datos-realtime.js?v=20260716n"></script>
+<script src="js/cotizador.js?v=20260716n"></script>
+<script src="js/historico-clientes-stats.js?v=20260716n"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="js/pdf.js?v=20260716m"></script>
+<script src="js/pdf.js?v=20260716n"></script>
 </body>
 </html>
