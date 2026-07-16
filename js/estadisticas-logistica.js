@@ -23,8 +23,21 @@ const _COLOR_CUMPLIDO_VIAJE = {
   pendiente:    { color: '#b0aea6', icono: '⏳', etiqueta: 'Pendiente' },
 };
 
+// Estado "efectivo" de una entrega para estadísticas: si sigue con resultado real (hecha,
+// cancelada) o si ya se marcó "reprogramada" a mano (vía Cumplidos), se respeta tal cual. Pero
+// si sigue "pendiente" en los datos y su viaje actual quedó en una fecha distinta a la
+// original, es porque se arrastró a otro día en el calendario sin pasar por Cumplidos — para
+// las estadísticas cuenta como reprogramada. Es una comparación EN VIVO, no una marca fija: si
+// el viaje se arrastra de vuelta a su fecha original, vuelve a ser "pendiente" solo, sin que
+// haya que deshacer nada a mano.
+function _cumplidoEfectivo(e, viajeFecha) {
+  const c = _cumplidoDeEntrega(e).estado;
+  const fechaOriginal = e.fechaOriginal || viajeFecha;
+  return (c === 'pendiente' && fechaOriginal !== viajeFecha) ? 'reprogramada' : c;
+}
+
 function _categoriaCumplidoViaje(v) {
-  const estados = _entregasDeViaje(v).map(e => _cumplidoDeEntrega(e).estado);
+  const estados = _entregasDeViaje(v).map(e => _cumplidoEfectivo(e, v.fecha));
   if (!estados.length || estados.some(s => s === 'pendiente')) return 'pendiente';
   const hechas = estados.filter(s => s === 'hecha').length;
   if (hechas === estados.length) return 'completo';
@@ -32,27 +45,28 @@ function _categoriaCumplidoViaje(v) {
   return 'sin_cumplir';
 }
 
-// Junta viajes + entregas del periodo seleccionado (solo hoy y hacia atrás; el futuro no
-// tiene cumplimiento que medir todavía).
+// Junta viajes + entregas del periodo seleccionado. El filtro de fecha usa `fechaOriginal` (el
+// compromiso original de la entrega), no la fecha actual del viaje — así una entrega que se
+// arrastró de hoy hacia adelante se sigue evaluando dentro de la ventana de hoy en vez de
+// desaparecer de las estadísticas (ver _cumplidoEfectivo arriba).
 function _datosEstadisticasLogistica(periodoDias) {
   const hoy = _fmtISO(new Date());
   const desde = periodoDias > 0 ? _fmtISO(_sumarDias(new Date(), -periodoDias)) : null;
   const entregas = [];
   const viajesEnPeriodo = [];
+  const viajesVistos = new Set();
   VIAJES.forEach(v => {
-    if (v.fecha > hoy) return;
-    if (desde && v.fecha < desde) return;
-    viajesEnPeriodo.push(v);
     _entregasDeViaje(v).forEach(e => {
+      const fechaOriginal = e.fechaOriginal || v.fecha;
+      if (fechaOriginal > hoy) return; // el compromiso original todavía no vence
+      if (desde && fechaOriginal < desde) return;
       const pesoEntrega = (e.productos || []).reduce((s, p) => s + (Number(p.peso) || 0), 0);
       // La ciudad de destino es la del viaje (Ciudad de Destino), no el "Destino específico /
       // Proyecto" de la entrega — ese es el sitio puntual dentro de la ciudad, no la ciudad.
       // `viajeId` se guarda para poder agrupar por viaje real (no por entrega) en los cálculos
       // de desempeño por vehículo — un viaje con 2 entregas cuenta como 1 viaje, no como 2.
-      // `fechaOriginal` vs. `fecha` (la del viaje actual) es lo que define si una entrega se
-      // reprogramó de verdad: si son iguales, nunca cambió de día (o el cambio fue dentro del
-      // mismo día, que no cuenta como reprogramación).
-      entregas.push({ viajeId: v.id, vehiculo: v.vehiculo, fecha: v.fecha, fechaOriginal: e.fechaOriginal || v.fecha, destino: (v.destino || '').trim() || 'Sin destino', cumplido: _cumplidoDeEntrega(e).estado, pesoEntrega });
+      entregas.push({ viajeId: v.id, vehiculo: v.vehiculo, fecha: v.fecha, fechaOriginal, destino: (v.destino || '').trim() || 'Sin destino', cumplido: _cumplidoEfectivo(e, v.fecha), pesoEntrega });
+      if (!viajesVistos.has(v.id)) { viajesVistos.add(v.id); viajesEnPeriodo.push(v); }
     });
   });
   return { viajesEnPeriodo, entregas };
