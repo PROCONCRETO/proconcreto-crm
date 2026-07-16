@@ -49,7 +49,10 @@ function _datosEstadisticasLogistica(periodoDias) {
       // Proyecto" de la entrega — ese es el sitio puntual dentro de la ciudad, no la ciudad.
       // `viajeId` se guarda para poder agrupar por viaje real (no por entrega) en los cálculos
       // de desempeño por vehículo — un viaje con 2 entregas cuenta como 1 viaje, no como 2.
-      entregas.push({ viajeId: v.id, vehiculo: v.vehiculo, fecha: v.fecha, destino: (v.destino || '').trim() || 'Sin destino', cumplido: _cumplidoDeEntrega(e).estado, pesoEntrega });
+      // `fechaOriginal` vs. `fecha` (la del viaje actual) es lo que define si una entrega se
+      // reprogramó de verdad: si son iguales, nunca cambió de día (o el cambio fue dentro del
+      // mismo día, que no cuenta como reprogramación).
+      entregas.push({ viajeId: v.id, vehiculo: v.vehiculo, fecha: v.fecha, fechaOriginal: e.fechaOriginal || v.fecha, destino: (v.destino || '').trim() || 'Sin destino', cumplido: _cumplidoDeEntrega(e).estado, pesoEntrega });
     });
   });
   return { viajesEnPeriodo, entregas };
@@ -86,11 +89,16 @@ function renderEstadisticasLogistica() {
   const pctCapacidadProm = viajesCumplidosConCapacidad.length
     ? Math.round(viajesCumplidosConCapacidad.reduce((s, vv) => s + vv.pesoHecho / CAPACIDAD_VEHICULO[vv.vehiculo], 0) / viajesCumplidosConCapacidad.length * 100)
     : 0;
+  // Reprogramada = cambió de día de verdad (fechaOriginal != fecha actual). Un movimiento
+  // dentro del mismo día no cuenta, sin importar si vino de arrastrar el viaje en el
+  // calendario o de "Reprogramar" en Cumplidos.
+  const entregasReprogramadas = entregas.filter(e => e.fechaOriginal && e.fechaOriginal !== e.fecha).length;
 
   const tarjetas = document.getElementById('est-log-tarjetas');
   if (tarjetas) {
     tarjetas.innerHTML = _tarjetaKPI('Viajes en el periodo', totalViajes)
       + _tarjetaKPI('Entregas programadas', entregas.length)
+      + _tarjetaKPI('Entregas reprogramadas', entregasReprogramadas)
       + _tarjetaKPI('Peso transportado', pesoTransportado.toFixed(1) + ' ton')
       + _tarjetaKPI('% Cumplimiento', pctCumplimiento + '%')
       + _tarjetaKPI('% Capacidad promedio', pctCapacidadProm + '%');

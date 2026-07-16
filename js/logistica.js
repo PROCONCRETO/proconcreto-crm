@@ -215,8 +215,12 @@ function soltarViajeEnDia(event, fechaDestino) {
   _viajeArrastradoId = null;
   if (!id) return;
   const v = VIAJES.find(x => String(x.id) === String(id));
-  if (!v || v.fecha === fechaDestino) return;
+  if (!v || v.fecha === fechaDestino) return; // mismo día: no se mueve nada, no cuenta como reprogramación
   if (esFechaBloqueada(fechaDestino)) { alert('No se puede mover un viaje a una fecha que ya pasó.'); return; }
+  // fechaOriginal se conserva tal cual estaba (o se fija por primera vez a la fecha vieja del
+  // viaje) — así queda registrado que esta entrega se reprogramó a un día distinto, para las
+  // estadísticas de Entregas Reprogramadas.
+  _entregasDeViaje(v).forEach(e => { if (!e.fechaOriginal) e.fechaOriginal = v.fecha; });
   v.fecha = fechaDestino;
   v.orden = Date.now();
   sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' })
@@ -605,7 +609,7 @@ function editarViaje(id) {
   // un viaje ya programado no debe cambiar solo porque un producto se actualizó después).
   const entregasPrevias = _entregasDeViaje(v);
   _entregasViajeActual = JSON.parse(JSON.stringify(entregasPrevias.length ? entregasPrevias : [_entregaVaciaViaje()]));
-  _entregasViajeActual.forEach(e => { if (!e.productos || !e.productos.length) e.productos = [_lineaVaciaEntrega()]; if (!e.cumplido) e.cumplido = { estado: 'pendiente' }; if (e.ordenId === undefined) e.ordenId = ''; if (e.ordenNumero === undefined) e.ordenNumero = ''; });
+  _entregasViajeActual.forEach(e => { if (!e.productos || !e.productos.length) e.productos = [_lineaVaciaEntrega()]; if (!e.cumplido) e.cumplido = { estado: 'pendiente' }; if (e.ordenId === undefined) e.ordenId = ''; if (e.ordenNumero === undefined) e.ordenNumero = ''; if (!e.fechaOriginal) e.fechaOriginal = v.fecha; });
   renderEntregasViaje();
   document.getElementById('modal-viaje').classList.add('abierto');
 }
@@ -619,6 +623,12 @@ function guardarViaje() {
     .map(e => ({
       ordenId: e.ordenId || '',
       ordenNumero: e.ordenNumero || '',
+      // Se fija la primera vez que la entrega se guarda y nunca vuelve a cambiar — es lo que
+      // permite saber después si una entrega se reprogramó (fechaOriginal != fecha actual del
+      // viaje) sin importar si el cambio de fecha vino de arrastrarla o de "Reprogramar" en
+      // Cumplidos. Si se reprograma dentro del mismo día, fechaOriginal queda igual a la fecha
+      // actual y no cuenta como reprogramación.
+      fechaOriginal: e.fechaOriginal || fecha,
       cliente: (e.cliente || '').trim(),
       destino: (e.destino || '').trim(),
       contactoObraNombre: (e.contactoObraNombre || '').trim(),
@@ -748,6 +758,11 @@ function confirmarReprogramacion(viajeId, entregaIndex) {
   const input = document.getElementById(`reprogramar-fecha-${key}`);
   const nuevaFecha = input ? input.value : '';
   if (!nuevaFecha) { alert('Elige la nueva fecha.'); return; }
+  const v = VIAJES.find(x => String(x.id) === String(viajeId));
+  if (v && nuevaFecha === v.fecha) {
+    alert('Esa es la misma fecha del viaje actual — si la entrega se va a hacer más tarde el mismo día, no hace falta reprogramarla: déjala pendiente y márcala como "Hecha" cuando se complete.');
+    return;
+  }
   marcarCumplidoEntrega(viajeId, entregaIndex, 'reprogramada', nuevaFecha);
 }
 
@@ -761,6 +776,7 @@ function marcarCumplidoEntrega(viajeId, entregaIndex, estado, nuevaFecha) {
   if (!v.entregas) v.entregas = _entregasDeViaje(v);
   const e = v.entregas[entregaIndex];
   if (!e) return;
+  if (!e.fechaOriginal) e.fechaOriginal = v.fecha;
 
   e.cumplido = {
     estado,
@@ -773,11 +789,16 @@ function marcarCumplidoEntrega(viajeId, entregaIndex, estado, nuevaFecha) {
     sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' }),
   ];
 
-  if (estado === 'reprogramada') {
+  // Reprogramar dentro del mismo día (ej. "se atrasó, se entrega más tarde hoy") no genera un
+  // viaje nuevo — no tiene sentido duplicarlo en la misma fecha, y tampoco cuenta como
+  // reprogramación en las estadísticas porque fechaOriginal seguiría siendo igual a la fecha.
+  if (estado === 'reprogramada' && nuevaFecha !== v.fecha) {
     const entregaNueva = {
+      ordenId: e.ordenId || '', ordenNumero: e.ordenNumero || '',
       cliente: e.cliente, destino: e.destino,
       contactoObraNombre: e.contactoObraNombre, contactoObraTelefono: e.contactoObraTelefono,
       productos: JSON.parse(JSON.stringify(e.productos || [])),
+      fechaOriginal: e.fechaOriginal,
       cumplido: { estado: 'pendiente' },
     };
     const pesoNuevo = entregaNueva.productos.reduce((s, p) => s + (Number(p.peso) || 0), 0);

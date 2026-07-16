@@ -21,6 +21,7 @@
 - **Orden de Producción asociada**: cada entrega puede vincularse a una orden (`entrega.ordenId`/`ordenNumero`, o "N/A" si no aplica — órdenes viejas no cargadas en el aplicativo, o entregas sin orden). Al elegir una orden se autocompletan cliente/destino/contacto y las líneas de producto con el **saldo pendiente** de cada una (pedido − ya entregado a la fecha en otras entregas "hecha" de esa orden), no la cantidad pedida completa — pensado para entregas parciales. Ver `aplicarOrdenAEntrega()`, `_itemsDeOrden()`, `_cantidadEntregadaPorProducto()`.
 - **Prioridad dentro del día**: los viajes de un mismo día se ordenan por `viaje.orden` (si no está definido, se usa el id/timestamp de creación como respaldo — orden cronológico). Las flechas ▲▼ en cada chip del calendario (`moverViajeOrden()`) intercambian el `orden` con el vecino inmediato, para reflejar prioridad real de despacho y no solo el orden en que se cargaron.
 - **Mover un viaje a otro día**: arrastrando el chip del calendario y soltándolo sobre otro día (drag & drop nativo, sin librerías — `iniciarArrastreViaje()`/`soltarViajeEnDia()`) se le cambia la fecha, incluso a días futuros. Solo se puede arrastrar un viaje en fecha no bloqueada, y no se puede soltar sobre una fecha bloqueada (mismo criterio que `esFechaBloqueada`) — un viaje que ya pasó se reprograma desde "✅ Cumplidos" (que deja rastro de la reprogramación), no arrastrándolo.
+- **`entrega.fechaOriginal`**: se fija la primera vez que la entrega se guarda y nunca vuelve a cambiar. Comparada contra la fecha actual de su viaje, es lo que define si una entrega "se reprogramó de verdad" (cambió de día) para las estadísticas — sin importar si el cambio vino de arrastrar el viaje en el calendario o de "Reprogramar" en Cumplidos. Un cambio dentro del mismo día NO cuenta como reprogramación (ver `confirmarReprogramacion()`, que bloquea elegir la misma fecha del viaje actual).
 
 ## Bloqueo de fechas pasadas
 
@@ -30,7 +31,7 @@
 
 Botón "✅ Cumplidos" en la barra de Programación de Viajes, con contador de entregas pendientes. `entregasPendientesAcumuladas()` junta TODAS las entregas de hoy o de cualquier día anterior que sigan en estado `pendiente` (no solo las de ayer — se van acumulando si no se marcan). Cada fila se marca como Hecha, Reprogramada (pide nueva fecha) o Cancelada vía `marcarCumplidoEntrega()`.
 
-**Reprogramar** mueve la entrega: crea un viaje nuevo en la fecha nueva con una copia de esa entrega (fresca, en `pendiente`), y dentro del viaje original la entrega original queda marcada `reprogramada` con la fecha a la que se movió (no desaparece — así las estadísticas conservan el rastro de que hubo una reprogramación ese día).
+**Reprogramar** mueve la entrega: crea un viaje nuevo en la fecha nueva con una copia de esa entrega (fresca, en `pendiente`, heredando `fechaOriginal`), y dentro del viaje original la entrega original queda marcada `reprogramada` con la fecha a la que se movió (no desaparece — así las estadísticas conservan el rastro de que hubo una reprogramación ese día). Si la fecha elegida es la misma del viaje actual (ej. "se atrasó, se entrega más tarde hoy"), no se crea nada nuevo — la entrega se deja `pendiente` tal cual, porque no es una reprogramación real.
 
 ## Datos
 
@@ -39,7 +40,7 @@ Botón "✅ Cumplidos" en la barra de Programación de Viajes, con contador de e
 
 ## Estadísticas (dashboard)
 
-`renderEstadisticasLogistica()`, filtrable por periodo (7/30/90 días o todo). "Viajes en el periodo" y "Entregas programadas" cuentan todo lo programado; **"Peso transportado", "% Capacidad promedio" y "Desempeño por vehículo" solo cuentan entregas marcadas "Hecha"** (agrupadas por viaje real — un viaje con 2 entregas hechas es 1 viaje, no 2), para no mezclar lo programado con lo realmente cumplido. Gráficas:
+`renderEstadisticasLogistica()`, filtrable por periodo (7/30/90 días o todo). "Viajes en el periodo" y "Entregas programadas" cuentan todo lo programado; **"Peso transportado", "% Capacidad promedio" y "Desempeño por vehículo" solo cuentan entregas marcadas "Hecha"** (agrupadas por viaje real — un viaje con 2 entregas hechas es 1 viaje, no 2), para no mezclar lo programado con lo realmente cumplido. **"Entregas reprogramadas"** cuenta entregas donde `fechaOriginal !== fecha` del viaje actual (cambiaron de día de verdad; un cambio dentro del mismo día no suma aquí). Gráficas:
 - Dona de **cumplimiento de entregas** (verde=hecha, ámbar=reprogramada, rojo=cancelada, gris=pendiente).
 - Dona de **cumplimiento de viajes** (`_categoriaCumplidoViaje()`: completo=100% de sus entregas hechas, parcial=algunas, sin_cumplir=ninguna, pendiente=todavía hay entregas sin marcar).
 - Barras de peso transportado por vehículo, **etiquetadas por placa** (propios) **o tipo de camión** (tercerizados — "CAMION SENCILLO" vs "TRACTO CAMION", nunca el nombre del conductor ni un genérico "TERCERIZADO" que los mezclaría), con tabla de apoyo de N° de viajes y % capacidad debajo (evita mezclar métricas de distinta escala en un mismo eje).
