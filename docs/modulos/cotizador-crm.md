@@ -11,7 +11,7 @@
 
 - Tablas Supabase: `cotizaciones`, `clientes`
 - Tarifas de transporte por municipio están fijas en `TARIFAS_TRANSPORTE` / `TARIFAS_KG_TRANSPORTE` (`js/config.js`), no en base de datos
-- `cliente`: `nombre`, `contacto` (persona que gestiona/recibe — **no necesariamente el representante legal**), `cel`, `email` (del contacto), `ciudad`, `nit` (formato `NIT-DV`), `direccion`, `representanteLegal`, `emailFacturacion` (el correo del RUT — **distinto** del email del contacto). Estos últimos 4 campos se pueden autocompletar leyendo el RUT (ver más abajo) o escribirse a mano.
+- `cliente`: `nombre`, `contacto` (persona que gestiona/recibe), `cel`, `email` (del contacto), `ciudad`, `nit` (formato `NIT-DV`), `direccion`, `emailFacturacion` (el correo del RUT — **distinto** del email del contacto). Estos últimos 3 campos se pueden autocompletar leyendo el RUT (ver más abajo) o escribirse a mano.
 
 ## Pantallas (`ir()` en `navegacion.js`)
 
@@ -22,9 +22,11 @@
 En el modal de Nuevo/Editar Cliente, el botón "📄 Muéstrame el RUT del cliente" (zona de arrastrar-y-soltar o buscar archivo) lee el PDF del RUT **completo en el navegador** con [pdf.js](https://mozilla.github.io/pdf.js/) (CDN) — el archivo nunca se sube a Supabase ni se guarda en ningún lado, solo se procesa en memoria y se descarta.
 
 - `_leerLineasPDF()`: pdf.js no entrega el texto en orden de lectura visual por defecto (el RUT de la DIAN suele separar "plantilla" de "valores llenados" en bloques distintos del PDF) — se reconstruyen renglones agrupando el texto por posición Y (con tolerancia) y ordenando por X, para recuperar el orden visual real.
-- `_extraerDatosRut()`: busca sobre esas líneas los patrones de las casillas del formulario 001 (Razón social, NIT+DV, Dirección principal, correo electrónico, representante legal en la hoja de Representación) y devuelve lo que logra reconocer.
+- `_extraerDatosRut()`: busca sobre esas líneas los patrones de las casillas del formulario 001 (Razón social, NIT+DV, Dirección principal, correo electrónico) y devuelve lo que logra reconocer.
+  - `_extraerNitDv()`: el NIT+DV es una fila de casillas de un solo dígito que a veces queda pegada a otros valores de la misma franja del formulario (ej. "Dirección seccional") — no basta con tomar "la línea siguiente" a la etiqueta tal cual; se busca, en las líneas después de la etiqueta, la primera racha de solo dígitos/espacios/guiones de al menos 9 caracteres.
+  - `_extraerCorreo()`: busca el correo cerca de la etiqueta "Correo electrónico" primero, y solo si no lo encuentra ahí cae a buscar en todo el documento — un PDF de RUT puede traer otros correos que no se ven a simple vista (metadatos, pie de página).
 - Es un parser de **mejor esfuerzo, no infalible** (la posición exacta del texto puede variar entre PDFs) — por eso siempre rellena el formulario para que se revise antes de guardar, nunca guarda directo. Si no reconoce nada, lo dice explícitamente en vez de fallar en silencio.
-- Solo llena: Razón social, NIT, Dirección, Representante legal, Correo de facturación. **Nunca** toca Contacto/Celular/Email — esos son datos de la persona operativa de contacto, que el RUT no tiene y siguen siendo manuales.
+- Solo llena: Razón social, NIT, Dirección, Correo de facturación. **Nunca** toca Contacto/Celular/Email — esos son datos de la persona operativa de contacto, que el RUT no tiene y siguen siendo manuales. (El representante legal del RUT se evaluó pero no se incluyó — no hace falta para este flujo.)
 
 ## Qué hace
 

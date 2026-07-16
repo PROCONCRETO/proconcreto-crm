@@ -45,56 +45,53 @@ function _valorDespuesDe(lineas, patronLabel) {
   return lineas[idx + 1].trim();
 }
 
-// Un NIT colombiano son 9 dígitos + 1 dígito de verificación (DV). En el RUT a veces quedan
-// separados por espacios (una casilla por dígito) — se juntan y se separa el último como DV.
+// Un NIT colombiano son 9 dígitos + 1 dígito de verificación (DV), impresos como una fila de
+// casillas de un solo dígito. Esa fila a veces queda pegada a otros valores de la misma
+// franja del formulario (ej. "12. Dirección seccional"), así que no basta con tomar "la línea
+// siguiente" a la etiqueta tal cual — se busca, en las líneas después de la etiqueta, la
+// primera que sea (o empiece por) una racha de solo dígitos/espacios/guiones de al menos 9
+// caracteres, en vez de confiar en que esa línea venga sola.
 function _extraerNitDv(lineas) {
-  const valor = _valorDespuesDe(lineas, /^5\.\s*N[úu]mero de Identificaci[óo]n Tributaria/i);
-  const digitos = (valor.match(/\d/g) || []).join('');
-  if (digitos.length < 2) return { nit: valor.replace(/\s+/g, ''), dv: '' };
-  return { nit: digitos.slice(0, -1), dv: digitos.slice(-1) };
+  const idxLabel = lineas.findIndex(l => /N[úu]mero de Identificaci[óo]n Tributaria/i.test(l));
+  if (idxLabel === -1) return { nit: '', dv: '' };
+  for (let i = idxLabel + 1; i < Math.min(idxLabel + 6, lineas.length); i++) {
+    const linea = lineas[i];
+    // Racha de dígitos al inicio de la línea (cubre tanto una línea 100% numérica como una
+    // línea donde el NIT viene primero y después se pega texto de otra casilla).
+    const m = linea.match(/^[\d\s-]{9,}/);
+    const digitos = ((m ? m[0] : '').match(/\d/g) || []).join('');
+    if (digitos.length >= 9) {
+      return digitos.length >= 10 ? { nit: digitos.slice(0, -1), dv: digitos.slice(-1) } : { nit: digitos, dv: '' };
+    }
+  }
+  return { nit: '', dv: '' };
+}
+
+// El correo se busca cerca de la etiqueta "42. Correo electrónico" primero — un PDF de RUT
+// puede traer otros correos que no se ven a simple vista (metadatos, pie de página) pero sí
+// aparecen en el texto que lee pdf.js, así que buscar en todo el documento es más arriesgado.
+function _extraerCorreo(lineas) {
+  const idxLabel = lineas.findIndex(l => /Correo electr[óo]nico/i.test(l));
+  const rango = idxLabel === -1 ? lineas : lineas.slice(idxLabel, idxLabel + 4);
+  for (const l of rango) {
+    const m = l.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+    if (m) return m[0];
+  }
+  const global = lineas.join('\n').match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+  return global ? global[0] : '';
 }
 
 function _extraerDatosRut(lineas) {
-  const texto = lineas.join('\n');
-
   const { nit, dv } = _extraerNitDv(lineas);
   const razonSocial = _valorDespuesDe(lineas, /^35\.\s*Raz[óo]n social/i);
   const direccion = _valorDespuesDe(lineas, /^41\.\s*Direcci[óo]n principal/i);
-
-  // El correo es un patrón muy distintivo — más confiable buscarlo en todo el texto que
-  // depender de la posición exacta de la casilla 42.
-  const matchEmail = texto.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
-  const correoFacturacion = matchEmail ? matchEmail[0] : '';
-
-  // Representante legal: la fila "REPRS LEGAL PRIN" (o variantes de "Representante Legal")
-  // en la Hoja 3 va seguida, un par de líneas más abajo, de los 4 nombres en una sola fila
-  // (104. Primer apellido / 105. Segundo apellido / 106. Primer nombre / 107. Otros nombres).
-  let representanteLegal = '';
-  const idxRepLegal = lineas.findIndex(l => /REPR?S?\.?\s*LEGAL/i.test(l));
-  if (idxRepLegal !== -1) {
-    for (let i = idxRepLegal + 1; i < Math.min(idxRepLegal + 4, lineas.length); i++) {
-      const candidata = lineas[i];
-      // Debe verse como nombres: solo letras/espacios, todo en mayúsculas, sin dígitos ni "N°/label".
-      if (/^[A-ZÁÉÍÓÚÑ ]{4,}$/.test(candidata) && !/\d/.test(candidata)) {
-        const partes = candidata.split(/\s+/);
-        if (partes.length >= 2) {
-          // RUT trae Apellido1 Apellido2 Nombre1 [Nombre2] — se muestra como "Nombres Apellidos".
-          const mitad = Math.ceil(partes.length / 2);
-          representanteLegal = [...partes.slice(mitad), ...partes.slice(0, mitad)].join(' ');
-        } else {
-          representanteLegal = candidata;
-        }
-        break;
-      }
-    }
-  }
+  const correoFacturacion = _extraerCorreo(lineas);
 
   return {
     nit: dv ? `${nit}-${dv}` : nit,
     nombre: razonSocial,
     direccion,
     correoFacturacion,
-    representanteLegal,
   };
 }
 
@@ -121,13 +118,12 @@ async function manejarArchivoRut(file) {
     if (datos.nit) document.getElementById('m-cliente-nit').value = datos.nit;
     if (datos.direccion) document.getElementById('m-cliente-direccion').value = datos.direccion;
     if (datos.correoFacturacion) document.getElementById('m-cliente-emailFacturacion').value = datos.correoFacturacion;
-    if (datos.representanteLegal) document.getElementById('m-cliente-repLegal').value = datos.representanteLegal;
 
-    const leidos = ['nombre', 'nit', 'direccion', 'correoFacturacion', 'representanteLegal'].filter(k => datos[k]).length;
+    const leidos = ['nombre', 'nit', 'direccion', 'correoFacturacion'].filter(k => datos[k]).length;
     if (leidos === 0) {
       _estadoRut('No pude reconocer los datos de este RUT — revisa que sea el formulario 001 de la DIAN, o completa a mano.', 'error');
     } else {
-      _estadoRut(`✅ Se leyeron ${leidos} de 5 campos del RUT — revísalos antes de guardar. El PDF no se guardó en ningún lado.`, 'ok');
+      _estadoRut(`✅ Se leyeron ${leidos} de 4 campos del RUT — revísalos antes de guardar. El PDF no se guardó en ningún lado.`, 'ok');
     }
   } catch (err) {
     console.error('Error leyendo RUT:', err);
