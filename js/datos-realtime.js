@@ -26,7 +26,7 @@ async function cargarDatosSupabase() {
   MATERIA_PRIMA = (mprima || []).filter(r => r.datos).map(r => r.datos);
   NO_CONFORMIDADES = (nconf || []).filter(r => r.datos).map(r => r.datos);
   AJUSTES_MEZCLA = (ajustes || []).filter(r => r.datos).map(r => r.datos);
-  DESPACHOS = (entregas || []).filter(r => r.datos).map(r => r.datos);
+  VIAJES = (entregas || []).filter(r => r.datos).map(r => r.datos);
 
   // Catálogo de productos desde Supabase (con auto-siembra la primera vez)
   await cargarCatalogo();
@@ -163,9 +163,9 @@ async function recargarAjustesRT() {
   AJUSTES_MEZCLA = (data || []).filter(r => r.datos).map(r => r.datos);
   rerenderPantallaActiva();
 }
-async function recargarDespachosRT() {
+async function recargarViajesRT() {
   const { data } = await sb.from('entregas_programadas').select('datos').order('creado', { ascending: false });
-  DESPACHOS = (data || []).filter(r => r.datos).map(r => r.datos);
+  VIAJES = (data || []).filter(r => r.datos).map(r => r.datos);
   rerenderPantallaActiva();
 }
 
@@ -182,7 +182,7 @@ function suscribirRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'materia_prima' },       () => _rtDebounce('materiaprima', recargarMateriaPrimaRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'no_conformidades' },    () => _rtDebounce('noconformidades', recargarNCRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ajustes_mezcla' },      () => _rtDebounce('ajustes', recargarAjustesRT))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'entregas_programadas' }, () => _rtDebounce('despachos', recargarDespachosRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'entregas_programadas' }, () => _rtDebounce('viajes', recargarViajesRT))
     .subscribe((status) => {
       const ind = document.getElementById('rt-indicador');
       if (ind) {

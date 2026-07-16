@@ -10,6 +10,7 @@ function activarModulo(modulo) {
   event.currentTarget.classList.add('activo');
   document.getElementById('subnav-cotizaciones').style.display = modulo === 'cotizaciones' ? 'flex' : 'none';
   document.getElementById('subnav-produccion').style.display = modulo === 'produccion' ? 'flex' : 'none';
+  document.getElementById('subnav-logistica').style.display = modulo === 'logistica' ? 'flex' : 'none';
   document.getElementById('subnav-calidad').style.display = modulo === 'calidad' ? 'flex' : 'none';
   if (modulo === 'logistica') {
     document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
@@ -57,5 +58,6 @@ function ir(pantalla) {
   if (pantalla === 'trazabilidad') { const inp = document.getElementById('buscar-trazabilidad'); if (inp) inp.value = ''; buscarTrazabilidad(); }
   if (pantalla === 'no-conformidades') renderNoConformidades();
   if (pantalla === 'certificados-calidad') renderCertificadosCalidad();
+  if (pantalla === 'logistica') renderCalendarioLogistica();
 }
 

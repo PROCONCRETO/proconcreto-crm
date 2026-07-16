@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260716a">
+<link rel="stylesheet" href="css/estilos.css?v=20260716c">
 </head>
 <body>
 
@@ -93,6 +93,10 @@
   <button class="nav-btn activo" onclick="ir('ordenes-servicio')">📝 Órdenes de Producción</button>
   <button class="nav-btn" onclick="ir('produccion-diaria')">📅 Producción Diaria</button>
   <button class="nav-btn" onclick="ir('inventario')">📦 Inventario</button>
+</nav>
+
+<nav class="nav" id="subnav-logistica" style="display:none">
+  <button class="nav-btn activo" onclick="ir('logistica')">🚛 Programación de Viajes</button>
 </nav>
 
 <nav class="nav" id="subnav-calidad" style="display:none">
@@ -621,17 +625,17 @@
 </div>
 
 <!-- ═══════════════════════════════════════
-     PANTALLA: LOGÍSTICA — PROGRAMACIÓN DE DESPACHOS
+     PANTALLA: LOGÍSTICA — PROGRAMACIÓN DE VIAJES
 ═══════════════════════════════════════ -->
 <div id="pantalla-logistica" class="pantalla">
   <div class="acciones-row">
-    <div style="font-size:18px;font-weight:700;color:var(--azul)">Programación de Despachos</div>
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Programación de Viajes</div>
     <div class="flex-gap">
       <button class="btn btn-secundario btn-sm" onclick="cambiarMesLogistica(-1)">◀</button>
       <div id="log-mes-titulo" style="font-weight:700;min-width:150px;text-align:center;text-transform:capitalize"></div>
       <button class="btn btn-secundario btn-sm" onclick="cambiarMesLogistica(1)">▶</button>
       <button class="btn btn-secundario btn-sm" onclick="irHoyLogistica()">Hoy</button>
-      <button class="btn btn-primario" onclick="abrirModalDespacho()">+ Nuevo Despacho</button>
+      <button class="btn btn-primario" onclick="abrirModalViaje()">+ Nuevo Viaje</button>
     </div>
   </div>
   <div class="card" style="padding:0;overflow:hidden">
@@ -934,17 +938,17 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-despacho">
+<div class="modal-overlay" id="modal-viaje">
   <div class="modal" style="width:820px;max-width:95vw">
-    <div class="modal-titulo" id="modal-despacho-titulo">🚛 Nuevo Despacho</div>
-    <input type="hidden" id="m-despacho-id">
+    <div class="modal-titulo" id="modal-viaje-titulo">🚛 Nuevo Viaje</div>
+    <input type="hidden" id="m-viaje-id">
     <div class="form-grid" style="margin-bottom:10px">
-      <div class="form-grupo"><label>Fecha *</label><input type="date" id="m-despacho-fecha"></div>
-      <div class="form-grupo"><label>Destino *</label><input type="text" id="m-despacho-destino" placeholder="Ej: Manizales"></div>
+      <div class="form-grupo"><label>Fecha *</label><input type="date" id="m-viaje-fecha"></div>
+      <div class="form-grupo"><label>Destino *</label><input type="text" id="m-viaje-destino" placeholder="Ej: Manizales"></div>
     </div>
     <div class="form-grid" style="margin-bottom:16px">
       <div class="form-grupo"><label>Vehículo</label>
-        <select id="m-despacho-vehiculo" onchange="actualizarPesoTotalDespacho()">
+        <select id="m-viaje-vehiculo" onchange="actualizarPesoTotalViaje()">
           <option value="GTV044 / JORGE JAMES ALVAREZ">GTV044 / JORGE JAMES ALVAREZ</option>
           <option value="GTU668 / JOSE RAMIRO CIRO">GTU668 / JOSE RAMIRO CIRO</option>
           <option value="CAMION SENCILLO / TERCERIZADO">CAMION SENCILLO / TERCERIZADO</option>
@@ -952,7 +956,7 @@
         </select>
       </div>
       <div class="form-grupo"><label>Estado</label>
-        <select id="m-despacho-estado">
+        <select id="m-viaje-estado">
           <option value="Programada">Programada</option>
           <option value="En ruta">En ruta</option>
           <option value="Entregada">Entregada</option>
@@ -962,25 +966,25 @@
     </div>
 
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
-      <span>CLIENTES DE ESTE DESPACHO</span>
-      <button type="button" class="btn btn-secundario btn-xs" onclick="agregarClienteDespacho()">+ Agregar cliente</button>
+      <span>ENTREGAS DE ESTE VIAJE</span>
+      <button type="button" class="btn btn-secundario btn-xs" onclick="agregarEntregaViaje()">+ Agregar entrega</button>
     </div>
-    <div id="despacho-clientes-wrap"></div>
+    <div id="viaje-entregas-wrap"></div>
 
     <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:12px 0;padding-top:10px;border-top:1px solid var(--gris-borde)">
-      <span style="font-size:12px;font-weight:700;color:var(--gris-medio)">PESO TOTAL DEL DESPACHO:</span>
-      <span id="despacho-peso-total" style="font-size:15px;font-weight:800;color:var(--azul)">0.00 ton</span>
+      <span style="font-size:12px;font-weight:700;color:var(--gris-medio)">PESO TOTAL DEL VIAJE:</span>
+      <span id="viaje-peso-total" style="font-size:15px;font-weight:800;color:var(--azul)">0.00 ton</span>
     </div>
 
-    <div class="form-grupo" style="margin-bottom:6px"><label>Observaciones</label><textarea id="m-despacho-obs" rows="2"></textarea></div>
+    <div class="form-grupo" style="margin-bottom:6px"><label>Observaciones</label><textarea id="m-viaje-obs" rows="2"></textarea></div>
     <div class="modal-acciones">
-      <button class="btn btn-rojo" id="btn-eliminar-despacho" onclick="eliminarDespacho()" style="display:none;margin-right:auto">🗑️ Eliminar</button>
-      <button class="btn btn-secundario" onclick="cerrarModal('modal-despacho')">Cancelar</button>
-      <button class="btn btn-primario" onclick="guardarDespacho()">Guardar</button>
+      <button class="btn btn-rojo" id="btn-eliminar-viaje" onclick="eliminarViaje()" style="display:none;margin-right:auto">🗑️ Eliminar</button>
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-viaje')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarViaje()">Guardar</button>
     </div>
   </div>
 </div>
-<datalist id="datalist-clientes-despacho"></datalist>
+<datalist id="datalist-clientes-viaje"></datalist>
 
 <div class="modal-overlay" id="modal-ajuste-mezcla">
   <div class="modal" style="width:1080px;max-width:95vw">
@@ -1456,24 +1460,24 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260716a"></script>
-<script src="js/catalogo.js?v=20260716a"></script>
-<script src="js/navegacion.js?v=20260716a"></script>
-<script src="js/ordenes-produccion.js?v=20260716a"></script>
-<script src="js/produccion-diaria.js?v=20260716a"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260716a"></script>
-<script src="js/calidad-mezclas.js?v=20260716a"></script>
-<script src="js/calidad-estadisticas.js?v=20260716a"></script>
-<script src="js/calidad-trazabilidad.js?v=20260716a"></script>
-<script src="js/logistica.js?v=20260716a"></script>
-<script src="js/auth.js?v=20260716a"></script>
-<script src="js/datos-realtime.js?v=20260716a"></script>
-<script src="js/cotizador.js?v=20260716a"></script>
-<script src="js/historico-clientes-stats.js?v=20260716a"></script>
+<script src="js/config.js?v=20260716c"></script>
+<script src="js/catalogo.js?v=20260716c"></script>
+<script src="js/navegacion.js?v=20260716c"></script>
+<script src="js/ordenes-produccion.js?v=20260716c"></script>
+<script src="js/produccion-diaria.js?v=20260716c"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260716c"></script>
+<script src="js/calidad-mezclas.js?v=20260716c"></script>
+<script src="js/calidad-estadisticas.js?v=20260716c"></script>
+<script src="js/calidad-trazabilidad.js?v=20260716c"></script>
+<script src="js/logistica.js?v=20260716c"></script>
+<script src="js/auth.js?v=20260716c"></script>
+<script src="js/datos-realtime.js?v=20260716c"></script>
+<script src="js/cotizador.js?v=20260716c"></script>
+<script src="js/historico-clientes-stats.js?v=20260716c"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="js/pdf.js?v=20260716a"></script>
+<script src="js/pdf.js?v=20260716c"></script>
 </body>
 </html>

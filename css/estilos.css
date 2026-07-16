@@ -272,6 +272,6 @@
   .log-cal-dia-num { font-size: 12px; font-weight: 700; color: var(--gris-oscuro); }
   .log-cal-hoy-badge { font-size: 8px; background: var(--azul-claro); color: white; padding: 1px 4px; border-radius: 3px; font-weight: 700; vertical-align: middle; }
   .log-cal-festivo-nombre { font-size: 9.5px; color: #C62828; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .log-cal-entregas { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
-  .log-cal-entrega { font-size: 10px; color: white; padding: 1px 5px; border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .log-cal-viajes { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+  .log-cal-viaje { font-size: 10px; color: white; padding: 1px 5px; border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
   #usuario-email { font-size: 12px; color: rgba(255,255,255,0.65); }
