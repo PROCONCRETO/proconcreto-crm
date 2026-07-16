@@ -87,12 +87,15 @@ function _extraerCorreo(lineas) {
 // y con esta prioridad: 47 (Régimen Simple, reemplaza al ordinario) > 13 (Gran Contribuyente,
 // es una calidad aparte que suele ser la más relevante de anotar) > 05 (régimen ordinario, el
 // más común/por defecto).
+// Las cajas de texto de esta sección son angostas y a veces cortan la descripción antes de
+// terminar la palabra (ej. "régimen ordinario" queda como "régimen ordinar" en algunos RUT) —
+// por eso se busca por la raíz de cada palabra clave, no la palabra completa.
 function _extraerRegimen(lineas) {
   const idxSeccion = lineas.findIndex(l => /Responsabilidades,?\s*Calidades\s*y\s*Atributos/i.test(l));
   const texto = (idxSeccion === -1 ? lineas : lineas.slice(idxSeccion)).join(' ');
-  if (/r[ée]gimen\s+simple\s+de\s+tributaci[óo]n/i.test(texto)) return '47. Régimen Simple de Tributación (SIMPLE)';
-  if (/gran\s+contribuyente/i.test(texto)) return '13. Gran contribuyente';
-  if (/r[ée]gimen\s+ordinario/i.test(texto)) return '05. Impuesto Sobre la Renta y Complementarios Régimen Ordinario';
+  if (/r[ée]gimen\s+simple/i.test(texto)) return '47. Régimen Simple de Tributación (SIMPLE)';
+  if (/gran\s+contribu/i.test(texto)) return '13. Gran contribuyente';
+  if (/r[ée]gimen\s+ordinar/i.test(texto)) return '05. Impuesto Sobre la Renta y Complementarios Régimen Ordinario';
   return '';
 }
 
