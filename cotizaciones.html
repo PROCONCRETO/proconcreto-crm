@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260716n">
+<link rel="stylesheet" href="css/estilos.css?v=20260716o">
 </head>
 <body>
 
@@ -1457,26 +1457,52 @@
 </div>
 
 <div class="modal-overlay" id="modal-cliente">
-  <div class="modal">
+  <div class="modal" style="width:560px;max-width:95vw">
     <div class="modal-titulo" id="modal-cliente-titulo">➕ Nuevo Cliente</div>
     <input type="hidden" id="m-cliente-id" value="">
+
+    <div id="rut-zona" style="border:2px dashed var(--gris-borde);border-radius:var(--radio);padding:14px;text-align:center;margin-bottom:14px;background:#FAFBFC;cursor:pointer;transition:border-color .15s"
+      onclick="document.getElementById('rut-archivo-input').click()"
+      ondragover="onArrastreSobreRut(event)" ondragleave="onArrastreFueraRut(event)" ondrop="onSoltarRut(event)">
+      <div style="font-size:13px;font-weight:600;color:var(--azul)">📄 Muéstrame el RUT del cliente</div>
+      <div style="font-size:11px;color:var(--gris-medio);margin-top:2px">Arrastra el PDF aquí o haz clic para buscarlo — se lee en tu navegador; el archivo no se sube ni se guarda en ningún lado</div>
+      <input type="file" id="rut-archivo-input" accept="application/pdf" style="display:none" onchange="onSeleccionRut(event)">
+      <div id="rut-estado" style="font-size:11.5px;margin-top:8px;min-height:16px"></div>
+    </div>
+
     <div class="form-grupo" style="margin-bottom:10px">
       <label>Razón social / Nombre *</label>
       <input type="text" id="m-cliente-nombre" placeholder="CONSTRUCTORA ABC S.A.S.">
     </div>
     <div class="form-grupo" style="margin-bottom:10px">
-      <label>Contacto</label>
+      <label>Contacto <span style="font-weight:400;text-transform:none">(quien recibe/gestiona, no siempre es el representante legal)</span></label>
       <input type="text" id="m-cliente-contacto" placeholder="Ing. Carlos Pérez">
     </div>
-    <div class="form-grid">
+    <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo">
         <label>Celular</label>
         <input type="text" id="m-cliente-cel">
       </div>
       <div class="form-grupo">
-        <label>Email</label>
+        <label>Email <span style="font-weight:400;text-transform:none">(del contacto)</span></label>
         <input type="email" id="m-cliente-email">
       </div>
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo">
+        <label>Representante legal <span style="font-weight:400;text-transform:none">(del RUT)</span></label>
+        <input type="text" id="m-cliente-repLegal">
+      </div>
+      <div class="form-grupo">
+        <label>Correo de facturación <span style="font-weight:400;text-transform:none">(del RUT)</span></label>
+        <input type="email" id="m-cliente-emailFacturacion">
+      </div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px">
+      <label>Dirección</label>
+      <input type="text" id="m-cliente-direccion">
+    </div>
+    <div class="form-grid">
       <div class="form-grupo">
         <label>Ciudad</label>
         <input type="text" id="m-cliente-ciudad">
@@ -1555,25 +1581,28 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260716n"></script>
-<script src="js/catalogo.js?v=20260716n"></script>
-<script src="js/navegacion.js?v=20260716n"></script>
-<script src="js/ordenes-produccion.js?v=20260716n"></script>
-<script src="js/produccion-diaria.js?v=20260716n"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260716n"></script>
-<script src="js/calidad-mezclas.js?v=20260716n"></script>
-<script src="js/calidad-estadisticas.js?v=20260716n"></script>
-<script src="js/calidad-trazabilidad.js?v=20260716n"></script>
-<script src="js/logistica.js?v=20260716n"></script>
-<script src="js/estadisticas-logistica.js?v=20260716n"></script>
-<script src="js/auth.js?v=20260716n"></script>
-<script src="js/datos-realtime.js?v=20260716n"></script>
-<script src="js/cotizador.js?v=20260716n"></script>
-<script src="js/historico-clientes-stats.js?v=20260716n"></script>
+<script src="js/config.js?v=20260716o"></script>
+<script src="js/catalogo.js?v=20260716o"></script>
+<script src="js/navegacion.js?v=20260716o"></script>
+<script src="js/ordenes-produccion.js?v=20260716o"></script>
+<script src="js/produccion-diaria.js?v=20260716o"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260716o"></script>
+<script src="js/calidad-mezclas.js?v=20260716o"></script>
+<script src="js/calidad-estadisticas.js?v=20260716o"></script>
+<script src="js/calidad-trazabilidad.js?v=20260716o"></script>
+<script src="js/logistica.js?v=20260716o"></script>
+<script src="js/estadisticas-logistica.js?v=20260716o"></script>
+<script src="js/auth.js?v=20260716o"></script>
+<script src="js/datos-realtime.js?v=20260716o"></script>
+<script src="js/cotizador.js?v=20260716o"></script>
+<script src="js/historico-clientes-stats.js?v=20260716o"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="js/pdf.js?v=20260716n"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+<script src="js/pdf.js?v=20260716o"></script>
+<script src="js/rut-parser.js?v=20260716o"></script>
 </body>
 </html>
