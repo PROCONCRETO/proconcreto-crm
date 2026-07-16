@@ -11,7 +11,7 @@
 
 - Tablas Supabase: `cotizaciones`, `clientes`
 - Tarifas de transporte por municipio están fijas en `TARIFAS_TRANSPORTE` / `TARIFAS_KG_TRANSPORTE` (`js/config.js`), no en base de datos
-- `cliente`: `nombre`, `contacto` (persona que gestiona/recibe), `cel`, `email` (del contacto), `ciudad`, `nit` (formato `NIT-DV`), `direccion`, `emailFacturacion` (el correo del RUT — **distinto** del email del contacto). Estos últimos 3 campos se pueden autocompletar leyendo el RUT (ver más abajo) o escribirse a mano.
+- `cliente`: `nombre`, `contacto` (persona que gestiona/recibe), `cel`, `email` (del contacto), `ciudad`, `nit` (formato `NIT-DV`), `direccion`, `emailFacturacion` (el correo del RUT — **distinto** del email del contacto), `regimen` (Régimen ordinario / Persona Natural / Gran contribuyente / Régimen simple de tributación — selector manual, sin autocompletar desde el RUT). `nombre`/`nit`/`direccion`/`emailFacturacion` se pueden autocompletar leyendo el RUT (ver más abajo) o escribirse a mano.
 
 ## Pantallas (`ir()` en `navegacion.js`)
 

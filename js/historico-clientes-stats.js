@@ -389,7 +389,7 @@ function abrirModalCliente() {
   document.getElementById('m-cliente-id').value = '';
   document.getElementById('modal-cliente-titulo').textContent = '➕ Nuevo Cliente';
   ['m-cliente-nombre','m-cliente-contacto','m-cliente-cel','m-cliente-email','m-cliente-ciudad','m-cliente-nit',
-   'm-cliente-emailFacturacion','m-cliente-direccion']
+   'm-cliente-emailFacturacion','m-cliente-direccion','m-cliente-regimen']
     .forEach(id => document.getElementById(id).value = '');
   const estadoRut = document.getElementById('rut-estado');
   if (estadoRut) estadoRut.textContent = '';
@@ -409,6 +409,7 @@ function editarCliente(id) {
   document.getElementById('m-cliente-nit').value = c.nit || '';
   document.getElementById('m-cliente-emailFacturacion').value = c.emailFacturacion || '';
   document.getElementById('m-cliente-direccion').value = c.direccion || '';
+  document.getElementById('m-cliente-regimen').value = c.regimen || '';
   const estadoRut = document.getElementById('rut-estado');
   if (estadoRut) estadoRut.textContent = '';
   document.getElementById('modal-cliente').classList.add('abierto');
@@ -427,6 +428,7 @@ function guardarCliente() {
     nit: document.getElementById('m-cliente-nit').value,
     emailFacturacion: document.getElementById('m-cliente-emailFacturacion').value,
     direccion: document.getElementById('m-cliente-direccion').value,
+    regimen: document.getElementById('m-cliente-regimen').value,
   };
   if (editId) {
     const idx = CLIENTES.findIndex(c => String(c.id) === String(editId));
