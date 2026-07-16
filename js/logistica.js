@@ -208,16 +208,9 @@ function quitarResaltadoSoltar(event) {
   event.currentTarget.classList.remove('log-cal-dragover');
 }
 
-function soltarViajeEnDia(event, fechaDestino) {
-  event.preventDefault();
-  event.currentTarget.classList.remove('log-cal-dragover');
-  const id = _viajeArrastradoId;
-  _viajeArrastradoId = null;
-  if (!id) return;
-  const v = VIAJES.find(x => String(x.id) === String(id));
-  if (!v || v.fecha === fechaDestino) return; // mismo día: no se mueve nada, no cuenta como reprogramación
-  if (esFechaBloqueada(fechaDestino)) { alert('No se puede mover un viaje a una fecha que ya pasó.'); return; }
-
+// Mueve un viaje completo a otra fecha (usado tanto al soltar sobre una celda vacía del día
+// como al soltar sobre otro viaje de un día distinto). Devuelve una Promise de guardado.
+function _moverViajeADia(v, fechaDestino) {
   const hoy = _fmtISO(new Date());
   if (v.fecha <= hoy) {
     // El viaje es de hoy (no puede ser de antes: eso ya está bloqueado para arrastrar) y por lo
@@ -240,7 +233,7 @@ function soltarViajeEnDia(event, fechaDestino) {
         cumplido: { estado: 'pendiente' },
       });
     });
-    if (!entregasNuevas.length) { alert('Las entregas de este viaje ya tienen un resultado registrado (Hecha/Cancelada) — no hay nada pendiente que mover.'); renderCalendarioLogistica(); return; }
+    if (!entregasNuevas.length) { alert('Las entregas de este viaje ya tienen un resultado registrado (Hecha/Cancelada) — no hay nada pendiente que mover.'); return Promise.resolve(); }
     const guardados = [sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' })];
     const pesoNuevo = entregasNuevas.reduce((s, e) => s + e.productos.reduce((s2, p) => s2 + (Number(p.peso) || 0), 0), 0);
     const viajeNuevo = {
@@ -257,17 +250,60 @@ function soltarViajeEnDia(event, fechaDestino) {
     };
     VIAJES.unshift(viajeNuevo);
     guardados.push(sb.from('entregas_programadas').upsert({ id: viajeNuevo.id, datos: viajeNuevo, modificado: new Date().toISOString() }, { onConflict: 'id' }));
-    Promise.all(guardados).then(rs => rs.forEach(({ error }) => { if (error) console.error('Error moviendo viaje de fecha:', error.message); }));
-  } else {
-    // El viaje es de un día futuro moviéndose a otro día futuro — no entra en ninguna ventana
-    // de estadísticas "hasta hoy" ni antes ni después del cambio, así que se puede mover en el
-    // mismo sitio sin duplicar nada.
-    _entregasDeViaje(v).forEach(e => { if (!e.fechaOriginal) e.fechaOriginal = v.fecha; });
-    v.fecha = fechaDestino;
-    v.orden = Date.now();
-    sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' })
-      .then(({ error }) => { if (error) console.error('Error moviendo viaje de fecha:', error.message); });
+    return Promise.all(guardados).then(rs => rs.forEach(({ error }) => { if (error) console.error('Error moviendo viaje de fecha:', error.message); }));
   }
+  // El viaje es de un día futuro moviéndose a otro día futuro — no entra en ninguna ventana de
+  // estadísticas "hasta hoy" ni antes ni después del cambio, así que se puede mover en el mismo
+  // sitio sin duplicar nada.
+  _entregasDeViaje(v).forEach(e => { if (!e.fechaOriginal) e.fechaOriginal = v.fecha; });
+  v.fecha = fechaDestino;
+  v.orden = Date.now();
+  return sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' })
+    .then(({ error }) => { if (error) console.error('Error moviendo viaje de fecha:', error.message); });
+}
+
+function soltarViajeEnDia(event, fechaDestino) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('log-cal-dragover');
+  const id = _viajeArrastradoId;
+  _viajeArrastradoId = null;
+  if (!id) return;
+  const v = VIAJES.find(x => String(x.id) === String(id));
+  if (!v || v.fecha === fechaDestino) return; // mismo día: no se mueve nada (se reordena soltando sobre otro viaje)
+  if (esFechaBloqueada(fechaDestino)) { alert('No se puede mover un viaje a una fecha que ya pasó.'); return; }
+  Promise.resolve(_moverViajeADia(v, fechaDestino)).then(() => renderCalendarioLogistica());
+}
+
+// Soltar un viaje sobre otro viaje: si son del mismo día, reordena (inserta el arrastrado justo
+// antes del objetivo); si son de días distintos, se comporta igual que soltarlo sobre la celda
+// del día (mover/reprogramar), permitiendo también cambiar de día soltando sobre un viaje.
+function soltarViajeSobreViaje(event, targetId) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.currentTarget.classList.remove('log-cal-dragover');
+  event.currentTarget.closest('.log-cal-celda')?.classList.remove('log-cal-dragover');
+  const id = _viajeArrastradoId;
+  _viajeArrastradoId = null;
+  if (!id || id === targetId) return;
+  const arrastrado = VIAJES.find(x => String(x.id) === String(id));
+  const objetivo = VIAJES.find(x => String(x.id) === String(targetId));
+  if (!arrastrado || !objetivo) return;
+
+  if (arrastrado.fecha !== objetivo.fecha) {
+    if (esFechaBloqueada(objetivo.fecha)) { alert('No se puede mover un viaje a una fecha que ya pasó.'); return; }
+    Promise.resolve(_moverViajeADia(arrastrado, objetivo.fecha)).then(() => renderCalendarioLogistica());
+    return;
+  }
+
+  const viajesDia = VIAJES.filter(x => x.fecha === arrastrado.fecha).sort((a, b) => _claveOrdenViaje(a) - _claveOrdenViaje(b));
+  const sinArrastrado = viajesDia.filter(x => String(x.id) !== String(id));
+  const idxObjetivo = sinArrastrado.findIndex(x => String(x.id) === String(targetId));
+  sinArrastrado.splice(idxObjetivo, 0, arrastrado);
+  const guardados = sinArrastrado.map((x, i) => {
+    x.orden = i;
+    return sb.from('entregas_programadas').upsert({ id: x.id, datos: x, modificado: new Date().toISOString() }, { onConflict: 'id' });
+  });
+  Promise.all(guardados).then(rs => rs.forEach(({ error }) => { if (error) console.error('Error reordenando viajes:', error.message); }));
   renderCalendarioLogistica();
 }
 
@@ -322,7 +358,7 @@ function renderCalendarioLogistica() {
                 ${idxViaje < viajesDia.length - 1 ? `<span onclick="event.stopPropagation();moverViajeOrden('${v.id}',1)" title="Bajar prioridad">▼</span>` : ''}
               </span>` : '';
             return `
-            <div class="log-cal-viaje" draggable="${!diaBloqueado}" ondragstart="iniciarArrastreViaje(event,'${v.id}')" ondragend="terminarArrastreViaje(event)" style="background:${COLOR_VEHICULO_VIAJE[v.vehiculo] || '#607D8B'}${v.estado === 'Cancelada' ? ';opacity:.5;text-decoration:line-through' : ''}" onclick="event.stopPropagation();editarViaje('${v.id}')" title="${tituloTip}${diaBloqueado ? '' : ' — arrastra para mover a otro día'}">
+            <div class="log-cal-viaje" draggable="${!diaBloqueado}" ondragstart="iniciarArrastreViaje(event,'${v.id}')" ondragend="terminarArrastreViaje(event)" ondragover="permitirSoltarViaje(event)" ondrop="soltarViajeSobreViaje(event,'${v.id}')" style="background:${COLOR_VEHICULO_VIAJE[v.vehiculo] || '#607D8B'}${v.estado === 'Cancelada' ? ';opacity:.5;text-decoration:line-through' : ''}" onclick="event.stopPropagation();editarViaje('${v.id}')" title="${tituloTip}${diaBloqueado ? '' : ' — arrastra para mover o reordenar'}">
               <span class="log-cal-viaje-texto">${v.destino || 'Viaje'} · ${nEntregas} ent · ${peso.toFixed(1)}t${fechaStr <= hoyStr && pct !== null ? ` · ${pct}%` : ''}</span>${flechas}
             </div>`;
           }).join('')}
@@ -883,9 +919,12 @@ function imprimirProgramacionDia(fechaStr) {
 
   const fechaLegible = new Date(fechaStr + 'T12:00').toLocaleDateString('es-CO', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
   const fechaHoy = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
-  viajesDia.sort((a, b) => (a.vehiculo || '').localeCompare(b.vehiculo || ''));
+  // Mismo orden de prioridad que el calendario (viaje.orden, flechas ▲▼ o arrastre) — el
+  // impreso es lo único que ve el área de despachos sin acceso al aplicativo, así que tiene
+  // que reflejar el orden real de despacho, no un orden alfabético por vehículo.
+  viajesDia.sort((a, b) => _claveOrdenViaje(a) - _claveOrdenViaje(b));
 
-  const bloques = viajesDia.map(v => {
+  const bloques = viajesDia.map((v, idxViaje) => {
     const capacidad = CAPACIDAD_VEHICULO[v.vehiculo];
     const peso = Number(v.pesoTotal) || 0;
     const excedido = capacidad && peso > capacidad;
@@ -899,10 +938,11 @@ function imprimirProgramacionDia(fechaStr) {
       </div>`).join('');
     return `
       <div style="margin-bottom:16px">
-        <div style="background:#003F7F;color:white;padding:6px 10px;border-radius:5px 5px 0 0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:12px;font-weight:700">
+        <div style="background:#003F7F;color:white;padding:6px 10px;border-radius:5px 5px 0 0;display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12px;font-weight:700">
+          <span style="background:#1D9E75;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">${idxViaje + 1}</span>
           <span>🚛 ${v.vehiculo || '—'}</span>
           <span>Destino: ${v.destino || '—'}</span>
-          <span style="color:${excedido ? '#FFCDD2' : 'white'}">${peso.toFixed(2)}${capacidad ? ' / ' + capacidad : ''} ton${excedido ? ' ⚠' : ''}</span>
+          <span style="margin-left:auto;color:${excedido ? '#FFCDD2' : 'white'}">${peso.toFixed(2)}${capacidad ? ' / ' + capacidad : ''} ton${excedido ? ' ⚠' : ''}</span>
         </div>
         <div style="border:1px solid #ddd;border-top:none;padding:6px 10px 10px">
           ${entregasHTML}
