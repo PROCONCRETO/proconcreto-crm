@@ -100,12 +100,28 @@ function _extraerRegimen(lineas) {
   return '';
 }
 
+// País, Departamento y Ciudad/Municipio (casillas 38/39/40) quedan en una sola fila visual —
+// la de etiquetas ("38. País 39. Departamento 40. Ciudad/Municipio") y, debajo, la de valores
+// ("COLOMBIA 169 Caldas 17 Chinchiná 174", con los códigos numéricos de cada uno pegados al
+// nombre). Se extraen solo las rachas de letras de esa línea de valores (ignorando los
+// códigos) — el primer bloque es el país, el segundo el departamento, el tercero la ciudad.
+function _extraerCiudadDepartamento(lineas) {
+  const idxLabel = lineas.findIndex(l => /38\.\s*Pa[íi]s/i.test(l));
+  const inicio = idxLabel === -1 ? 0 : idxLabel + 1;
+  for (let i = inicio; i < Math.min(inicio + 4, lineas.length); i++) {
+    const bloques = lineas[i].match(/[A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:\s+[A-Za-zÁÉÍÓÚÑáéíóúñ]+)*/g) || [];
+    if (bloques.length >= 3) return { departamento: bloques[1].trim(), ciudad: bloques[2].trim() };
+  }
+  return { departamento: '', ciudad: '' };
+}
+
 function _extraerDatosRut(lineas) {
   const { nit, dv } = _extraerNitDv(lineas);
   const razonSocial = _valorDespuesDe(lineas, /^35\.\s*Raz[óo]n social/i);
   const direccion = _valorDespuesDe(lineas, /^41\.\s*Direcci[óo]n principal/i);
   const correoFacturacion = _extraerCorreo(lineas);
   const regimen = _extraerRegimen(lineas);
+  const { departamento, ciudad } = _extraerCiudadDepartamento(lineas);
 
   return {
     nit: dv ? `${nit}-${dv}` : nit,
@@ -113,6 +129,7 @@ function _extraerDatosRut(lineas) {
     direccion,
     correoFacturacion,
     regimen,
+    ciudad: departamento ? `${ciudad}, ${departamento}` : ciudad,
   };
 }
 
@@ -140,12 +157,13 @@ async function manejarArchivoRut(file) {
     if (datos.direccion) document.getElementById('m-cliente-direccion').value = datos.direccion;
     if (datos.correoFacturacion) document.getElementById('m-cliente-emailFacturacion').value = datos.correoFacturacion;
     if (datos.regimen) document.getElementById('m-cliente-regimen').value = datos.regimen;
+    if (datos.ciudad) document.getElementById('m-cliente-ciudad').value = datos.ciudad;
 
-    const leidos = ['nombre', 'nit', 'direccion', 'correoFacturacion', 'regimen'].filter(k => datos[k]).length;
+    const leidos = ['nombre', 'nit', 'direccion', 'correoFacturacion', 'regimen', 'ciudad'].filter(k => datos[k]).length;
     if (leidos === 0) {
       _estadoRut('No pude reconocer los datos de este RUT — revisa que sea el formulario 001 de la DIAN, o completa a mano.', 'error');
     } else {
-      _estadoRut(`✅ Se leyeron ${leidos} de 5 campos del RUT — revísalos antes de guardar. El PDF no se guardó en ningún lado.`, 'ok');
+      _estadoRut(`✅ Se leyeron ${leidos} de 6 campos del RUT — revísalos antes de guardar. El PDF no se guardó en ningún lado.`, 'ok');
     }
   } catch (err) {
     console.error('Error leyendo RUT:', err);
