@@ -81,17 +81,34 @@ function _extraerCorreo(lineas) {
   return global ? global[0] : '';
 }
 
+// El RUT puede traer varios códigos marcados a la vez en "Responsabilidades, Calidades y
+// Atributos" (casilla 53) — se busca por la frase descriptiva de cada código (más estable que
+// depender de la posición exacta del número), acotado a esa sección si se encuentra el título,
+// y con esta prioridad: 47 (Régimen Simple, reemplaza al ordinario) > 13 (Gran Contribuyente,
+// es una calidad aparte que suele ser la más relevante de anotar) > 05 (régimen ordinario, el
+// más común/por defecto).
+function _extraerRegimen(lineas) {
+  const idxSeccion = lineas.findIndex(l => /Responsabilidades,?\s*Calidades\s*y\s*Atributos/i.test(l));
+  const texto = (idxSeccion === -1 ? lineas : lineas.slice(idxSeccion)).join(' ');
+  if (/r[ée]gimen\s+simple\s+de\s+tributaci[óo]n/i.test(texto)) return '47. Régimen Simple de Tributación (SIMPLE)';
+  if (/gran\s+contribuyente/i.test(texto)) return '13. Gran contribuyente';
+  if (/r[ée]gimen\s+ordinario/i.test(texto)) return '05. Impuesto Sobre la Renta y Complementarios Régimen Ordinario';
+  return '';
+}
+
 function _extraerDatosRut(lineas) {
   const { nit, dv } = _extraerNitDv(lineas);
   const razonSocial = _valorDespuesDe(lineas, /^35\.\s*Raz[óo]n social/i);
   const direccion = _valorDespuesDe(lineas, /^41\.\s*Direcci[óo]n principal/i);
   const correoFacturacion = _extraerCorreo(lineas);
+  const regimen = _extraerRegimen(lineas);
 
   return {
     nit: dv ? `${nit}-${dv}` : nit,
     nombre: razonSocial,
     direccion,
     correoFacturacion,
+    regimen,
   };
 }
 
@@ -118,12 +135,13 @@ async function manejarArchivoRut(file) {
     if (datos.nit) document.getElementById('m-cliente-nit').value = datos.nit;
     if (datos.direccion) document.getElementById('m-cliente-direccion').value = datos.direccion;
     if (datos.correoFacturacion) document.getElementById('m-cliente-emailFacturacion').value = datos.correoFacturacion;
+    if (datos.regimen) document.getElementById('m-cliente-regimen').value = datos.regimen;
 
-    const leidos = ['nombre', 'nit', 'direccion', 'correoFacturacion'].filter(k => datos[k]).length;
+    const leidos = ['nombre', 'nit', 'direccion', 'correoFacturacion', 'regimen'].filter(k => datos[k]).length;
     if (leidos === 0) {
       _estadoRut('No pude reconocer los datos de este RUT — revisa que sea el formulario 001 de la DIAN, o completa a mano.', 'error');
     } else {
-      _estadoRut(`✅ Se leyeron ${leidos} de 4 campos del RUT — revísalos antes de guardar. El PDF no se guardó en ningún lado.`, 'ok');
+      _estadoRut(`✅ Se leyeron ${leidos} de 5 campos del RUT — revísalos antes de guardar. El PDF no se guardó en ningún lado.`, 'ok');
     }
   } catch (err) {
     console.error('Error leyendo RUT:', err);
