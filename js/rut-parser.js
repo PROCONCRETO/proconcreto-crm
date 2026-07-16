@@ -82,20 +82,21 @@ function _extraerCorreo(lineas) {
 }
 
 // El RUT puede traer varios códigos marcados a la vez en "Responsabilidades, Calidades y
-// Atributos" (casilla 53) — se busca por la frase descriptiva de cada código (más estable que
-// depender de la posición exacta del número), acotado a esa sección si se encuentra el título,
-// y con esta prioridad: 47 (Régimen Simple, reemplaza al ordinario) > 13 (Gran Contribuyente,
-// es una calidad aparte que suele ser la más relevante de anotar) > 05 (régimen ordinario, el
-// más común/por defecto).
-// Las cajas de texto de esta sección son angostas y a veces cortan la descripción antes de
-// terminar la palabra (ej. "régimen ordinario" queda como "régimen ordinar" en algunos RUT) —
-// por eso se busca por la raíz de cada palabra clave, no la palabra completa.
+// Atributos" (casilla 53). Cada código presente aparece en la leyenda de esa sección como
+// "NN- descripción" (con o sin espacio antes del guion) — buscar por el código en sí es más
+// confiable que por el texto de la descripción, porque esas cajas son angostas y a veces
+// cortan la palabra antes de terminar (ej. "régimen ordinario" queda como "régimen ordinar"
+// en algunos RUT). La frase se deja como respaldo por si el guion no queda pegado al código.
+// Prioridad si hay más de uno marcado: 47 (Régimen Simple, reemplaza al ordinario) > 13 (Gran
+// Contribuyente, es una calidad aparte que suele ser la más relevante de anotar) > 05 (régimen
+// ordinario, el más común/por defecto).
 function _extraerRegimen(lineas) {
   const idxSeccion = lineas.findIndex(l => /Responsabilidades,?\s*Calidades\s*y\s*Atributos/i.test(l));
   const texto = (idxSeccion === -1 ? lineas : lineas.slice(idxSeccion)).join(' ');
-  if (/r[ée]gimen\s+simple/i.test(texto)) return '47. Régimen Simple de Tributación (SIMPLE)';
-  if (/gran\s+contribu/i.test(texto)) return '13. Gran contribuyente';
-  if (/r[ée]gimen\s+ordinar/i.test(texto)) return '05. Impuesto Sobre la Renta y Complementarios Régimen Ordinario';
+  const tieneCodigo = (codigo) => new RegExp(`\\b${codigo}\\s*-`).test(texto);
+  if (tieneCodigo('47') || /r[ée]gimen\s+simple/i.test(texto)) return '47. Régimen Simple de Tributación (SIMPLE)';
+  if (tieneCodigo('13') || /gran\s+contribu/i.test(texto)) return '13. Gran contribuyente';
+  if (tieneCodigo('05') || /r[ée]gimen\s+ordinar/i.test(texto)) return '05. Impuesto Sobre la Renta y Complementarios Régimen Ordinario';
   return '';
 }
 
