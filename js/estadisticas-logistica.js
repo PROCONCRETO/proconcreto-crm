@@ -29,11 +29,12 @@ const _COLOR_CUMPLIDO_VIAJE = {
 // "¿Esta entrega se reprogramó alguna vez?" — es un hecho histórico, independiente del estado
 // ACTUAL (una entrega se puede haber reprogramado y de todas formas terminar "hecha": reprogramar
 // ya no bloquea la entrega, ver marcarCumplidoEntrega() en logistica.js). Cubre tres señales:
-// `vecesReprogramada` (mecanismo nuevo, no bloquea nada), `cumplido.estado === 'reprogramada'`
-// (marcas de antes de este cambio, donde sí quedaba fija como estado final) y `fechaOriginal`
-// distinta a la fecha actual del viaje (se arrastró en el calendario sin pasar por Cumplidos).
+// `_countReprogramaciones(e)` (mecanismo nuevo, con historial y causa; no bloquea nada),
+// `cumplido.estado === 'reprogramada'` (marcas de antes de este cambio, donde sí quedaba fija
+// como estado final) y `fechaOriginal` distinta a la fecha actual del viaje (se arrastró en el
+// calendario sin pasar por Cumplidos).
 function _fueReprogramada(e, viajeFecha) {
-  if (e.vecesReprogramada) return true;
+  if (_countReprogramaciones(e)) return true;
   if (_cumplidoDeEntrega(e).estado === 'reprogramada') return true;
   const fechaOriginal = e.fechaOriginal || viajeFecha;
   return fechaOriginal !== viajeFecha;
@@ -59,6 +60,8 @@ function _datosEstadisticasLogistica(periodoDias) {
   const entregas = [];
   const viajesEnPeriodo = [];
   const viajesVistos = new Set();
+  const causasReprogramacion = [];
+  const causasCancelacion = [];
   VIAJES.forEach(v => {
     _entregasDeViaje(v).forEach(e => {
       const fechaOriginal = e.fechaOriginal || v.fecha;
@@ -76,10 +79,15 @@ function _datosEstadisticasLogistica(periodoDias) {
         reprogramada: _fueReprogramada(e, v.fecha),
         pesoEntrega,
       });
+      // Causas: un registro por CADA VEZ que se reprogramó (una entrega puede reprogramarse más
+      // de una vez, con causas distintas cada vez), y uno por cada cancelación con causa.
+      (e.reprogramaciones || []).forEach(r => { if (r.causa) causasReprogramacion.push(r.causa); });
+      const c = _cumplidoDeEntrega(e);
+      if (c.estado === 'cancelada' && c.causa) causasCancelacion.push(c.causa);
       if (!viajesVistos.has(v.id)) { viajesVistos.add(v.id); viajesEnPeriodo.push(v); }
     });
   });
-  return { viajesEnPeriodo, entregas };
+  return { viajesEnPeriodo, entregas, causasReprogramacion, causasCancelacion };
 }
 
 // ── Tarjetas KPI (.stat-card, mismo componente que Cotizaciones→Estadísticas) ──
@@ -121,7 +129,7 @@ function setPeriodoLogistica(dias) {
 function renderEstadisticasLogistica() {
   if (typeof Chart === 'undefined') return; // Chart.js aún no cargó (pantalla no visible todavía)
   const periodo = _periodoLogistica;
-  const { viajesEnPeriodo, entregas } = _datosEstadisticasLogistica(periodo);
+  const { viajesEnPeriodo, entregas, causasReprogramacion, causasCancelacion } = _datosEstadisticasLogistica(periodo);
 
   // "Peso transportado" y desempeño por vehículo son sobre lo que REALMENTE se cumplió, no
   // sobre lo programado — así que se agrupan las entregas "hecha" por viaje real (un viaje con
@@ -162,6 +170,8 @@ function renderEstadisticasLogistica() {
   _chartVehiculos(viajesCumplidos);
   _chartTendencia(viajesEnPeriodo, periodo);
   _chartDestinos(entregas);
+  _chartCausas('chart-log-causas-reprogramacion', causasReprogramacion, '#fab219');
+  _chartCausas('chart-log-causas-cancelacion', causasCancelacion, '#d03b3b');
 }
 
 // ── Cumplimiento de entregas (dona, colores de estado) ──
@@ -353,6 +363,41 @@ function _chartDestinos(entregas) {
       scales: {
         x: { beginAtZero: true, grid: { color: '#e1e0d9' }, ticks: { color: '#898781', precision: 0 } },
         y: { grid: { display: false }, ticks: { color: '#0b0b0b', font: { size: 11 } } },
+      },
+    },
+  });
+}
+
+// ── Causas de reprogramación / cancelación más frecuentes (ranking, top 7) — mismo patrón que
+// Destinos, pero coloreado con la paleta de estado (ámbar=reprogramación, rojo=cancelación) para
+// mantener el mismo lenguaje visual del resto del dashboard. Las etiquetas del eje Y se truncan
+// (la causa completa queda en el tooltip) porque el texto de las causas es largo y en 7 filas se
+// encima si no se acorta.
+const _chartCausasInst = {};
+function _chartCausas(canvasId, causas, color) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  const conteo = {};
+  causas.forEach(c => { conteo[c] = (conteo[c] || 0) + 1; });
+  const top = Object.entries(conteo).sort((a, b) => b[1] - a[1]).slice(0, 7);
+  if (_chartCausasInst[canvasId]) _chartCausasInst[canvasId].destroy();
+  _chartCausasInst[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: top.map(([c]) => c), datasets: [{ data: top.map(([, n]) => n), backgroundColor: color, borderRadius: 4, maxBarThickness: 20 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => ` ${top[c.dataIndex][0]}: ${c.parsed.x} vez${c.parsed.x === 1 ? '' : 'es'}` } },
+      },
+      scales: {
+        x: { beginAtZero: true, grid: { color: '#e1e0d9' }, ticks: { color: '#898781', precision: 0 } },
+        y: {
+          grid: { display: false },
+          ticks: { color: '#0b0b0b', font: { size: 10 }, autoSkip: false, callback: (val, idx) => { const t = top[idx] ? top[idx][0] : ''; return t.length > 34 ? t.slice(0, 32) + '…' : t; } },
+        },
       },
     },
   });

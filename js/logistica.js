@@ -143,6 +143,24 @@ function _entregasDeViaje(v) { return v.entregas || v.clientes || []; }
 
 function _cumplidoDeEntrega(e) { return (e && e.cumplido) || { estado: 'pendiente' }; }
 
+// Cuántas veces se reprogramó una entrega — de `e.reprogramaciones` (historial con causa, un
+// registro por cada vez que se reprograma), con respaldo al contador viejo `vecesReprogramada`
+// (entregas movidas antes de agregar el historial de causas, que no tienen el arreglo).
+function _countReprogramaciones(e) { return (e.reprogramaciones && e.reprogramaciones.length) || e.vecesReprogramada || 0; }
+
+// Causas de reprogramación/cancelación — mismo catálogo para ambas acciones, elegido en un
+// desplegable al confirmar cualquiera de las dos, para poder analizar después cuáles son las
+// causas más recurrentes y tomar acciones correctivas.
+const CAUSAS_REPROGRAMACION_CANCELACION = [
+  'El cliente no está en capacidad de recibir',
+  'No se alcanzó a hacer la entrega',
+  'No se tiene acceso a la obra por condiciones de la vía o espacio',
+  'Hubo un error en el material cargado',
+  'Hubo un error en la orden de producción o de despacho',
+  'No se tiene inventario suficiente del producto a despachar',
+  'El cliente canceló el pedido',
+];
+
 // Cualquier fecha antes de hoy queda bloqueada para edición estructural del viaje
 // (fecha, destino, vehículo, entregas). Marcar cumplidos sigue permitido sobre esas fechas.
 function esFechaBloqueada(fechaStr) { return fechaStr < _fmtISO(new Date()); }
@@ -468,10 +486,11 @@ function renderEntregasViaje() {
       <div class="card" style="padding:12px;margin-bottom:10px;background:#FAFBFC;box-shadow:none;border:1px solid var(--gris-borde)">
         <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
           <div style="font-size:13px;font-weight:700">${e.cliente || 'Sin cliente'}${e.destino ? ' — ' + e.destino : ''}</div>
-          <div style="font-size:11px;font-weight:700">${_ETIQUETA_CUMPLIDO[c.estado] || _ETIQUETA_CUMPLIDO.pendiente}${c.estado === 'reprogramada' && c.nuevaFecha ? ` → ${c.nuevaFecha}` : ''}${e.vecesReprogramada ? ` <span style="color:var(--naranja)">🔁×${e.vecesReprogramada}</span>` : ''}</div>
+          <div style="font-size:11px;font-weight:700">${_ETIQUETA_CUMPLIDO[c.estado] || _ETIQUETA_CUMPLIDO.pendiente}${c.estado === 'reprogramada' && c.nuevaFecha ? ` → ${c.nuevaFecha}` : ''}${_countReprogramaciones(e) ? ` <span style="color:var(--naranja)">🔁×${_countReprogramaciones(e)}</span>` : ''}</div>
         </div>
         <div style="font-size:11px;color:var(--gris-medio);margin-bottom:2px">Orden: ${e.ordenNumero || 'N/A — sin orden asociada'}</div>
         <div style="font-size:11px;color:var(--gris-medio);margin-bottom:6px">Contacto en obra: ${e.contactoObraNombre ? e.contactoObraNombre + (e.contactoObraTelefono ? ' — ' + e.contactoObraTelefono : '') : '—'}</div>
+        ${c.estado === 'cancelada' && c.causa ? `<div style="font-size:11px;color:var(--rojo);margin-bottom:6px">Causa: ${c.causa}</div>` : ''}
         ${(e.productos || []).map(p => `<div style="font-size:12px;padding:3px 0;border-top:1px solid #eee">• ${p.producto || ''} — ${p.cantidad || 0} (${(Number(p.peso) || 0).toFixed(2)} ton)</div>`).join('')}
       </div>`;
     }).join('');
@@ -783,12 +802,14 @@ function actualizarBadgeCumplidos() {
 }
 
 function abrirModalCumplidos() {
-  _reprogramarAbiertoKey = null;
+  _accionAbiertaKey = null;
+  _accionAbiertaTipo = null;
   renderListaCumplidos();
   document.getElementById('modal-cumplidos').classList.add('abierto');
 }
 
-let _reprogramarAbiertoKey = null; // `${viajeId}-${entregaIndex}` de la fila con el selector de nueva fecha abierto
+let _accionAbiertaKey = null;  // `${viajeId}-${entregaIndex}` de la fila con el panel de Reprogramar/Cancelar abierto
+let _accionAbiertaTipo = null; // 'reprogramar' | 'cancelar' — cuál de los dos paneles mostrar
 
 function renderListaCumplidos() {
   const cont = document.getElementById('cumplidos-lista');
@@ -802,54 +823,74 @@ function renderListaCumplidos() {
     const key = `${f.viajeId}-${f.entregaIndex}`;
     const pesoEntrega = (f.entrega.productos || []).reduce((s, p) => s + (Number(p.peso) || 0), 0);
     const fechaLegible = new Date(f.fecha + 'T12:00').toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short' });
+    const vecesRepro = _countReprogramaciones(f.entrega);
+    const panelAbierto = _accionAbiertaKey === key;
     return `
     <div class="card" style="padding:10px 12px;margin-bottom:8px;border:1px solid var(--gris-borde);box-shadow:none">
       <div style="margin-bottom:8px">
-        <div style="font-size:12.5px;font-weight:700;text-transform:capitalize">${fechaLegible} — ${f.entrega.cliente || 'Sin cliente'}${f.entrega.vecesReprogramada ? ` <span style="color:var(--naranja);font-size:11px">🔁×${f.entrega.vecesReprogramada}</span>` : ''}</div>
+        <div style="font-size:12.5px;font-weight:700;text-transform:capitalize">${fechaLegible} — ${f.entrega.cliente || 'Sin cliente'}${vecesRepro ? ` <span style="color:var(--naranja);font-size:11px">🔁×${vecesRepro}</span>` : ''}</div>
         <div style="font-size:11px;color:var(--gris-medio)">${f.entrega.destino || f.destinoViaje || ''} · ${f.vehiculo || ''} · ${pesoEntrega.toFixed(2)} ton</div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <button class="btn btn-primario btn-xs" onclick="marcarCumplidoEntrega('${f.viajeId}',${f.entregaIndex},'hecha')">✅ Hecha</button>
-        <button class="btn btn-secundario btn-xs" onclick="toggleReprogramarCumplido('${f.viajeId}',${f.entregaIndex})">🔁 Reprogramar</button>
-        <button class="btn btn-rojo btn-xs" onclick="marcarCumplidoEntrega('${f.viajeId}',${f.entregaIndex},'cancelada')">❌ Cancelada</button>
-        ${_reprogramarAbiertoKey === key ? `
-          <input type="date" id="reprogramar-fecha-${key}" min="${_fmtISO(new Date())}" style="margin-left:4px;padding:5px 7px;border:1px solid var(--gris-borde);border-radius:4px;font-size:12px">
-          <button class="btn btn-primario btn-xs" onclick="confirmarReprogramacion('${f.viajeId}',${f.entregaIndex})">Confirmar nueva fecha</button>
-        ` : ''}
+        <button class="btn btn-secundario btn-xs" onclick="toggleAccionCumplido('${f.viajeId}',${f.entregaIndex},'reprogramar')">🔁 Reprogramar</button>
+        <button class="btn btn-rojo btn-xs" onclick="toggleAccionCumplido('${f.viajeId}',${f.entregaIndex},'cancelar')">❌ Cancelada</button>
       </div>
+      ${panelAbierto ? `
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--gris-borde)">
+          ${_accionAbiertaTipo === 'reprogramar' ? `<input type="date" id="reprogramar-fecha-${key}" min="${_fmtISO(new Date())}" style="padding:5px 7px;border:1px solid var(--gris-borde);border-radius:4px;font-size:12px">` : ''}
+          <select id="causa-${key}" style="padding:5px 7px;border:1px solid var(--gris-borde);border-radius:4px;font-size:12px;flex:1;min-width:220px">
+            <option value="">Causa de la ${_accionAbiertaTipo === 'reprogramar' ? 'reprogramación' : 'cancelación'}...</option>
+            ${CAUSAS_REPROGRAMACION_CANCELACION.map(c => `<option value="${c}">${c}</option>`).join('')}
+          </select>
+          <button class="btn btn-primario btn-xs" onclick="${_accionAbiertaTipo === 'reprogramar' ? `confirmarReprogramacion('${f.viajeId}',${f.entregaIndex})` : `confirmarCancelacion('${f.viajeId}',${f.entregaIndex})`}">Confirmar</button>
+        </div>
+      ` : ''}
     </div>`;
   }).join('');
 }
 
-function toggleReprogramarCumplido(viajeId, entregaIndex) {
+function toggleAccionCumplido(viajeId, entregaIndex, tipo) {
   const key = `${viajeId}-${entregaIndex}`;
-  _reprogramarAbiertoKey = _reprogramarAbiertoKey === key ? null : key;
+  if (_accionAbiertaKey === key && _accionAbiertaTipo === tipo) { _accionAbiertaKey = null; _accionAbiertaTipo = null; }
+  else { _accionAbiertaKey = key; _accionAbiertaTipo = tipo; }
   renderListaCumplidos();
 }
 
 function confirmarReprogramacion(viajeId, entregaIndex) {
   const key = `${viajeId}-${entregaIndex}`;
-  const input = document.getElementById(`reprogramar-fecha-${key}`);
-  const nuevaFecha = input ? input.value : '';
+  const inputFecha = document.getElementById(`reprogramar-fecha-${key}`);
+  const nuevaFecha = inputFecha ? inputFecha.value : '';
+  const inputCausa = document.getElementById(`causa-${key}`);
+  const causa = inputCausa ? inputCausa.value : '';
   if (!nuevaFecha) { alert('Elige la nueva fecha.'); return; }
+  if (!causa) { alert('Elige la causa de la reprogramación.'); return; }
   const v = VIAJES.find(x => String(x.id) === String(viajeId));
   if (v && nuevaFecha === v.fecha) {
     alert('Esa es la misma fecha del viaje actual — si la entrega se va a hacer más tarde el mismo día, no hace falta reprogramarla: déjala pendiente y márcala como "Hecha" cuando se complete.');
     return;
   }
-  marcarCumplidoEntrega(viajeId, entregaIndex, 'reprogramada', nuevaFecha);
+  marcarCumplidoEntrega(viajeId, entregaIndex, 'reprogramada', nuevaFecha, causa);
+}
+
+function confirmarCancelacion(viajeId, entregaIndex) {
+  const key = `${viajeId}-${entregaIndex}`;
+  const inputCausa = document.getElementById(`causa-${key}`);
+  const causa = inputCausa ? inputCausa.value : '';
+  if (!causa) { alert('Elige la causa de la cancelación.'); return; }
+  marcarCumplidoEntrega(viajeId, entregaIndex, 'cancelada', null, causa);
 }
 
 // Marca el resultado de una entrega. "Hecha" y "Cancelada" sí son resultados finales.
 // "Reprogramada" YA NO bloquea la entrega: solo la mueve a la fecha nueva (igual mecanismo que
-// arrastrarla en el calendario — ver _moverEntregaADia) y deja constancia de que se movió
-// (`e.vecesReprogramada`), pero la entrega sigue "pendiente" y vuelve a aparecer en Cumplidos en
-// su nueva fecha, totalmente accionable (se puede volver a marcar Hecha, reprogramar de nuevo o
-// Cancelar). Esto evita el callejón sin salida de una entrega que se reprogramó y al final SÍ se
-// cumplió, pero se quedaba sin forma de marcarse como hecha. Lo que sí queda registrado para las
-// estadísticas es el hecho de que se reprogramó — ver _fueReprogramada() en
-// estadisticas-logistica.js.
-function marcarCumplidoEntrega(viajeId, entregaIndex, estado, nuevaFecha) {
+// arrastrarla en el calendario — ver _moverEntregaADia) y agrega un registro a su historial
+// (`e.reprogramaciones`, con la causa elegida), pero la entrega sigue "pendiente" y vuelve a
+// aparecer en Cumplidos en su nueva fecha, totalmente accionable (se puede volver a marcar Hecha,
+// reprogramar de nuevo o Cancelar). Esto evita el callejón sin salida de una entrega que se
+// reprogramó y al final SÍ se cumplió, pero se quedaba sin forma de marcarse como hecha.
+// Reprogramar y Cancelar piden la causa (mismo catálogo, CAUSAS_REPROGRAMACION_CANCELACION) para
+// poder analizar en Estadísticas cuáles son las causas más recurrentes.
+function marcarCumplidoEntrega(viajeId, entregaIndex, estado, nuevaFecha, causa) {
   const v = VIAJES.find(x => String(x.id) === String(viajeId));
   if (!v) return;
   if (!v.entregas) v.entregas = _entregasDeViaje(v);
@@ -858,19 +899,23 @@ function marcarCumplidoEntrega(viajeId, entregaIndex, estado, nuevaFecha) {
   if (!e.fechaOriginal) e.fechaOriginal = v.fecha;
 
   if (estado === 'reprogramada') {
-    e.vecesReprogramada = (e.vecesReprogramada || 0) + 1;
+    if (!e.reprogramaciones) e.reprogramaciones = [];
+    e.reprogramaciones.push({ fecha: nuevaFecha, causa: causa || '', fechaConfirmacion: new Date().toISOString(), confirmadoPor: USUARIO_ACTUAL?.email });
     e.cumplido = { estado: 'pendiente' };
     Promise.resolve(_moverEntregaADia(v, entregaIndex, nuevaFecha)).then(() => renderCalendarioLogistica());
-    _reprogramarAbiertoKey = null;
+    _accionAbiertaKey = null;
+    _accionAbiertaTipo = null;
     renderListaCumplidos();
     return;
   }
 
   e.cumplido = { estado, fechaConfirmacion: new Date().toISOString(), confirmadoPor: USUARIO_ACTUAL?.email };
+  if (estado === 'cancelada') e.cumplido.causa = causa || '';
   sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' })
     .then(({ error }) => { if (error) console.error('Error guardando cumplido:', error.message); });
 
-  _reprogramarAbiertoKey = null;
+  _accionAbiertaKey = null;
+  _accionAbiertaTipo = null;
   renderListaCumplidos();
   renderCalendarioLogistica();
 }
