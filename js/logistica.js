@@ -244,6 +244,50 @@ function _moverViajeADia(v, fechaDestino) {
     .then(({ error }) => { if (error) console.error('Error moviendo viaje de fecha:', error.message); });
 }
 
+// ── Razón al arrastrar un viaje a otro día ──
+// Soltar un viaje sobre una fecha distinta ya NO lo mueve de una vez: abre este modal a pedir la
+// causa (mismo catálogo que Cumplidos) y solo mueve el viaje al confirmar — así el arrastre deja
+// el mismo rastro que "Reprogramar" en Cumplidos, sin importar cuál de los dos mecanismos se usó.
+// La causa se guarda en CADA entrega del viaje (todas se mueven juntas al arrastrar el viaje
+// completo, a diferencia de Cumplidos que actúa sobre una entrega puntual).
+let _arrastrePendiente = null; // { viajeId, fechaDestino }
+
+function abrirModalMotivoArrastre(viajeId, fechaDestino) {
+  const v = VIAJES.find(x => String(x.id) === String(viajeId));
+  if (!v) return;
+  _arrastrePendiente = { viajeId, fechaDestino };
+  const info = document.getElementById('motivo-arrastre-info');
+  if (info) info.textContent = `Vas a mover el viaje del ${v.fecha} al ${fechaDestino}${v.destino ? ' — ' + v.destino : ''}. Elige la razón para dejarla registrada en Estadísticas.`;
+  const sel = document.getElementById('motivo-arrastre-causa');
+  if (sel) sel.innerHTML = `<option value="">Elige una causa...</option>` + CAUSAS_REPROGRAMACION_CANCELACION.map(c => `<option value="${c}">${c}</option>`).join('');
+  document.getElementById('modal-motivo-arrastre').classList.add('abierto');
+}
+
+function cancelarMotivoArrastre() {
+  _arrastrePendiente = null;
+  cerrarModal('modal-motivo-arrastre');
+}
+
+function confirmarMotivoArrastre() {
+  if (!_arrastrePendiente) return;
+  const sel = document.getElementById('motivo-arrastre-causa');
+  const causa = sel ? sel.value : '';
+  if (!causa) { alert('Elige la razón de la reprogramación.'); return; }
+  const { viajeId, fechaDestino } = _arrastrePendiente;
+  _arrastrePendiente = null;
+  cerrarModal('modal-motivo-arrastre');
+  const v = VIAJES.find(x => String(x.id) === String(viajeId));
+  if (!v) return;
+
+  _entregasDeViaje(v).forEach(e => {
+    if (!e.reprogramaciones) e.reprogramaciones = [];
+    e.reprogramaciones.push({ fecha: fechaDestino, causa, fechaConfirmacion: new Date().toISOString(), confirmadoPor: USUARIO_ACTUAL?.email });
+  });
+
+  Promise.resolve(_moverViajeADia(v, fechaDestino)).then(() => renderCalendarioLogistica());
+  renderCalendarioLogistica();
+}
+
 // Mueve UNA entrega de un viaje a otra fecha (usado por "Reprogramar" en Cumplidos, que actúa
 // sobre una entrega puntual, no sobre el viaje completo). Si es la única entrega del viaje, es
 // exactamente lo mismo que mover el viaje entero (_moverViajeADia, mutación simple). Si el viaje
@@ -284,7 +328,7 @@ function soltarViajeEnDia(event, fechaDestino) {
   const v = VIAJES.find(x => String(x.id) === String(id));
   if (!v || v.fecha === fechaDestino) return; // mismo día: no se mueve nada (se reordena soltando sobre otro viaje)
   if (esFechaBloqueada(fechaDestino)) { alert('No se puede mover un viaje a una fecha que ya pasó.'); return; }
-  Promise.resolve(_moverViajeADia(v, fechaDestino)).then(() => renderCalendarioLogistica());
+  abrirModalMotivoArrastre(id, fechaDestino);
 }
 
 // Soltar un viaje sobre otro viaje: si son del mismo día, reordena (inserta el arrastrado justo
@@ -304,7 +348,7 @@ function soltarViajeSobreViaje(event, targetId) {
 
   if (arrastrado.fecha !== objetivo.fecha) {
     if (esFechaBloqueada(objetivo.fecha)) { alert('No se puede mover un viaje a una fecha que ya pasó.'); return; }
-    Promise.resolve(_moverViajeADia(arrastrado, objetivo.fecha)).then(() => renderCalendarioLogistica());
+    abrirModalMotivoArrastre(id, objetivo.fecha);
     return;
   }
 

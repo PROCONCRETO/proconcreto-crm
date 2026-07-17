@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260717d">
+<link rel="stylesheet" href="css/estilos.css?v=20260717e">
 </head>
 <body>
 
@@ -1089,6 +1089,23 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-motivo-arrastre">
+  <div class="modal" style="width:420px;max-width:95vw">
+    <div class="modal-titulo">🔁 Razón de la reprogramación</div>
+    <div id="motivo-arrastre-info" style="font-size:12.5px;color:var(--gris-medio);margin-bottom:12px"></div>
+    <div class="form-grupo">
+      <label>Causa</label>
+      <select id="motivo-arrastre-causa" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <option value="">Elige una causa...</option>
+      </select>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cancelarMotivoArrastre()">Cancelar</button>
+      <button class="btn btn-primario" onclick="confirmarMotivoArrastre()">Confirmar y mover</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-ajuste-mezcla">
   <div class="modal" style="width:1080px;max-width:95vw">
     <div class="modal-titulo" id="modal-ajuste-titulo">🌡️ Nuevo Ajuste Diario de Mezcla</div>
@@ -1596,28 +1613,28 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260717d"></script>
-<script src="js/catalogo.js?v=20260717d"></script>
-<script src="js/navegacion.js?v=20260717d"></script>
-<script src="js/ordenes-produccion.js?v=20260717d"></script>
-<script src="js/produccion-diaria.js?v=20260717d"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260717d"></script>
-<script src="js/calidad-mezclas.js?v=20260717d"></script>
-<script src="js/calidad-estadisticas.js?v=20260717d"></script>
-<script src="js/calidad-trazabilidad.js?v=20260717d"></script>
-<script src="js/logistica.js?v=20260717d"></script>
-<script src="js/estadisticas-logistica.js?v=20260717d"></script>
-<script src="js/auth.js?v=20260717d"></script>
-<script src="js/datos-realtime.js?v=20260717d"></script>
-<script src="js/cotizador.js?v=20260717d"></script>
-<script src="js/historico-clientes-stats.js?v=20260717d"></script>
+<script src="js/config.js?v=20260717e"></script>
+<script src="js/catalogo.js?v=20260717e"></script>
+<script src="js/navegacion.js?v=20260717e"></script>
+<script src="js/ordenes-produccion.js?v=20260717e"></script>
+<script src="js/produccion-diaria.js?v=20260717e"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260717e"></script>
+<script src="js/calidad-mezclas.js?v=20260717e"></script>
+<script src="js/calidad-estadisticas.js?v=20260717e"></script>
+<script src="js/calidad-trazabilidad.js?v=20260717e"></script>
+<script src="js/logistica.js?v=20260717e"></script>
+<script src="js/estadisticas-logistica.js?v=20260717e"></script>
+<script src="js/auth.js?v=20260717e"></script>
+<script src="js/datos-realtime.js?v=20260717e"></script>
+<script src="js/cotizador.js?v=20260717e"></script>
+<script src="js/historico-clientes-stats.js?v=20260717e"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260717d"></script>
-<script src="js/rut-parser.js?v=20260717d"></script>
+<script src="js/pdf.js?v=20260717e"></script>
+<script src="js/rut-parser.js?v=20260717e"></script>
 </body>
 </html>
