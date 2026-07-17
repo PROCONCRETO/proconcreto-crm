@@ -226,6 +226,37 @@ function _moverViajeADia(v, fechaDestino) {
     .then(({ error }) => { if (error) console.error('Error moviendo viaje de fecha:', error.message); });
 }
 
+// Mueve UNA entrega de un viaje a otra fecha (usado por "Reprogramar" en Cumplidos, que actúa
+// sobre una entrega puntual, no sobre el viaje completo). Si es la única entrega del viaje, es
+// exactamente lo mismo que mover el viaje entero (_moverViajeADia, mutación simple). Si el viaje
+// tiene otras entregas que se quedan donde estaban, se separa solo esta en un viaje nuevo en la
+// fecha destino y se saca del viaje original — las demás entregas del viaje original no se tocan.
+function _moverEntregaADia(v, entregaIndex, fechaDestino) {
+  const entregas = v.entregas || _entregasDeViaje(v);
+  if (entregas.length <= 1) return _moverViajeADia(v, fechaDestino);
+
+  const [e] = entregas.splice(entregaIndex, 1);
+  v.pesoTotal = entregas.reduce((s, e2) => s + (e2.productos || []).reduce((s2, p) => s2 + (Number(p.peso) || 0), 0), 0);
+  const pesoMovido = (e.productos || []).reduce((s, p) => s + (Number(p.peso) || 0), 0);
+  const viajeNuevo = {
+    id: String(Date.now()) + '-r',
+    fecha: fechaDestino,
+    destino: e.destino || v.destino,
+    vehiculo: v.vehiculo,
+    estado: 'Programada',
+    observaciones: `Separado del viaje del ${v.fecha}.`,
+    entregas: [e],
+    pesoTotal: pesoMovido,
+    creadoPor: USUARIO_ACTUAL?.email,
+    creadoEn: new Date().toISOString(),
+  };
+  VIAJES.unshift(viajeNuevo);
+  return Promise.all([
+    sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' }),
+    sb.from('entregas_programadas').upsert({ id: viajeNuevo.id, datos: viajeNuevo, modificado: new Date().toISOString() }, { onConflict: 'id' }),
+  ]).then(resultados => resultados.forEach(({ error }) => { if (error) console.error('Error moviendo entrega:', error.message); }));
+}
+
 function soltarViajeEnDia(event, fechaDestino) {
   event.preventDefault();
   event.currentTarget.classList.remove('log-cal-dragover');
@@ -437,7 +468,7 @@ function renderEntregasViaje() {
       <div class="card" style="padding:12px;margin-bottom:10px;background:#FAFBFC;box-shadow:none;border:1px solid var(--gris-borde)">
         <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
           <div style="font-size:13px;font-weight:700">${e.cliente || 'Sin cliente'}${e.destino ? ' — ' + e.destino : ''}</div>
-          <div style="font-size:11px;font-weight:700">${_ETIQUETA_CUMPLIDO[c.estado] || _ETIQUETA_CUMPLIDO.pendiente}${c.estado === 'reprogramada' && c.nuevaFecha ? ` → ${c.nuevaFecha}` : ''}</div>
+          <div style="font-size:11px;font-weight:700">${_ETIQUETA_CUMPLIDO[c.estado] || _ETIQUETA_CUMPLIDO.pendiente}${c.estado === 'reprogramada' && c.nuevaFecha ? ` → ${c.nuevaFecha}` : ''}${e.vecesReprogramada ? ` <span style="color:var(--naranja)">🔁×${e.vecesReprogramada}</span>` : ''}</div>
         </div>
         <div style="font-size:11px;color:var(--gris-medio);margin-bottom:2px">Orden: ${e.ordenNumero || 'N/A — sin orden asociada'}</div>
         <div style="font-size:11px;color:var(--gris-medio);margin-bottom:6px">Contacto en obra: ${e.contactoObraNombre ? e.contactoObraNombre + (e.contactoObraTelefono ? ' — ' + e.contactoObraTelefono : '') : '—'}</div>
@@ -774,7 +805,7 @@ function renderListaCumplidos() {
     return `
     <div class="card" style="padding:10px 12px;margin-bottom:8px;border:1px solid var(--gris-borde);box-shadow:none">
       <div style="margin-bottom:8px">
-        <div style="font-size:12.5px;font-weight:700;text-transform:capitalize">${fechaLegible} — ${f.entrega.cliente || 'Sin cliente'}</div>
+        <div style="font-size:12.5px;font-weight:700;text-transform:capitalize">${fechaLegible} — ${f.entrega.cliente || 'Sin cliente'}${f.entrega.vecesReprogramada ? ` <span style="color:var(--naranja);font-size:11px">🔁×${f.entrega.vecesReprogramada}</span>` : ''}</div>
         <div style="font-size:11px;color:var(--gris-medio)">${f.entrega.destino || f.destinoViaje || ''} · ${f.vehiculo || ''} · ${pesoEntrega.toFixed(2)} ton</div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
@@ -809,10 +840,15 @@ function confirmarReprogramacion(viajeId, entregaIndex) {
   marcarCumplidoEntrega(viajeId, entregaIndex, 'reprogramada', nuevaFecha);
 }
 
-// Marca el resultado de una entrega. Si es "reprogramada", además crea un viaje nuevo en la
-// fecha nueva con una copia de esa entrega (en estado "pendiente" de nuevo) — así aparece
-// programada en el día al que se movió, y el viaje original conserva el rastro de que esa
-// entrega se reprogramó (para las estadísticas), en vez de simplemente desaparecer.
+// Marca el resultado de una entrega. "Hecha" y "Cancelada" sí son resultados finales.
+// "Reprogramada" YA NO bloquea la entrega: solo la mueve a la fecha nueva (igual mecanismo que
+// arrastrarla en el calendario — ver _moverEntregaADia) y deja constancia de que se movió
+// (`e.vecesReprogramada`), pero la entrega sigue "pendiente" y vuelve a aparecer en Cumplidos en
+// su nueva fecha, totalmente accionable (se puede volver a marcar Hecha, reprogramar de nuevo o
+// Cancelar). Esto evita el callejón sin salida de una entrega que se reprogramó y al final SÍ se
+// cumplió, pero se quedaba sin forma de marcarse como hecha. Lo que sí queda registrado para las
+// estadísticas es el hecho de que se reprogramó — ver _fueReprogramada() en
+// estadisticas-logistica.js.
 function marcarCumplidoEntrega(viajeId, entregaIndex, estado, nuevaFecha) {
   const v = VIAJES.find(x => String(x.id) === String(viajeId));
   if (!v) return;
@@ -821,49 +857,18 @@ function marcarCumplidoEntrega(viajeId, entregaIndex, estado, nuevaFecha) {
   if (!e) return;
   if (!e.fechaOriginal) e.fechaOriginal = v.fecha;
 
-  e.cumplido = {
-    estado,
-    nuevaFecha: estado === 'reprogramada' ? nuevaFecha : '',
-    fechaConfirmacion: new Date().toISOString(),
-    confirmadoPor: USUARIO_ACTUAL?.email,
-  };
-
-  const guardados = [
-    sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' }),
-  ];
-
-  // Reprogramar dentro del mismo día (ej. "se atrasó, se entrega más tarde hoy") no genera un
-  // viaje nuevo — no tiene sentido duplicarlo en la misma fecha, y tampoco cuenta como
-  // reprogramación en las estadísticas porque fechaOriginal seguiría siendo igual a la fecha.
-  if (estado === 'reprogramada' && nuevaFecha !== v.fecha) {
-    const entregaNueva = {
-      ordenId: e.ordenId || '', ordenNumero: e.ordenNumero || '',
-      cliente: e.cliente, destino: e.destino,
-      contactoObraNombre: e.contactoObraNombre, contactoObraTelefono: e.contactoObraTelefono,
-      productos: JSON.parse(JSON.stringify(e.productos || [])),
-      fechaOriginal: e.fechaOriginal,
-      cumplido: { estado: 'pendiente' },
-    };
-    const pesoNuevo = entregaNueva.productos.reduce((s, p) => s + (Number(p.peso) || 0), 0);
-    const viajeNuevo = {
-      id: String(Date.now()) + '-r',
-      fecha: nuevaFecha,
-      destino: e.destino || v.destino,
-      vehiculo: v.vehiculo,
-      estado: 'Programada',
-      observaciones: `Reprogramado desde el viaje del ${v.fecha}.`,
-      entregas: [entregaNueva],
-      pesoTotal: pesoNuevo,
-      creadoPor: USUARIO_ACTUAL?.email,
-      creadoEn: new Date().toISOString(),
-    };
-    VIAJES.unshift(viajeNuevo);
-    guardados.push(sb.from('entregas_programadas').upsert({ id: viajeNuevo.id, datos: viajeNuevo, modificado: new Date().toISOString() }, { onConflict: 'id' }));
+  if (estado === 'reprogramada') {
+    e.vecesReprogramada = (e.vecesReprogramada || 0) + 1;
+    e.cumplido = { estado: 'pendiente' };
+    Promise.resolve(_moverEntregaADia(v, entregaIndex, nuevaFecha)).then(() => renderCalendarioLogistica());
+    _reprogramarAbiertoKey = null;
+    renderListaCumplidos();
+    return;
   }
 
-  Promise.all(guardados).then(resultados => {
-    resultados.forEach(({ error }) => { if (error) console.error('Error guardando cumplido:', error.message); });
-  });
+  e.cumplido = { estado, fechaConfirmacion: new Date().toISOString(), confirmadoPor: USUARIO_ACTUAL?.email };
+  sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' })
+    .then(({ error }) => { if (error) console.error('Error guardando cumplido:', error.message); });
 
   _reprogramarAbiertoKey = null;
   renderListaCumplidos();

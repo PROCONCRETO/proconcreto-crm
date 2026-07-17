@@ -26,21 +26,21 @@ const _COLOR_CUMPLIDO_VIAJE = {
   pendiente:    { color: '#b0aea6', icono: '⏳', etiqueta: 'Pendiente' },
 };
 
-// Estado "efectivo" de una entrega para estadísticas: si sigue con resultado real (hecha,
-// cancelada) o si ya se marcó "reprogramada" a mano (vía Cumplidos), se respeta tal cual. Pero
-// si sigue "pendiente" en los datos y su viaje actual quedó en una fecha distinta a la
-// original, es porque se arrastró a otro día en el calendario sin pasar por Cumplidos — para
-// las estadísticas cuenta como reprogramada. Es una comparación EN VIVO, no una marca fija: si
-// el viaje se arrastra de vuelta a su fecha original, vuelve a ser "pendiente" solo, sin que
-// haya que deshacer nada a mano.
-function _cumplidoEfectivo(e, viajeFecha) {
-  const c = _cumplidoDeEntrega(e).estado;
+// "¿Esta entrega se reprogramó alguna vez?" — es un hecho histórico, independiente del estado
+// ACTUAL (una entrega se puede haber reprogramado y de todas formas terminar "hecha": reprogramar
+// ya no bloquea la entrega, ver marcarCumplidoEntrega() en logistica.js). Cubre tres señales:
+// `vecesReprogramada` (mecanismo nuevo, no bloquea nada), `cumplido.estado === 'reprogramada'`
+// (marcas de antes de este cambio, donde sí quedaba fija como estado final) y `fechaOriginal`
+// distinta a la fecha actual del viaje (se arrastró en el calendario sin pasar por Cumplidos).
+function _fueReprogramada(e, viajeFecha) {
+  if (e.vecesReprogramada) return true;
+  if (_cumplidoDeEntrega(e).estado === 'reprogramada') return true;
   const fechaOriginal = e.fechaOriginal || viajeFecha;
-  return (c === 'pendiente' && fechaOriginal !== viajeFecha) ? 'reprogramada' : c;
+  return fechaOriginal !== viajeFecha;
 }
 
 function _categoriaCumplidoViaje(v) {
-  const estados = _entregasDeViaje(v).map(e => _cumplidoEfectivo(e, v.fecha));
+  const estados = _entregasDeViaje(v).map(e => _cumplidoDeEntrega(e).estado);
   if (!estados.length || estados.some(s => s === 'pendiente')) return 'pendiente';
   const hechas = estados.filter(s => s === 'hecha').length;
   if (hechas === estados.length) return 'completo';
@@ -50,8 +50,9 @@ function _categoriaCumplidoViaje(v) {
 
 // Junta viajes + entregas del periodo seleccionado. El filtro de fecha usa `fechaOriginal` (el
 // compromiso original de la entrega), no la fecha actual del viaje — así una entrega que se
-// arrastró de hoy hacia adelante se sigue evaluando dentro de la ventana de hoy en vez de
-// desaparecer de las estadísticas (ver _cumplidoEfectivo arriba).
+// movió de hoy hacia adelante se sigue evaluando dentro de la ventana de hoy en vez de
+// desaparecer de las estadísticas, y de paso queda contada como reprogramada ahí (ver
+// _fueReprogramada arriba) aunque termine "hecha" en su fecha nueva.
 function _datosEstadisticasLogistica(periodoDias) {
   const hoy = _fmtISO(new Date());
   const desde = periodoDias > 0 ? _fmtISO(_sumarDias(new Date(), -periodoDias)) : null;
@@ -68,7 +69,13 @@ function _datosEstadisticasLogistica(periodoDias) {
       // Proyecto" de la entrega — ese es el sitio puntual dentro de la ciudad, no la ciudad.
       // `viajeId` se guarda para poder agrupar por viaje real (no por entrega) en los cálculos
       // de desempeño por vehículo — un viaje con 2 entregas cuenta como 1 viaje, no como 2.
-      entregas.push({ viajeId: v.id, vehiculo: v.vehiculo, fecha: v.fecha, fechaOriginal, destino: (v.destino || '').trim() || 'Sin destino', cumplido: _cumplidoEfectivo(e, v.fecha), pesoEntrega });
+      entregas.push({
+        viajeId: v.id, vehiculo: v.vehiculo, fecha: v.fecha, fechaOriginal,
+        destino: (v.destino || '').trim() || 'Sin destino',
+        cumplido: _cumplidoDeEntrega(e).estado,
+        reprogramada: _fueReprogramada(e, v.fecha),
+        pesoEntrega,
+      });
       if (!viajesVistos.has(v.id)) { viajesVistos.add(v.id); viajesEnPeriodo.push(v); }
     });
   });
@@ -135,10 +142,10 @@ function renderEstadisticasLogistica() {
   const pctCapacidadProm = viajesCumplidosConCapacidad.length
     ? Math.round(viajesCumplidosConCapacidad.reduce((s, vv) => s + vv.pesoHecho / CAPACIDAD_VEHICULO[vv.vehiculo], 0) / viajesCumplidosConCapacidad.length * 100)
     : 0;
-  // Mismo bucket que la dona de cumplimiento (estado efectivo === 'reprogramada') — tanto
-  // "Reprogramar" en Cumplidos como arrastrar un viaje a otro día quedan contados igual, en
-  // vivo (ver _cumplidoEfectivo).
-  const entregasReprogramadas = entregas.filter(e => e.cumplido === 'reprogramada').length;
+  // Cuenta el hecho histórico de haberse reprogramado (ver _fueReprogramada), no un bucket de
+  // estado actual — una entrega puede estar aquí Y en el conteo de "Hecha" a la vez, porque
+  // reprogramar ya no es un resultado final.
+  const entregasReprogramadas = entregas.filter(e => e.reprogramada).length;
 
   const tarjetas = document.getElementById('est-log-tarjetas');
   if (tarjetas) {
