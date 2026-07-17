@@ -12,6 +12,12 @@ function activarModulo(modulo) {
   document.getElementById('subnav-produccion').style.display = modulo === 'produccion' ? 'flex' : 'none';
   document.getElementById('subnav-logistica').style.display = modulo === 'logistica' ? 'flex' : 'none';
   document.getElementById('subnav-calidad').style.display = modulo === 'calidad' ? 'flex' : 'none';
+  if (modulo === 'cotizaciones') {
+    document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+    document.getElementById('pantalla-nueva-cotizacion').classList.add('activa');
+    document.querySelectorAll('#subnav-cotizaciones .nav-btn').forEach(b => b.classList.remove('activo'));
+    document.querySelector('#subnav-cotizaciones .nav-btn[onclick*="nueva-cotizacion"]')?.classList.add('activo');
+  }
   if (modulo === 'logistica') {
     document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
     document.getElementById('pantalla-logistica').classList.add('activa');

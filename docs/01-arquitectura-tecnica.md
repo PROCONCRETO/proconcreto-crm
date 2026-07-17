@@ -30,6 +30,12 @@ Tablas identificadas en el código (`js/datos-realtime.js` es el punto central q
 | `ajustes_mezcla` | `calidad-ajuste-mezcla.js` |
 | `entregas_programadas` | `logistica.js` |
 
+## Navegación (`js/navegacion.js`)
+
+Dos niveles: `activarModulo(modulo)` cambia de módulo (Cotizaciones/Producción/Logística/Calidad/Productos — los botones grandes del nav superior), `ir(pantalla)` cambia de sub-pantalla dentro del módulo activo (los botones del subnav). Todas las `.pantalla` del HTML viven en el mismo documento a la vez; solo se les agrega/quita la clase `activa` para mostrarlas.
+
+**Invariante importante**: cada rama de `activarModulo()` tiene que dejar activada la pantalla por defecto de ESE módulo (quitando `activa` de todas las `.pantalla` primero) — si un módulo nuevo no lo hace, al entrar desde otro módulo queda visible la pantalla del módulo anterior en vez de la propia (bug real, corregido 2026-07-17: al módulo Cotizaciones le faltaba este bloque, así que entrar desde Calidad/Logística/Producción dejaba la pantalla anterior en pantalla en vez de "Nueva Cotización").
+
 ## Autenticación
 
 Supabase Auth con email/contraseña (`js/auth.js`): login, recuperación de contraseña por email, cambio de contraseña. Los usuarios del equipo y su rol/cargo (solo informativo, no de permisos) están hardcodeados en `USUARIOS_CRM` dentro de `js/config.js`. No hay control de acceso diferenciado por rol todavía — cualquier cuenta autenticada ve todos los módulos.
