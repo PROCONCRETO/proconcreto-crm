@@ -52,6 +52,7 @@ Tarjetas KPI con el componente `.stat-card` (mismo que Cotizaciones→Estadísti
 - Tendencia de viajes por día.
 - Ranking de destinos más frecuentes — cuenta la **Ciudad de Destino del viaje**, no el destino específico/proyecto de la entrega.
 - Ranking de **causas de reprogramación** (ámbar) y **causas de cancelación** (rojo) más frecuentes — un conteo por cada vez que se eligió esa causa (`_chartCausas()`, mismo patrón que Destinos; las etiquetas largas se truncan en el eje, el texto completo queda en el tooltip). Vacío hasta que haya reprogramaciones/cancelaciones con causa registrada (el campo se agregó el 2026-07-17; lo de antes no tiene causa y no aparece en el ranking).
+- Debajo, un **cuadro "Motivos más frecuentes"** (`_tablaCausas()`, tabla en HTML, no una gráfica) que junta reprogramación y cancelación en un solo ranking por **porcentaje del total de incidencias** — para ver de un vistazo cuál es la causa raíz más recurrente sin importar en cuál de las dos terminó (una causa puede sumar reprogramaciones Y cancelaciones a la vez; cada fila muestra el desglose 🔁/❌).
 
 ## Qué hace
 

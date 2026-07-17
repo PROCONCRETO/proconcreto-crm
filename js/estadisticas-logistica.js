@@ -172,6 +172,7 @@ function renderEstadisticasLogistica() {
   _chartDestinos(entregas);
   _chartCausas('chart-log-causas-reprogramacion', causasReprogramacion, '#fab219');
   _chartCausas('chart-log-causas-cancelacion', causasCancelacion, '#d03b3b');
+  _tablaCausas(causasReprogramacion, causasCancelacion);
 }
 
 // ── Cumplimiento de entregas (dona, colores de estado) ──
@@ -401,4 +402,44 @@ function _chartCausas(canvasId, causas, color) {
       },
     },
   });
+}
+
+// ── Motivos más frecuentes (tabla, no gráfica) — junta reprogramación y cancelación en un solo
+// ranking por PORCENTAJE del total de incidencias, para leer de un vistazo cuál es la causa raíz
+// más recurrente sin importar en cuál de las dos terminó, complementando las dos gráficas de
+// arriba (que sí las separan por tipo). Cada fila es una barra de progreso simple en HTML, no
+// Chart.js — es una tabla ordenada, no una gráfica nueva. ──
+function _tablaCausas(causasReprogramacion, causasCancelacion) {
+  const cont = document.getElementById('tabla-log-causas');
+  if (!cont) return;
+
+  const total = causasReprogramacion.length + causasCancelacion.length;
+  if (!total) {
+    cont.innerHTML = '<div class="empty-state"><div class="icono">📋</div><div>Todavía no hay causas registradas — aparecen acá cuando se reprograma o cancela una entrega con causa elegida en Cumplidos.</div></div>';
+    return;
+  }
+
+  const conteoRepro = {};
+  causasReprogramacion.forEach(c => { conteoRepro[c] = (conteoRepro[c] || 0) + 1; });
+  const conteoCancel = {};
+  causasCancelacion.forEach(c => { conteoCancel[c] = (conteoCancel[c] || 0) + 1; });
+
+  const causas = new Set([...Object.keys(conteoRepro), ...Object.keys(conteoCancel)]);
+  const filas = [...causas].map(causa => {
+    const repro = conteoRepro[causa] || 0;
+    const cancel = conteoCancel[causa] || 0;
+    const casos = repro + cancel;
+    return { causa, repro, cancel, casos, pct: Math.round((casos / total) * 100) };
+  }).sort((a, b) => b.casos - a.casos);
+
+  cont.innerHTML = filas.map(f => `
+    <div style="padding:9px 0;border-top:1px solid var(--gris-borde)">
+      <div style="display:flex;justify-content:space-between;gap:10px;font-size:12.5px;margin-bottom:5px">
+        <span style="font-weight:600">${f.causa}</span>
+        <span style="white-space:nowrap;color:var(--gris-medio)">${f.pct}% · ${f.casos} caso${f.casos === 1 ? '' : 's'}${f.repro ? ` · <span style="color:var(--naranja)">🔁 ${f.repro}</span>` : ''}${f.cancel ? ` · <span style="color:var(--rojo)">❌ ${f.cancel}</span>` : ''}</span>
+      </div>
+      <div style="background:#eee;border-radius:3px;height:6px;overflow:hidden">
+        <div style="width:${f.pct}%;height:100%;background:var(--azul)"></div>
+      </div>
+    </div>`).join('');
 }
