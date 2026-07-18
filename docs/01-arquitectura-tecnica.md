@@ -30,6 +30,8 @@ Tablas identificadas en el código (`js/datos-realtime.js` es el punto central q
 | `ajustes_mezcla` | `calidad-ajuste-mezcla.js` |
 | `entregas_programadas` | `logistica.js` |
 
+Además de las tablas (Postgres), hay un bucket de **Supabase Storage** para archivos binarios reales (no JSONB): `laboratorio-pdf` (privado, solo autenticados) — informes de laboratorio en PDF adjuntos a un Ensayo de Calidad (ligado al N° de cilindro), comprimidos en el navegador antes de subirse si pesan mucho (`js/compresor-pdf.js`). El registro en la tabla `ensayos_calidad` solo guarda la referencia al archivo (`pdfPath`), nunca el binario.
+
 ## Navegación (`js/navegacion.js`)
 
 Dos niveles: `activarModulo(modulo)` cambia de módulo (Cotizaciones/Producción/Logística/Calidad/Productos — los botones grandes del nav superior), `ir(pantalla)` cambia de sub-pantalla dentro del módulo activo (los botones del subnav). Todas las `.pantalla` del HTML viven en el mismo documento a la vez; solo se les agrega/quita la clase `activa` para mostrarlas.

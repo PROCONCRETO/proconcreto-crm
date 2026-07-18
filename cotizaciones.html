@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260717h">
+<link rel="stylesheet" href="css/estilos.css?v=20260717i">
 </head>
 <body>
 
@@ -1244,7 +1244,15 @@
     </div>
     <div id="resultados-ensayo-nota" style="font-size:11px;color:var(--gris-medio);margin-bottom:6px">Falla 2 o 3 probetas de la misma muestra y edad; el resultado válido es el promedio (NSR-10 C.5.6.2.4).</div>
     <div id="resultados-ensayo-cont" style="overflow-x:auto;margin-bottom:10px"></div>
-    <div class="form-grupo" style="margin-bottom:16px"><label>Observaciones</label><textarea id="m-ensayo-obs" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical"></textarea></div>
+    <div class="form-grupo" style="margin-bottom:14px"><label>Observaciones</label><textarea id="m-ensayo-obs" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical"></textarea></div>
+    <div id="ensayo-pdf-zona" style="border:2px dashed var(--gris-borde);border-radius:var(--radio);padding:14px;text-align:center;margin-bottom:16px;background:#FAFBFC;cursor:pointer;transition:border-color .15s"
+      onclick="document.getElementById('ensayo-pdf-input').click()"
+      ondragover="onArrastreSobreLaboratorio(event)" ondragleave="onArrastreFueraLaboratorio(event)" ondrop="onSoltarLaboratorio(event)">
+      <div style="font-size:13px;font-weight:600;color:var(--azul)">📄 Informe de laboratorio (PDF)</div>
+      <div style="font-size:11px;color:var(--gris-medio);margin-top:2px">Arrastra el PDF aquí o haz clic para buscarlo — si pesa mucho se comprime automáticamente antes de guardar</div>
+      <input type="file" id="ensayo-pdf-input" accept="application/pdf" style="display:none" onchange="onSeleccionLaboratorio(event)">
+      <div id="ensayo-pdf-estado" style="font-size:11.5px;margin-top:8px;min-height:16px"></div>
+    </div>
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-ensayo')">Cancelar</button>
       <button class="btn btn-primario" onclick="guardarEnsayo()">Guardar</button>
@@ -1625,28 +1633,29 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260717h"></script>
-<script src="js/catalogo.js?v=20260717h"></script>
-<script src="js/navegacion.js?v=20260717h"></script>
-<script src="js/ordenes-produccion.js?v=20260717h"></script>
-<script src="js/produccion-diaria.js?v=20260717h"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260717h"></script>
-<script src="js/calidad-mezclas.js?v=20260717h"></script>
-<script src="js/calidad-estadisticas.js?v=20260717h"></script>
-<script src="js/calidad-trazabilidad.js?v=20260717h"></script>
-<script src="js/logistica.js?v=20260717h"></script>
-<script src="js/estadisticas-logistica.js?v=20260717h"></script>
-<script src="js/auth.js?v=20260717h"></script>
-<script src="js/datos-realtime.js?v=20260717h"></script>
-<script src="js/cotizador.js?v=20260717h"></script>
-<script src="js/historico-clientes-stats.js?v=20260717h"></script>
+<script src="js/config.js?v=20260717i"></script>
+<script src="js/catalogo.js?v=20260717i"></script>
+<script src="js/navegacion.js?v=20260717i"></script>
+<script src="js/ordenes-produccion.js?v=20260717i"></script>
+<script src="js/produccion-diaria.js?v=20260717i"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260717i"></script>
+<script src="js/calidad-mezclas.js?v=20260717i"></script>
+<script src="js/calidad-estadisticas.js?v=20260717i"></script>
+<script src="js/calidad-trazabilidad.js?v=20260717i"></script>
+<script src="js/logistica.js?v=20260717i"></script>
+<script src="js/estadisticas-logistica.js?v=20260717i"></script>
+<script src="js/auth.js?v=20260717i"></script>
+<script src="js/datos-realtime.js?v=20260717i"></script>
+<script src="js/cotizador.js?v=20260717i"></script>
+<script src="js/historico-clientes-stats.js?v=20260717i"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260717h"></script>
-<script src="js/rut-parser.js?v=20260717h"></script>
+<script src="js/pdf.js?v=20260717i"></script>
+<script src="js/rut-parser.js?v=20260717i"></script>
+<script src="js/compresor-pdf.js?v=20260717i"></script>
 </body>
 </html>

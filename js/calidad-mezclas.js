@@ -324,6 +324,7 @@ function renderEnsayosCalidad() {
       <td>${USUARIOS_CRM[e.creadoPor]?.nombre || e.creadoPor || '—'}</td>
       <td>
         <div class="flex-gap">
+          ${e.pdfPath ? `<button class="btn btn-secundario btn-xs" onclick="verPdfEnsayo('${e.id}')">📄 Ver PDF</button>` : ''}
           <button class="btn btn-primario btn-xs" onclick="editarEnsayo('${e.id}')">✏️ Editar</button>
           <button class="btn btn-rojo btn-xs" onclick="eliminarEnsayo('${e.id}')">🗑️</button>
         </div>
@@ -638,6 +639,80 @@ function actualizarObjetivoDesdeDiseno() {
   if (d) document.getElementById('m-ensayo-objetivo').value = d.resistenciaDiseno;
 }
 
+// ── Informe de laboratorio (PDF) adjunto — bucket privado "laboratorio-pdf" en Supabase
+// Storage. Cada ensayo va ligado a un N° de cilindro (del Ajuste Diario), y es justamente el
+// informe de ESE cilindro el que manda el laboratorio — por eso se adjunta acá y no en Materia
+// Prima (que es sobre insumos como cemento/arena, un concepto distinto). Los PDFs pesados
+// (escaneados) se comprimen en el navegador antes de subirlos (ver js/compresor-pdf.js); la
+// subida real a Storage se hace al Guardar, no al elegir el archivo, para no dejar archivos
+// huérfanos si se cancela el modal sin guardar.
+let _pdfLaboratorioPendiente = null; // { blob, nombre, comprimido, tamanoOriginal, tamanoFinal } recién elegido, listo para subir
+let _pdfLaboratorioExistente = null; // { path, nombre } ya guardado en el ensayo que se está editando
+
+function _renderZonaPdfLaboratorio() {
+  const el = document.getElementById('ensayo-pdf-estado');
+  if (!el) return;
+  const kb = (n) => (n / 1024).toFixed(0) + ' KB';
+  if (_pdfLaboratorioPendiente) {
+    const p = _pdfLaboratorioPendiente;
+    el.innerHTML = `<span style="color:var(--verde)">✅ ${p.nombre} — ${p.comprimido ? `comprimido de ${kb(p.tamanoOriginal)} a ${kb(p.tamanoFinal)}` : kb(p.tamanoFinal)}</span> · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
+  } else if (_pdfLaboratorioExistente) {
+    el.innerHTML = `<span style="color:var(--gris-medio)">📄 ${_pdfLaboratorioExistente.nombre || 'PDF adjunto'}</span> · <a href="#" onclick="event.stopPropagation();verPdfLaboratorio();return false">ver</a> · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
+  } else {
+    el.textContent = '';
+  }
+}
+
+async function manejarArchivoLaboratorio(file) {
+  if (!file) return;
+  if (file.type !== 'application/pdf') { alert('Ese archivo no es un PDF.'); return; }
+  if (typeof pdfjsLib === 'undefined' || typeof window.jspdf === 'undefined') { alert('No se pudo cargar el procesador de PDF — revisa tu conexión.'); return; }
+
+  const el = document.getElementById('ensayo-pdf-estado');
+  if (el) el.textContent = '⏳ Procesando...';
+  try {
+    const { blob, comprimido, tamanoOriginal, tamanoFinal } = await _comprimirPdfSiPesa(file);
+    _pdfLaboratorioPendiente = { blob, nombre: file.name, comprimido, tamanoOriginal, tamanoFinal };
+    _pdfLaboratorioExistente = null; // el nuevo reemplaza al que hubiera
+    _renderZonaPdfLaboratorio();
+  } catch (err) {
+    console.error('Error procesando PDF de laboratorio:', err);
+    if (el) el.textContent = 'No se pudo procesar este PDF.';
+  }
+}
+
+function onSeleccionLaboratorio(event) {
+  const file = event.target.files[0];
+  manejarArchivoLaboratorio(file);
+  event.target.value = '';
+}
+
+function onArrastreSobreLaboratorio(event) { event.preventDefault(); event.currentTarget.style.borderColor = 'var(--azul-claro)'; }
+function onArrastreFueraLaboratorio(event) { event.currentTarget.style.borderColor = 'var(--gris-borde)'; }
+function onSoltarLaboratorio(event) {
+  event.preventDefault();
+  event.currentTarget.style.borderColor = 'var(--gris-borde)';
+  const file = event.dataTransfer.files && event.dataTransfer.files[0];
+  manejarArchivoLaboratorio(file);
+}
+
+function quitarPdfLaboratorio() {
+  _pdfLaboratorioPendiente = null;
+  _pdfLaboratorioExistente = null;
+  _renderZonaPdfLaboratorio();
+}
+
+function verPdfLaboratorio() {
+  if (!_pdfLaboratorioExistente) return;
+  _abrirPdfStorage('laboratorio-pdf', _pdfLaboratorioExistente.path);
+}
+
+function verPdfEnsayo(id) {
+  const e = ENSAYOS_CALIDAD.find(x => String(x.id) === String(id));
+  if (!e || !e.pdfPath) return;
+  _abrirPdfStorage('laboratorio-pdf', e.pdfPath);
+}
+
 function abrirModalEnsayo() {
   document.getElementById('m-ensayo-id').value = '';
   document.getElementById('modal-ensayo-titulo').textContent = '📐 Nuevo Ensayo de Calidad';
@@ -653,6 +728,9 @@ function abrirModalEnsayo() {
   document.getElementById('m-ensayo-obs').value = '';
   _resultadosEnsayoActual = [];
   renderResultadosEnsayo();
+  _pdfLaboratorioPendiente = null;
+  _pdfLaboratorioExistente = null;
+  _renderZonaPdfLaboratorio();
   document.getElementById('modal-ensayo').classList.add('abierto');
 }
 
@@ -681,10 +759,13 @@ function editarEnsayo(id) {
   document.getElementById('m-ensayo-obs').value = e.observaciones || '';
   _resultadosEnsayoActual = JSON.parse(JSON.stringify(e.resultados || [])).map(_normalizarResultado);
   renderResultadosEnsayo();
+  _pdfLaboratorioPendiente = null;
+  _pdfLaboratorioExistente = e.pdfPath ? { path: e.pdfPath, nombre: e.pdfNombre || 'informe.pdf' } : null;
+  _renderZonaPdfLaboratorio();
   document.getElementById('modal-ensayo').classList.add('abierto');
 }
 
-function guardarEnsayo() {
+async function guardarEnsayo() {
   const numero = document.getElementById('m-ensayo-numero').value.trim();
   const fecha = document.getElementById('m-ensayo-fecha').value;
   if (!numero || !fecha) { alert('Completa los campos obligatorios: N° Ensayo y Fecha.'); return; }
@@ -692,8 +773,21 @@ function guardarEnsayo() {
   const ajusteVinculado = _ajusteDesdeTextoCilindroEnsayo(cilindroTexto);
   if (cilindroTexto && !ajusteVinculado) { alert('El cilindro escrito no corresponde a ningún Ajuste Diario. Elige uno de la lista, o borra el campo si el ensayo no tiene ajuste asociado.'); return; }
   const editId = document.getElementById('m-ensayo-id').value;
+  const idFinal = editId || String(Date.now());
+
+  let pdfPath = _pdfLaboratorioExistente?.path || '';
+  let pdfNombre = _pdfLaboratorioExistente?.nombre || '';
+
+  if (_pdfLaboratorioPendiente) {
+    const ruta = `${idFinal}/${Date.now()}-${_pdfLaboratorioPendiente.nombre}`;
+    const { error } = await sb.storage.from('laboratorio-pdf').upload(ruta, _pdfLaboratorioPendiente.blob, { contentType: 'application/pdf' });
+    if (error) { alert('No se pudo subir el informe de laboratorio: ' + error.message); return; }
+    pdfPath = ruta;
+    pdfNombre = _pdfLaboratorioPendiente.nombre;
+  }
+
   const ensayo = {
-    id: editId || String(Date.now()),
+    id: idFinal,
     numero, fecha,
     laboratorio: document.getElementById('m-ensayo-laboratorio').value.trim(),
     cilindroNo: ajusteVinculado?.cilindroNo || '',
@@ -704,6 +798,7 @@ function guardarEnsayo() {
     resistenciaObjetivo: parseFloat(document.getElementById('m-ensayo-objetivo').value) || 0,
     observaciones: document.getElementById('m-ensayo-obs').value.trim(),
     laboratorioTipo: _esEnsayoInterno() ? 'interno' : 'externo',
+    pdfPath, pdfNombre,
     resultados: _resultadosEnsayoActual.map(r => {
       const probetas = (r.probetas || []).map(_normalizarProbeta)
         .filter(p => p.resistencia != null || p.diametro != null || p.longitud != null || p.carga != null);
@@ -725,6 +820,7 @@ function eliminarEnsayo(id) {
   if (!e || !confirm(`¿Eliminar el ensayo ${e.numero}?`)) return;
   ENSAYOS_CALIDAD = ENSAYOS_CALIDAD.filter(x => String(x.id) !== String(id));
   renderEnsayosCalidad();
+  if (e.pdfPath) sb.storage.from('laboratorio-pdf').remove([e.pdfPath]);
   sb.from('ensayos_calidad').delete().eq('id', e.id)
     .then(({ error }) => {
       if (error) { console.error('Error eliminando ensayo:', error.message); alert('Error al eliminar: ' + error.message); ENSAYOS_CALIDAD.push(e); renderEnsayosCalidad(); }
