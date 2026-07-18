@@ -236,8 +236,17 @@ function quitarResaltadoSoltar(event) {
 // estadisticas-logistica.js): si quedó en una fecha distinta a la original cuenta como
 // "reprogramada" en vivo, y si se arrastra de vuelta a su fecha original, el indicador se
 // corrige solo — no hay una marca fija que haya que "deshacer" a mano.
+//
+// También resetea `cumplido` a "pendiente" en cada entrega: mover la fecha de un viaje significa
+// que ese resultado (Hecha/Cancelada) ya no aplica a la fecha nueva — si se dejara como estaba,
+// una entrega ya resuelta que se arrastra a otro día quedaría "resuelta" para una fecha en la que
+// en realidad no pasó nada todavía, y no volvería a aparecer en Cumplidos para confirmarla de
+// verdad en su fecha nueva.
 function _moverViajeADia(v, fechaDestino) {
-  _entregasDeViaje(v).forEach(e => { if (!e.fechaOriginal) e.fechaOriginal = v.fecha; });
+  _entregasDeViaje(v).forEach(e => {
+    if (!e.fechaOriginal) e.fechaOriginal = v.fecha;
+    e.cumplido = { estado: 'pendiente' };
+  });
   v.fecha = fechaDestino;
   v.orden = Date.now();
   return sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' })
