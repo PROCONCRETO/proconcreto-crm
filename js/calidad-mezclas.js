@@ -779,7 +779,9 @@ async function guardarEnsayo() {
   let pdfNombre = _pdfLaboratorioExistente?.nombre || '';
 
   if (_pdfLaboratorioPendiente) {
-    const ruta = `${idFinal}/${Date.now()}-${_pdfLaboratorioPendiente.nombre}`;
+    // La ruta interna va saneada (Supabase Storage rechaza espacios/tildes con "Invalid key"),
+    // pero el nombre que se le muestra al usuario (pdfNombre) sigue siendo el original.
+    const ruta = `${idFinal}/${Date.now()}-${_sanearNombreArchivo(_pdfLaboratorioPendiente.nombre)}`;
     const { error } = await sb.storage.from('laboratorio-pdf').upload(ruta, _pdfLaboratorioPendiente.blob, { contentType: 'application/pdf' });
     if (error) { alert('No se pudo subir el informe de laboratorio: ' + error.message); return; }
     pdfPath = ruta;

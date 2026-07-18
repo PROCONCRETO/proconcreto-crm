@@ -57,6 +57,18 @@ async function _comprimirPdfSiPesa(file) {
   return { blob, comprimido: true, tamanoOriginal: file.size, tamanoFinal: blob.size };
 }
 
+// Supabase Storage (S3 por debajo) rechaza rutas con espacios, tildes u otros caracteres fuera
+// de ASCII básico ("Invalid key") — el nombre visible para el usuario (pdfNombre) no cambia,
+// esto solo sanea la parte del nombre que se usa como ruta interna del archivo.
+const _RANGO_DIACRITICOS = String.fromCharCode(0x0300) + '-' + String.fromCharCode(0x036f);
+const _RE_DIACRITICOS = new RegExp('[' + _RANGO_DIACRITICOS + ']', 'g');
+
+function _sanearNombreArchivo(nombre) {
+  return nombre
+    .normalize('NFD').replace(_RE_DIACRITICOS, '') // quita tildes/diacríticos (producción -> produccion)
+    .replace(/[^a-zA-Z0-9.\-]+/g, '_'); // todo lo demás (espacios, ñ ya descompuesta, paréntesis...) -> "_"
+}
+
 // Abre un archivo de un bucket privado de Supabase Storage en una pestaña nueva, vía URL firmada
 // (el bucket no es público — solo usuarios autenticados de la app pueden generar el link, y ese
 // link vence en una hora).
