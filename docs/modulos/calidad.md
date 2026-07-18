@@ -32,6 +32,7 @@ Cada día se ajusta la mezcla por humedad (Ajuste Diario) y a ese ajuste se le a
 - **Nombre de archivo saneado**: Supabase Storage rechaza rutas con espacios, tildes u otros caracteres fuera de ASCII básico ("Invalid key") — `_sanearNombreArchivo()` en `js/compresor-pdf.js` arma la ruta interna sin esos caracteres; el nombre que ve el usuario (`pdfNombre`) sigue siendo el original tal como se subió.
 - **Cuándo se sube de verdad**: el archivo se procesa (comprime o no) apenas se elige, pero la subida real a Storage ocurre recién al hacer clic en "Guardar" (`guardarEnsayo()`, ahora async) — así no quedan archivos huérfanos en Storage si se cancela el modal sin guardar. Al eliminar un ensayo también se borra su PDF de Storage.
 - Un botón "📄 Ver PDF" aparece en la fila de la tabla de Control de Ensayos cuando el registro tiene uno adjunto.
+- **Descarga masiva**: el botón "📦 Descargar informes" (junto a "🖨️ Imprimir Reporte") arma un .zip con los informes de TODOS los ensayos que cumplen los filtros activos (Cliente/Proyecto/Resistencia/Estado/búsqueda) — pensado para bajar de una vez, por ejemplo, todos los informes de un proyecto o de un diseño de mezcla puntual. Usa JSZip (CDN) para armar el .zip en el navegador; cada ensayo sin informe adjunto se omite en silencio (`descargarInformesZip()` en `js/calidad-mezclas.js`).
 
 ## Qué hace
 

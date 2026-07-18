@@ -333,6 +333,48 @@ function renderEnsayosCalidad() {
   }).join('');
 }
 
+// Descarga en un solo .zip los informes de laboratorio (PDF) de todos los ensayos que cumplen
+// los filtros activos de Control de Ensayos — para no tener que abrir/descargar uno por uno
+// cuando se necesitan, por ejemplo, todos los de un proyecto o un diseño de mezcla.
+async function descargarInformesZip() {
+  const data = _ensayosFiltrados().filter(e => e.pdfPath);
+  if (!data.length) { alert('No hay informes de laboratorio adjuntos entre los ensayos que coinciden con los filtros seleccionados.'); return; }
+
+  const btn = document.getElementById('btn-descargar-informes');
+  if (btn) { btn.disabled = true; btn.textContent = `⏳ Descargando (0/${data.length})...`; }
+
+  try {
+    const zip = new JSZip();
+    let ok = 0;
+    for (let i = 0; i < data.length; i++) {
+      const e = data[i];
+      const { data: blob, error } = await sb.storage.from('laboratorio-pdf').download(e.pdfPath);
+      if (error) { console.error(`Error descargando informe de ${e.numero}:`, error.message); continue; }
+      const nombreZip = `${e.numero || 'ensayo'}-cilindro-${e.cilindroNo || 's-n'}-${_sanearNombreArchivo(e.pdfNombre || 'informe.pdf')}`;
+      zip.file(nombreZip, blob);
+      ok++;
+      if (btn) btn.textContent = `⏳ Descargando (${i + 1}/${data.length})...`;
+    }
+    if (!ok) { alert('No se pudo descargar ningún informe — revisa la conexión e intenta de nuevo.'); return; }
+
+    const contenidoZip = await zip.generateAsync({ type: 'blob' });
+    const fCliente = document.getElementById('ensayos-filtro-cliente')?.value || '';
+    const fProyecto = document.getElementById('ensayos-filtro-proyecto')?.value || '';
+    const fResistencia = document.getElementById('ensayos-filtro-resistencia')?.value || '';
+    const sufijo = [fCliente, fProyecto, fResistencia].filter(Boolean).map(_sanearNombreArchivo).join('-');
+    const nombreArchivo = `Informes-Laboratorio${sufijo ? '-' + sufijo : ''}-${_fmtISO(new Date())}.zip`;
+
+    const url = URL.createObjectURL(contenidoZip);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombreArchivo;
+    a.click();
+    URL.revokeObjectURL(url);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📦 Descargar informes'; }
+  }
+}
+
 // Genera un reporte imprimible (mismo membrete de las cotizaciones/certificados) con los
 // ensayos que cumplen los filtros activos de Control de Ensayos, para entregar al cliente.
 function verReporteEnsayosPDF() {
