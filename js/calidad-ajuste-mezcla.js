@@ -132,16 +132,73 @@ function calcularHumedadAgregado(pesoRecipiente, pesoHumedo, pesoSeco) {
   return ((pesoHumedo - pesoSeco) / denom) * 100;
 }
 
+// Clientes y proyectos de un ajuste (cliente/proyecto principal + adicionales) — mismo patrón
+// que _clientesProyectosEnsayo() en calidad-mezclas.js, para los filtros del histórico.
+function _clientesProyectosAjuste(a) {
+  const clientes = new Set(), proyectos = new Set();
+  const principal = a.cliente || a.clienteElemento || '';
+  if (principal) clientes.add(principal);
+  if (a.proyecto) proyectos.add(a.proyecto);
+  (a.clientesAdicionales || []).forEach(c => { if (c.cliente) clientes.add(c.cliente); if (c.proyecto) proyectos.add(c.proyecto); });
+  return { clientes: [...clientes], proyectos: [...proyectos] };
+}
+
+// Puebla los desplegables de Cliente/Proyecto/Resistencia con los valores que de verdad
+// aparecen en el histórico — mismo patrón que poblarFiltrosEnsayosLista() en calidad-mezclas.js.
+function poblarFiltrosAjustesLista() {
+  const selCliente = document.getElementById('ajustes-filtro-cliente');
+  const selProyecto = document.getElementById('ajustes-filtro-proyecto');
+  const selResistencia = document.getElementById('ajustes-filtro-resistencia');
+  if (!selCliente || !selProyecto || !selResistencia) return;
+
+  const clientes = new Set(), proyectos = new Set();
+  AJUSTES_MEZCLA.forEach(a => {
+    const ctx = _clientesProyectosAjuste(a);
+    ctx.clientes.forEach(c => clientes.add(c));
+    ctx.proyectos.forEach(p => proyectos.add(p));
+  });
+  const prevCliente = selCliente.value, prevProyecto = selProyecto.value;
+  selCliente.innerHTML = '<option value="">Todos los clientes</option>' +
+    [...clientes].sort().map(c => `<option value="${c}">${c}</option>`).join('');
+  selProyecto.innerHTML = '<option value="">Todos los proyectos</option>' +
+    [...proyectos].sort().map(p => `<option value="${p}">${p}</option>`).join('');
+  if (prevCliente) selCliente.value = prevCliente;
+  if (prevProyecto) selProyecto.value = prevProyecto;
+
+  const disenosConAjuste = [...new Set(AJUSTES_MEZCLA.map(a => a.disenoCodigo).filter(Boolean))]
+    .map(c => DISENOS_MEZCLA.find(d => d.codigo === c) || { codigo: c, nombre: '' })
+    .sort((a, b) => a.codigo.localeCompare(b.codigo));
+  const prevResistencia = selResistencia.value;
+  selResistencia.innerHTML = '<option value="">Todas las resistencias</option>' +
+    disenosConAjuste.map(d => `<option value="${d.codigo}">${d.codigo}${d.nombre ? ' — ' + d.nombre : ''}</option>`).join('');
+  if (prevResistencia) selResistencia.value = prevResistencia;
+}
+
+// Aplica los filtros de la pantalla de Ajuste Diario (búsqueda, cliente, proyecto, resistencia)
+// — mismo patrón que _ensayosFiltrados() en calidad-mezclas.js.
+function _ajustesFiltrados() {
+  const q = (document.getElementById('buscar-ajuste')?.value || '').toLowerCase();
+  const fCliente = document.getElementById('ajustes-filtro-cliente')?.value || '';
+  const fProyecto = document.getElementById('ajustes-filtro-proyecto')?.value || '';
+  const fResistencia = document.getElementById('ajustes-filtro-resistencia')?.value || '';
+  let data = [...AJUSTES_MEZCLA];
+  if (q) data = data.filter(a => (String(a.cilindroNo) + ' ' + (a.cliente || a.clienteElemento || '') + ' ' + (a.proyecto || '') + ' ' + (a.disenoCodigo || '')).toLowerCase().includes(q));
+  if (fCliente) data = data.filter(a => _clientesProyectosAjuste(a).clientes.includes(fCliente));
+  if (fProyecto) data = data.filter(a => _clientesProyectosAjuste(a).proyectos.includes(fProyecto));
+  if (fResistencia) data = data.filter(a => a.disenoCodigo === fResistencia);
+  data.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (Number(b.cilindroNo) || 0) - (Number(a.cilindroNo) || 0));
+  return data;
+}
+
 function renderAjustesMezcla() {
   const tbody = document.getElementById('ajustes-body');
   if (!tbody) return;
-  const q = (document.getElementById('buscar-ajuste')?.value || '').toLowerCase();
-  let data = [...AJUSTES_MEZCLA];
-  if (q) data = data.filter(a => (String(a.cilindroNo) + ' ' + (a.cliente || a.clienteElemento || '') + ' ' + (a.proyecto || '') + ' ' + (a.disenoCodigo || '')).toLowerCase().includes(q));
-  data.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (Number(b.cilindroNo) || 0) - (Number(a.cilindroNo) || 0));
+  poblarFiltrosAjustesLista();
+  const data = _ajustesFiltrados();
 
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">🌡️</div><div>No hay ajustes diarios registrados.</div></td></tr>`;
+    const hayFiltros = document.getElementById('buscar-ajuste')?.value || document.getElementById('ajustes-filtro-cliente')?.value || document.getElementById('ajustes-filtro-proyecto')?.value || document.getElementById('ajustes-filtro-resistencia')?.value;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">🌡️</div><div>${hayFiltros ? 'No hay ajustes que coincidan con los filtros seleccionados.' : 'No hay ajustes diarios registrados.'}</div></td></tr>`;
     return;
   }
   tbody.innerHTML = data.map(a => {
