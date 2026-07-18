@@ -688,14 +688,17 @@ function actualizarObjetivoDesdeDiseno() {
 // (escaneados) se comprimen en el navegador antes de subirlos (ver js/compresor-pdf.js); la
 // subida real a Storage se hace al Guardar, no al elegir el archivo, para no dejar archivos
 // huérfanos si se cancela el modal sin guardar.
-let _pdfLaboratorioPendiente = null; // { blob, nombre, comprimido, tamanoOriginal, tamanoFinal } recién elegido, listo para subir
-let _pdfLaboratorioExistente = null; // { path, nombre } ya guardado en el ensayo que se está editando
+let _pdfLaboratorioPendiente = null; // { blob?, nombre, hash, comprimido?, tamanoOriginal?, tamanoFinal?, reusado, pathReusado?, nombreReusado?, ensayoOrigen? }
+let _pdfLaboratorioExistente = null; // { path, nombre, hash } ya guardado en el ensayo que se está editando
 
 function _renderZonaPdfLaboratorio() {
   const el = document.getElementById('ensayo-pdf-estado');
   if (!el) return;
   const kb = (n) => (n / 1024).toFixed(0) + ' KB';
-  if (_pdfLaboratorioPendiente) {
+  if (_pdfLaboratorioPendiente?.reusado) {
+    const p = _pdfLaboratorioPendiente;
+    el.innerHTML = `<span style="color:var(--azul)">🔗 ${p.nombre} — mismo informe que el ensayo ${p.ensayoOrigen || 'ya subido'}, no se duplica</span> · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
+  } else if (_pdfLaboratorioPendiente) {
     const p = _pdfLaboratorioPendiente;
     el.innerHTML = `<span style="color:var(--verde)">✅ ${p.nombre} — ${p.comprimido ? `comprimido de ${kb(p.tamanoOriginal)} a ${kb(p.tamanoFinal)}` : kb(p.tamanoFinal)}</span> · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
   } else if (_pdfLaboratorioExistente) {
@@ -705,6 +708,9 @@ function _renderZonaPdfLaboratorio() {
   }
 }
 
+// Un mismo informe de laboratorio a veces cubre varios cilindros a la vez (un solo PDF, varias
+// muestras) — si el archivo elegido ya se subió antes desde otro ensayo (mismo hash), se
+// reutiliza esa misma copia en Storage en vez de comprimir y subir un duplicado.
 async function manejarArchivoLaboratorio(file) {
   if (!file) return;
   if (file.type !== 'application/pdf') { alert('Ese archivo no es un PDF.'); return; }
@@ -713,8 +719,16 @@ async function manejarArchivoLaboratorio(file) {
   const el = document.getElementById('ensayo-pdf-estado');
   if (el) el.textContent = '⏳ Procesando...';
   try {
+    const hash = await _hashArchivo(file);
+    const yaSubido = ENSAYOS_CALIDAD.find(x => x.pdfHash && x.pdfHash === hash && x.pdfPath);
+    if (yaSubido) {
+      _pdfLaboratorioPendiente = { hash, nombre: file.name, reusado: true, pathReusado: yaSubido.pdfPath, nombreReusado: yaSubido.pdfNombre, ensayoOrigen: yaSubido.numero };
+      _pdfLaboratorioExistente = null;
+      _renderZonaPdfLaboratorio();
+      return;
+    }
     const { blob, comprimido, tamanoOriginal, tamanoFinal } = await _comprimirPdfSiPesa(file);
-    _pdfLaboratorioPendiente = { blob, nombre: file.name, comprimido, tamanoOriginal, tamanoFinal };
+    _pdfLaboratorioPendiente = { blob, nombre: file.name, hash, comprimido, tamanoOriginal, tamanoFinal, reusado: false };
     _pdfLaboratorioExistente = null; // el nuevo reemplaza al que hubiera
     _renderZonaPdfLaboratorio();
   } catch (err) {
@@ -802,7 +816,7 @@ function editarEnsayo(id) {
   _resultadosEnsayoActual = JSON.parse(JSON.stringify(e.resultados || [])).map(_normalizarResultado);
   renderResultadosEnsayo();
   _pdfLaboratorioPendiente = null;
-  _pdfLaboratorioExistente = e.pdfPath ? { path: e.pdfPath, nombre: e.pdfNombre || 'informe.pdf' } : null;
+  _pdfLaboratorioExistente = e.pdfPath ? { path: e.pdfPath, nombre: e.pdfNombre || 'informe.pdf', hash: e.pdfHash || '' } : null;
   _renderZonaPdfLaboratorio();
   document.getElementById('modal-ensayo').classList.add('abierto');
 }
@@ -819,15 +833,25 @@ async function guardarEnsayo() {
 
   let pdfPath = _pdfLaboratorioExistente?.path || '';
   let pdfNombre = _pdfLaboratorioExistente?.nombre || '';
+  let pdfHash = _pdfLaboratorioExistente?.hash || '';
 
   if (_pdfLaboratorioPendiente) {
-    // La ruta interna va saneada (Supabase Storage rechaza espacios/tildes con "Invalid key"),
-    // pero el nombre que se le muestra al usuario (pdfNombre) sigue siendo el original.
-    const ruta = `${idFinal}/${Date.now()}-${_sanearNombreArchivo(_pdfLaboratorioPendiente.nombre)}`;
-    const { error } = await sb.storage.from('laboratorio-pdf').upload(ruta, _pdfLaboratorioPendiente.blob, { contentType: 'application/pdf' });
-    if (error) { alert('No se pudo subir el informe de laboratorio: ' + error.message); return; }
-    pdfPath = ruta;
-    pdfNombre = _pdfLaboratorioPendiente.nombre;
+    if (_pdfLaboratorioPendiente.reusado) {
+      // Mismo informe que otro ensayo (un lote de laboratorio a veces cubre varios cilindros) —
+      // se reutiliza la misma copia en Storage, no se sube un duplicado.
+      pdfPath = _pdfLaboratorioPendiente.pathReusado;
+      pdfNombre = _pdfLaboratorioPendiente.nombreReusado;
+      pdfHash = _pdfLaboratorioPendiente.hash;
+    } else {
+      // La ruta interna va saneada (Supabase Storage rechaza espacios/tildes con "Invalid key"),
+      // pero el nombre que se le muestra al usuario (pdfNombre) sigue siendo el original.
+      const ruta = `${idFinal}/${Date.now()}-${_sanearNombreArchivo(_pdfLaboratorioPendiente.nombre)}`;
+      const { error } = await sb.storage.from('laboratorio-pdf').upload(ruta, _pdfLaboratorioPendiente.blob, { contentType: 'application/pdf' });
+      if (error) { alert('No se pudo subir el informe de laboratorio: ' + error.message); return; }
+      pdfPath = ruta;
+      pdfNombre = _pdfLaboratorioPendiente.nombre;
+      pdfHash = _pdfLaboratorioPendiente.hash;
+    }
   }
 
   const ensayo = {
@@ -842,7 +866,7 @@ async function guardarEnsayo() {
     resistenciaObjetivo: parseFloat(document.getElementById('m-ensayo-objetivo').value) || 0,
     observaciones: document.getElementById('m-ensayo-obs').value.trim(),
     laboratorioTipo: _esEnsayoInterno() ? 'interno' : 'externo',
-    pdfPath, pdfNombre,
+    pdfPath, pdfNombre, pdfHash,
     resultados: _resultadosEnsayoActual.map(r => {
       const probetas = (r.probetas || []).map(_normalizarProbeta)
         .filter(p => p.resistencia != null || p.diametro != null || p.longitud != null || p.carga != null);
@@ -864,7 +888,9 @@ function eliminarEnsayo(id) {
   if (!e || !confirm(`¿Eliminar el ensayo ${e.numero}?`)) return;
   ENSAYOS_CALIDAD = ENSAYOS_CALIDAD.filter(x => String(x.id) !== String(id));
   renderEnsayosCalidad();
-  if (e.pdfPath) sb.storage.from('laboratorio-pdf').remove([e.pdfPath]);
+  // Si el informe está compartido con otro ensayo (mismo PDF, varios cilindros de un mismo
+  // lote), no se borra de Storage — solo cuando este era el último que lo usaba.
+  if (e.pdfPath && !ENSAYOS_CALIDAD.some(x => x.pdfPath === e.pdfPath)) sb.storage.from('laboratorio-pdf').remove([e.pdfPath]);
   sb.from('ensayos_calidad').delete().eq('id', e.id)
     .then(({ error }) => {
       if (error) { console.error('Error eliminando ensayo:', error.message); alert('Error al eliminar: ' + error.message); ENSAYOS_CALIDAD.push(e); renderEnsayosCalidad(); }

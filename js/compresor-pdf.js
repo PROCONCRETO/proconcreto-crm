@@ -69,6 +69,17 @@ function _sanearNombreArchivo(nombre) {
     .replace(/[^a-zA-Z0-9.\-]+/g, '_'); // todo lo demás (espacios, ñ ya descompuesta, paréntesis...) -> "_"
 }
 
+// Huella (SHA-256) del PDF ORIGINAL tal como se subió (antes de comprimir) — sirve para detectar
+// que un mismo informe (un lote de laboratorio a veces cubre varios cilindros a la vez) ya se
+// subió antes desde otro ensayo, y así reutilizar el mismo archivo en Storage en vez de subir una
+// copia duplicada. Se hashea el original, no el comprimido, porque la compresión no está
+// garantizada byte-a-byte determinística entre corridas.
+async function _hashArchivo(file) {
+  const buffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  return [...new Uint8Array(hashBuffer)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 // Abre un archivo de un bucket privado de Supabase Storage en una pestaña nueva, vía URL firmada
 // (el bucket no es público — solo usuarios autenticados de la app pueden generar el link, y ese
 // link vence en una hora).
