@@ -9,6 +9,7 @@ El más grande de la aplicación — control técnico de las mezclas de concreto
 - `js/calidad-estadisticas.js` (462 líneas) — análisis estadístico
 - `js/calidad-trazabilidad.js` (433 líneas) — materia prima, trazabilidad y no conformidades
 - `js/compresor-pdf.js` — comprime PDFs pesados (informes de laboratorio) en el navegador antes de subirlos
+- `js/lector-informes.js` — lee el informe de laboratorio (PDF) en el navegador para autocompletar el modal de Ensayo
 
 ## Datos
 
@@ -34,6 +35,7 @@ Cada día se ajusta la mezcla por humedad (Ajuste Diario) y a ese ajuste se le a
 - **Cuándo se sube de verdad**: el archivo se procesa (comprime o no) apenas se elige, pero la subida real a Storage ocurre recién al hacer clic en "Guardar" (`guardarEnsayo()`, ahora async) — así no quedan archivos huérfanos en Storage si se cancela el modal sin guardar. Al eliminar un ensayo también se borra su PDF de Storage.
 - Un botón "📄 Ver PDF" aparece en la fila de la tabla de Control de Ensayos cuando el registro tiene uno adjunto.
 - **Descarga masiva**: el botón "📦 Descargar informes" (junto a "🖨️ Imprimir Reporte") arma un .zip con los informes de TODOS los ensayos que cumplen los filtros activos (Cliente/Proyecto/Resistencia/Estado/búsqueda) — pensado para bajar de una vez, por ejemplo, todos los informes de un proyecto o de un diseño de mezcla puntual. Usa JSZip (CDN) para armar el .zip en el navegador; cada ensayo sin informe adjunto se omite en silencio (`descargarInformesZip()` en `js/calidad-mezclas.js`).
+- **Lectura automática del informe** (`js/lector-informes.js`, mismo principio que el lector de RUT — todo en el navegador, nunca se sube el PDF crudo a ningún lado más que a Storage): requiere elegir el **N° de Cilindro primero** — a propósito, así el lector no tiene que adivinar a cuál de las muestras del PDF corresponde este ensayo (un informe puede cubrir varios cilindros a la vez). Al soltar el archivo, busca dentro del PDF la fila de ESE cilindro puntual y autocompleta: Laboratorio (por la marca del membrete/pie — hoy reconoce ASPRECON y CONSUAS), Fecha de ensayo y las resistencias por probeta (agrega un resultado nuevo a "Resultados por edad"), y Observaciones (códigos de probeta tipo "T2-21, T2-22..."). Si el informe cubre otro cilindro también, se repite el proceso en un ensayo nuevo con el mismo PDF — no se duplica en Storage (ver deduplicación arriba). Es un lector de mejor esfuerzo: si no reconoce el laboratorio o no encuentra resistencias para ese cilindro, lo dice explícitamente en la zona de subida en vez de fallar en silencio, y nunca guarda nada solo — siempre queda en el formulario para revisar antes de Guardar.
 
 ## Qué hace
 

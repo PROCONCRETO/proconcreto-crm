@@ -690,17 +690,22 @@ function actualizarObjetivoDesdeDiseno() {
 // huérfanos si se cancela el modal sin guardar.
 let _pdfLaboratorioPendiente = null; // { blob?, nombre, hash, comprimido?, tamanoOriginal?, tamanoFinal?, reusado, pathReusado?, nombreReusado?, ensayoOrigen? }
 let _pdfLaboratorioExistente = null; // { path, nombre, hash } ya guardado en el ensayo que se está editando
+let _ultimaLecturaInforme = null; // { laboratorio, fechaEnsayo, probetas, observaciones } — resumen de la última lectura automática, solo para mostrar
 
 function _renderZonaPdfLaboratorio() {
   const el = document.getElementById('ensayo-pdf-estado');
   if (!el) return;
   const kb = (n) => (n / 1024).toFixed(0) + ' KB';
+  const l = _ultimaLecturaInforme;
+  const resumenLectura = l
+    ? ` · 📋 ${l.laboratorio || 'laboratorio no identificado'}${l.fechaEnsayo ? `, ensayo ${l.fechaEnsayo}` : ''}${l.probetas.length ? `, ${l.probetas.join('/')} MPa` : ', sin resistencias reconocidas — revisa a mano'}`
+    : (!_ajusteDesdeTextoCilindroEnsayo(document.getElementById('m-ensayo-cilindro')?.value.trim() || '') ? ' · 💡 elige primero el N° de Cilindro para autocompletar los datos del informe' : '');
   if (_pdfLaboratorioPendiente?.reusado) {
     const p = _pdfLaboratorioPendiente;
-    el.innerHTML = `<span style="color:var(--azul)">🔗 ${p.nombre} — mismo informe que el ensayo ${p.ensayoOrigen || 'ya subido'}, no se duplica</span> · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
+    el.innerHTML = `<span style="color:var(--azul)">🔗 ${p.nombre} — mismo informe que el ensayo ${p.ensayoOrigen || 'ya subido'}, no se duplica</span>${resumenLectura} · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
   } else if (_pdfLaboratorioPendiente) {
     const p = _pdfLaboratorioPendiente;
-    el.innerHTML = `<span style="color:var(--verde)">✅ ${p.nombre} — ${p.comprimido ? `comprimido de ${kb(p.tamanoOriginal)} a ${kb(p.tamanoFinal)}` : kb(p.tamanoFinal)}</span> · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
+    el.innerHTML = `<span style="color:var(--verde)">✅ ${p.nombre} — ${p.comprimido ? `comprimido de ${kb(p.tamanoOriginal)} a ${kb(p.tamanoFinal)}` : kb(p.tamanoFinal)}</span>${resumenLectura} · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
   } else if (_pdfLaboratorioExistente) {
     el.innerHTML = `<span style="color:var(--gris-medio)">📄 ${_pdfLaboratorioExistente.nombre || 'PDF adjunto'}</span> · <a href="#" onclick="event.stopPropagation();verPdfLaboratorio();return false">ver</a> · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
   } else {
@@ -708,9 +713,34 @@ function _renderZonaPdfLaboratorio() {
   }
 }
 
+// Traslada lo leído del informe al formulario — SIEMPRE queda mostrado para revisar antes de
+// Guardar, nunca se guarda solo. La resistencia objetivo/diseño/cliente/proyecto/fecha fundida
+// NO se tocan acá: esas ya se autocompletan solas desde el Ajuste Diario vinculado al elegir el
+// N° de Cilindro, antes de llegar a este paso.
+function _aplicarLecturaInforme(lectura) {
+  if (!lectura) return;
+  if (lectura.laboratorio) document.getElementById('m-ensayo-laboratorio').value = lectura.laboratorio;
+  const obsEl = document.getElementById('m-ensayo-obs');
+  if (lectura.observaciones && obsEl && !obsEl.value.trim()) obsEl.value = lectura.observaciones;
+  if (lectura.fechaEnsayo && lectura.probetas.length) {
+    _resultadosEnsayoActual.push({
+      fecha: lectura.fechaEnsayo,
+      probetas: [0, 1, 2].map(i => ({ resistencia: lectura.probetas[i] ?? null, diametro: null, longitud: null, carga: null })),
+      resistencia: 0,
+    });
+    renderResultadosEnsayo();
+  }
+}
+
 // Un mismo informe de laboratorio a veces cubre varios cilindros a la vez (un solo PDF, varias
 // muestras) — si el archivo elegido ya se subió antes desde otro ensayo (mismo hash), se
 // reutiliza esa misma copia en Storage en vez de comprimir y subir un duplicado.
+//
+// Además, si ya hay un N° de Cilindro elegido en el formulario, se intenta LEER el informe y
+// autocompletar Laboratorio/Fecha de ensayo/Probetas/Observaciones puntualmente para ESE
+// cilindro (el usuario elige el cilindro primero a propósito, para que el lector no tenga que
+// adivinar cuál de las muestras del PDF le corresponde — ver js/lector-informes.js). Si el PDF
+// cubre otro cilindro también, se repite el proceso en un ensayo nuevo con el mismo archivo.
 async function manejarArchivoLaboratorio(file) {
   if (!file) return;
   if (file.type !== 'application/pdf') { alert('Ese archivo no es un PDF.'); return; }
@@ -718,7 +748,18 @@ async function manejarArchivoLaboratorio(file) {
 
   const el = document.getElementById('ensayo-pdf-estado');
   if (el) el.textContent = '⏳ Procesando...';
+  _ultimaLecturaInforme = null;
   try {
+    const ajusteActual = _ajusteDesdeTextoCilindroEnsayo(document.getElementById('m-ensayo-cilindro').value.trim());
+    if (ajusteActual) {
+      try {
+        _ultimaLecturaInforme = await leerInformeLaboratorio(file, ajusteActual.cilindroNo);
+        _aplicarLecturaInforme(_ultimaLecturaInforme);
+      } catch (err) {
+        console.error('Error leyendo el informe de laboratorio:', err);
+      }
+    }
+
     const hash = await _hashArchivo(file);
     const yaSubido = ENSAYOS_CALIDAD.find(x => x.pdfHash && x.pdfHash === hash && x.pdfPath);
     if (yaSubido) {
@@ -755,6 +796,7 @@ function onSoltarLaboratorio(event) {
 function quitarPdfLaboratorio() {
   _pdfLaboratorioPendiente = null;
   _pdfLaboratorioExistente = null;
+  _ultimaLecturaInforme = null;
   _renderZonaPdfLaboratorio();
 }
 
@@ -786,6 +828,7 @@ function abrirModalEnsayo() {
   renderResultadosEnsayo();
   _pdfLaboratorioPendiente = null;
   _pdfLaboratorioExistente = null;
+  _ultimaLecturaInforme = null;
   _renderZonaPdfLaboratorio();
   document.getElementById('modal-ensayo').classList.add('abierto');
 }
@@ -817,6 +860,7 @@ function editarEnsayo(id) {
   renderResultadosEnsayo();
   _pdfLaboratorioPendiente = null;
   _pdfLaboratorioExistente = e.pdfPath ? { path: e.pdfPath, nombre: e.pdfNombre || 'informe.pdf', hash: e.pdfHash || '' } : null;
+  _ultimaLecturaInforme = null;
   _renderZonaPdfLaboratorio();
   document.getElementById('modal-ensayo').classList.add('abierto');
 }
