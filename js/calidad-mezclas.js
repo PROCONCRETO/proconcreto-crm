@@ -769,6 +769,7 @@ async function manejarArchivoLaboratorio(file) {
       let lineas = null;
       try {
         lineas = await _leerLineasPDF(file);
+        window._debugLineasInforme = lineas; // para inspeccionar en consola cómo quedó reconstruido el PDF
       } catch (err) {
         console.error('Error leyendo el PDF del informe:', err);
       }
