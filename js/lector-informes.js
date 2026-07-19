@@ -58,13 +58,22 @@ function _lineasCilindro(lineas, cilindroNo) {
   return lineas.filter(l => re.test(l));
 }
 
-// Heurística compartida entre laboratorios: en estos formatos la resistencia en MPa de cada
-// probeta viene como el TERCERO de un grupo de 4 números seguidos (con coma decimal en los dos
-// del medio) al final de la fila — ej. ASPRECON "7506 527,7 51,7 166,8" (psi/kg-cm²/MPa/%) o
-// CONSUAS "428,7 545,3 53,5 7790" (kN/kg-cm²/MPa/psi). El primero y el último pueden traer o no
-// decimales según el laboratorio, por eso quedan flexibles.
+// La resistencia en MPa de cada probeta viene como el TERCERO de un grupo de 4 números seguidos
+// (con coma decimal en los dos del medio) al final de la fila — ej. ASPRECON
+// "7506 527,7 51,7 166,8" (psi/kg-cm²/MPa/%). El primero puede traer o no decimales; el cuarto
+// (%) sí trae decimal siempre en este formato.
 function _extraerResistenciasMPa(texto) {
   const grupos = [...texto.matchAll(/(\d{2,6}[.,]?\d*)\s+(\d{2,4}[.,]\d)\s+(\d{1,3}[.,]\d)\s+(\d{2,6}[.,]?\d*)/g)];
+  return grupos.map(g => parseFloat(g[3].replace(',', '.')));
+}
+
+// CONSUAS trae más columnas antes de la resistencia (Área, Altura, Carga, Kg/cm², MPa, P.S.I.) —
+// "Área Altura Carga Kg/cm²" tiene la misma forma de 4-números-con-coma que el grupo real
+// "Carga Kg/cm² MPa P.S.I.", así que la heurística genérica de arriba agarra el grupo
+// equivocado (confirmado a mano contra un informe real: leía la Carga en vez del MPa). Acá el
+// 4° número (P.S.I.) es SIEMPRE un entero sin coma — eso sí distingue el grupo correcto.
+function _extraerResistenciaConsuas(texto) {
+  const grupos = [...texto.matchAll(/(\d{1,4}[.,]\d)\s+(\d{2,4}[.,]\d)\s+(\d{1,3}[.,]\d)\s+(\d{3,6})(?![.,]\d)/g)];
   return grupos.map(g => parseFloat(g[3].replace(',', '.')));
 }
 
@@ -95,7 +104,7 @@ function _extractorConsuas(lineas, cilindroNo) {
   const fechas = filas.length ? [...filas[0].matchAll(/\d{2}\/\d{2}\/\d{4}/g)] : [];
   return {
     fechaEnsayo: fechas.length >= 2 ? _parsearFechaDDMMAAAA(fechas[1][0]) : '',
-    probetas: filas.map(l => _extraerResistenciasMPa(l)[0]).filter(v => v != null),
+    probetas: filas.map(l => _extraerResistenciaConsuas(l)[0]).filter(v => v != null),
     observaciones: '',
   };
 }
