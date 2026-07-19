@@ -745,6 +745,14 @@ function _aplicarLecturaInforme(lectura) {
 // Si el cilindro elegido NO aparece en el PDF, se bloquea la subida por completo (no se
 // comprime ni se sube a Storage) — evita adjuntar por error el informe de un cilindro distinto
 // al que se está registrando.
+// Resalta la zona de subida en rojo suave cuando el cilindro no aparece en el informe soltado —
+// para que la alerta de texto no pase desapercibida. Se limpia solo al procesar cualquier
+// archivo nuevo o al abrir/cerrar el modal (ver abrirModalEnsayo/editarEnsayo/quitarPdfLaboratorio).
+function _marcarZonaPdfError(esError) {
+  const zona = document.getElementById('ensayo-pdf-zona');
+  if (zona) zona.style.background = esError ? '#FFEBEE' : '#FAFBFC';
+}
+
 async function manejarArchivoLaboratorio(file) {
   if (!file) return;
   if (file.type !== 'application/pdf') { alert('Ese archivo no es un PDF.'); return; }
@@ -754,6 +762,7 @@ async function manejarArchivoLaboratorio(file) {
   if (el) el.textContent = '⏳ Procesando...';
   _ultimaLecturaInforme = null;
   _pdfLaboratorioPendiente = null;
+  _marcarZonaPdfError(false);
   try {
     const ajusteActual = _ajusteDesdeTextoCilindroEnsayo(document.getElementById('m-ensayo-cilindro').value.trim());
     if (ajusteActual) {
@@ -768,6 +777,7 @@ async function manejarArchivoLaboratorio(file) {
           // Se bloquea sin tocar _pdfLaboratorioExistente: si el ensayo ya tenía un informe
           // adjunto de antes, ese no se pierde por un intento fallido de reemplazarlo.
           if (el) el.textContent = `⚠️ No encontramos el cilindro ${ajusteActual.cilindroNo} en este informe — no se puede adjuntar este archivo a este ensayo.`;
+          _marcarZonaPdfError(true);
           return;
         }
         _ultimaLecturaInforme = _extraerDatosInformeCilindro(lineas, ajusteActual.cilindroNo);
@@ -812,6 +822,7 @@ function quitarPdfLaboratorio() {
   _pdfLaboratorioPendiente = null;
   _pdfLaboratorioExistente = null;
   _ultimaLecturaInforme = null;
+  _marcarZonaPdfError(false);
   _renderZonaPdfLaboratorio();
 }
 
@@ -844,6 +855,7 @@ function abrirModalEnsayo() {
   _pdfLaboratorioPendiente = null;
   _pdfLaboratorioExistente = null;
   _ultimaLecturaInforme = null;
+  _marcarZonaPdfError(false);
   _renderZonaPdfLaboratorio();
   document.getElementById('modal-ensayo').classList.add('abierto');
 }
@@ -876,6 +888,7 @@ function editarEnsayo(id) {
   _pdfLaboratorioPendiente = null;
   _pdfLaboratorioExistente = e.pdfPath ? { path: e.pdfPath, nombre: e.pdfNombre || 'informe.pdf', hash: e.pdfHash || '' } : null;
   _ultimaLecturaInforme = null;
+  _marcarZonaPdfError(false);
   _renderZonaPdfLaboratorio();
   document.getElementById('modal-ensayo').classList.add('abierto');
 }
