@@ -33,10 +33,10 @@ function _parsearFechaTextoEs(texto) {
   return `${m[3]}-${String(mes).padStart(2, '0')}-${m[1].padStart(2, '0')}`;
 }
 
-// "11/07/2026" -> "2026-07-11"
+// "11/07/2026" o "1/6/2026" (algunos informes no traen cero adelante) -> "2026-07-11" / "2026-06-01"
 function _parsearFechaDDMMAAAA(texto) {
-  const m = texto.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+  const m = texto.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : '';
 }
 
 function _detectarLaboratorioInforme(lineas) {
@@ -101,7 +101,8 @@ function _extractorAsprecon(lineas, cilindroNo) {
 // probeta reconocibles en este formato, así que Observaciones queda vacío. ──
 function _extractorConsuas(lineas, cilindroNo) {
   const filas = _lineasCilindro(lineas, cilindroNo);
-  const fechas = filas.length ? [...filas[0].matchAll(/\d{2}\/\d{2}\/\d{4}/g)] : [];
+  // Algunos informes de CONSUAS traen las fechas sin cero adelante (ej. "1/6/2026").
+  const fechas = filas.length ? [...filas[0].matchAll(/\d{1,2}\/\d{1,2}\/\d{4}/g)] : [];
   return {
     fechaEnsayo: fechas.length >= 2 ? _parsearFechaDDMMAAAA(fechas[1][0]) : '',
     probetas: filas.map(l => _extraerResistenciaConsuas(l)[0]).filter(v => v != null),
