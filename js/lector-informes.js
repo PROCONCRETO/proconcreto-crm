@@ -79,18 +79,30 @@ function _extraerResistenciaConsuas(texto) {
 
 // ── ASPRECON: la fecha de ensayo va en texto ("FECHA DE REALIZACIÓN DE ENSAYO: 15 DE JULIO DE
 // 2026", una sola vez para todo el informe) y las 3 probetas de una muestra quedan en filas
-// seguidas después de la fila con el N° de cilindro — se toma una ventana de líneas desde ahí. ──
+// seguidas después de la fila con el N° de cilindro. La fila de la PRIMERA probeta trae además,
+// pegado al final de la misma línea, el grupo de "resistencia promedio" (misma forma de 4
+// números que una probeta) — si se juntan todas las líneas en un solo bloque y se toman los
+// primeros 3 grupos que aparezcan, ese promedio se cuela como si fuera la 2da probeta y la 3ra
+// probeta real queda afuera (bug real, confirmado contra un informe donde solo cargaban 2 de 3).
+// Por eso se recorre línea por línea y se toma como mucho UN valor por línea — el promedio,
+// que siempre es el 2do grupo de la línea de la 1ra probeta, queda descartado solo. ──
 function _extractorAsprecon(lineas, cilindroNo) {
   const fechaLinea = lineas.find(l => /FECHA DE REALIZACI[ÓO]N DE ENSAYO/i.test(l));
   const idx = _lineaCilindro(lineas, cilindroNo);
-  const bloque = idx === -1 ? '' : lineas.slice(idx, idx + 15).join(' ');
+  const ventana = idx === -1 ? [] : lineas.slice(idx, idx + 10);
+  const probetas = [];
+  for (const linea of ventana) {
+    const grupos = _extraerResistenciasMPa(linea);
+    if (grupos.length) probetas.push(grupos[0]);
+    if (probetas.length >= 3) break;
+  }
   // Códigos de probeta (ej. "T2-21, T2-22, T2-23, T2-24") al final de la descripción del
   // elemento, quedan como Observaciones.
   const ventanaObs = idx === -1 ? '' : lineas.slice(idx, idx + 5).join(' ');
   const obs = ventanaObs.match(/([A-Z][A-Z0-9]*-[A-Z0-9]+(?:\s*,\s*[A-Z][A-Z0-9]*-[A-Z0-9]+)*)/);
   return {
     fechaEnsayo: fechaLinea ? _parsearFechaTextoEs(fechaLinea) : '',
-    probetas: _extraerResistenciasMPa(bloque).slice(0, 3),
+    probetas,
     observaciones: obs ? obs[1].replace(/\s+/g, ' ').trim() : '',
   };
 }
