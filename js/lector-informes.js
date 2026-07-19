@@ -78,18 +78,22 @@ function _extraerResistenciaConsuas(texto) {
 }
 
 // ── ASPRECON: la fecha de ensayo va en texto ("FECHA DE REALIZACIÓN DE ENSAYO: 15 DE JULIO DE
-// 2026", una sola vez para todo el informe) y las 3 probetas de una muestra quedan en filas
-// seguidas después de la fila con el N° de cilindro. La fila de la PRIMERA probeta trae además,
-// pegado al final de la misma línea, el grupo de "resistencia promedio" (misma forma de 4
-// números que una probeta) — si se juntan todas las líneas en un solo bloque y se toman los
-// primeros 3 grupos que aparezcan, ese promedio se cuela como si fuera la 2da probeta y la 3ra
-// probeta real queda afuera (bug real, confirmado contra un informe donde solo cargaban 2 de 3).
-// Por eso se recorre línea por línea y se toma como mucho UN valor por línea — el promedio,
-// que siempre es el 2do grupo de la línea de la 1ra probeta, queda descartado solo. ──
+// 2026", una sola vez para todo el informe). El N° de cilindro y las filas de las 3 probetas NO
+// quedan en un orden de lectura prolijo — pdf.js reconstruye el texto por posición, y en un
+// informe real la fila de la 1ra probeta (con sus números) aparece ANTES de la línea donde
+// figura el N° de cilindro, mientras que la 2da probeta comparte línea con el cilindro y la 3ra
+// va después (confirmado línea por línea contra un informe real: cilindro en la línea 20, pero
+// la 1ra probeta está en la línea 17 — buscar solo hacia adelante la dejaba afuera). Por eso la
+// ventana de búsqueda mira unas líneas hacia atrás Y hacia adelante del cilindro.
+//
+// La fila de la PRIMERA probeta trae además, pegado al final de la misma línea, el grupo de
+// "resistencia promedio" (misma forma de 4 números que una probeta) — por eso se recorre línea
+// por línea tomando como mucho UN valor por línea, así ese promedio (2do grupo de esa línea)
+// queda descartado solo en vez de colarse como si fuera otra probeta. ──
 function _extractorAsprecon(lineas, cilindroNo) {
   const fechaLinea = lineas.find(l => /FECHA DE REALIZACI[ÓO]N DE ENSAYO/i.test(l));
   const idx = _lineaCilindro(lineas, cilindroNo);
-  const ventana = idx === -1 ? [] : lineas.slice(idx, idx + 10);
+  const ventana = idx === -1 ? [] : lineas.slice(Math.max(0, idx - 5), idx + 10);
   const probetas = [];
   for (const linea of ventana) {
     const grupos = _extraerResistenciasMPa(linea);
