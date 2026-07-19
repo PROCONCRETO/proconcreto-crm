@@ -741,6 +741,10 @@ function _aplicarLecturaInforme(lectura) {
 // cilindro (el usuario elige el cilindro primero a propósito, para que el lector no tenga que
 // adivinar cuál de las muestras del PDF le corresponde — ver js/lector-informes.js). Si el PDF
 // cubre otro cilindro también, se repite el proceso en un ensayo nuevo con el mismo archivo.
+//
+// Si el cilindro elegido NO aparece en el PDF, se bloquea la subida por completo (no se
+// comprime ni se sube a Storage) — evita adjuntar por error el informe de un cilindro distinto
+// al que se está registrando.
 async function manejarArchivoLaboratorio(file) {
   if (!file) return;
   if (file.type !== 'application/pdf') { alert('Ese archivo no es un PDF.'); return; }
@@ -749,14 +753,25 @@ async function manejarArchivoLaboratorio(file) {
   const el = document.getElementById('ensayo-pdf-estado');
   if (el) el.textContent = '⏳ Procesando...';
   _ultimaLecturaInforme = null;
+  _pdfLaboratorioPendiente = null;
   try {
     const ajusteActual = _ajusteDesdeTextoCilindroEnsayo(document.getElementById('m-ensayo-cilindro').value.trim());
     if (ajusteActual) {
+      let lineas = null;
       try {
-        _ultimaLecturaInforme = await leerInformeLaboratorio(file, ajusteActual.cilindroNo);
-        _aplicarLecturaInforme(_ultimaLecturaInforme);
+        lineas = await _leerLineasPDF(file);
       } catch (err) {
-        console.error('Error leyendo el informe de laboratorio:', err);
+        console.error('Error leyendo el PDF del informe:', err);
+      }
+      if (lineas) {
+        if (!_cilindroEnInforme(lineas, ajusteActual.cilindroNo)) {
+          // Se bloquea sin tocar _pdfLaboratorioExistente: si el ensayo ya tenía un informe
+          // adjunto de antes, ese no se pierde por un intento fallido de reemplazarlo.
+          if (el) el.textContent = `⚠️ No encontramos el cilindro ${ajusteActual.cilindroNo} en este informe — no se puede adjuntar este archivo a este ensayo.`;
+          return;
+        }
+        _ultimaLecturaInforme = _extraerDatosInformeCilindro(lineas, ajusteActual.cilindroNo);
+        _aplicarLecturaInforme(_ultimaLecturaInforme);
       }
     }
 

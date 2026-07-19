@@ -8,13 +8,16 @@
 // A diferencia del RUT, acá el usuario YA eligió el N° de Cilindro manualmente antes de soltar
 // el PDF (paso obligatorio del flujo) — así el lector no tiene que adivinar cuál de las muestras
 // del informe le corresponde: busca puntualmente la fila de ESE cilindro y llena Laboratorio,
-// Fecha de ensayo, las resistencias por probeta y Observaciones. Si el informe cubre varios
-// cilindros, se repite el proceso por cada uno: nuevo ensayo, mismo PDF, otro N° de Cilindro —
-// no se duplica en Storage (ver js/compresor-pdf.js).
+// Fecha de ensayo, las resistencias por probeta y Observaciones. Si el cilindro elegido NO
+// aparece en el PDF, se bloquea la subida por completo (ver manejarArchivoLaboratorio en
+// calidad-mezclas.js) — evita adjuntar por error el informe de otro cilindro. Si el informe cubre
+// varios cilindros, se repite el proceso por cada uno: nuevo ensayo, mismo PDF, otro N° de
+// Cilindro — no se duplica en Storage (ver js/compresor-pdf.js).
 //
-// Es un lector de MEJOR ESFUERZO — cada laboratorio arma su propio formato de PDF, así que esto
-// se ajusta contra informes reales a medida que se prueba (mismo proceso que se siguió con RUT).
-// Nunca guarda nada solo: siempre rellena el formulario para que se revise antes de Guardar.
+// Cada laboratorio arma su propio formato de PDF, así que hay un extractor por laboratorio
+// (_extractorInforme[laboratorio]), ajustado contra informes reales a medida que se prueba
+// (mismo proceso que se siguió con RUT). Es lectura de MEJOR ESFUERZO: nunca guarda nada
+// solo, siempre rellena el formulario para que se revise antes de Guardar.
 
 const _MESES_ES = {
   enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
@@ -30,6 +33,12 @@ function _parsearFechaTextoEs(texto) {
   return `${m[3]}-${String(mes).padStart(2, '0')}-${m[1].padStart(2, '0')}`;
 }
 
+// "11/07/2026" -> "2026-07-11"
+function _parsearFechaDDMMAAAA(texto) {
+  const m = texto.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+}
+
 function _detectarLaboratorioInforme(lineas) {
   const texto = lineas.join(' ').toLowerCase();
   if (/asprecon/.test(texto)) return 'ASPRECON INGENIERÍA';
@@ -37,46 +46,74 @@ function _detectarLaboratorioInforme(lineas) {
   return '';
 }
 
-function _extraerFechaEnsayoInforme(lineas) {
-  const linea = lineas.find(l => /FECHA DE REALIZACI[ÓO]N DE ENSAYO/i.test(l));
-  return linea ? _parsearFechaTextoEs(linea) : '';
-}
-
 // Ancla la búsqueda en la línea donde aparece el N° de cilindro como número aislado (no como
-// parte de otro número más largo) — desde ahí se buscan, en las líneas siguientes, las
-// resistencias y los códigos de probeta de esa muestra puntual.
+// parte de otro número más largo, ej. "1467" no debe matchear dentro de "14670").
 function _lineaCilindro(lineas, cilindroNo) {
   const re = new RegExp(`(^|[^0-9])${cilindroNo}([^0-9]|$)`);
   return lineas.findIndex(l => re.test(l));
 }
 
-// Cada probeta imprime un grupo de 4 números con coma decimal (psi / kg-cm² / MPa / %) — el
-// tercero de cada grupo es la resistencia en MPa. La fila del promedio (que sale después de la
-// primera probeta) tiene la misma forma, así que solo se toman los primeros 3 grupos.
-function _extraerProbetasCilindro(lineas, cilindroNo) {
-  const idx = _lineaCilindro(lineas, cilindroNo);
-  if (idx === -1) return [];
-  const bloque = lineas.slice(idx, idx + 15).join(' ');
-  const grupos = [...bloque.matchAll(/(\d{3,6}[.,]?\d*)\s+(\d{2,4}[.,]\d)\s+(\d{1,3}[.,]\d)\s+(\d{2,3}[.,]\d)/g)];
-  return grupos.slice(0, 3).map(g => parseFloat(g[3].replace(',', '.')));
+function _lineasCilindro(lineas, cilindroNo) {
+  const re = new RegExp(`(^|[^0-9])${cilindroNo}([^0-9]|$)`);
+  return lineas.filter(l => re.test(l));
 }
 
-// Códigos de probeta (ej. "T2-21, T2-22, T2-23, T2-24") que suelen ir al final de la descripción
-// del elemento — quedan como Observaciones del ensayo.
-function _extraerObservacionesInforme(lineas, cilindroNo) {
-  const idx = _lineaCilindro(lineas, cilindroNo);
-  if (idx === -1) return '';
-  const ventana = lineas.slice(idx, idx + 5).join(' ');
-  const m = ventana.match(/([A-Z][A-Z0-9]*-[A-Z0-9]+(?:\s*,\s*[A-Z][A-Z0-9]*-[A-Z0-9]+)*)/);
-  return m ? m[1].replace(/\s+/g, ' ').trim() : '';
+// Heurística compartida entre laboratorios: en estos formatos la resistencia en MPa de cada
+// probeta viene como el TERCERO de un grupo de 4 números seguidos (con coma decimal en los dos
+// del medio) al final de la fila — ej. ASPRECON "7506 527,7 51,7 166,8" (psi/kg-cm²/MPa/%) o
+// CONSUAS "428,7 545,3 53,5 7790" (kN/kg-cm²/MPa/psi). El primero y el último pueden traer o no
+// decimales según el laboratorio, por eso quedan flexibles.
+function _extraerResistenciasMPa(texto) {
+  const grupos = [...texto.matchAll(/(\d{2,6}[.,]?\d*)\s+(\d{2,4}[.,]\d)\s+(\d{1,3}[.,]\d)\s+(\d{2,6}[.,]?\d*)/g)];
+  return grupos.map(g => parseFloat(g[3].replace(',', '.')));
 }
 
-async function leerInformeLaboratorio(file, cilindroNo) {
-  const lineas = await _leerLineasPDF(file);
+// ── ASPRECON: la fecha de ensayo va en texto ("FECHA DE REALIZACIÓN DE ENSAYO: 15 DE JULIO DE
+// 2026", una sola vez para todo el informe) y las 3 probetas de una muestra quedan en filas
+// seguidas después de la fila con el N° de cilindro — se toma una ventana de líneas desde ahí. ──
+function _extractorAsprecon(lineas, cilindroNo) {
+  const fechaLinea = lineas.find(l => /FECHA DE REALIZACI[ÓO]N DE ENSAYO/i.test(l));
+  const idx = _lineaCilindro(lineas, cilindroNo);
+  const bloque = idx === -1 ? '' : lineas.slice(idx, idx + 15).join(' ');
+  // Códigos de probeta (ej. "T2-21, T2-22, T2-23, T2-24") al final de la descripción del
+  // elemento, quedan como Observaciones.
+  const ventanaObs = idx === -1 ? '' : lineas.slice(idx, idx + 5).join(' ');
+  const obs = ventanaObs.match(/([A-Z][A-Z0-9]*-[A-Z0-9]+(?:\s*,\s*[A-Z][A-Z0-9]*-[A-Z0-9]+)*)/);
   return {
-    laboratorio: _detectarLaboratorioInforme(lineas),
-    fechaEnsayo: _extraerFechaEnsayoInforme(lineas),
-    probetas: _extraerProbetasCilindro(lineas, cilindroNo),
-    observaciones: _extraerObservacionesInforme(lineas, cilindroNo),
+    fechaEnsayo: fechaLinea ? _parsearFechaTextoEs(fechaLinea) : '',
+    probetas: _extraerResistenciasMPa(bloque).slice(0, 3),
+    observaciones: obs ? obs[1].replace(/\s+/g, ' ').trim() : '',
   };
+}
+
+// ── CONSUAS: cada probeta es una fila propia que repite el N° de cilindro ("NUMERO o
+// REFERENCIA") al principio, con dos fechas DD/MM/AAAA seguidas (fecha de vaciado, fecha de
+// ensayo — se toma la segunda) y termina en el mismo grupo de 4 números. No trae códigos de
+// probeta reconocibles en este formato, así que Observaciones queda vacío. ──
+function _extractorConsuas(lineas, cilindroNo) {
+  const filas = _lineasCilindro(lineas, cilindroNo);
+  const fechas = filas.length ? [...filas[0].matchAll(/\d{2}\/\d{2}\/\d{4}/g)] : [];
+  return {
+    fechaEnsayo: fechas.length >= 2 ? _parsearFechaDDMMAAAA(fechas[1][0]) : '',
+    probetas: filas.map(l => _extraerResistenciasMPa(l)[0]).filter(v => v != null),
+    observaciones: '',
+  };
+}
+
+const _EXTRACTORES_INFORME = {
+  'ASPRECON INGENIERÍA': _extractorAsprecon,
+  'CONSUAS INGENIERÍA': _extractorConsuas,
+};
+
+// true si el cilindro aparece en el PDF (independiente de si se logran leer bien los demás
+// datos) — es el chequeo que decide si se bloquea la subida o no (ver calidad-mezclas.js).
+function _cilindroEnInforme(lineas, cilindroNo) {
+  return _lineaCilindro(lineas, cilindroNo) !== -1;
+}
+
+function _extraerDatosInformeCilindro(lineas, cilindroNo) {
+  const laboratorio = _detectarLaboratorioInforme(lineas);
+  const extractor = _EXTRACTORES_INFORME[laboratorio];
+  const datos = extractor ? extractor(lineas, cilindroNo) : { fechaEnsayo: '', probetas: [], observaciones: '' };
+  return { laboratorio, ...datos };
 }
