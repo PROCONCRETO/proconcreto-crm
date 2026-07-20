@@ -19,7 +19,7 @@
 
 ## Lectura de RUT (autocompletar cliente desde el PDF)
 
-En el modal de Nuevo/Editar Cliente, el botón "📄 Muéstrame el RUT del cliente" (zona de arrastrar-y-soltar o buscar archivo) lee el PDF del RUT **completo en el navegador** con [pdf.js](https://mozilla.github.io/pdf.js/) (CDN) — el archivo nunca se sube a Supabase ni se guarda en ningún lado, solo se procesa en memoria y se descarta.
+En el modal de Nuevo/Editar Cliente, el botón "📄 Muéstrame el RUT del cliente" (zona de arrastrar-y-soltar o buscar archivo, ubicada al final del formulario, justo antes de los botones Cancelar/Guardar) lee el PDF del RUT **completo en el navegador** con [pdf.js](https://mozilla.github.io/pdf.js/) (CDN) — el archivo nunca se sube a Supabase ni se guarda en ningún lado, solo se procesa en memoria y se descarta.
 
 - `_leerLineasPDF()`: pdf.js no entrega el texto en orden de lectura visual por defecto (el RUT de la DIAN suele separar "plantilla" de "valores llenados" en bloques distintos del PDF) — se reconstruyen renglones agrupando el texto por posición Y (con tolerancia) y ordenando por X, para recuperar el orden visual real.
 - `_extraerDatosRut()`: busca sobre esas líneas los patrones de las casillas del formulario 001 (Razón social, NIT+DV, correo electrónico, régimen tributario, ciudad/departamento) y devuelve lo que logra reconocer.
