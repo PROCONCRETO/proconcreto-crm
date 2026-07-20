@@ -16,7 +16,12 @@ function renderClientesAdicionalesAjuste() {
       <tbody>
         ${_clientesAdicionalesAjuste.map((c, i) => `
           <tr>
-            <td><input type="text" value="${c.cliente || ''}" list="datalist-clientes-ajuste" oninput="_clientesAdicionalesAjuste[${i}].cliente=this.value;_alCambiarClienteAdicionalAjuste(${i})" placeholder="Busca un cliente existente..."></td>
+            <td>
+              <div class="buscador-cliente" style="position:relative">
+                <input type="text" id="cliente-adicional-input-${i}" value="${c.cliente || ''}" title="${c.cliente || ''}" oninput="filtrarClienteAdicionalAjuste(${i})" placeholder="Busca un cliente existente...">
+                <div id="cliente-adicional-resultados-${i}" style="display:none;position:absolute;z-index:60;left:0;right:0;margin-top:2px;border:1.5px solid #93C5FD;border-radius:8px;background:#fff;max-height:200px;overflow-y:auto;box-shadow:var(--sombra-md)"></div>
+              </div>
+            </td>
             <td><select id="cliente-adicional-proyecto-${i}" onchange="_clientesAdicionalesAjuste[${i}].proyecto=this.value" style="width:100%;padding:5px 7px;border:1px solid var(--gris-borde);border-radius:4px;font-size:12px"></select></td>
             <td><button class="btn btn-rojo btn-xs" onclick="eliminarClienteAdicionalAjuste(${i})">✕</button></td>
           </tr>`).join('')}
@@ -34,6 +39,36 @@ function _alCambiarClienteAdicionalAjuste(i) {
   _clientesAdicionalesAjuste[i].proyecto = ''; // el proyecto anterior puede no existir para el nuevo cliente
 }
 
+// Buscador de cliente propio para cada fila de clientes adicionales — mismo motivo y patrón
+// que filtrarClienteAjuste()/filtrarClienteEntrega() (ver ahí el porqué de no usar <datalist>).
+function filtrarClienteAdicionalAjuste(i) {
+  const inputEl = document.getElementById(`cliente-adicional-input-${i}`);
+  const div = document.getElementById(`cliente-adicional-resultados-${i}`);
+  if (!inputEl || !div) return;
+  inputEl.title = inputEl.value;
+  _clientesAdicionalesAjuste[i].cliente = inputEl.value;
+  _alCambiarClienteAdicionalAjuste(i);
+  const q = inputEl.value.toLowerCase().trim();
+  if (q.length < 2) { div.style.display = 'none'; return; }
+  const res = CLIENTES.filter(c => c.nombre.toLowerCase().includes(q)).slice(0, 18);
+  div.innerHTML = res.length
+    ? res.map(c => `
+      <div data-cliente="${(c.nombre || '').replace(/"/g, '&quot;')}" onclick="elegirClienteAdicionalAjuste(${i},this.dataset.cliente)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
+        <div style="font-weight:600;font-size:13px;color:#1e293b">${c.nombre}</div>
+      </div>`).join('')
+    : '<div style="padding:10px 14px;color:#888;font-size:12px">Sin resultados para esta búsqueda.</div>';
+  div.style.display = 'block';
+}
+
+function elegirClienteAdicionalAjuste(i, nombre) {
+  const inputEl = document.getElementById(`cliente-adicional-input-${i}`);
+  if (inputEl) { inputEl.value = nombre; inputEl.title = nombre; }
+  _clientesAdicionalesAjuste[i].cliente = nombre;
+  _alCambiarClienteAdicionalAjuste(i);
+  const div = document.getElementById(`cliente-adicional-resultados-${i}`);
+  if (div) div.style.display = 'none';
+}
+
 function agregarClienteAdicionalAjuste() {
   _clientesAdicionalesAjuste.push({ cliente: '', proyecto: '' });
   renderClientesAdicionalesAjuste();
@@ -44,14 +79,42 @@ function eliminarClienteAdicionalAjuste(i) {
   renderClientesAdicionalesAjuste();
 }
 
-// El cliente se busca contra la base de datos real (tabla de Cotizaciones y Ventas)
-// para no terminar con el mismo cliente escrito de varias formas distintas.
-function poblarDatalistClientes(datalistId) {
-  const dl = document.getElementById(datalistId);
-  if (!dl) return;
-  const ordenados = [...CLIENTES].sort((a, b) => a.nombre.localeCompare(b.nombre));
-  dl.innerHTML = ordenados.map(c => `<option value="${c.nombre}">`).join('');
+// Buscador de cliente propio para el campo Cliente principal de Ajuste Diario, en vez del
+// <datalist> nativo del navegador — el datalist filtra distinto según el navegador y en
+// muchos casos solo busca desde el INICIO del nombre, no por cualquier fragmento (bug real
+// reportado: escribir un fragmento del nombre no filtraba nada). Mismo patrón que el
+// buscador de producto de Nueva Cotización / Logística.
+function filtrarClienteAjuste() {
+  const inputEl = document.getElementById('m-ajuste-cliente');
+  const div = document.getElementById('m-ajuste-cliente-resultados');
+  if (!inputEl || !div) return;
+  inputEl.title = inputEl.value;
+  _alCambiarClienteAjuste();
+  const q = inputEl.value.toLowerCase().trim();
+  if (q.length < 2) { div.style.display = 'none'; return; }
+  const res = CLIENTES.filter(c => c.nombre.toLowerCase().includes(q)).slice(0, 18);
+  div.innerHTML = res.length
+    ? res.map(c => `
+      <div data-cliente="${(c.nombre || '').replace(/"/g, '&quot;')}" onclick="elegirClienteAjuste(this.dataset.cliente)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
+        <div style="font-weight:600;font-size:13px;color:#1e293b">${c.nombre}</div>
+      </div>`).join('')
+    : '<div style="padding:10px 14px;color:#888;font-size:12px">Sin resultados para esta búsqueda.</div>';
+  div.style.display = 'block';
 }
+
+function elegirClienteAjuste(nombre) {
+  const inputEl = document.getElementById('m-ajuste-cliente');
+  if (inputEl) { inputEl.value = nombre; inputEl.title = nombre; }
+  _alCambiarClienteAjuste();
+  const div = document.getElementById('m-ajuste-cliente-resultados');
+  if (div) div.style.display = 'none';
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.buscador-cliente')) {
+    document.querySelectorAll('#m-ajuste-cliente-resultados, [id^="cliente-adicional-resultados-"]').forEach(d => { d.style.display = 'none'; });
+  }
+});
 
 function _clienteValidoAjuste(nombre) {
   const t = (nombre || '').trim();
@@ -372,7 +435,6 @@ function abrirModalAjusteMezcla() {
   document.getElementById('m-ajuste-fecha').value = new Date().toISOString().split('T')[0];
   poblarSelectDisenos('m-ajuste-diseno');
   poblarDatalistProductos('datalist-productos-ajuste');
-  poblarDatalistClientes('datalist-clientes-ajuste');
   document.getElementById('m-ajuste-producto').value = '';
   document.getElementById('m-ajuste-diseno').value = '';
   _clientesAdicionalesAjuste = [];
@@ -399,12 +461,12 @@ function editarAjusteMezcla(id) {
   document.getElementById('m-ajuste-fecha').value = a.fecha || '';
   poblarSelectDisenos('m-ajuste-diseno');
   poblarDatalistProductos('datalist-productos-ajuste');
-  poblarDatalistClientes('datalist-clientes-ajuste');
   document.getElementById('m-ajuste-producto').value = a.productoCodigo
     ? `${a.productoCodigo} — ${a.productoNombre || PRODUCTOS.find(p => p.codigo === a.productoCodigo)?.nombre || ''}`
     : '';
   document.getElementById('m-ajuste-diseno').value = a.disenoCodigo || '';
   document.getElementById('m-ajuste-cliente').value = a.cliente || a.clienteElemento || '';
+  document.getElementById('m-ajuste-cliente').title = a.cliente || a.clienteElemento || '';
   poblarSelectProyectosDeCliente('m-ajuste-proyecto', a.cliente || a.clienteElemento || '');
   document.getElementById('m-ajuste-proyecto').value = a.proyecto || '';
   _clientesAdicionalesAjuste = JSON.parse(JSON.stringify(a.clientesAdicionales || []));

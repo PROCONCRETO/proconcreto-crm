@@ -561,7 +561,12 @@ function renderEntregasViaje() {
         </select>
       </div>
       <div class="form-grid" style="margin-bottom:8px">
-        <div class="form-grupo"><label>Cliente</label><input type="text" value="${e.cliente || ''}" list="datalist-clientes-viaje" oninput="_entregasViajeActual[${ei}].cliente=this.value;_alCambiarClienteEntrega(${ei})" placeholder="Busca un cliente existente..."></div>
+        <div class="form-grupo"><label>Cliente</label>
+          <div class="buscador-cliente" style="position:relative">
+            <input type="text" id="entrega-cliente-input-${ei}" value="${e.cliente || ''}" title="${e.cliente || ''}" oninput="filtrarClienteEntrega(${ei})" placeholder="Busca un cliente existente..." style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:8px;font-size:13px">
+            <div id="entrega-cliente-resultados-${ei}" style="display:none;position:absolute;z-index:60;left:0;right:0;margin-top:2px;border:1.5px solid #93C5FD;border-radius:8px;background:#fff;max-height:220px;overflow-y:auto;box-shadow:var(--sombra-md)"></div>
+          </div>
+        </div>
         <div class="form-grupo"><label>Destino específico / Proyecto</label>
           <select id="entrega-proyecto-${ei}" onchange="_alElegirProyectoEntrega(${ei},this.value)" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
         </div>
@@ -590,7 +595,6 @@ function renderEntregasViaje() {
         <button type="button" class="btn btn-rojo btn-xs" onclick="eliminarEntregaViaje(${ei})">🗑️ Quitar entrega</button>
       </div>
     </div>`).join('');
-  if (typeof poblarDatalistClientes === 'function') poblarDatalistClientes('datalist-clientes-viaje');
   _entregasViajeActual.forEach((e, ei) => {
     if (typeof poblarSelectProyectosDeCliente === 'function') poblarSelectProyectosDeCliente(`entrega-proyecto-${ei}`, e.cliente);
     const sel = document.getElementById(`entrega-proyecto-${ei}`);
@@ -632,6 +636,38 @@ function _alElegirProyectoEntrega(ei, nombreProyecto) {
   if (elTel) elTel.value = e.contactoObraTelefono;
 }
 
+// Buscador de cliente propio, en vez del <datalist> nativo del navegador — el datalist nativo
+// filtra distinto según el navegador y en muchos casos solo busca desde el INICIO del nombre,
+// no por cualquier fragmento (bug real reportado: escribir un fragmento del nombre no filtraba
+// nada). Mismo patrón que el buscador de producto de abajo.
+function filtrarClienteEntrega(ei) {
+  const inputEl = document.getElementById(`entrega-cliente-input-${ei}`);
+  const div = document.getElementById(`entrega-cliente-resultados-${ei}`);
+  if (!inputEl || !div) return;
+  inputEl.title = inputEl.value;
+  _entregasViajeActual[ei].cliente = inputEl.value;
+  _alCambiarClienteEntrega(ei);
+  const q = inputEl.value.toLowerCase().trim();
+  if (q.length < 2) { div.style.display = 'none'; return; }
+  const res = (typeof CLIENTES !== 'undefined' ? CLIENTES : []).filter(c => c.nombre.toLowerCase().includes(q)).slice(0, 18);
+  div.innerHTML = res.length
+    ? res.map(c => `
+      <div data-cliente="${(c.nombre || '').replace(/"/g, '&quot;')}" onclick="elegirClienteEntrega(${ei},this.dataset.cliente)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
+        <div style="font-weight:600;font-size:13px;color:#1e293b">${c.nombre}</div>
+      </div>`).join('')
+    : '<div style="padding:10px 14px;color:#888;font-size:12px">Sin resultados para esta búsqueda.</div>';
+  div.style.display = 'block';
+}
+
+function elegirClienteEntrega(ei, nombre) {
+  const inputEl = document.getElementById(`entrega-cliente-input-${ei}`);
+  if (inputEl) { inputEl.value = nombre; inputEl.title = nombre; }
+  _entregasViajeActual[ei].cliente = nombre;
+  _alCambiarClienteEntrega(ei);
+  const div = document.getElementById(`entrega-cliente-resultados-${ei}`);
+  if (div) div.style.display = 'none';
+}
+
 // Buscador de producto estilo "Nueva Cotización": nombre en negrita + código en gris debajo,
 // en vez del <datalist> nativo del navegador (que no se puede rediseñar y por eso el nombre
 // largo quedaba ilegible). Cada línea de producto tiene su propio buscador independiente.
@@ -666,6 +702,9 @@ function elegirProductoEntrega(ei, pi, codigo) {
 }
 
 document.addEventListener('click', (e) => {
+  if (!e.target.closest('.buscador-cliente')) {
+    document.querySelectorAll('[id^="entrega-cliente-resultados-"]').forEach(d => { d.style.display = 'none'; });
+  }
   if (!e.target.closest('.entrega-prod-buscador')) {
     document.querySelectorAll('[id^="viaje-prod-resultados-"]').forEach(d => { d.style.display = 'none'; });
   }
