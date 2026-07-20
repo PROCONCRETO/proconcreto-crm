@@ -11,7 +11,7 @@
 
 - Tablas Supabase: `cotizaciones`, `clientes`
 - Tarifas de transporte por municipio están fijas en `TARIFAS_TRANSPORTE` / `TARIFAS_KG_TRANSPORTE` (`js/config.js`), no en base de datos
-- `cliente`: `nombre`, `contacto` (persona que gestiona/recibe), `cel`, `email` (del contacto), `ciudad` (formato "Ciudad, Departamento"), `nit` (formato `NIT-DV`), `emailFacturacion` (el correo del RUT — **distinto** del email del contacto), `regimen` (uno de los 3 códigos de responsabilidad del RUT: `05. Impuesto Sobre la Renta y Complementarios Régimen Ordinario` / `13. Gran contribuyente` / `47. Régimen Simple de Tributación (SIMPLE)`). Todos estos (salvo Contacto/Celular/Email) se pueden autocompletar leyendo el RUT (ver más abajo) o escribirse/elegirse a mano. (No hay campo de Dirección — se evaluó pero no se incluyó, no es un dato relevante para este flujo.)
+- `cliente`: `nombre`, `contacto` (persona que gestiona/recibe), `cel`, `email` (del contacto), `ciudad` (formato "Ciudad, Departamento"), `nit` (formato `NIT-DV`), `emailFacturacion` (el correo del RUT — **distinto** del email del contacto), `regimen` (uno de los 3 códigos de responsabilidad del RUT: `05. Impuesto Sobre la Renta y Complementarios Régimen Ordinario` / `13. Gran contribuyente` / `47. Régimen Simple de Tributación (SIMPLE)`), `proyectos` (arreglo — un cliente puede tener una o varias obras/proyectos a la vez, cada uno con su propio `nombre`, `contacto` y `telefono` en obra, distintos del contacto general del cliente). Todos estos (salvo Contacto/Celular/Email) se pueden autocompletar leyendo el RUT (ver más abajo) o escribirse/elegirse a mano. (No hay campo de Dirección — se evaluó pero no se incluyó, no es un dato relevante para este flujo.)
 
 ## Pantallas (`ir()` en `navegacion.js`)
 
@@ -29,6 +29,10 @@ En el modal de Nuevo/Editar Cliente, el botón "📄 Muéstrame el RUT del clien
   - `_extraerCiudadDepartamento()`: País, Departamento y Ciudad/Municipio (casillas 38/39/40) quedan en una sola fila visual — se extraen solo las rachas de letras de esa línea (ignorando los códigos numéricos pegados a cada una): el primer bloque es el país, el segundo el departamento, el tercero la ciudad. Se exige que el primer bloque sea literalmente "COLOMBIA" como ancla — sin eso, otra línea con 3+ rachas de letras (ej. una dirección con guion, que se parte en varios bloques) se puede confundir con esta. Se guarda como "Ciudad, Departamento" en el campo Ciudad del cliente.
 - Es un parser de **mejor esfuerzo, no infalible** (la posición exacta del texto puede variar entre PDFs) — por eso siempre rellena el formulario para que se revise antes de guardar, nunca guarda directo. Si no reconoce nada, lo dice explícitamente en vez de fallar en silencio.
 - Solo llena: Razón social, NIT, Correo de facturación, Régimen tributario, Ciudad. **Nunca** toca Contacto/Celular/Email — esos son datos de la persona operativa de contacto, que el RUT no tiene y siguen siendo manuales. (El representante legal y la Dirección del RUT se evaluaron pero no se incluyeron — no son datos relevantes para este flujo.)
+
+## Proyectos del cliente
+
+En el modal de Nuevo/Editar Cliente, debajo de la zona del RUT: botón "+ Agregar proyecto" que arma una fila editable por proyecto (Nombre del proyecto, Contacto, Teléfono) — mismo patrón que los clientes/productos adicionales de Ajuste Diario (`js/calidad-ajuste-mezcla.js`): arreglo de trabajo (`_proyectosClienteActual`) mientras el modal está abierto, se guarda dentro del cliente (`cliente.proyectos`) al hacer Guardar. Las filas sin nombre de proyecto se descartan al guardar. `renderProyectosCliente()`/`agregarProyectoCliente()`/`eliminarProyectoCliente()` en `js/historico-clientes-stats.js`.
 
 ## Qué hace
 

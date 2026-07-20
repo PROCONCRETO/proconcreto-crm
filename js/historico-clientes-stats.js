@@ -385,6 +385,41 @@ function filtrarClientes(q) {
   renderClientes(res);
 }
 
+// Un cliente puede tener uno o varios proyectos (obras) — cada uno con su propio contacto y
+// teléfono en obra, distinto del contacto general del cliente. Mismo patrón que los clientes/
+// productos adicionales de Ajuste Diario (js/calidad-ajuste-mezcla.js): arreglo de trabajo
+// mientras el modal está abierto, se guarda dentro del cliente al hacer Guardar.
+let _proyectosClienteActual = [];
+
+function renderProyectosCliente() {
+  const wrap = document.getElementById('proyectos-cliente-wrap');
+  if (!wrap) return;
+  if (!_proyectosClienteActual.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `
+    <table class="tabla-items" style="width:100%">
+      <thead><tr><th>Proyecto</th><th>Contacto</th><th>Teléfono</th><th style="width:36px"></th></tr></thead>
+      <tbody>
+        ${_proyectosClienteActual.map((p, i) => `
+          <tr>
+            <td><input type="text" value="${p.nombre || ''}" oninput="_proyectosClienteActual[${i}].nombre=this.value" placeholder="Ej: Torres del Parque"></td>
+            <td><input type="text" value="${p.contacto || ''}" oninput="_proyectosClienteActual[${i}].contacto=this.value" placeholder="Ing. ..."></td>
+            <td><input type="text" value="${p.telefono || ''}" oninput="_proyectosClienteActual[${i}].telefono=this.value"></td>
+            <td><button class="btn btn-rojo btn-xs" onclick="eliminarProyectoCliente(${i})">✕</button></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function agregarProyectoCliente() {
+  _proyectosClienteActual.push({ nombre: '', contacto: '', telefono: '' });
+  renderProyectosCliente();
+}
+
+function eliminarProyectoCliente(i) {
+  _proyectosClienteActual.splice(i, 1);
+  renderProyectosCliente();
+}
+
 function abrirModalCliente() {
   document.getElementById('m-cliente-id').value = '';
   document.getElementById('modal-cliente-titulo').textContent = '➕ Nuevo Cliente';
@@ -393,6 +428,8 @@ function abrirModalCliente() {
     .forEach(id => document.getElementById(id).value = '');
   const estadoRut = document.getElementById('rut-estado');
   if (estadoRut) estadoRut.textContent = '';
+  _proyectosClienteActual = [];
+  renderProyectosCliente();
   document.getElementById('modal-cliente').classList.add('abierto');
 }
 
@@ -411,6 +448,8 @@ function editarCliente(id) {
   document.getElementById('m-cliente-regimen').value = c.regimen || '';
   const estadoRut = document.getElementById('rut-estado');
   if (estadoRut) estadoRut.textContent = '';
+  _proyectosClienteActual = JSON.parse(JSON.stringify(c.proyectos || []));
+  renderProyectosCliente();
   document.getElementById('modal-cliente').classList.add('abierto');
 }
 
@@ -427,6 +466,7 @@ function guardarCliente() {
     nit: document.getElementById('m-cliente-nit').value,
     emailFacturacion: document.getElementById('m-cliente-emailFacturacion').value,
     regimen: document.getElementById('m-cliente-regimen').value,
+    proyectos: _proyectosClienteActual.filter(p => (p.nombre || '').trim()),
   };
   if (editId) {
     const idx = CLIENTES.findIndex(c => String(c.id) === String(editId));

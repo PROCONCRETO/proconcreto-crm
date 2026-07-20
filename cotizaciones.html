@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260719i">
+<link rel="stylesheet" href="css/estilos.css?v=20260719j">
 </head>
 <body>
 
@@ -1566,6 +1566,12 @@
       <div id="rut-estado" style="font-size:11.5px;margin-top:8px;min-height:16px"></div>
     </div>
 
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <label style="font-size:11px;font-weight:600;color:var(--gris-medio);text-transform:uppercase;letter-spacing:0.5px">Proyectos del cliente</label>
+      <button class="btn btn-secundario btn-xs" onclick="agregarProyectoCliente()">+ Agregar proyecto</button>
+    </div>
+    <div id="proyectos-cliente-wrap" style="margin-bottom:16px"></div>
+
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-cliente')">Cancelar</button>
       <button class="btn btn-primario" onclick="guardarCliente()">Guardar</button>
@@ -1635,21 +1641,21 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260719i"></script>
-<script src="js/catalogo.js?v=20260719i"></script>
-<script src="js/navegacion.js?v=20260719i"></script>
-<script src="js/ordenes-produccion.js?v=20260719i"></script>
-<script src="js/produccion-diaria.js?v=20260719i"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260719i"></script>
-<script src="js/calidad-mezclas.js?v=20260719i"></script>
-<script src="js/calidad-estadisticas.js?v=20260719i"></script>
-<script src="js/calidad-trazabilidad.js?v=20260719i"></script>
-<script src="js/logistica.js?v=20260719i"></script>
-<script src="js/estadisticas-logistica.js?v=20260719i"></script>
-<script src="js/auth.js?v=20260719i"></script>
-<script src="js/datos-realtime.js?v=20260719i"></script>
-<script src="js/cotizador.js?v=20260719i"></script>
-<script src="js/historico-clientes-stats.js?v=20260719i"></script>
+<script src="js/config.js?v=20260719j"></script>
+<script src="js/catalogo.js?v=20260719j"></script>
+<script src="js/navegacion.js?v=20260719j"></script>
+<script src="js/ordenes-produccion.js?v=20260719j"></script>
+<script src="js/produccion-diaria.js?v=20260719j"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260719j"></script>
+<script src="js/calidad-mezclas.js?v=20260719j"></script>
+<script src="js/calidad-estadisticas.js?v=20260719j"></script>
+<script src="js/calidad-trazabilidad.js?v=20260719j"></script>
+<script src="js/logistica.js?v=20260719j"></script>
+<script src="js/estadisticas-logistica.js?v=20260719j"></script>
+<script src="js/auth.js?v=20260719j"></script>
+<script src="js/datos-realtime.js?v=20260719j"></script>
+<script src="js/cotizador.js?v=20260719j"></script>
+<script src="js/historico-clientes-stats.js?v=20260719j"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1657,9 +1663,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260719i"></script>
-<script src="js/rut-parser.js?v=20260719i"></script>
-<script src="js/compresor-pdf.js?v=20260719i"></script>
-<script src="js/lector-informes.js?v=20260719i"></script>
+<script src="js/pdf.js?v=20260719j"></script>
+<script src="js/rut-parser.js?v=20260719j"></script>
+<script src="js/compresor-pdf.js?v=20260719j"></script>
+<script src="js/lector-informes.js?v=20260719j"></script>
 </body>
 </html>
