@@ -16,12 +16,22 @@ function renderClientesAdicionalesAjuste() {
       <tbody>
         ${_clientesAdicionalesAjuste.map((c, i) => `
           <tr>
-            <td><input type="text" value="${c.cliente || ''}" list="datalist-clientes-ajuste" oninput="_clientesAdicionalesAjuste[${i}].cliente=this.value" placeholder="Busca un cliente existente..."></td>
-            <td><input type="text" value="${c.proyecto || ''}" oninput="_clientesAdicionalesAjuste[${i}].proyecto=this.value" placeholder="Ej: Proyecto Villa 86"></td>
+            <td><input type="text" value="${c.cliente || ''}" list="datalist-clientes-ajuste" oninput="_clientesAdicionalesAjuste[${i}].cliente=this.value;_alCambiarClienteAdicionalAjuste(${i})" placeholder="Busca un cliente existente..."></td>
+            <td><select id="cliente-adicional-proyecto-${i}" onchange="_clientesAdicionalesAjuste[${i}].proyecto=this.value" style="width:100%;padding:5px 7px;border:1px solid var(--gris-borde);border-radius:4px;font-size:12px"></select></td>
             <td><button class="btn btn-rojo btn-xs" onclick="eliminarClienteAdicionalAjuste(${i})">✕</button></td>
           </tr>`).join('')}
       </tbody>
     </table>`;
+  _clientesAdicionalesAjuste.forEach((c, i) => {
+    poblarSelectProyectosDeCliente(`cliente-adicional-proyecto-${i}`, c.cliente);
+    const sel = document.getElementById(`cliente-adicional-proyecto-${i}`);
+    if (sel && c.proyecto) sel.value = c.proyecto;
+  });
+}
+
+function _alCambiarClienteAdicionalAjuste(i) {
+  poblarSelectProyectosDeCliente(`cliente-adicional-proyecto-${i}`, _clientesAdicionalesAjuste[i].cliente);
+  _clientesAdicionalesAjuste[i].proyecto = ''; // el proyecto anterior puede no existir para el nuevo cliente
 }
 
 function agregarClienteAdicionalAjuste() {
@@ -47,6 +57,30 @@ function _clienteValidoAjuste(nombre) {
   const t = (nombre || '').trim();
   if (!t) return true; // el campo es opcional; solo se valida si se llenó
   return CLIENTES.some(c => c.nombre.trim().toLowerCase() === t.toLowerCase());
+}
+
+// Trazabilidad Cliente → Proyecto: el proyecto ya NO se escribe a mano en ningún lado del
+// aplicativo (Logística ni Calidad) — se elige de los proyectos que ese cliente tiene
+// registrados (cliente.proyectos, ver "+ Agregar proyecto" en el modal de Cliente), para no
+// terminar con el mismo proyecto escrito de formas distintas en cada módulo. El desplegable
+// queda deshabilitado hasta que el texto del campo Cliente coincida con un cliente real.
+function poblarSelectProyectosDeCliente(selectId, nombreCliente) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const cliente = CLIENTES.find(c => c.nombre.trim().toLowerCase() === (nombreCliente || '').trim().toLowerCase());
+  if (!cliente) {
+    sel.disabled = true;
+    sel.innerHTML = '<option value="">Elige primero un cliente válido...</option>';
+    return;
+  }
+  const proyectos = cliente.proyectos || [];
+  if (!proyectos.length) {
+    sel.disabled = true;
+    sel.innerHTML = '<option value="">Este cliente no tiene proyectos registrados — agrégalo en Clientes</option>';
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = '<option value="">Elige un proyecto...</option>' + proyectos.map(p => `<option value="${p.nombre}">${p.nombre}</option>`).join('');
 }
 
 let _productosAdicionalesAjuste = []; // cada entrada es el texto tecleado "CODIGO — Nombre"
@@ -325,6 +359,12 @@ function recalcularAjusteMezcla() {
   document.getElementById('m-ajuste-ajustada-acelerante').textContent = g('m-ajuste-mat-acelerante').toFixed(1) + ' g';
 }
 
+// El proyecto ya no se escribe a mano — se elige de los proyectos registrados para el cliente
+// que esté en el campo Cliente en este momento (ver poblarSelectProyectosDeCliente()).
+function _alCambiarClienteAjuste() {
+  poblarSelectProyectosDeCliente('m-ajuste-proyecto', document.getElementById('m-ajuste-cliente').value);
+}
+
 function abrirModalAjusteMezcla() {
   document.getElementById('m-ajuste-id').value = '';
   document.getElementById('modal-ajuste-titulo').textContent = '🌡️ Nuevo Ajuste Diario de Mezcla';
@@ -339,12 +379,13 @@ function abrirModalAjusteMezcla() {
   renderClientesAdicionalesAjuste();
   _productosAdicionalesAjuste = [];
   renderProductosAdicionalesAjuste();
-  ['m-ajuste-resistencia', 'm-ajuste-cliente', 'm-ajuste-proyecto', 'm-ajuste-tamano',
+  ['m-ajuste-resistencia', 'm-ajuste-cliente', 'm-ajuste-tamano',
     'm-ajuste-arena-recipiente', 'm-ajuste-arena-humedo', 'm-ajuste-arena-seco', 'm-ajuste-arena-absorcion',
     'm-ajuste-triturado-recipiente', 'm-ajuste-triturado-humedo', 'm-ajuste-triturado-seco', 'm-ajuste-triturado-absorcion',
     'm-ajuste-mat-agua', 'm-ajuste-mat-cemento', 'm-ajuste-mat-adicion', 'm-ajuste-mat-plastificante',
     'm-ajuste-mat-arena', 'm-ajuste-mat-triturado', 'm-ajuste-mat-acelerante', 'm-ajuste-obs'
-  ].forEach(id => { const el = document.getElementById(id); if (el) el.value = id.includes('obs') || id.includes('cliente') || id.includes('proyecto') || id.includes('tamano') ? '' : 0; });
+  ].forEach(id => { const el = document.getElementById(id); if (el) el.value = id.includes('obs') || id.includes('cliente') || id.includes('tamano') ? '' : 0; });
+  _alCambiarClienteAjuste(); // deja el select de Proyecto deshabilitado hasta elegir cliente
   recalcularAjusteMezcla();
   document.getElementById('modal-ajuste-mezcla').classList.add('abierto');
 }
@@ -364,6 +405,7 @@ function editarAjusteMezcla(id) {
     : '';
   document.getElementById('m-ajuste-diseno').value = a.disenoCodigo || '';
   document.getElementById('m-ajuste-cliente').value = a.cliente || a.clienteElemento || '';
+  poblarSelectProyectosDeCliente('m-ajuste-proyecto', a.cliente || a.clienteElemento || '');
   document.getElementById('m-ajuste-proyecto').value = a.proyecto || '';
   _clientesAdicionalesAjuste = JSON.parse(JSON.stringify(a.clientesAdicionales || []));
   renderClientesAdicionalesAjuste();

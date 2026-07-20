@@ -561,12 +561,14 @@ function renderEntregasViaje() {
         </select>
       </div>
       <div class="form-grid" style="margin-bottom:8px">
-        <div class="form-grupo"><label>Cliente</label><input type="text" value="${e.cliente || ''}" list="datalist-clientes-viaje" oninput="_entregasViajeActual[${ei}].cliente=this.value" placeholder="Busca un cliente existente..."></div>
-        <div class="form-grupo"><label>Destino específico / Proyecto</label><input type="text" value="${e.destino || ''}" oninput="_entregasViajeActual[${ei}].destino=this.value" placeholder="Ej: Proyecto Villa 86"></div>
+        <div class="form-grupo"><label>Cliente</label><input type="text" value="${e.cliente || ''}" list="datalist-clientes-viaje" oninput="_entregasViajeActual[${ei}].cliente=this.value;_alCambiarClienteEntrega(${ei})" placeholder="Busca un cliente existente..."></div>
+        <div class="form-grupo"><label>Destino específico / Proyecto</label>
+          <select id="entrega-proyecto-${ei}" onchange="_alElegirProyectoEntrega(${ei},this.value)" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+        </div>
       </div>
       <div class="form-grid" style="margin-bottom:8px">
-        <div class="form-grupo"><label>Contacto en obra <span style="font-weight:400;text-transform:none">(si es distinto al del cliente)</span></label><input type="text" value="${e.contactoObraNombre || ''}" oninput="_entregasViajeActual[${ei}].contactoObraNombre=this.value" placeholder="Nombre de quien recibe en obra"></div>
-        <div class="form-grupo"><label>Teléfono contacto en obra</label><input type="text" value="${e.contactoObraTelefono || ''}" oninput="_entregasViajeActual[${ei}].contactoObraTelefono=this.value" placeholder="Ej: 3101234567"></div>
+        <div class="form-grupo"><label>Contacto en obra <span style="font-weight:400;text-transform:none">(por defecto del proyecto — se puede ajustar)</span></label><input type="text" id="entrega-contacto-nombre-${ei}" value="${e.contactoObraNombre || ''}" oninput="_entregasViajeActual[${ei}].contactoObraNombre=this.value" placeholder="Nombre de quien recibe en obra"></div>
+        <div class="form-grupo"><label>Teléfono contacto en obra</label><input type="text" id="entrega-contacto-tel-${ei}" value="${e.contactoObraTelefono || ''}" oninput="_entregasViajeActual[${ei}].contactoObraTelefono=this.value" placeholder="Ej: 3101234567"></div>
       </div>
       <div style="margin-bottom:6px">
         ${e.productos.map((p, pi) => `
@@ -589,7 +591,45 @@ function renderEntregasViaje() {
       </div>
     </div>`).join('');
   if (typeof poblarDatalistClientes === 'function') poblarDatalistClientes('datalist-clientes-viaje');
+  _entregasViajeActual.forEach((e, ei) => {
+    if (typeof poblarSelectProyectosDeCliente === 'function') poblarSelectProyectosDeCliente(`entrega-proyecto-${ei}`, e.cliente);
+    const sel = document.getElementById(`entrega-proyecto-${ei}`);
+    if (sel && e.destino) sel.value = e.destino;
+  });
   actualizarPesoTotalViaje();
+}
+
+// Trazabilidad Cliente → Proyecto (ver poblarSelectProyectosDeCliente en
+// calidad-ajuste-mezcla.js): el Destino específico/Proyecto de la entrega ya no se escribe a
+// mano, se elige de los proyectos que ese cliente tiene registrados. Si el cliente cambia, el
+// proyecto y el contacto en obra elegidos antes ya no aplican necesariamente, así que se limpian.
+function _alCambiarClienteEntrega(ei) {
+  if (typeof poblarSelectProyectosDeCliente === 'function') poblarSelectProyectosDeCliente(`entrega-proyecto-${ei}`, _entregasViajeActual[ei].cliente);
+  const sel = document.getElementById(`entrega-proyecto-${ei}`);
+  if (sel) sel.value = '';
+  _entregasViajeActual[ei].destino = '';
+  _entregasViajeActual[ei].contactoObraNombre = '';
+  _entregasViajeActual[ei].contactoObraTelefono = '';
+  const elNombre = document.getElementById(`entrega-contacto-nombre-${ei}`);
+  const elTel = document.getElementById(`entrega-contacto-tel-${ei}`);
+  if (elNombre) elNombre.value = '';
+  if (elTel) elTel.value = '';
+}
+
+// Al elegir el proyecto, el contacto en obra se autocompleta con lo registrado para ESE
+// proyecto del cliente (cliente.proyectos[].contacto/telefono) — queda como valor por defecto,
+// editable, por si quien recibe ese día en particular es otra persona.
+function _alElegirProyectoEntrega(ei, nombreProyecto) {
+  const e = _entregasViajeActual[ei];
+  e.destino = nombreProyecto;
+  const cliente = (typeof CLIENTES !== 'undefined' ? CLIENTES : []).find(c => c.nombre.trim().toLowerCase() === (e.cliente || '').trim().toLowerCase());
+  const proyecto = cliente?.proyectos?.find(p => p.nombre === nombreProyecto);
+  e.contactoObraNombre = proyecto?.contacto || '';
+  e.contactoObraTelefono = proyecto?.telefono || '';
+  const elNombre = document.getElementById(`entrega-contacto-nombre-${ei}`);
+  const elTel = document.getElementById(`entrega-contacto-tel-${ei}`);
+  if (elNombre) elNombre.value = e.contactoObraNombre;
+  if (elTel) elTel.value = e.contactoObraTelefono;
 }
 
 // Buscador de producto estilo "Nueva Cotización": nombre en negrita + código en gris debajo,

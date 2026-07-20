@@ -34,6 +34,8 @@ En el modal de Nuevo/Editar Cliente, el botón "📄 Muéstrame el RUT del clien
 
 En el modal de Nuevo/Editar Cliente, debajo de la zona del RUT: botón "+ Agregar proyecto" que arma una fila editable por proyecto (Nombre del proyecto, Contacto, Teléfono) — mismo patrón que los clientes/productos adicionales de Ajuste Diario (`js/calidad-ajuste-mezcla.js`): arreglo de trabajo (`_proyectosClienteActual`) mientras el modal está abierto, se guarda dentro del cliente (`cliente.proyectos`) al hacer Guardar. Las filas sin nombre de proyecto se descartan al guardar. `renderProyectosCliente()`/`agregarProyectoCliente()`/`eliminarProyectoCliente()` en `js/historico-clientes-stats.js`.
 
+**Trazabilidad Cliente → Proyecto en el resto de la app**: `cliente.proyectos` es lo que alimenta los desplegables de "Destino específico/Proyecto" en Logística y "Proyecto" en Calidad (Ajuste Diario) — ver `poblarSelectProyectosDeCliente()` en `js/calidad-ajuste-mezcla.js`, el módulo que documenta ese patrón compartido.
+
 ## Qué hace
 
 Arma cotizaciones para clientes (producto, cantidad, transporte según municipio), las guarda en Supabase, lleva el pipeline comercial y genera estadísticas/histórico por cliente. Exporta a PDF con membrete de la empresa.

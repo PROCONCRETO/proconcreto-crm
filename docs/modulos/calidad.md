@@ -20,6 +20,10 @@ El más grande de la aplicación — control técnico de las mezclas de concreto
 
 `diseno-mezcla`, `ajuste-mezcla`, `control-ensayos`, `analisis-estadistico`, `materia-prima`, `trazabilidad`, `no-conformidades`, `certificados-calidad`
 
+## Cliente → Proyecto en Ajuste Diario
+
+El Proyecto (principal y de cada cliente adicional) ya no se escribe a mano — es un `<select>` que solo se habilita y se llena con los proyectos registrados para el cliente que esté en el campo Cliente en ese momento (`cliente.proyectos`, ver "+ Agregar proyecto" en el modal de Cliente, `docs/modulos/cotizador-crm.md`). Si el cliente no coincide con ninguno real, o no tiene proyectos registrados, el desplegable queda deshabilitado con un mensaje explicando por qué. `poblarSelectProyectosDeCliente()` en `js/calidad-ajuste-mezcla.js` es el helper compartido — Logística usa el mismo (ver `docs/modulos/logistica.md`), para que "Proyecto" se llame igual en toda la app y no queden nombres distintos para la misma obra según el módulo donde se haya escrito. `_alCambiarClienteAjuste()` (principal) y `_alCambiarClienteAdicionalAjuste()` (clientes adicionales) limpian el proyecto elegido cuando el cliente de esa fila cambia.
+
 ## Filtros del histórico (Ajuste Diario y Control de Ensayos)
 
 Ambas pantallas comparten el mismo patrón de filtros para encontrar registros del histórico: búsqueda de texto libre + desplegables de Cliente / Proyecto / Resistencia (tipo de mezcla), poblados dinámicamente solo con los valores que de verdad aparecen en los datos (no una lista fija). En Ajuste Diario: `_clientesProyectosAjuste()`, `poblarFiltrosAjustesLista()`, `_ajustesFiltrados()` (`js/calidad-ajuste-mezcla.js`). En Control de Ensayos: `_clientesProyectosEnsayo()`, `poblarFiltrosEnsayosLista()`, `_ensayosFiltrados()` (`js/calidad-mezclas.js`) — este último agrega también un filtro de Estado (En curado/Cumple/No cumple) y el botón "Imprimir Reporte", que Ajuste Diario no tiene.
