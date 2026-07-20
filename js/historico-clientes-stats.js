@@ -481,8 +481,12 @@ function guardarCliente() {
             .then(({ error }) => { if (error) console.error('Error guardando cliente:', error.message); });
         });
       } else {
-        // Mismo nombre: actualizar directamente
-        sb.from('clientes').update({ datos: clienteActualizado, modificado: new Date().toISOString() })
+        // Mismo nombre: actualizar directamente. La tabla "clientes" no tiene columna
+        // "modificado" (a diferencia del resto de tablas de la app) — incluirla hacía fallar
+        // el update entero con "Could not find the 'modificado' column..." (PostgREST),
+        // así que ninguna edición a un cliente existente se guardaba de verdad. Bug real,
+        // corregido 2026-07-19; no tiene relación con el campo proyectos en sí.
+        sb.from('clientes').update({ datos: clienteActualizado })
           .eq('nombre', nombreAnterior)
           .then(({ error }) => { if (error) console.error('Error actualizando cliente:', error.message); });
       }
