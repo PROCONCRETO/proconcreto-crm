@@ -36,6 +36,10 @@ En el modal de Nuevo/Editar Cliente, debajo de la zona del RUT: botón "+ Agrega
 
 **Trazabilidad Cliente → Proyecto en el resto de la app**: `cliente.proyectos` es lo que alimenta los desplegables de "Destino específico/Proyecto" en Logística y "Proyecto" en Calidad (Ajuste Diario) — ver `poblarSelectProyectosDeCliente()` en `js/calidad-ajuste-mezcla.js`, el módulo que documenta ese patrón compartido.
 
+## Formulario de Nueva Cotización se limpia solo al guardar
+
+`guardarCotizacion()` deja el formulario en blanco (`_resetFormularioCotizacion()` en `js/cotizador.js`, mismo helper que usa `limpiarFormulario()`) apenas termina de guardar. Antes del 2026-07-21 solo limpiaba el campo Número — el cliente, los ítems, transporte y descuentos quedaban pegados en pantalla, así que en equipos donde varias personas comparten la misma sesión del navegador (no se recarga la página entre un uso y otro), el siguiente que entraba a "+Nueva Cotización" veía los datos de la última cotización guardada por otra persona (bug real, reportado así).
+
 ## Qué hace
 
 Arma cotizaciones para clientes (producto, cantidad, transporte según municipio), las guarda en Supabase, lleva el pipeline comercial y genera estadísticas/histórico por cliente. Exporta a PDF con membrete de la empresa.

@@ -685,6 +685,7 @@ function guardarCotizacion() {
     else alert(`✅ Cotización ${num} ${cot.version} guardada y sincronizada.`);
   });
 
+  _resetFormularioCotizacion();
   document.getElementById('num-cot').value = '';
   document.getElementById('display-num-cot').textContent = '—';
   document.getElementById('sugerencia-num').textContent = '— Último usado: ' + num;
@@ -732,8 +733,14 @@ function cargarCotizacion(id) {
   document.querySelectorAll('.nav-btn')[0].classList.add('activo');
 }
 
-function limpiarFormulario() {
-  if (!confirm('¿Limpiar el formulario actual?')) return;
+// Deja el formulario de Nueva Cotización en blanco (todo salvo Número, que cada
+// llamador deja como corresponda a su caso). Se usa tanto al limpiar a mano como
+// automáticamente al terminar de guardar — antes solo se limpiaba el Número, así
+// que la cotización recién guardada (cliente, ítems, transporte...) se quedaba
+// pegada en pantalla para el siguiente que entrara a hacer una nueva (bug real,
+// reportado como "carga los datos de la última cotización que hizo otro usuario"
+// en equipos donde varios comparten la misma sesión del navegador; corregido 2026-07-21).
+function _resetFormularioCotizacion() {
   itemsActuales = [];
   document.getElementById('cliente-nombre').value = '';
   document.getElementById('cliente-contacto').value = '';
@@ -750,9 +757,6 @@ function limpiarFormulario() {
   document.getElementById('desc-descargue').value = 0;
   opcionesExtra = [];
   renderOpcionesExtra();
-  document.getElementById('num-cot').value = '';
-  document.getElementById('display-num-cot').textContent = '—';
-  document.getElementById('sugerencia-num').textContent = COTIZACIONES.length ? '— Último usado: ' + COTIZACIONES.reduce((a,b) => (parseInt(a.numero.replace(/\D/g,''))||0) > (parseInt(b.numero.replace(/\D/g,''))||0) ? a : b).numero : '';
   document.getElementById('fecha-cot').value = new Date().toISOString().split('T')[0];
   const perfil = USUARIOS_CRM[USUARIO_ACTUAL?.email];
   if (perfil) {
@@ -760,6 +764,14 @@ function limpiarFormulario() {
     document.getElementById('vendedor-cargo').value = perfil.cargo;
   }
   renderItems();
+}
+
+function limpiarFormulario() {
+  if (!confirm('¿Limpiar el formulario actual?')) return;
+  _resetFormularioCotizacion();
+  document.getElementById('num-cot').value = '';
+  document.getElementById('display-num-cot').textContent = '—';
+  document.getElementById('sugerencia-num').textContent = COTIZACIONES.length ? '— Último usado: ' + COTIZACIONES.reduce((a,b) => (parseInt(a.numero.replace(/\D/g,''))||0) > (parseInt(b.numero.replace(/\D/g,''))||0) ? a : b).numero : '';
 }
 
 // ═══════════════════════════════
