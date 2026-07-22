@@ -63,13 +63,21 @@ function setPeriodoHistorico(p) {
   renderHistorico();
 }
 
+// Ciudad y Proyecto se muestran juntos donde antes había un solo campo combinado —
+// Ciudad es texto libre por cotización, Proyecto es el elegido de los registrados en el
+// cliente (ver el desplegable de Proyecto en Nueva Cotización, opcional hasta aceptar).
+function _ciudadProyectoTexto(cliente) {
+  const partes = [cliente?.ciudad, cliente?.proyecto].filter(Boolean);
+  return partes.length ? partes.join(' · ') : '—';
+}
+
 function renderHistorico() {
   _poblarFiltrosPeriodoVendedor('hist');
   let data = COTIZACIONES;
   if (filtroTexto) data = data.filter(c =>
     c.numero.toLowerCase().includes(filtroTexto) ||
     c.cliente.nombre.toLowerCase().includes(filtroTexto) ||
-    (c.cliente.proyecto || '').toLowerCase().includes(filtroTexto)
+    ((c.cliente.ciudad || '') + ' ' + (c.cliente.proyecto || '')).toLowerCase().includes(filtroTexto)
   );
   if (filtroEstado) data = data.filter(c => c.estado === filtroEstado);
   data = _filtrarPorPeriodoVendedor(data, 'hist', _periodoHistorico);
@@ -121,7 +129,7 @@ function renderHistorico() {
       </td>
       <td>${new Date(latest.fecha+'T12:00').toLocaleDateString('es-CO')}</td>
       <td style="font-weight:600">${latest.cliente.nombre}</td>
-      <td style="color:var(--gris-medio)">${latest.cliente.proyecto||'—'}</td>
+      <td style="color:var(--gris-medio)">${_ciudadProyectoTexto(latest.cliente)}</td>
       <td style="color:var(--gris-medio)">${latest.vendedor?.nombre||'—'}</td>
       <td style="font-weight:700">$${(numOps > 1 ? menorVal : latest.totales.total).toLocaleString()}${numOps > 1 ? `<div style="font-size:10px;color:var(--gris-medio);font-weight:400">desde (menor opción)</div>` : ''}</td>
       <td><span class="badge badge-${latest.estado.toLowerCase()}">${latest.estado}</span></td>
@@ -146,7 +154,7 @@ function renderHistorico() {
         </td>
         <td style="color:var(--gris-medio);font-size:13px">${new Date(v.fecha+'T12:00').toLocaleDateString('es-CO')}</td>
         <td style="color:var(--gris-medio);font-size:13px">${v.cliente.nombre}</td>
-        <td style="color:var(--gris-medio);font-size:13px">${v.cliente.proyecto||'—'}</td>
+        <td style="color:var(--gris-medio);font-size:13px">${_ciudadProyectoTexto(v.cliente)}</td>
         <td style="color:var(--gris-medio);font-size:13px">${v.vendedor?.nombre||'—'}</td>
         <td style="color:var(--gris-medio);font-size:13px">$${v.totales.total.toLocaleString()}</td>
         <td><span class="badge badge-${v.estado.toLowerCase()}" style="opacity:0.7">${v.estado}</span></td>
@@ -205,23 +213,25 @@ function abrirModalEstado(id) {
 function cambiarEstado(estado) {
   const id = document.getElementById('estado-cot-id').value;
   const cot = COTIZACIONES.find(c => String(c.id) === String(id));
-  if (cot) {
+  if (!cot) { cerrarModal('modal-estado'); return; }
+
+  if (estado === 'Aceptada') {
     // Si se acepta y hay varias opciones, preguntar cuál eligió el cliente
-    if (estado === 'Aceptada') {
-      const ops = obtenerOpcionesCot(cot);
-      if (ops.length > 1) {
-        const lista = ops.map((o, i) => `${i + 1}) Opción ${i + 1} — $${(o.totales?.total || 0).toLocaleString()}`).join('\n');
-        const resp = prompt(`El cliente aceptó la cotización ${cot.numero}.\n¿Cuál opción eligió?\n\n${lista}\n\nEscribe el número de la opción (1-${ops.length}):`, '1');
-        if (resp === null) return; // canceló
-        const sel = parseInt(resp);
-        if (!(sel >= 1 && sel <= ops.length)) { alert('Opción inválida. No se cambió el estado.'); return; }
-        cot.opcionAceptada = sel - 1;
-      } else {
-        cot.opcionAceptada = 0;
-      }
+    const ops = obtenerOpcionesCot(cot);
+    if (ops.length > 1) {
+      const lista = ops.map((o, i) => `${i + 1}) Opción ${i + 1} — $${(o.totales?.total || 0).toLocaleString()}`).join('\n');
+      const resp = prompt(`El cliente aceptó la cotización ${cot.numero}.\n¿Cuál opción eligió?\n\n${lista}\n\nEscribe el número de la opción (1-${ops.length}):`, '1');
+      if (resp === null) { cerrarModal('modal-estado'); return; } // canceló
+      const sel = parseInt(resp);
+      if (!(sel >= 1 && sel <= ops.length)) { alert('Opción inválida. No se cambió el estado.'); cerrarModal('modal-estado'); return; }
+      cot.opcionAceptada = sel - 1;
+    } else {
+      cot.opcionAceptada = 0;
     }
+    cerrarModal('modal-estado');
+    if (_intentarAceptarCotizacion(cot)) _confirmarAceptacionCotizacion(cot);
+  } else {
     cot.estado = estado;
-    const cotActualizada = { ...cot, estado };
     sb.from('cotizaciones').upsert({
       numero: cot.numero,
       version: cot.version || 'V1',
@@ -229,21 +239,51 @@ function cambiarEstado(estado) {
       cliente: cot.cliente,
       items: cot.items,
       condiciones: cot.condiciones,
-      datos: cotActualizada,
+      datos: { ...cot, estado },
       modificado: new Date().toISOString()
     }, { onConflict: 'numero,version' }).then(({ error }) => {
       if (error) console.error('Error actualizando estado:', error.message);
     });
-    // Auto-crear Orden de Servicio al aceptar
-    if (estado === 'Aceptada') {
-      const osExistente = ORDENES.find(o => o.cotizacion === cot.numero);
-      if (!osExistente) crearOrdenDesdeCotizacion(cot);
-    }
+    cerrarModal('modal-estado');
   }
-  cerrarModal('modal-estado');
   renderHistorico();
   renderPipeline();
   renderEstadisticas();
+}
+
+// Al aceptar una cotización, el Proyecto debe quedar diligenciado — es el dato que se
+// hereda a la Orden de Producción y de ahí a Logística (ver _confirmarAceptacionCotizacion()
+// y aplicarOrdenAEntrega() en js/logistica.js). Si todavía no tiene proyecto asignado, se
+// felicita al vendedor por cerrar la venta y se abre la ficha del cliente para registrar el
+// proyecto/obra y su contacto — la aceptación se retoma sola al guardar el cliente (ver
+// _completarAceptacionCotizacion()), o queda pendiente si se cancela esa ficha (ver cerrarModal()).
+let _cotAceptandoPendienteProyecto = null;
+
+function _intentarAceptarCotizacion(cot) {
+  if (cot.cliente?.proyecto) return true;
+  _cotAceptandoPendienteProyecto = cot.id;
+  alert(`🎉 ¡Felicitaciones por cerrar la venta ${cot.numero}!\n\nAntes de continuar, registra el proyecto/obra y su contacto en la ficha del cliente — es el dato que usarán Producción, Logística y Calidad para programar la entrega.`);
+  const c = CLIENTES.find(cl => cl.nombre === cot.cliente?.nombre);
+  if (c) editarCliente(c.id); else abrirModalCliente();
+  return false;
+}
+
+function _confirmarAceptacionCotizacion(cot) {
+  cot.estado = 'Aceptada';
+  sb.from('cotizaciones').upsert({
+    numero: cot.numero,
+    version: cot.version || 'V1',
+    estado: 'Aceptada',
+    cliente: cot.cliente,
+    items: cot.items,
+    condiciones: cot.condiciones,
+    datos: { ...cot, estado: 'Aceptada' },
+    modificado: new Date().toISOString()
+  }, { onConflict: 'numero,version' }).then(({ error }) => {
+    if (error) console.error('Error actualizando estado:', error.message);
+  });
+  const osExistente = ORDENES.find(o => o.cotizacion === cot.numero);
+  if (!osExistente) crearOrdenDesdeCotizacion(cot);
 }
 
 // ═══════════════════════════════
@@ -502,8 +542,43 @@ function guardarCliente() {
         }
       });
   }
+  if (_cotAceptandoPendienteProyecto) _completarAceptacionCotizacion(clienteData);
   cerrarModal('modal-cliente');
   renderClientes();
+}
+
+// Retoma la aceptación de una cotización que quedó pendiente porque el cliente todavía no
+// tenía proyecto registrado (ver _intentarAceptarCotizacion() más arriba). Si el cliente
+// recién guardado ya tiene proyectos, se usa el único que tenga o se pregunta cuál si hay
+// varios; si no se pudo asignar ninguno, la cotización se queda como estaba (se puede
+// reintentar "Aceptada" más adelante).
+function _completarAceptacionCotizacion(clienteData) {
+  const cotId = _cotAceptandoPendienteProyecto;
+  _cotAceptandoPendienteProyecto = null;
+  const cot = COTIZACIONES.find(c => String(c.id) === String(cotId));
+  if (!cot) return;
+  const proyectos = clienteData.proyectos || [];
+  if (!proyectos.length) {
+    alert(`⚠️ La cotización ${cot.numero} todavía no quedó Aceptada — no se registró ningún proyecto para ${clienteData.nombre}. Vuelve a intentar "Aceptada" cuando el proyecto esté registrado.`);
+    return;
+  }
+  let proyectoElegido = proyectos[0].nombre;
+  if (proyectos.length > 1) {
+    const lista = proyectos.map((p, i) => `${i + 1}) ${p.nombre}`).join('\n');
+    const resp = prompt(`¿Qué proyecto corresponde a la cotización ${cot.numero}?\n\n${lista}\n\nEscribe el número (1-${proyectos.length}):`, '1');
+    if (resp === null) {
+      alert(`La cotización ${cot.numero} todavía no quedó Aceptada — vuelve a intentar "Aceptada" cuando sepas qué proyecto asignarle.`);
+      return;
+    }
+    const sel = parseInt(resp);
+    proyectoElegido = (sel >= 1 && sel <= proyectos.length) ? proyectos[sel - 1].nombre : proyectos[0].nombre;
+  }
+  cot.cliente.proyecto = proyectoElegido;
+  _confirmarAceptacionCotizacion(cot);
+  alert(`✅ Cotización ${cot.numero} aceptada — proyecto asignado: ${proyectoElegido}.`);
+  renderHistorico();
+  renderPipeline();
+  renderEstadisticas();
 }
 
 function verCotizacionesCliente(nombre) {
@@ -534,6 +609,8 @@ function usarCliente(id) {
   document.getElementById('cliente-nombre').value = c.nombre;
   document.getElementById('cliente-contacto').value = c.contacto || '';
   document.getElementById('cliente-cel').value = c.cel || '';
+  document.getElementById('cliente-ciudad').value = c.ciudad || '';
+  poblarSelectProyectosDeCliente('cliente-proyecto', c.nombre);
   document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
   document.getElementById('pantalla-nueva-cotizacion').classList.add('activa');
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('activo'));
@@ -559,10 +636,11 @@ function seleccionarClienteCot(id) {
   document.getElementById('cliente-nombre').value = c.nombre;
   document.getElementById('cliente-contacto').value = c.contacto || '';
   document.getElementById('cliente-cel').value = c.cel || '';
-  document.getElementById('cliente-proyecto').value = '';
+  document.getElementById('cliente-ciudad').value = c.ciudad || '';
+  poblarSelectProyectosDeCliente('cliente-proyecto', c.nombre);
   document.getElementById('lista-clientes-cot').style.display = 'none';
   document.getElementById('buscar-cliente-cot').value = '';
-  document.getElementById('cliente-proyecto').focus();
+  document.getElementById('cliente-ciudad').focus();
 }
 
 // ═══════════════════════════════
@@ -758,7 +836,7 @@ function renderPipeline() {
                ondragend="onDragEnd(event)">
             <div class="kc-num">${c.numero} ${c.version||''}</div>
             <div class="kc-cliente">${c.cliente.nombre}</div>
-            <div class="kc-proyecto">${c.cliente.proyecto || '—'}</div>
+            <div class="kc-proyecto">${_ciudadProyectoTexto(c.cliente)}</div>
             <div class="kc-total">$${c.totales.total.toLocaleString()}</div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
               <div class="kc-fecha">${new Date(c.fecha+'T12:00').toLocaleDateString('es-CO',{day:'2-digit',month:'short'})}</div>
@@ -827,23 +905,23 @@ function onDrop(e) {
   const nuevoEstado = e.currentTarget.dataset.estado;
   const cot = COTIZACIONES.find(c => String(c.id) === String(dragId));
   if (cot && cot.estado !== nuevoEstado) {
-    cot.estado = nuevoEstado;
-    const cotActualizada = { ...cot, estado: nuevoEstado };
-    sb.from('cotizaciones').upsert({
-      numero: cot.numero,
-      version: cot.version || 'V1',
-      estado: nuevoEstado,
-      cliente: cot.cliente,
-      items: cot.items,
-      condiciones: cot.condiciones,
-      datos: cotActualizada,
-      modificado: new Date().toISOString()
-    }, { onConflict: 'numero,version' }).then(({ error }) => {
-      if (error) console.error('Error actualizando estado pipeline:', error.message);
-    });
     if (nuevoEstado === 'Aceptada') {
-      const osExistente = ORDENES.find(o => o.cotizacion === cot.numero);
-      if (!osExistente) crearOrdenDesdeCotizacion(cot);
+      if (_intentarAceptarCotizacion(cot)) _confirmarAceptacionCotizacion(cot);
+    } else {
+      cot.estado = nuevoEstado;
+      const cotActualizada = { ...cot, estado: nuevoEstado };
+      sb.from('cotizaciones').upsert({
+        numero: cot.numero,
+        version: cot.version || 'V1',
+        estado: nuevoEstado,
+        cliente: cot.cliente,
+        items: cot.items,
+        condiciones: cot.condiciones,
+        datos: cotActualizada,
+        modificado: new Date().toISOString()
+      }, { onConflict: 'numero,version' }).then(({ error }) => {
+        if (error) console.error('Error actualizando estado pipeline:', error.message);
+      });
     }
     renderHistorico();
     renderEstadisticas();
@@ -993,7 +1071,12 @@ function cambiarEstadoOrden(id, nuevoEstado, fromDrop) {
 // ═══════════════════════════════
 // MODALES
 // ═══════════════════════════════
-function cerrarModal(id) { document.getElementById(id).classList.remove('abierto'); }
+function cerrarModal(id) {
+  document.getElementById(id).classList.remove('abierto');
+  // Si se cancela la ficha de cliente que se abrió para registrar el proyecto pendiente de
+  // una aceptación (ver _intentarAceptarCotizacion()), esa cotización se queda sin aceptar.
+  if (id === 'modal-cliente' && _cotAceptandoPendienteProyecto) _cotAceptandoPendienteProyecto = null;
+}
 document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) m.classList.remove('abierto'); });
 });

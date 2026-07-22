@@ -184,7 +184,7 @@ function verPDFOrden(id) {
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
         <div><div style="font-size:10px;color:#888">Razón social</div><div style="font-size:13px;font-weight:600;margin-top:2px">${o.clienteData?.nombre||o.cliente}</div></div>
         <div><div style="font-size:10px;color:#888">Contacto</div><div style="font-size:12px;margin-top:2px">${o.clienteData?.contacto||'—'}</div></div>
-        <div><div style="font-size:10px;color:#888">Ciudad / Proyecto</div><div style="font-size:12px;margin-top:2px">${o.clienteData?.proyecto||'—'}</div></div>
+        <div><div style="font-size:10px;color:#888">Ciudad / Proyecto</div><div style="font-size:12px;margin-top:2px">${_ciudadProyectoTexto(o.clienteData)}</div></div>
       </div>
     </div>
     <!-- Productos -->

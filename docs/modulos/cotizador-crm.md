@@ -36,6 +36,19 @@ En el modal de Nuevo/Editar Cliente, debajo de la zona del RUT: botón "+ Agrega
 
 **Trazabilidad Cliente → Proyecto en el resto de la app**: `cliente.proyectos` es lo que alimenta los desplegables de "Destino específico/Proyecto" en Logística y "Proyecto" en Calidad (Ajuste Diario) — ver `poblarSelectProyectosDeCliente()` en `js/calidad-ajuste-mezcla.js`, el módulo que documenta ese patrón compartido.
 
+## Ciudad y Proyecto en Nueva Cotización (campos separados)
+
+Hasta el 2026-07-22 existía un solo campo de texto libre "Ciudad / Proyecto". Ahora son dos, y significan cosas distintas dentro del objeto `cot.cliente` que se guarda con cada cotización (no confundir con el registro persistente del cliente en la tabla `clientes`, que tiene su propio `ciudad` de RUT y su arreglo `proyectos`):
+
+- **`cot.cliente.ciudad`**: texto libre, obligatorio — la ciudad de entrega de ESTA cotización en particular (puede no coincidir con la ciudad registrada del cliente).
+- **`cot.cliente.proyecto`**: opcional al cotizar. Es un `<select>` (`poblarSelectProyectosDeCliente('cliente-proyecto', ...)`) que solo ofrece los proyectos ya registrados para ese cliente (`cliente.proyectos` — ver arriba); se repuebla al escribir/elegir el cliente (`oninput` en Razón social, `usarCliente()`, `seleccionarClienteCot()`).
+
+**Por qué es opcional al cotizar pero obligatorio al aceptar**: en la etapa de cotizar puede que el proyecto/obra todavía no exista como tal. Pero el Proyecto es justamente el dato que la Orden de Producción hereda (`crearOrdenDesdeCotizacion()`) y que de ahí pasa a Logística para autocompletar la entrega (`aplicarOrdenAEntrega()` en `js/logistica.js`) — así que sin proyecto asignado, esa cadena se rompe. Por eso, al pasar una cotización a **Aceptada** (`cambiarEstado()` o arrastrando en el kanban del Pipeline, `onDrop()`, ambos en `js/historico-clientes-stats.js`) sin que `cot.cliente.proyecto` tenga valor:
+
+1. `_intentarAceptarCotizacion(cot)` bloquea la aceptación, felicita al vendedor por cerrar la venta, y abre la ficha del cliente (`editarCliente()`) para que registre el proyecto y su contacto en obra.
+2. Al guardar esa ficha, `guardarCliente()` retoma la aceptación pendiente (`_completarAceptacionCotizacion()`): si el cliente ya tiene proyectos, usa el único que haya o pregunta cuál si hay varios, se lo asigna a la cotización, y ahí sí la marca Aceptada y crea la Orden de Servicio (`_confirmarAceptacionCotizacion()`).
+3. Si se cancela esa ficha sin guardar (`cerrarModal('modal-cliente')`), la aceptación queda pendiente sin completarse — se puede reintentar "Aceptada" más adelante.
+
 ## Formulario de Nueva Cotización se limpia solo al guardar
 
 `guardarCotizacion()` deja el formulario en blanco (`_resetFormularioCotizacion()` en `js/cotizador.js`, mismo helper que usa `limpiarFormulario()`) apenas termina de guardar. Antes del 2026-07-21 solo limpiaba el campo Número — el cliente, los ítems, transporte y descuentos quedaban pegados en pantalla, así que en equipos donde varias personas comparten la misma sesión del navegador (no se recarga la página entre un uso y otro), el siguiente que entraba a "+Nueva Cotización" veía los datos de la última cotización guardada por otra persona (bug real, reportado así).

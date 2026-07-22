@@ -587,9 +587,9 @@ function guardarCotizacion() {
     alert('Por favor ingresa el nombre del cliente.');
     return;
   }
-  if (!document.getElementById('cliente-proyecto').value.trim()) {
-    alert('⚠️ Debes ingresar la ciudad / proyecto antes de guardar.');
-    document.getElementById('cliente-proyecto').focus();
+  if (!document.getElementById('cliente-ciudad').value.trim()) {
+    alert('⚠️ Debes ingresar la ciudad antes de guardar.');
+    document.getElementById('cliente-ciudad').focus();
     return;
   }
   if (itemsActuales.length === 0) {
@@ -635,6 +635,7 @@ function guardarCotizacion() {
       nombre: document.getElementById('cliente-nombre').value,
       contacto: document.getElementById('cliente-contacto').value,
       cel: document.getElementById('cliente-cel').value,
+      ciudad: document.getElementById('cliente-ciudad').value,
       proyecto: document.getElementById('cliente-proyecto').value,
     },
     items: JSON.parse(JSON.stringify(itemsActuales)),
@@ -664,7 +665,7 @@ function guardarCotizacion() {
 
   // Registrar o actualizar cliente en la tabla clientes
   if (!CLIENTES.find(c => c.nombre === cot.cliente.nombre)) {
-    const nuevoCliente = { id: Date.now(), nombre: cot.cliente.nombre, contacto: cot.cliente.contacto || '', cel: cot.cliente.cel || '', email: '', ciudad: cot.cliente.proyecto || '', nit: '' };
+    const nuevoCliente = { id: Date.now(), nombre: cot.cliente.nombre, contacto: cot.cliente.contacto || '', cel: cot.cliente.cel || '', email: '', ciudad: cot.cliente.ciudad || '', nit: '' };
     CLIENTES.push(nuevoCliente);
     sb.from('clientes').upsert({ nombre: nuevoCliente.nombre, datos: nuevoCliente }, { onConflict: 'nombre' })
       .then(({ error }) => { if (error) console.warn('Cliente no guardado:', error.message); });
@@ -708,7 +709,9 @@ function cargarCotizacion(id) {
   document.getElementById('cliente-nombre').value = cot.cliente.nombre;
   document.getElementById('cliente-contacto').value = cot.cliente.contacto;
   document.getElementById('cliente-cel').value = cot.cliente.cel;
-  document.getElementById('cliente-proyecto').value = cot.cliente.proyecto;
+  document.getElementById('cliente-ciudad').value = cot.cliente.ciudad || '';
+  poblarSelectProyectosDeCliente('cliente-proyecto', cot.cliente.nombre);
+  document.getElementById('cliente-proyecto').value = cot.cliente.proyecto || '';
   document.getElementById('destino-transporte').value = cot.transporte.destino || '';
   document.getElementById('tarifa-manual').value = cot.transporte.tarifaManual || 0;
   document.getElementById('destino-otro-nombre').value = cot.transporte.destinoNombre || '';
@@ -745,7 +748,8 @@ function _resetFormularioCotizacion() {
   document.getElementById('cliente-nombre').value = '';
   document.getElementById('cliente-contacto').value = '';
   document.getElementById('cliente-cel').value = '';
-  document.getElementById('cliente-proyecto').value = '';
+  document.getElementById('cliente-ciudad').value = '';
+  poblarSelectProyectosDeCliente('cliente-proyecto', '');
   document.getElementById('destino-transporte').value = '';
   document.getElementById('tarifa-manual').value = 0;
   document.getElementById('destino-otro-nombre').value = '';
@@ -787,7 +791,9 @@ function previsualizarCotizacionById(id) {
   document.getElementById('cliente-nombre').value = cot.cliente.nombre;
   document.getElementById('cliente-contacto').value = cot.cliente.contacto;
   document.getElementById('cliente-cel').value = cot.cliente.cel;
-  document.getElementById('cliente-proyecto').value = cot.cliente.proyecto;
+  document.getElementById('cliente-ciudad').value = cot.cliente.ciudad || '';
+  poblarSelectProyectosDeCliente('cliente-proyecto', cot.cliente.nombre);
+  document.getElementById('cliente-proyecto').value = cot.cliente.proyecto || '';
   document.getElementById('destino-transporte').value = cot.transporte.destino || '';
   document.getElementById('tarifa-manual').value = cot.transporte.tarifaManual || 0;
   document.getElementById('destino-otro-nombre').value = cot.transporte.destinoNombre || '';
@@ -815,9 +821,9 @@ function previsualizarCotizacion() {
     document.getElementById('num-cot').focus();
     return;
   }
-  if (!document.getElementById('cliente-proyecto').value.trim()) {
-    alert('⚠️ Debes ingresar la ciudad / proyecto antes de previsualizar.');
-    document.getElementById('cliente-proyecto').focus();
+  if (!document.getElementById('cliente-ciudad').value.trim()) {
+    alert('⚠️ Debes ingresar la ciudad antes de previsualizar.');
+    document.getElementById('cliente-ciudad').focus();
     return;
   }
   const fecha = new Date(document.getElementById('fecha-cot').value + 'T12:00:00');
@@ -826,6 +832,7 @@ function previsualizarCotizacion() {
     nombre: document.getElementById('cliente-nombre').value || '—',
     contacto: document.getElementById('cliente-contacto').value,
     cel: document.getElementById('cliente-cel').value,
+    ciudad: document.getElementById('cliente-ciudad').value,
     proyecto: document.getElementById('cliente-proyecto').value,
   };
 

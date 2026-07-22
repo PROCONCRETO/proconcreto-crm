@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260721a">
+<link rel="stylesheet" href="css/estilos.css?v=20260722a">
 </head>
 <body>
 
@@ -149,7 +149,7 @@
     <div class="form-grid">
       <div class="form-grupo">
         <label>Razón social / Nombre</label>
-        <input type="text" id="cliente-nombre" placeholder="Ej: CONSTRUCTORA ABC S.A.S.">
+        <input type="text" id="cliente-nombre" placeholder="Ej: CONSTRUCTORA ABC S.A.S." oninput="poblarSelectProyectosDeCliente('cliente-proyecto', this.value)">
       </div>
       <div class="form-grupo">
         <label>Atención (contacto)</label>
@@ -160,8 +160,14 @@
         <input type="text" id="cliente-cel" placeholder="3101234567">
       </div>
       <div class="form-grupo">
-        <label>Ciudad / Proyecto <span style="color:var(--rojo)">*</span></label>
-        <input type="text" id="cliente-proyecto" placeholder="Ej: Proyecto Villa 86 – Pereira">
+        <label>Ciudad <span style="color:var(--rojo)">*</span></label>
+        <input type="text" id="cliente-ciudad" placeholder="Ej: Pereira">
+      </div>
+      <div class="form-grupo">
+        <label>Proyecto <span style="font-weight:400;text-transform:none">(opcional — de los proyectos registrados del cliente)</span></label>
+        <select id="cliente-proyecto" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="">Elige primero un cliente válido...</option>
+        </select>
       </div>
     </div>
   </div>
@@ -418,7 +424,7 @@
           <th>N° COT.</th>
           <th>FECHA</th>
           <th>CLIENTE</th>
-          <th>PROYECTO</th>
+          <th>CIUDAD / PROYECTO</th>
           <th>VENDEDOR</th>
           <th>TOTAL</th>
           <th>ESTADO</th>
@@ -1644,21 +1650,21 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260721a"></script>
-<script src="js/catalogo.js?v=20260721a"></script>
-<script src="js/navegacion.js?v=20260721a"></script>
-<script src="js/ordenes-produccion.js?v=20260721a"></script>
-<script src="js/produccion-diaria.js?v=20260721a"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260721a"></script>
-<script src="js/calidad-mezclas.js?v=20260721a"></script>
-<script src="js/calidad-estadisticas.js?v=20260721a"></script>
-<script src="js/calidad-trazabilidad.js?v=20260721a"></script>
-<script src="js/logistica.js?v=20260721a"></script>
-<script src="js/estadisticas-logistica.js?v=20260721a"></script>
-<script src="js/auth.js?v=20260721a"></script>
-<script src="js/datos-realtime.js?v=20260721a"></script>
-<script src="js/cotizador.js?v=20260721a"></script>
-<script src="js/historico-clientes-stats.js?v=20260721a"></script>
+<script src="js/config.js?v=20260722a"></script>
+<script src="js/catalogo.js?v=20260722a"></script>
+<script src="js/navegacion.js?v=20260722a"></script>
+<script src="js/ordenes-produccion.js?v=20260722a"></script>
+<script src="js/produccion-diaria.js?v=20260722a"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260722a"></script>
+<script src="js/calidad-mezclas.js?v=20260722a"></script>
+<script src="js/calidad-estadisticas.js?v=20260722a"></script>
+<script src="js/calidad-trazabilidad.js?v=20260722a"></script>
+<script src="js/logistica.js?v=20260722a"></script>
+<script src="js/estadisticas-logistica.js?v=20260722a"></script>
+<script src="js/auth.js?v=20260722a"></script>
+<script src="js/datos-realtime.js?v=20260722a"></script>
+<script src="js/cotizador.js?v=20260722a"></script>
+<script src="js/historico-clientes-stats.js?v=20260722a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1666,9 +1672,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260721a"></script>
-<script src="js/rut-parser.js?v=20260721a"></script>
-<script src="js/compresor-pdf.js?v=20260721a"></script>
-<script src="js/lector-informes.js?v=20260721a"></script>
+<script src="js/pdf.js?v=20260722a"></script>
+<script src="js/rut-parser.js?v=20260722a"></script>
+<script src="js/compresor-pdf.js?v=20260722a"></script>
+<script src="js/lector-informes.js?v=20260722a"></script>
 </body>
 </html>
