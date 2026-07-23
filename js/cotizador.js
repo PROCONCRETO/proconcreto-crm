@@ -815,11 +815,10 @@ function previsualizarCotizacion() {
     document.getElementById('num-cot').focus();
     return;
   }
-  if (!document.getElementById('cliente-ciudad').value.trim()) {
-    alert('⚠️ Debes ingresar la ciudad antes de previsualizar.');
-    document.getElementById('cliente-ciudad').focus();
-    return;
-  }
+  // Ciudad es obligatoria para GUARDAR (ver guardarCotizacion()), pero no para previsualizar —
+  // las cotizaciones de antes del 2026-07-22 (cuando Ciudad/Proyecto era un solo campo) no
+  // tienen este dato por separado, y bloquear su vista previa las dejaría imposibles de ver
+  // o reimprimir (bug real, reportado justo así). El PDF ya omite la línea si está vacía.
   const numTexto = _numeroCotTexto(COTIZACIONES.find(c => c.numero === num) || { numero: num });
   const fecha = new Date(document.getElementById('fecha-cot').value + 'T12:00:00');
   const fechaStr = fecha.toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
