@@ -6,6 +6,7 @@
 - `js/historico-clientes-stats.js` (946 líneas) — pipeline de cotizaciones, histórico por cliente, estadísticas, modal de Cliente (`abrirModalCliente()`/`editarCliente()`/`guardarCliente()`)
 - `js/pdf.js` — exporta la cotización a PDF (jsPDF + html2canvas)
 - `js/rut-parser.js` — lee el RUT (PDF) de un cliente en el navegador para autocompletar el modal de Cliente
+- `js/migracion-consecutivos.js` — **temporal**, borrar tras usarla una vez (ver "Migración de las cotizaciones anteriores al 2026-07-22" más abajo)
 
 ## Datos
 
@@ -52,6 +53,20 @@ Hasta el 2026-07-22 existía un solo campo de texto libre "Ciudad / Proyecto". A
 ## Formulario de Nueva Cotización se limpia solo al guardar
 
 `guardarCotizacion()` deja el formulario en blanco (`_resetFormularioCotizacion()` en `js/cotizador.js`, mismo helper que usa `limpiarFormulario()`) apenas termina de guardar. Antes del 2026-07-21 solo limpiaba el campo Número — el cliente, los ítems, transporte y descuentos quedaban pegados en pantalla, así que en equipos donde varias personas comparten la misma sesión del navegador (no se recarga la página entre un uso y otro), el siguiente que entraba a "+Nueva Cotización" veía los datos de la última cotización guardada por otra persona (bug real, reportado así).
+
+## Consecutivo de cotización (automático desde C100001)
+
+Hasta el 2026-07-22 el Número se escribía a mano (con solo una sugerencia de "último usado" al lado) — causaba typos, saltos y duplicados. Ahora se asigna solo:
+
+- `siguienteNum()` (`js/config.js`) calcula el máximo `numero` ya usado en `COTIZACIONES` y devuelve el siguiente, con un piso de `100001` (formato `C100001`, `C100002`...).
+- El campo Número del formulario (`#num-cot`) es de solo lectura — ya no se puede escribir. Se autorrellena con `siguienteNum()` cada vez que el formulario queda en blanco (`_resetFormularioCotizacion()`, usado por `limpiarFormulario()`, el final de `guardarCotizacion()`, y `mostrarApp()` al iniciar sesión).
+- **Por qué se recalcula otra vez justo al guardar** (`guardarCotizacion()`): el número que se ve en pantalla se calculó al abrir el formulario, y pudo quedar desactualizado si otra persona guardó una cotización mientras tanto (dos personas cotizando a la vez) — así que si ese número todavía no le pertenece a ninguna cotización guardada, se recalcula contra los datos más frescos (ya actualizados por la sincronización en tiempo real) antes de guardar. Si el número SÍ pertenece a una cotización existente, es porque se está guardando una nueva versión de ella (`cargarCotizacion()`), y conserva su propio número — nunca se le asigna uno nuevo por accidente. No hay un secuenciador atómico del lado de Supabase, así que sigue existiendo una ventana de colisión teórica (submilisegundos) si dos personas guardan literalmente al mismo tiempo; con 7 usuarios no se consideró necesario blindarlo más que esto.
+
+### Migración de las cotizaciones anteriores al 2026-07-22
+
+Los números viejos (escritos a mano, sin un formato fijo) no se pierden: `js/migracion-consecutivos.js` es una **herramienta de un solo uso** (no parte permanente del aplicativo — se debe borrar, junto con su `<script>` en `cotizaciones.html`, después de usarla una vez) que agrupa las cotizaciones existentes por número (una cotización con varias versiones V1/V2/V3... comparte un solo consecutivo nuevo), las ordena por fecha y les asigna `C100001`, `C100002`... en ese orden, guardando el número viejo en un campo nuevo `cot.numeroAnterior`. Donde se muestra el número a una persona (histórico, kanban del Pipeline, PDF de la cotización, referencia en la Orden de Producción) se usa `_numeroCotTexto(cot)` (`js/historico-clientes-stats.js`), que arma `"C100001 (C4562)"` si hay `numeroAnterior`, o solo `cot.numero` si no lo hay (las cotizaciones nuevas nunca tienen `numeroAnterior`). También reamarra las Órdenes de Servicio que ya apuntaban al número viejo (`orden.cotizacion`), para no romper el enlace cotización → orden.
+
+Se corre a mano desde la consola del navegador, ya logueado en la app: `migrarConsecutivosCotizaciones()` solo muestra el plan (no escribe nada); `migrarConsecutivosCotizaciones(true)` lo ejecuta de verdad. Es idempotente (una cotización con `numeroAnterior` ya asignado se salta sola en una segunda corrida) y se niega a correr si detecta alguna cotización ya creada con el consecutivo nuevo antes de migrar las viejas — por eso **debe correrse antes de crear cualquier cotización nueva** después de este cambio, para que la numeración no se cruce.
 
 ## Qué hace
 

@@ -26,7 +26,7 @@ function renderOrdenes(lista) {
         </div>
       </td>
       <td>
-        ${o.cotizacion ? `<span style="font-weight:600;color:var(--azul)">${o.cotizacion}</span> <span style="font-size:11px;background:var(--gris-borde);color:var(--gris-texto);padding:2px 6px;border-radius:3px;font-weight:600">${o.versionCotizacion||''}</span>` : '—'}
+        ${o.cotizacion ? `<span style="font-weight:600;color:var(--azul)">${_numeroCotTexto(COTIZACIONES.find(c => c.numero === o.cotizacion) || { numero: o.cotizacion })}</span> <span style="font-size:11px;background:var(--gris-borde);color:var(--gris-texto);padding:2px 6px;border-radius:3px;font-weight:600">${o.versionCotizacion||''}</span>` : '—'}
       </td>
       <td style="font-weight:600">${o.cliente}</td>
       <td style="color:var(--gris-medio);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${o.descripcion}">${o.descripcion}</td>
@@ -176,7 +176,7 @@ function verPDFOrden(id) {
     </div>
     <!-- Ref cotización -->
     <div style="background:#E8F5E9;border-left:4px solid #1D9E75;padding:8px 16px;font-size:12px;color:#1B5E20">
-      Generada desde cotización <strong>${o.cotizacion||'—'} ${o.versionCotizacion||''}</strong> — Estado: Aceptada
+      Generada desde cotización <strong>${o.cotizacion ? _numeroCotTexto(COTIZACIONES.find(c => c.numero === o.cotizacion) || { numero: o.cotizacion }) : '—'} ${o.versionCotizacion||''}</strong> — Estado: Aceptada
     </div>
     <!-- Cliente -->
     <div style="padding:14px 16px;border-bottom:1px solid #eee">

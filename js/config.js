@@ -19,11 +19,13 @@ let COTIZACIONES = [];
 let CLIENTES = [];
 let USUARIO_ACTUAL = null;
 
-// Contador de cotizaciones
+// Consecutivo de cotización — se asigna solo, nunca se escribe a mano (antes era manual y
+// causaba typos, saltos y duplicados). Arranca en 100001; los números de antes de esa fecha
+// quedan intactos como referencia en cot.numeroAnterior tras la migración (ver docs).
 function siguienteNum() {
-  const nums = COTIZACIONES.map(c => parseInt(c.numero.replace('C','')) || 0);
+  const nums = COTIZACIONES.map(c => parseInt((c.numero || '').replace(/\D/g, '')) || 0);
   const max = nums.length ? Math.max(...nums) : 0;
-  return 'C' + String(max + 1).padStart(4, '0');
+  return 'C' + String(Math.max(max + 1, 100001));
 }
 
 // Tarifas de transporte (desde Excel)

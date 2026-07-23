@@ -61,10 +61,7 @@ async function mostrarApp() {
   }
   await cargarDatosSupabase();
   poblarGrupos();
-  document.getElementById('fecha-cot').value = new Date().toISOString().split('T')[0];
-  document.getElementById('num-cot').value = '';
-  document.getElementById('display-num-cot').textContent = '—';
-  document.getElementById('sugerencia-num').textContent = '— Último usado: ' + (COTIZACIONES.length ? COTIZACIONES.reduce((a,b) => (parseInt(a.numero.replace(/\D/g,''))||0) > (parseInt(b.numero.replace(/\D/g,''))||0) ? a : b).numero : 'ninguno');
+  _resetFormularioCotizacion();
   const sel = document.getElementById('destino-transporte');
   while (sel.options.length > 1) sel.remove(1);
   Object.keys(TARIFAS_TRANSPORTE).forEach(d => {

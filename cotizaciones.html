@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260722a">
+<link rel="stylesheet" href="css/estilos.css?v=20260722b">
 </head>
 <body>
 
@@ -124,8 +124,8 @@
     </div>
     <div class="form-grid-3">
       <div class="form-grupo">
-        <label>Número <span style="color:var(--rojo)">*</span> <span id="sugerencia-num" style="font-size:10px;color:var(--gris-medio);font-weight:400;text-transform:none"></span></label>
-        <input type="text" id="num-cot" value="" placeholder="Ej: C0085" oninput="this.value=this.value.toUpperCase();document.getElementById('display-num-cot').textContent=this.value||'—'" style="font-weight:700;border-color:var(--azul-medio)">
+        <label>Número <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(consecutivo automático)</span></label>
+        <input type="text" id="num-cot" value="" readonly style="font-weight:700;border-color:var(--azul-medio);background:#F3F4F6;color:#374151;cursor:not-allowed">
       </div>
       <div class="form-grupo">
         <label>Versión</label>
@@ -1650,21 +1650,23 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260722a"></script>
-<script src="js/catalogo.js?v=20260722a"></script>
-<script src="js/navegacion.js?v=20260722a"></script>
-<script src="js/ordenes-produccion.js?v=20260722a"></script>
-<script src="js/produccion-diaria.js?v=20260722a"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260722a"></script>
-<script src="js/calidad-mezclas.js?v=20260722a"></script>
-<script src="js/calidad-estadisticas.js?v=20260722a"></script>
-<script src="js/calidad-trazabilidad.js?v=20260722a"></script>
-<script src="js/logistica.js?v=20260722a"></script>
-<script src="js/estadisticas-logistica.js?v=20260722a"></script>
-<script src="js/auth.js?v=20260722a"></script>
-<script src="js/datos-realtime.js?v=20260722a"></script>
-<script src="js/cotizador.js?v=20260722a"></script>
-<script src="js/historico-clientes-stats.js?v=20260722a"></script>
+<script src="js/config.js?v=20260722b"></script>
+<script src="js/catalogo.js?v=20260722b"></script>
+<script src="js/navegacion.js?v=20260722b"></script>
+<script src="js/ordenes-produccion.js?v=20260722b"></script>
+<script src="js/produccion-diaria.js?v=20260722b"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260722b"></script>
+<script src="js/calidad-mezclas.js?v=20260722b"></script>
+<script src="js/calidad-estadisticas.js?v=20260722b"></script>
+<script src="js/calidad-trazabilidad.js?v=20260722b"></script>
+<script src="js/logistica.js?v=20260722b"></script>
+<script src="js/estadisticas-logistica.js?v=20260722b"></script>
+<script src="js/auth.js?v=20260722b"></script>
+<script src="js/datos-realtime.js?v=20260722b"></script>
+<script src="js/cotizador.js?v=20260722b"></script>
+<script src="js/historico-clientes-stats.js?v=20260722b"></script>
+<!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
+<script src="js/migracion-consecutivos.js?v=20260722b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1672,9 +1674,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260722a"></script>
-<script src="js/rut-parser.js?v=20260722a"></script>
-<script src="js/compresor-pdf.js?v=20260722a"></script>
-<script src="js/lector-informes.js?v=20260722a"></script>
+<script src="js/pdf.js?v=20260722b"></script>
+<script src="js/rut-parser.js?v=20260722b"></script>
+<script src="js/compresor-pdf.js?v=20260722b"></script>
+<script src="js/lector-informes.js?v=20260722b"></script>
 </body>
 </html>

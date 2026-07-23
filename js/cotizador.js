@@ -568,21 +568,18 @@ function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCarg
 // GUARDAR / CARGAR COTIZACIÓN
 // ═══════════════════════════════
 function guardarCotizacion() {
-  const num = document.getElementById('num-cot').value.trim().toUpperCase();
-  if (!num) {
-    alert('⚠️ Debes asignar un número de cotización antes de guardar.');
-    document.getElementById('num-cot').focus();
-    return;
-  }
-  if (!/^[A-Z]\d{4}$/.test(num)) {
-    alert('⚠️ El número debe tener el formato C0085 (una letra seguida de 4 dígitos).');
-    document.getElementById('num-cot').focus();
-    return;
-  }
-  const duplicado = COTIZACIONES.find(c => c.numero === num && c.id !== (COTIZACIONES.find(x => x.numero === num)?.id));
-  if (duplicado && !COTIZACIONES.find(c => c.numero === num && c.id === duplicado.id)) {
-    if (!confirm(`Ya existe la cotización ${num}. ¿Deseas sobreescribirla?`)) return;
-  }
+  // El número ya no se escribe a mano (causaba typos/saltos/duplicados) — se asigna solo.
+  // Si el número que se ve en pantalla todavía no le pertenece a ninguna cotización guardada,
+  // es apenas el "próximo consecutivo" que se mostró al abrir el formulario, y puede haberse
+  // quedado desactualizado si alguien más guardó una cotización mientras tanto (dos personas
+  // cotizando a la vez) — por eso se recalcula justo antes de guardar, contra los datos más
+  // frescos que ya trajo la sincronización en tiempo real. Si el número SÍ pertenece a una
+  // cotización existente, es porque se está guardando una nueva versión de ella, y conserva
+  // su propio número.
+  let num = document.getElementById('num-cot').value.trim().toUpperCase();
+  if (!COTIZACIONES.some(c => c.numero === num)) num = siguienteNum();
+  document.getElementById('num-cot').value = num;
+  document.getElementById('display-num-cot').textContent = num;
   if (!document.getElementById('cliente-nombre').value.trim()) {
     alert('Por favor ingresa el nombre del cliente.');
     return;
@@ -687,9 +684,6 @@ function guardarCotizacion() {
   });
 
   _resetFormularioCotizacion();
-  document.getElementById('num-cot').value = '';
-  document.getElementById('display-num-cot').textContent = '—';
-  document.getElementById('sugerencia-num').textContent = '— Último usado: ' + num;
 }
 
 function cargarCotizacion(id) {
@@ -744,6 +738,9 @@ function cargarCotizacion(id) {
 // reportado como "carga los datos de la última cotización que hizo otro usuario"
 // en equipos donde varios comparten la misma sesión del navegador; corregido 2026-07-21).
 function _resetFormularioCotizacion() {
+  const num = siguienteNum();
+  document.getElementById('num-cot').value = num;
+  document.getElementById('display-num-cot').textContent = num;
   itemsActuales = [];
   document.getElementById('cliente-nombre').value = '';
   document.getElementById('cliente-contacto').value = '';
@@ -773,9 +770,6 @@ function _resetFormularioCotizacion() {
 function limpiarFormulario() {
   if (!confirm('¿Limpiar el formulario actual?')) return;
   _resetFormularioCotizacion();
-  document.getElementById('num-cot').value = '';
-  document.getElementById('display-num-cot').textContent = '—';
-  document.getElementById('sugerencia-num').textContent = COTIZACIONES.length ? '— Último usado: ' + COTIZACIONES.reduce((a,b) => (parseInt(a.numero.replace(/\D/g,''))||0) > (parseInt(b.numero.replace(/\D/g,''))||0) ? a : b).numero : '';
 }
 
 // ═══════════════════════════════
@@ -826,6 +820,7 @@ function previsualizarCotizacion() {
     document.getElementById('cliente-ciudad').focus();
     return;
   }
+  const numTexto = _numeroCotTexto(COTIZACIONES.find(c => c.numero === num) || { numero: num });
   const fecha = new Date(document.getElementById('fecha-cot').value + 'T12:00:00');
   const fechaStr = fecha.toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
   const cliente = {
@@ -891,7 +886,7 @@ function previsualizarCotizacion() {
       <div class="preview-content">
         <div class="preview-header">
           <div class="preview-cod">
-            <div style="color:#003F7F;font-weight:700;font-size:15px">COTIZACIÓN N°${num}</div>
+            <div style="color:#003F7F;font-weight:700;font-size:15px">COTIZACIÓN N°${numTexto}</div>
             <div style="color:#1565C0;font-weight:600;font-size:12px">VERSIÓN N°${document.getElementById('version-cot').value}</div>
             <div style="font-size:11px;color:#555;margin-top:2px">Chinchiná, ${fechaStr}</div>
           </div>

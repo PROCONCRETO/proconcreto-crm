@@ -71,11 +71,20 @@ function _ciudadProyectoTexto(cliente) {
   return partes.length ? partes.join(' · ') : '—';
 }
 
+// Al migrar los consecutivos manuales de antes del 2026-07-22 a la numeración automática
+// desde C100001, el número viejo queda en cot.numeroAnterior para no perder la trazabilidad
+// con lo ya impreso/enviado a clientes — se muestra entre paréntesis junto al nuevo. Las
+// cotizaciones nuevas no tienen numeroAnterior, así que esto no les agrega nada.
+function _numeroCotTexto(cot) {
+  return cot?.numeroAnterior ? `${cot.numero} (${cot.numeroAnterior})` : (cot?.numero || '');
+}
+
 function renderHistorico() {
   _poblarFiltrosPeriodoVendedor('hist');
   let data = COTIZACIONES;
   if (filtroTexto) data = data.filter(c =>
     c.numero.toLowerCase().includes(filtroTexto) ||
+    (c.numeroAnterior || '').toLowerCase().includes(filtroTexto) ||
     c.cliente.nombre.toLowerCase().includes(filtroTexto) ||
     ((c.cliente.ciudad || '') + ' ' + (c.cliente.proyecto || '')).toLowerCase().includes(filtroTexto)
   );
@@ -120,7 +129,7 @@ function renderHistorico() {
     const mainRow = `<tr style="border-top:2px solid var(--azul-oscuro)">
       <td>
         <div style="font-weight:700;color:var(--azul);display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          ${latest.numero}
+          ${_numeroCotTexto(latest)}
           <span style="font-size:11px;background:var(--azul);color:white;padding:2px 6px;border-radius:3px;font-weight:600">${latest.version||'V1'}</span>
           <span style="font-size:10px;background:#E8F5E9;color:#2E7D32;padding:1px 5px;border-radius:3px">ACTIVA</span>
           ${numOps > 1 ? `<span style="font-size:10px;background:#FFF3E0;color:#E65100;padding:1px 5px;border-radius:3px;font-weight:600" title="Esta cotización tiene ${numOps} opciones">🔁 ${numOps} opciones</span>` : ''}
@@ -148,7 +157,7 @@ function renderHistorico() {
         <td style="padding-left:20px">
           <div style="display:flex;align-items:center;gap:6px;color:var(--gris-medio)">
             <span style="font-size:11px;color:var(--gris-texto)">↳</span>
-            <span style="font-weight:600;color:var(--gris-texto)">${v.numero}</span>
+            <span style="font-weight:600;color:var(--gris-texto)">${_numeroCotTexto(v)}</span>
             <span style="font-size:11px;background:var(--gris-borde);color:var(--gris-texto);padding:2px 6px;border-radius:3px;font-weight:600">${v.version||'V1'}</span>
           </div>
         </td>
@@ -834,7 +843,7 @@ function renderPipeline() {
                data-id="${c.id}"
                ondragstart="onDragStart(event)"
                ondragend="onDragEnd(event)">
-            <div class="kc-num">${c.numero} ${c.version||''}</div>
+            <div class="kc-num">${_numeroCotTexto(c)} ${c.version||''}</div>
             <div class="kc-cliente">${c.cliente.nombre}</div>
             <div class="kc-proyecto">${_ciudadProyectoTexto(c.cliente)}</div>
             <div class="kc-total">$${c.totales.total.toLocaleString()}</div>
