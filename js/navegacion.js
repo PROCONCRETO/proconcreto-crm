@@ -17,6 +17,7 @@ function activarModulo(modulo) {
     document.getElementById('pantalla-nueva-cotizacion').classList.add('activa');
     document.querySelectorAll('#subnav-cotizaciones .nav-btn').forEach(b => b.classList.remove('activo'));
     document.querySelector('#subnav-cotizaciones .nav-btn[onclick*="nueva-cotizacion"]')?.classList.add('activo');
+    if (typeof _resetFormularioCotizacion === 'function') _resetFormularioCotizacion();
   }
   if (modulo === 'logistica') {
     document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
@@ -48,6 +49,12 @@ function ir(pantalla) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('activo'));
   document.getElementById('pantalla-' + pantalla).classList.add('activa');
   event.currentTarget.classList.add('activo');
+  // Entrar a "Nueva Cotización" siempre debe dejar el formulario en blanco — si no se hiciera,
+  // cualquier dato que hubiera quedado pegado ahí (de previsualizar, de una edición abandonada
+  // sin guardar, etc.) se seguiría mostrando como si fuera la cotización nueva, y hasta se
+  // podía terminar guardando "encima" de la cotización vieja con su mismo número (bug real,
+  // reportado como "se pierde el consecutivo porque se graba con el de la que previsualizaron").
+  if (pantalla === 'nueva-cotizacion' && typeof _resetFormularioCotizacion === 'function') _resetFormularioCotizacion();
   if (pantalla === 'pipeline') renderPipeline();
   if (pantalla === 'pipeline-produccion') renderPipelineProduccion();
   if (pantalla === 'ordenes-servicio') renderOrdenes();

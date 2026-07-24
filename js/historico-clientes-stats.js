@@ -615,6 +615,7 @@ function eliminarCliente(id) {
 function usarCliente(id) {
   const c = CLIENTES.find(cl => String(cl.id) === String(id));
   if (!c) return;
+  if (typeof _resetFormularioCotizacion === 'function') _resetFormularioCotizacion();
   document.getElementById('cliente-nombre').value = c.nombre;
   document.getElementById('cliente-contacto').value = c.contacto || '';
   document.getElementById('cliente-cel').value = c.cel || '';
