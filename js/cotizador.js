@@ -816,6 +816,8 @@ function previsualizarCotizacionById(id) {
   _resetFormularioCotizacion();
 }
 
+let _pantallaAntesDeVistaPrevia = null;
+
 function previsualizarCotizacion() {
   const num = document.getElementById('num-cot').value.trim().toUpperCase();
   if (!num) {
@@ -881,7 +883,7 @@ function previsualizarCotizacion() {
       <span style="font-weight:700">Vista previa — Cotización ${num}</span>
       <div style="flex:1"></div>
       <button onclick="descargarPDF('${num}')" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700">⬇️ Descargar PDF</button>
-      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-nueva-cotizacion').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+      <button onclick="volverDeVistaPrevia()" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
     </div>
     <div class="preview-doc" id="pdf-documento">
       <!-- Cabecera membrete -->
@@ -961,9 +963,19 @@ function previsualizarCotizacion() {
       </div>
     </div>`;
 
+  // "← Volver" debe regresar a la pantalla desde donde se abrió la vista previa (Histórico,
+  // Pipeline...), no siempre a Nueva Cotización — antes quedaba fijo ahí sin importar de dónde
+  // venías (bug real, reportado así). Se captura la pantalla activa justo antes de ocultarlas.
+  _pantallaAntesDeVistaPrevia = document.querySelector('.pantalla.activa')?.id || 'pantalla-nueva-cotizacion';
   document.getElementById('contenido-preview').innerHTML = html;
   document.getElementById('vista-previa').style.display = 'block';
   document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
   window.scrollTo(0, 0);
+}
+
+function volverDeVistaPrevia() {
+  document.getElementById('vista-previa').style.display = 'none';
+  const idPantalla = _pantallaAntesDeVistaPrevia || 'pantalla-nueva-cotizacion';
+  document.getElementById(idPantalla)?.classList.add('activa');
 }
 
