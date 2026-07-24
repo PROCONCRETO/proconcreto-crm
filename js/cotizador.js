@@ -806,6 +806,14 @@ function previsualizarCotizacionById(id) {
   renderItems();
   cargarOpcionesExtraDesde(cot);
   previsualizarCotizacion();
+  // La vista previa ya quedó armada (es un string de HTML ya inyectado, no vuelve a leer
+  // estos campos) — así que el formulario de Nueva Cotización se puede dejar en blanco de
+  // una vez. Si no se hiciera, el número y los datos de ESTA cotización vieja se quedaban
+  // pegados en el formulario; si después alguien guardaba "una nueva" sin pasar por Limpiar
+  // formulario, en realidad sobreescribía esta cotización vieja con el contenido nuevo, bajo
+  // su mismo número+versión (bug real, reportado como "se pierde el consecutivo porque se
+  // graba con el de la que previsualizaron").
+  _resetFormularioCotizacion();
 }
 
 function previsualizarCotizacion() {
