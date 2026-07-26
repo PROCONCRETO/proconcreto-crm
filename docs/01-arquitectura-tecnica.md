@@ -29,6 +29,7 @@ Tablas identificadas en el código (`js/datos-realtime.js` es el punto central q
 | `no_conformidades` | `calidad-trazabilidad.js` |
 | `ajustes_mezcla` | `calidad-ajuste-mezcla.js` |
 | `entregas_programadas` | `logistica.js` |
+| `parametros_mo`, `clases_salariales`, `cuadrillas_productivas` | `costeo-mano-obra.js` — módulo Costeo, ver `docs/modulos/costeo.md`. Tablas nuevas (2026-07-26), hay que correr `sql/2026-07-26_costeo_mano_obra.sql` en Supabase antes de usarlas. |
 
 Además de las tablas (Postgres), hay un bucket de **Supabase Storage** para archivos binarios reales (no JSONB): `laboratorio-pdf` (privado, solo autenticados) — informes de laboratorio en PDF adjuntos a un Ensayo de Calidad (ligado al N° de cilindro), comprimidos en el navegador antes de subirse si pesan mucho (`js/compresor-pdf.js`). El registro en la tabla `ensayos_calidad` solo guarda la referencia al archivo (`pdfPath`), nunca el binario.
 

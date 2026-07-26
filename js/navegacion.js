@@ -12,6 +12,7 @@ function activarModulo(modulo) {
   document.getElementById('subnav-produccion').style.display = modulo === 'produccion' ? 'flex' : 'none';
   document.getElementById('subnav-logistica').style.display = modulo === 'logistica' ? 'flex' : 'none';
   document.getElementById('subnav-calidad').style.display = modulo === 'calidad' ? 'flex' : 'none';
+  document.getElementById('subnav-costeo').style.display = modulo === 'costeo' ? 'flex' : 'none';
   if (modulo === 'cotizaciones') {
     document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
     document.getElementById('pantalla-nueva-cotizacion').classList.add('activa');
@@ -40,6 +41,13 @@ function activarModulo(modulo) {
     document.querySelectorAll('#subnav-calidad .nav-btn').forEach(b => b.classList.remove('activo'));
     document.querySelector('#subnav-calidad .nav-btn[onclick*="ajuste-mezcla"]')?.classList.add('activo');
     renderAjustesMezcla();
+  }
+  if (modulo === 'costeo') {
+    document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+    document.getElementById('pantalla-costeo-mo').classList.add('activa');
+    document.querySelectorAll('#subnav-costeo .nav-btn').forEach(b => b.classList.remove('activo'));
+    document.querySelector('#subnav-costeo .nav-btn[onclick*="costeo-mo"]')?.classList.add('activo');
+    renderCosteoManoObra();
   }
 }
 
@@ -73,5 +81,6 @@ function ir(pantalla) {
   if (pantalla === 'certificados-calidad') renderCertificadosCalidad();
   if (pantalla === 'logistica') renderCalendarioLogistica();
   if (pantalla === 'logistica-estadisticas') renderEstadisticasLogistica();
+  if (pantalla === 'costeo-mo') renderCosteoManoObra();
 }
 

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260724c">
+<link rel="stylesheet" href="css/estilos.css?v=20260726a">
 </head>
 <body>
 
@@ -70,6 +70,7 @@
   <button class="nav-modulo" onclick="activarModulo('produccion')">🏭 Producción</button>
   <button class="nav-modulo" onclick="activarModulo('logistica')">🚛 Logística</button>
   <button class="nav-modulo" onclick="activarModulo('calidad')">🔬 Calidad</button>
+  <button class="nav-modulo" onclick="activarModulo('costeo')">💰 Costeo</button>
   <button class="nav-modulo" onclick="activarModulo('productos')" style="margin-left:auto">📦 Productos</button>
   <div id="nav-usuario" style="margin-left:16px">
     <span id="rt-indicador" style="font-size:14px;font-weight:700;color:#999;white-space:nowrap;padding:4px 10px;border-radius:14px;background:rgba(255,255,255,0.12)" title="Estado de sincronización">⚪ Conectando…</span>
@@ -108,6 +109,10 @@
   <button class="nav-btn" onclick="ir('no-conformidades')">⚠️ No Conformidades</button>
   <button class="nav-btn" onclick="ir('certificados-calidad')">📜 Certificados</button>
   <button class="nav-btn" onclick="ir('diseno-mezcla')" style="margin-left:auto">🧪 Diseño de Mezcla</button>
+</nav>
+
+<nav class="nav" id="subnav-costeo" style="display:none">
+  <button class="nav-btn activo" onclick="ir('costeo-mo')">👷 Costo de Mano de Obra</button>
 </nav>
 
 <!-- ═══════════════════════════════════════
@@ -743,6 +748,79 @@
 </div>
 
 <!-- ═══════════════════════════════════════
+     PANTALLA: COSTEO — COSTO DE MANO DE OBRA
+═══════════════════════════════════════ -->
+<div id="pantalla-costeo-mo" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Costo de Mano de Obra</div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--gris-medio);text-transform:uppercase;letter-spacing:0.5px">Parámetros generales — ajustar cuando cambie la ley (SMMLV, %)</div>
+      <button class="btn btn-primario btn-sm" onclick="guardarParametrosMO()">💾 Guardar parámetros</button>
+    </div>
+    <div class="form-grid-3" style="margin-bottom:10px">
+      <div class="form-grupo"><label>S.M.M.L.V.</label><input type="number" id="pmo-smmlv" min="0" step="1"></div>
+      <div class="form-grupo"><label>Subsidio de transporte (mensual)</label><input type="number" id="pmo-subsidio-transporte" min="0" step="1"></div>
+      <div class="form-grupo"><label>Días hábiles / mes (para el valor/día)</label><input type="number" id="pmo-divisor-dia" min="1" step="1"></div>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--gris-medio);margin:12px 0 6px">PRESTACIONES SOCIALES Y SEGURIDAD SOCIAL</div>
+    <div class="form-grid-3" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Cesantía (días de salario/año)</label><input type="number" id="pmo-cesantia-dias" min="0" step="1"></div>
+      <div class="form-grupo"><label>Intereses sobre cesantía (%)</label><input type="number" id="pmo-intereses-cesantia" min="0" step="0.01"></div>
+      <div class="form-grupo"><label>Vacaciones (% de 1 mes de salario)</label><input type="number" id="pmo-vacaciones" min="0" step="0.01"></div>
+      <div class="form-grupo"><label>Prima (% de 1 mes salario+subsidio)</label><input type="number" id="pmo-prima" min="0" step="0.01"></div>
+      <div class="form-grupo"><label>Pensión (%)</label><input type="number" id="pmo-pension" min="0" step="0.01"></div>
+      <div class="form-grupo"><label>Salud (%)</label><input type="number" id="pmo-salud" min="0" step="0.01"></div>
+      <div class="form-grupo"><label>ARL (%)</label><input type="number" id="pmo-arl" min="0" step="0.01"></div>
+      <div class="form-grupo"><label>SENA / Aporte ordinario (%)</label><input type="number" id="pmo-aporte-ordinario" min="0" step="0.01"></div>
+      <div class="form-grupo"><label>Caja de compensación (%)</label><input type="number" id="pmo-subsidio-familiar" min="0" step="0.01"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px">
+      <label style="font-size:11px;font-weight:700;color:var(--gris-medio);text-transform:uppercase;letter-spacing:0.5px">Dotación (anual, igual para todas las clases)</label>
+      <button type="button" class="btn btn-secundario btn-xs" onclick="agregarDotacionMO()">+ Agregar ítem</button>
+    </div>
+    <table class="tabla-items" style="width:100%">
+      <thead><tr><th>Ítem</th><th style="width:150px">Valor unitario</th><th style="width:110px">Cantidad/año</th><th style="width:130px">Total/año</th><th style="width:36px"></th></tr></thead>
+      <tbody id="dotacion-mo-body"></tbody>
+    </table>
+  </div>
+
+  <div class="acciones-row">
+    <div style="font-size:16px;font-weight:700;color:var(--azul)">Clases Salariales</div>
+    <button class="btn btn-primario btn-sm" onclick="abrirModalClaseSalarial()">+ Nueva clase</button>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
+    <table class="tabla-cots" id="tabla-clases-salariales">
+      <thead><tr>
+        <th>CLASE</th><th style="text-align:center">MÚLT. SMMLV</th><th style="text-align:center">SUBS. TRANSPORTE</th>
+        <th style="text-align:right">VALOR/MES</th><th style="text-align:right">VALOR/DÍA</th><th style="text-align:right">VALOR/AÑO</th>
+        <th style="min-width:110px">ACCIONES</th>
+      </tr></thead>
+      <tbody id="clases-salariales-body">
+        <tr><td colspan="7" class="empty-state"><div class="icono">👷</div><div>No hay clases salariales registradas.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="acciones-row">
+    <div style="font-size:16px;font-weight:700;color:var(--azul)">Cuadrillas Productivas</div>
+    <button class="btn btn-primario btn-sm" onclick="abrirModalCuadrilla()">+ Nueva cuadrilla</button>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" id="tabla-cuadrillas">
+      <thead><tr>
+        <th>CUADRILLA</th><th>ROLES</th><th style="text-align:right">VALOR/MES</th><th style="text-align:right">VALOR/DÍA</th><th style="min-width:110px">ACCIONES</th>
+      </tr></thead>
+      <tbody id="cuadrillas-body">
+        <tr><td colspan="5" class="empty-state"><div class="icono">🧑‍🤝‍🧑</div><div>No hay cuadrillas registradas.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
      PANTALLA: AJUSTE DIARIO DE MEZCLA
 ═══════════════════════════════════════ -->
 <div id="pantalla-ajuste-mezcla" class="pantalla">
@@ -1016,6 +1094,48 @@
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-diseno')">Cancelar</button>
       <button class="btn btn-primario" onclick="guardarDiseno()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-clase-salarial">
+  <div class="modal" style="width:420px;max-width:95vw">
+    <div class="modal-titulo" id="modal-clase-titulo">➕ Nueva Clase Salarial</div>
+    <input type="hidden" id="m-clase-nombre-anterior">
+    <div class="form-grupo" style="margin-bottom:10px"><label>Nombre *</label><input type="text" id="m-clase-nombre" placeholder="Ej: Clase 1 (Ayudante)"></div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Múltiplo de SMMLV *</label><input type="number" id="m-clase-multiplicador" min="0" step="0.01" value="1"></div>
+      <div class="form-grupo"><label>¿Aplica subsidio de transporte?</label>
+        <select id="m-clase-subsidio" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="si">Sí</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-clase-salarial')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarClaseSalarial()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-cuadrilla">
+  <div class="modal" style="width:640px;max-width:95vw">
+    <div class="modal-titulo" id="modal-cuadrilla-titulo">➕ Nueva Cuadrilla</div>
+    <input type="hidden" id="m-cuadrilla-nombre-anterior">
+    <div class="form-grupo" style="margin-bottom:10px"><label>Nombre *</label><input type="text" id="m-cuadrilla-nombre" placeholder="Ej: Cuadrilla Tipo 1: 1 Oficial + 1 Ayudante"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <label style="font-size:11px;font-weight:600;color:var(--gris-medio);text-transform:uppercase;letter-spacing:0.5px">Roles</label>
+      <button type="button" class="btn btn-secundario btn-xs" onclick="agregarRolCuadrilla()">+ Agregar rol</button>
+    </div>
+    <table class="tabla-items" style="width:100%;margin-bottom:10px">
+      <thead><tr><th>Rol</th><th style="width:90px">Personas</th><th style="width:190px">Clase</th><th style="width:110px">Valor/mes</th><th style="width:36px"></th></tr></thead>
+      <tbody id="roles-cuadrilla-body"></tbody>
+    </table>
+    <div style="text-align:right;font-size:13px;font-weight:700;color:var(--azul);margin-bottom:10px" id="cuadrilla-total-preview"></div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-cuadrilla')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarCuadrilla()">Guardar</button>
     </div>
   </div>
 </div>
@@ -1650,23 +1770,24 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260724c"></script>
-<script src="js/catalogo.js?v=20260724c"></script>
-<script src="js/navegacion.js?v=20260724c"></script>
-<script src="js/ordenes-produccion.js?v=20260724c"></script>
-<script src="js/produccion-diaria.js?v=20260724c"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260724c"></script>
-<script src="js/calidad-mezclas.js?v=20260724c"></script>
-<script src="js/calidad-estadisticas.js?v=20260724c"></script>
-<script src="js/calidad-trazabilidad.js?v=20260724c"></script>
-<script src="js/logistica.js?v=20260724c"></script>
-<script src="js/estadisticas-logistica.js?v=20260724c"></script>
-<script src="js/auth.js?v=20260724c"></script>
-<script src="js/datos-realtime.js?v=20260724c"></script>
-<script src="js/cotizador.js?v=20260724c"></script>
-<script src="js/historico-clientes-stats.js?v=20260724c"></script>
+<script src="js/config.js?v=20260726a"></script>
+<script src="js/catalogo.js?v=20260726a"></script>
+<script src="js/navegacion.js?v=20260726a"></script>
+<script src="js/ordenes-produccion.js?v=20260726a"></script>
+<script src="js/produccion-diaria.js?v=20260726a"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260726a"></script>
+<script src="js/costeo-mano-obra.js?v=20260726a"></script>
+<script src="js/calidad-mezclas.js?v=20260726a"></script>
+<script src="js/calidad-estadisticas.js?v=20260726a"></script>
+<script src="js/calidad-trazabilidad.js?v=20260726a"></script>
+<script src="js/logistica.js?v=20260726a"></script>
+<script src="js/estadisticas-logistica.js?v=20260726a"></script>
+<script src="js/auth.js?v=20260726a"></script>
+<script src="js/datos-realtime.js?v=20260726a"></script>
+<script src="js/cotizador.js?v=20260726a"></script>
+<script src="js/historico-clientes-stats.js?v=20260726a"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
-<script src="js/migracion-consecutivos.js?v=20260724c"></script>
+<script src="js/migracion-consecutivos.js?v=20260726a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1674,9 +1795,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260724c"></script>
-<script src="js/rut-parser.js?v=20260724c"></script>
-<script src="js/compresor-pdf.js?v=20260724c"></script>
-<script src="js/lector-informes.js?v=20260724c"></script>
+<script src="js/pdf.js?v=20260726a"></script>
+<script src="js/rut-parser.js?v=20260726a"></script>
+<script src="js/compresor-pdf.js?v=20260726a"></script>
+<script src="js/lector-informes.js?v=20260726a"></script>
 </body>
 </html>
