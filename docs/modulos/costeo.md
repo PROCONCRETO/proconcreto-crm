@@ -28,16 +28,25 @@ Basada en la fórmula del Excel original (`MOD`), verificada al peso contra sus 
 - `C` = A + B (mensual); anual = C × 12.
 - `D` (base seguridad social y parafiscales) = A anual — **no** incluye el subsidio de transporte.
 - `E` (base cesantía) = C anual — **sí** incluye el subsidio de transporte.
-- Cesantía anual = E × (días cesantía / 365). Intereses sobre cesantía = Cesantía × %. Vacaciones = A mensual × %. Prima = C mensual × %.
+- Cesantía anual = E × (días cesantía / 365). Intereses sobre cesantía = Cesantía × %. Vacaciones = A mensual × % (se calcula, pero ver más abajo por qué no se suma al total). Prima = C mensual × %.
 - Dotación anual = suma de (valor unitario × cantidad/año) de `parametros_mo.dotacion` — **simplificación**: en el Excel original la cantidad de cada ítem de dotación variaba un poco por clase (ej. más pares de guantes para las clases más operativas); aquí se dejó un solo valor de cantidad por ítem, igual para todas las clases, para no tener que mantener una matriz ítem×clase por una diferencia de menos del 1% del costo total. Si en algún momento se necesita esa precisión, se puede agregar cantidad por clase.
 - Pensión, Salud, ARL, Aporte ordinario (SENA), Subsidio familiar (caja de compensación) = D × su % respectivo.
-- **Valor real anual = C anual + prestaciones sociales (cesantía, intereses, vacaciones, prima) + dotación + seguridad social + parafiscales.** Mensual = anual/12. Semana = anual/52. Hora = semana / horas semanales legales (`parametros_mo.horasSemanales`, 42 desde jul-2026 en Colombia).
+- **Valor real anual = C anual + cesantía + intereses cesantía + prima + dotación + seguridad social + parafiscales** (sin vacaciones, ver justo abajo). Mensual = anual/12. Semana = anual/52. Hora = semana / horas semanales legales (`parametros_mo.horasSemanales`, 42 desde jul-2026 en Colombia).
 - **Valor/día = valor real anual / `parametros_mo.diasLaboradosAno`** (220 por defecto — días realmente trabajados al año, después de descontar sábados, domingos, festivos y vacaciones). Antes del 2026-07-26 el divisor era "días hábiles del mes" (20) aplicado al valor mensual; se cambió a un divisor anual real a pedido del usuario.
-- **Vacaciones SÍ se suma al valor real anual.** Se evaluó (y se llegó a implementar por un momento) quitarla de la suma con el argumento de que el divisor `diasLaboradosAno` ya la descuenta de los días disponibles — pero eso hace las cosas al revés: el divisor responde "¿entre cuántos días productivos reparto el costo?", mientras que Vacaciones responde "¿cuánto es ese costo?". Son preguntas distintas, no se pisan. Quitarla de la suma habría subestimado el costo real de un día de producción, porque esa plata sí se paga y en el modelo corregido no quedaba reflejada en ningún otro lado.
+
+### Por qué Vacaciones NO se suma al valor real anual (decisión final, verificada con flujo de caja real)
+
+Este punto se discutió varias veces antes de asentarse — vale la pena dejar la razón completa por escrito para no volver a darle vueltas.
+
+El salario que un empleado devenga durante sus 15 días hábiles de vacaciones **no es plata extra**: es el mismo salario mensual de siempre (el salario se paga igual los 12 meses del año, haya o no vacaciones dentro de ese mes) — a diferencia de la Prima o la Cesantía, que sí son pagos adicionales reales exigidos por ley. La plata real que la empresa gasta al año en un empleado, sin ningún renglón de "Vacaciones", es exactamente: salario + subsidio transporte + cesantía + intereses + prima + dotación + seguridad social + parafiscales — ni un peso más ni uno menos.
+
+El renglón "Vacaciones" del Excel original (A mensual × 50%) era un parche para compensar que su propio divisor ("20 días hábiles del mes", equivalente a 240 días/año) **no restaba los días de vacaciones** de los días disponibles para repartir el costo — sin ese parche, dividir por un divisor inflado habría subestimado el costo real por día. Ahora que el divisor `diasLaboradosAno` (220) sí resta los días de vacaciones de verdad, ese parche ya no hace falta: sumarlo aparte y también restar esos días del divisor sería cobrar el mismo efecto dos veces (esto se verificó concretamente: para la Clase 1 del Excel original, el gasto real anual sin el renglón de vacaciones es $37.532.945 — sumarle igual el renglón de "vacaciones" ($875.500) habría inflado el total a $38.408.445, que no es plata que la empresa realmente desembolse).
+
+Vacaciones se sigue calculando y se muestra en el discriminado (en cursiva, sin "% del costo") solo como referencia informativa — no entra en la suma del valor real anual.
 
 ## Discriminado de costos (botón ➕ en cada clase)
 
-Modal con cada concepto de costo (salario, subsidio, cesantía, intereses, vacaciones, prima, dotación, pensión, salud, ARL, parafiscales) y **dos lecturas de porcentaje** lado a lado: "% del costo" (sobre el costo real total = 100%) y "% del salario" (sobre el salario base = 100%, muestra el sobrecosto que agrega cada concepto por encima del sueldo — el total da el factor prestacional real, ~180-190% del salario).
+Modal con cada concepto de costo (salario, subsidio, cesantía, intereses, vacaciones, prima, dotación, pensión, salud, ARL, parafiscales) y **dos lecturas de porcentaje** lado a lado: "% del costo" (sobre el costo real total = 100%) y "% del salario" (sobre el salario base = 100%, muestra el sobrecosto que agrega cada concepto por encima del sueldo — el total da el factor prestacional real, ~175-185% del salario). La fila de Vacaciones aparece en cursiva y sin "% del costo" (guion) porque es informativa, no está incluida en el total.
 
 ## Cuadrillas productivas
 
