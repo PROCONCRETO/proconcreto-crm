@@ -15,7 +15,7 @@ function _defaultParametrosMO() {
   return {
     smmlv: 1751000,
     subsidioTransporte: 250000,
-    divisorDia: 20,
+    diasLaboradosAno: 220,
     horasSemanales: 42,
     cesantiaDias: 30,
     interesesCesantiaPct: 12,
@@ -67,10 +67,15 @@ function calcularCosteoClase(clase, p) {
   const aporteOrdinario = D_anual * (p.aporteOrdinarioPct / 100);
   const subsidioFamiliar = D_anual * (p.subsidioFamiliarPct / 100);
 
-  const valorRealAnual = C_anual + cesantia + interesesCesantia + vacaciones + prima + dotacionTotal
+  // Vacaciones NO se suma al total: los 15 días hábiles de vacaciones al año ya están
+  // descontados del divisor "días laborados al año" que se usa para el valor/día (junto con
+  // sábados, domingos y festivos) — sumarla aparte y también restarla del divisor sería
+  // contar el mismo sobrecosto dos veces. Se sigue calculando y mostrando en el discriminado
+  // (informativo), solo que no entra en la suma del valor real.
+  const valorRealAnual = C_anual + cesantia + interesesCesantia + prima + dotacionTotal
     + pension + salud + arl + aporteOrdinario + subsidioFamiliar;
   const valorRealMensual = valorRealAnual / 12;
-  const valorRealDiario = valorRealMensual / (p.divisorDia || 20);
+  const valorRealDiario = valorRealAnual / (p.diasLaboradosAno || 220);
   // Semana = año/52; hora = semana / horas semanales legales (42 en Colombia desde jul-2026).
   const valorRealSemanal = valorRealAnual / 52;
   const valorRealHora = valorRealSemanal / (p.horasSemanales || 42);
@@ -89,7 +94,7 @@ function renderCosteoManoObra() {
   if (!PARAMETROS_MO) PARAMETROS_MO = _defaultParametrosMO();
   document.getElementById('pmo-smmlv').value = PARAMETROS_MO.smmlv;
   document.getElementById('pmo-subsidio-transporte').value = PARAMETROS_MO.subsidioTransporte;
-  document.getElementById('pmo-divisor-dia').value = PARAMETROS_MO.divisorDia;
+  document.getElementById('pmo-dias-laborados-ano').value = PARAMETROS_MO.diasLaboradosAno;
   document.getElementById('pmo-horas-semanales').value = PARAMETROS_MO.horasSemanales;
   document.getElementById('pmo-cesantia-dias').value = PARAMETROS_MO.cesantiaDias;
   document.getElementById('pmo-intereses-cesantia').value = PARAMETROS_MO.interesesCesantiaPct;
@@ -134,7 +139,7 @@ function eliminarDotacionMO(i) {
 function guardarParametrosMO() {
   PARAMETROS_MO.smmlv = parseFloat(document.getElementById('pmo-smmlv').value) || 0;
   PARAMETROS_MO.subsidioTransporte = parseFloat(document.getElementById('pmo-subsidio-transporte').value) || 0;
-  PARAMETROS_MO.divisorDia = parseFloat(document.getElementById('pmo-divisor-dia').value) || 20;
+  PARAMETROS_MO.diasLaboradosAno = parseFloat(document.getElementById('pmo-dias-laborados-ano').value) || 220;
   PARAMETROS_MO.horasSemanales = parseFloat(document.getElementById('pmo-horas-semanales').value) || 42;
   PARAMETROS_MO.cesantiaDias = parseFloat(document.getElementById('pmo-cesantia-dias').value) || 0;
   PARAMETROS_MO.interesesCesantiaPct = parseFloat(document.getElementById('pmo-intereses-cesantia').value) || 0;
@@ -202,7 +207,7 @@ function abrirDetalleClase(nombre) {
     { nombre: 'Subsidio de transporte', valor: c.subsidioTransporteAnual },
     { nombre: 'Cesantía', valor: c.cesantia },
     { nombre: 'Intereses sobre cesantía', valor: c.interesesCesantia },
-    { nombre: 'Vacaciones', valor: c.vacaciones },
+    { nombre: 'Vacaciones (15 días hábiles/año — informativo, no se suma al total)', valor: c.vacaciones, excluido: true },
     { nombre: 'Prima', valor: c.prima },
     { nombre: 'Dotación', valor: c.dotacionTotal },
     { nombre: 'Pensión', valor: c.pension },
@@ -222,10 +227,10 @@ function abrirDetalleClase(nombre) {
   // real que carga cada concepto por encima del salario, útil para ver de un vistazo
   // cuánto más cuesta un trabajador que su sueldo (el total da ~180-190% del salario).
   document.getElementById('detalle-clase-body').innerHTML = conceptos.map(x => `
-    <tr>
+    <tr${x.excluido ? ' style="color:var(--gris-medio);font-style:italic"' : ''}>
       <td>${x.nombre}</td>
       <td style="text-align:right">${_fmt(x.valor)}</td>
-      <td style="text-align:right">${c.valorRealAnual ? (x.valor / c.valorRealAnual * 100).toFixed(1) : '0.0'}%</td>
+      <td style="text-align:right">${x.excluido ? '—' : (c.valorRealAnual ? (x.valor / c.valorRealAnual * 100).toFixed(1) + '%' : '0.0%')}</td>
       <td style="text-align:right">${c.salarioAnual ? (x.valor / c.salarioAnual * 100).toFixed(1) : '0.0'}%</td>
     </tr>`).join('') + `
     <tr style="font-weight:700;border-top:2px solid var(--gris-borde)">
@@ -328,7 +333,7 @@ function _totalCuadrilla(cu) {
     const clase = _claseCalculada(r.clase);
     if (clase) mensual += (Number(r.personas) || 0) * clase.valorRealMensual;
   });
-  const diario = mensual / (PARAMETROS_MO.divisorDia || 20);
+  const diario = (mensual * 12) / (PARAMETROS_MO.diasLaboradosAno || 220);
   return { mensual, diario };
 }
 
