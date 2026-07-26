@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260726f">
+<link rel="stylesheet" href="css/estilos.css?v=20260726g">
 </head>
 <body>
 
@@ -770,7 +770,6 @@
     <div class="form-grid-3" style="margin-bottom:10px">
       <div class="form-grupo"><label>Cesantía (días de salario/año)</label><input type="number" id="pmo-cesantia-dias" min="0" step="1"></div>
       <div class="form-grupo"><label>Intereses sobre cesantía (%)</label><input type="number" id="pmo-intereses-cesantia" min="0" step="0.01"></div>
-      <div class="form-grupo"><label>Vacaciones (% de 1 mes de salario)</label><input type="number" id="pmo-vacaciones" min="0" step="0.01"></div>
       <div class="form-grupo"><label>Prima (% de 1 mes salario+subsidio)</label><input type="number" id="pmo-prima" min="0" step="0.01"></div>
       <div class="form-grupo"><label>Pensión (%)</label><input type="number" id="pmo-pension" min="0" step="0.01"></div>
       <div class="form-grupo"><label>Salud (%)</label><input type="number" id="pmo-salud" min="0" step="0.01"></div>
@@ -1149,7 +1148,7 @@
       <thead><tr><th>Concepto</th><th style="text-align:right;width:120px">Valor/año</th><th style="text-align:right;width:80px">% del costo</th><th style="text-align:right;width:100px">% del salario</th></tr></thead>
       <tbody id="detalle-clase-body"></tbody>
     </table>
-    <div style="font-size:11px;color:var(--gris-medio);margin-top:8px">"% del costo" toma el costo real total como el 100%. "% del salario" toma el salario base como el 100% — muestra el sobrecosto que cada concepto agrega por encima del salario. La fila de Vacaciones (en cursiva) es solo informativa: el salario de esos días no es plata extra (ya está en el salario mensual normal), así que no se suma al total — el efecto de esos días ya está reflejado en el divisor "días laborados al año" usado para el valor/día.</div>
+    <div style="font-size:11px;color:var(--gris-medio);margin-top:8px">"% del costo" toma el costo real total como el 100%. "% del salario" toma el salario base como el 100% — muestra el sobrecosto que cada concepto agrega por encima del salario.</div>
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-detalle-clase')">Cerrar</button>
     </div>
@@ -1786,24 +1785,24 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260726f"></script>
-<script src="js/catalogo.js?v=20260726f"></script>
-<script src="js/navegacion.js?v=20260726f"></script>
-<script src="js/ordenes-produccion.js?v=20260726f"></script>
-<script src="js/produccion-diaria.js?v=20260726f"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260726f"></script>
-<script src="js/costeo-mano-obra.js?v=20260726f"></script>
-<script src="js/calidad-mezclas.js?v=20260726f"></script>
-<script src="js/calidad-estadisticas.js?v=20260726f"></script>
-<script src="js/calidad-trazabilidad.js?v=20260726f"></script>
-<script src="js/logistica.js?v=20260726f"></script>
-<script src="js/estadisticas-logistica.js?v=20260726f"></script>
-<script src="js/auth.js?v=20260726f"></script>
-<script src="js/datos-realtime.js?v=20260726f"></script>
-<script src="js/cotizador.js?v=20260726f"></script>
-<script src="js/historico-clientes-stats.js?v=20260726f"></script>
+<script src="js/config.js?v=20260726g"></script>
+<script src="js/catalogo.js?v=20260726g"></script>
+<script src="js/navegacion.js?v=20260726g"></script>
+<script src="js/ordenes-produccion.js?v=20260726g"></script>
+<script src="js/produccion-diaria.js?v=20260726g"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260726g"></script>
+<script src="js/costeo-mano-obra.js?v=20260726g"></script>
+<script src="js/calidad-mezclas.js?v=20260726g"></script>
+<script src="js/calidad-estadisticas.js?v=20260726g"></script>
+<script src="js/calidad-trazabilidad.js?v=20260726g"></script>
+<script src="js/logistica.js?v=20260726g"></script>
+<script src="js/estadisticas-logistica.js?v=20260726g"></script>
+<script src="js/auth.js?v=20260726g"></script>
+<script src="js/datos-realtime.js?v=20260726g"></script>
+<script src="js/cotizador.js?v=20260726g"></script>
+<script src="js/historico-clientes-stats.js?v=20260726g"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
-<script src="js/migracion-consecutivos.js?v=20260726f"></script>
+<script src="js/migracion-consecutivos.js?v=20260726g"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1811,9 +1810,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260726f"></script>
-<script src="js/rut-parser.js?v=20260726f"></script>
-<script src="js/compresor-pdf.js?v=20260726f"></script>
-<script src="js/lector-informes.js?v=20260726f"></script>
+<script src="js/pdf.js?v=20260726g"></script>
+<script src="js/rut-parser.js?v=20260726g"></script>
+<script src="js/compresor-pdf.js?v=20260726g"></script>
+<script src="js/lector-informes.js?v=20260726g"></script>
 </body>
 </html>
