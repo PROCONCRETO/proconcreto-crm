@@ -16,6 +16,7 @@ function _defaultParametrosMO() {
     smmlv: 1751000,
     subsidioTransporte: 250000,
     divisorDia: 20,
+    horasSemanales: 42,
     cesantiaDias: 30,
     interesesCesantiaPct: 12,
     vacacionesPct: 50,
@@ -70,8 +71,16 @@ function calcularCosteoClase(clase, p) {
     + pension + salud + arl + aporteOrdinario + subsidioFamiliar;
   const valorRealMensual = valorRealAnual / 12;
   const valorRealDiario = valorRealMensual / (p.divisorDia || 20);
+  // Semana = año/52; hora = semana / horas semanales legales (42 en Colombia desde jul-2026).
+  const valorRealSemanal = valorRealAnual / 52;
+  const valorRealHora = valorRealSemanal / (p.horasSemanales || 42);
 
-  return { A_mensual, B_mensual, C_mensual, valorRealAnual, valorRealMensual, valorRealDiario };
+  return {
+    valorRealAnual, valorRealMensual, valorRealSemanal, valorRealDiario, valorRealHora,
+    // Discriminado (para el detalle con %) — cada concepto en valor/año, como en el Excel original.
+    salarioAnual: A_anual, subsidioTransporteAnual: B_mensual * 12, cesantia, interesesCesantia, vacaciones, prima,
+    dotacionTotal, pension, salud, arl, aporteOrdinario, subsidioFamiliar,
+  };
 }
 
 function _fmt(n) { return '$' + Math.round(n || 0).toLocaleString('es-CO'); }
@@ -81,6 +90,7 @@ function renderCosteoManoObra() {
   document.getElementById('pmo-smmlv').value = PARAMETROS_MO.smmlv;
   document.getElementById('pmo-subsidio-transporte').value = PARAMETROS_MO.subsidioTransporte;
   document.getElementById('pmo-divisor-dia').value = PARAMETROS_MO.divisorDia;
+  document.getElementById('pmo-horas-semanales').value = PARAMETROS_MO.horasSemanales;
   document.getElementById('pmo-cesantia-dias').value = PARAMETROS_MO.cesantiaDias;
   document.getElementById('pmo-intereses-cesantia').value = PARAMETROS_MO.interesesCesantiaPct;
   document.getElementById('pmo-vacaciones').value = PARAMETROS_MO.vacacionesPct;
@@ -125,6 +135,7 @@ function guardarParametrosMO() {
   PARAMETROS_MO.smmlv = parseFloat(document.getElementById('pmo-smmlv').value) || 0;
   PARAMETROS_MO.subsidioTransporte = parseFloat(document.getElementById('pmo-subsidio-transporte').value) || 0;
   PARAMETROS_MO.divisorDia = parseFloat(document.getElementById('pmo-divisor-dia').value) || 20;
+  PARAMETROS_MO.horasSemanales = parseFloat(document.getElementById('pmo-horas-semanales').value) || 42;
   PARAMETROS_MO.cesantiaDias = parseFloat(document.getElementById('pmo-cesantia-dias').value) || 0;
   PARAMETROS_MO.interesesCesantiaPct = parseFloat(document.getElementById('pmo-intereses-cesantia').value) || 0;
   PARAMETROS_MO.vacacionesPct = parseFloat(document.getElementById('pmo-vacaciones').value) || 0;
@@ -148,7 +159,7 @@ function renderClasesSalariales() {
   const body = document.getElementById('clases-salariales-body');
   if (!body) return;
   if (!CLASES_SALARIALES.length) {
-    body.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">👷</div><div>No hay clases salariales registradas.</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">👷</div><div>No hay clases salariales registradas.</div></td></tr>`;
     return;
   }
   body.innerHTML = CLASES_SALARIALES.map(c => {
@@ -158,11 +169,14 @@ function renderClasesSalariales() {
       <td style="font-weight:600">${c.nombre}</td>
       <td style="text-align:center">${Number(c.multiplicador).toFixed(2)}×</td>
       <td style="text-align:center">${c.aplicaSubsidioTransporte === false ? 'No' : 'Sí'}</td>
-      <td style="text-align:right">${_fmt(r.valorRealMensual)}</td>
+      <td style="text-align:right">${_fmt(r.valorRealHora)}</td>
       <td style="text-align:right">${_fmt(r.valorRealDiario)}</td>
+      <td style="text-align:right">${_fmt(r.valorRealSemanal)}</td>
+      <td style="text-align:right">${_fmt(r.valorRealMensual)}</td>
       <td style="text-align:right">${_fmt(r.valorRealAnual)}</td>
       <td>
         <div class="flex-gap">
+          <button class="btn btn-secundario btn-xs" onclick="abrirDetalleClase('${c.nombre.replace(/'/g, "\\'")}')" title="Ver discriminado del costo">➕</button>
           <button class="btn btn-primario btn-xs" onclick="editarClaseSalarial('${c.nombre.replace(/'/g, "\\'")}')">✏️</button>
           <button class="btn btn-rojo btn-xs" onclick="eliminarClaseSalarial('${c.nombre.replace(/'/g, "\\'")}')">🗑️</button>
         </div>
@@ -175,6 +189,46 @@ function _claseCalculada(nombre) {
   const c = CLASES_SALARIALES.find(x => x.nombre === nombre);
   if (!c) return null;
   return { ...c, ...calcularCosteoClase(c, PARAMETROS_MO) };
+}
+
+// Discriminado del costo de una clase — mismo desglose "BASE/FACTOR/VALOR/%" del Excel
+// original (MOD), para que se pueda auditar de dónde sale el valor real de cada clase.
+function abrirDetalleClase(nombre) {
+  const c = _claseCalculada(nombre);
+  if (!c) return;
+  document.getElementById('modal-detalle-clase-titulo').textContent = `Discriminado de Costos — ${c.nombre}`;
+  const conceptos = [
+    { nombre: 'Salario (S.M.M.L.V. × múltiplo)', valor: c.salarioAnual },
+    { nombre: 'Subsidio de transporte', valor: c.subsidioTransporteAnual },
+    { nombre: 'Cesantía', valor: c.cesantia },
+    { nombre: 'Intereses sobre cesantía', valor: c.interesesCesantia },
+    { nombre: 'Vacaciones', valor: c.vacaciones },
+    { nombre: 'Prima', valor: c.prima },
+    { nombre: 'Dotación', valor: c.dotacionTotal },
+    { nombre: 'Pensión', valor: c.pension },
+    { nombre: 'Salud', valor: c.salud },
+    { nombre: 'ARL', valor: c.arl },
+    { nombre: 'SENA / Aporte ordinario', valor: c.aporteOrdinario },
+    { nombre: 'Caja de compensación', valor: c.subsidioFamiliar },
+  ];
+  document.getElementById('detalle-clase-resumen').innerHTML = `
+    <span><strong>Hora:</strong> ${_fmt(c.valorRealHora)}</span>
+    <span><strong>Día:</strong> ${_fmt(c.valorRealDiario)}</span>
+    <span><strong>Semana:</strong> ${_fmt(c.valorRealSemanal)}</span>
+    <span><strong>Mes:</strong> ${_fmt(c.valorRealMensual)}</span>
+    <span><strong>Año:</strong> ${_fmt(c.valorRealAnual)}</span>`;
+  document.getElementById('detalle-clase-body').innerHTML = conceptos.map(x => `
+    <tr>
+      <td>${x.nombre}</td>
+      <td style="text-align:right">${_fmt(x.valor)}</td>
+      <td style="text-align:right">${c.valorRealAnual ? (x.valor / c.valorRealAnual * 100).toFixed(1) : '0.0'}%</td>
+    </tr>`).join('') + `
+    <tr style="font-weight:700;border-top:2px solid var(--gris-borde)">
+      <td>TOTAL (valor real anual)</td>
+      <td style="text-align:right">${_fmt(c.valorRealAnual)}</td>
+      <td style="text-align:right">100.0%</td>
+    </tr>`;
+  document.getElementById('modal-detalle-clase').classList.add('abierto');
 }
 
 function abrirModalClaseSalarial() {
