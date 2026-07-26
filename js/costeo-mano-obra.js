@@ -217,16 +217,22 @@ function abrirDetalleClase(nombre) {
     <span><strong>Semana:</strong> ${_fmt(c.valorRealSemanal)}</span>
     <span><strong>Mes:</strong> ${_fmt(c.valorRealMensual)}</span>
     <span><strong>Año:</strong> ${_fmt(c.valorRealAnual)}</span>`;
+  // Dos lecturas del % lado a lado: cuánto pesa cada concepto sobre el COSTO TOTAL, y
+  // cuánto representa sobre el SALARIO BASE (100%) — esta segunda es el "sobrecosto"
+  // real que carga cada concepto por encima del salario, útil para ver de un vistazo
+  // cuánto más cuesta un trabajador que su sueldo (el total da ~180-190% del salario).
   document.getElementById('detalle-clase-body').innerHTML = conceptos.map(x => `
     <tr>
       <td>${x.nombre}</td>
       <td style="text-align:right">${_fmt(x.valor)}</td>
       <td style="text-align:right">${c.valorRealAnual ? (x.valor / c.valorRealAnual * 100).toFixed(1) : '0.0'}%</td>
+      <td style="text-align:right">${c.salarioAnual ? (x.valor / c.salarioAnual * 100).toFixed(1) : '0.0'}%</td>
     </tr>`).join('') + `
     <tr style="font-weight:700;border-top:2px solid var(--gris-borde)">
       <td>TOTAL (valor real anual)</td>
       <td style="text-align:right">${_fmt(c.valorRealAnual)}</td>
       <td style="text-align:right">100.0%</td>
+      <td style="text-align:right">${c.salarioAnual ? (c.valorRealAnual / c.salarioAnual * 100).toFixed(1) : '0.0'}%</td>
     </tr>`;
   document.getElementById('modal-detalle-clase').classList.add('abierto');
 }
