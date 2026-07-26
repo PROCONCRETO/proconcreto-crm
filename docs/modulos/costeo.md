@@ -21,7 +21,7 @@ Tablas Supabase nuevas (patrón `datos` JSONB, igual al resto de la app):
 
 ## Fórmula de costo real de una clase salarial (`calcularCosteoClase()`)
 
-Basada en la fórmula del Excel original (`MOD`), verificada al peso contra sus valores reales, con un ajuste deliberado en Vacaciones y en el divisor del valor/día (ver más abajo, decisión del 2026-07-26, ya no es una réplica literal del Excel en ese punto):
+Basada en la fórmula del Excel original (`MOD`), verificada al peso contra sus valores reales, con un ajuste deliberado en el divisor del valor/día (ver más abajo, decisión del 2026-07-26, ya no es una réplica literal del Excel en ese punto):
 
 - `A` = S.M.M.L.V. × multiplicador (mensual); anual = A × 12.
 - `B` = subsidio de transporte (mensual, si `aplicaSubsidioTransporte`); mismo valor para toda clase que lo tenga.
@@ -31,13 +31,13 @@ Basada en la fórmula del Excel original (`MOD`), verificada al peso contra sus 
 - Cesantía anual = E × (días cesantía / 365). Intereses sobre cesantía = Cesantía × %. Vacaciones = A mensual × %. Prima = C mensual × %.
 - Dotación anual = suma de (valor unitario × cantidad/año) de `parametros_mo.dotacion` — **simplificación**: en el Excel original la cantidad de cada ítem de dotación variaba un poco por clase (ej. más pares de guantes para las clases más operativas); aquí se dejó un solo valor de cantidad por ítem, igual para todas las clases, para no tener que mantener una matriz ítem×clase por una diferencia de menos del 1% del costo total. Si en algún momento se necesita esa precisión, se puede agregar cantidad por clase.
 - Pensión, Salud, ARL, Aporte ordinario (SENA), Subsidio familiar (caja de compensación) = D × su % respectivo.
-- **Valor real anual = C anual + prestaciones sociales (SIN vacaciones) + dotación + seguridad social + parafiscales.** Mensual = anual/12. Semana = anual/52. Hora = semana / horas semanales legales (`parametros_mo.horasSemanales`, 42 desde jul-2026 en Colombia).
+- **Valor real anual = C anual + prestaciones sociales (cesantía, intereses, vacaciones, prima) + dotación + seguridad social + parafiscales.** Mensual = anual/12. Semana = anual/52. Hora = semana / horas semanales legales (`parametros_mo.horasSemanales`, 42 desde jul-2026 en Colombia).
 - **Valor/día = valor real anual / `parametros_mo.diasLaboradosAno`** (220 por defecto — días realmente trabajados al año, después de descontar sábados, domingos, festivos y vacaciones). Antes del 2026-07-26 el divisor era "días hábiles del mes" (20) aplicado al valor mensual; se cambió a un divisor anual real a pedido del usuario.
-- **Vacaciones ya NO se suma al valor real anual** (sí se sigue calculando y mostrando en el discriminado, marcada como informativa): como el divisor `diasLaboradosAno` ya resta los días de vacaciones (15 hábiles/año por ley) de los días disponibles para repartir el costo, sumarla también como concepto de costo sería contar el mismo sobrecosto dos veces.
+- **Vacaciones SÍ se suma al valor real anual.** Se evaluó (y se llegó a implementar por un momento) quitarla de la suma con el argumento de que el divisor `diasLaboradosAno` ya la descuenta de los días disponibles — pero eso hace las cosas al revés: el divisor responde "¿entre cuántos días productivos reparto el costo?", mientras que Vacaciones responde "¿cuánto es ese costo?". Son preguntas distintas, no se pisan. Quitarla de la suma habría subestimado el costo real de un día de producción, porque esa plata sí se paga y en el modelo corregido no quedaba reflejada en ningún otro lado.
 
 ## Discriminado de costos (botón ➕ en cada clase)
 
-Modal con cada concepto de costo (salario, subsidio, cesantía, intereses, vacaciones, prima, dotación, pensión, salud, ARL, parafiscales) y **dos lecturas de porcentaje** lado a lado: "% del costo" (sobre el costo real total = 100%) y "% del salario" (sobre el salario base = 100%, muestra el sobrecosto que agrega cada concepto por encima del sueldo — el total da el factor prestacional real, ~180-190% del salario). La fila de Vacaciones aparece en cursiva y sin "% del costo" (guion) porque es informativa, no está incluida en el total.
+Modal con cada concepto de costo (salario, subsidio, cesantía, intereses, vacaciones, prima, dotación, pensión, salud, ARL, parafiscales) y **dos lecturas de porcentaje** lado a lado: "% del costo" (sobre el costo real total = 100%) y "% del salario" (sobre el salario base = 100%, muestra el sobrecosto que agrega cada concepto por encima del sueldo — el total da el factor prestacional real, ~180-190% del salario).
 
 ## Cuadrillas productivas
 

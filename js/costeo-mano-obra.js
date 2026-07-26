@@ -67,12 +67,12 @@ function calcularCosteoClase(clase, p) {
   const aporteOrdinario = D_anual * (p.aporteOrdinarioPct / 100);
   const subsidioFamiliar = D_anual * (p.subsidioFamiliarPct / 100);
 
-  // Vacaciones NO se suma al total: los 15 días hábiles de vacaciones al año ya están
-  // descontados del divisor "días laborados al año" que se usa para el valor/día (junto con
-  // sábados, domingos y festivos) — sumarla aparte y también restarla del divisor sería
-  // contar el mismo sobrecosto dos veces. Se sigue calculando y mostrando en el discriminado
-  // (informativo), solo que no entra en la suma del valor real.
-  const valorRealAnual = C_anual + cesantia + interesesCesantia + prima + dotacionTotal
+  // Vacaciones SÍ se suma al total (corregido 2026-07-26): el divisor "días laborados al
+  // año" y el costo de vacaciones responden preguntas distintas — uno dice entre cuántos
+  // días productivos se reparte el costo, el otro dice cuánto es ese costo. La plata que se
+  // paga en vacaciones es real y tiene que quedar reflejada en algún lado; si se quitara de
+  // la suma, el valor/día terminaría subestimando el costo real de un día de producción.
+  const valorRealAnual = C_anual + cesantia + interesesCesantia + vacaciones + prima + dotacionTotal
     + pension + salud + arl + aporteOrdinario + subsidioFamiliar;
   const valorRealMensual = valorRealAnual / 12;
   const valorRealDiario = valorRealAnual / (p.diasLaboradosAno || 220);
@@ -207,7 +207,7 @@ function abrirDetalleClase(nombre) {
     { nombre: 'Subsidio de transporte', valor: c.subsidioTransporteAnual },
     { nombre: 'Cesantía', valor: c.cesantia },
     { nombre: 'Intereses sobre cesantía', valor: c.interesesCesantia },
-    { nombre: 'Vacaciones (15 días hábiles/año — informativo, no se suma al total)', valor: c.vacaciones, excluido: true },
+    { nombre: 'Vacaciones (15 días hábiles/año)', valor: c.vacaciones },
     { nombre: 'Prima', valor: c.prima },
     { nombre: 'Dotación', valor: c.dotacionTotal },
     { nombre: 'Pensión', valor: c.pension },
@@ -227,10 +227,10 @@ function abrirDetalleClase(nombre) {
   // real que carga cada concepto por encima del salario, útil para ver de un vistazo
   // cuánto más cuesta un trabajador que su sueldo (el total da ~180-190% del salario).
   document.getElementById('detalle-clase-body').innerHTML = conceptos.map(x => `
-    <tr${x.excluido ? ' style="color:var(--gris-medio);font-style:italic"' : ''}>
+    <tr>
       <td>${x.nombre}</td>
       <td style="text-align:right">${_fmt(x.valor)}</td>
-      <td style="text-align:right">${x.excluido ? '—' : (c.valorRealAnual ? (x.valor / c.valorRealAnual * 100).toFixed(1) + '%' : '0.0%')}</td>
+      <td style="text-align:right">${c.valorRealAnual ? (x.valor / c.valorRealAnual * 100).toFixed(1) : '0.0'}%</td>
       <td style="text-align:right">${c.salarioAnual ? (x.valor / c.salarioAnual * 100).toFixed(1) : '0.0'}%</td>
     </tr>`).join('') + `
     <tr style="font-weight:700;border-top:2px solid var(--gris-borde)">
