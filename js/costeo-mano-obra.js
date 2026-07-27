@@ -16,6 +16,7 @@ function _defaultParametrosMO() {
     smmlv: 1751000,
     subsidioTransporte: 250000,
     diasLaboradosAno: 220,
+    ausentismoDias: 9,
     horasSemanales: 42,
     cesantiaDias: 30,
     interesesCesantiaPct: 12,
@@ -39,6 +40,13 @@ function _defaultParametrosMO() {
 
 function _dotacionTotalAnual(p) {
   return (p.dotacion || []).reduce((s, d) => s + (Number(d.valorUnitario) || 0) * (Number(d.cantidadAnual) || 0), 0);
+}
+
+// Días laborados al año, netos de un ajuste por ausentismo (incapacidades, calamidades y
+// permisos) — 9 días por defecto. Mínimo 1 para no dividir por cero si alguien pone un
+// ajuste igual o mayor a los días laborados.
+function _diasLaboradosNeto(p) {
+  return Math.max(1, (p.diasLaboradosAno || 220) - (p.ausentismoDias || 0));
 }
 
 // Reproduce exactamente las fórmulas de MOD: A=salario base, B=subsidio transporte,
@@ -73,7 +81,7 @@ function calcularCosteoClase(clase, p) {
   const valorRealAnual = C_anual + cesantia + interesesCesantia + prima + dotacionTotal
     + pension + salud + arl + aporteOrdinario + subsidioFamiliar;
   const valorRealMensual = valorRealAnual / 12;
-  const valorRealDiario = valorRealAnual / (p.diasLaboradosAno || 220);
+  const valorRealDiario = valorRealAnual / _diasLaboradosNeto(p);
   // Semana = año/52; hora = semana / horas semanales legales (42 en Colombia desde jul-2026).
   const valorRealSemanal = valorRealAnual / 52;
   const valorRealHora = valorRealSemanal / (p.horasSemanales || 42);
@@ -93,7 +101,9 @@ function renderCosteoManoObra() {
   document.getElementById('pmo-smmlv').value = PARAMETROS_MO.smmlv;
   document.getElementById('pmo-subsidio-transporte').value = PARAMETROS_MO.subsidioTransporte;
   document.getElementById('pmo-dias-laborados-ano').value = PARAMETROS_MO.diasLaboradosAno || 220;
+  document.getElementById('pmo-ausentismo-dias').value = PARAMETROS_MO.ausentismoDias ?? 9;
   document.getElementById('pmo-horas-semanales').value = PARAMETROS_MO.horasSemanales || 42;
+  _actualizarDiasNetosMO();
   document.getElementById('pmo-cesantia-dias').value = PARAMETROS_MO.cesantiaDias;
   document.getElementById('pmo-intereses-cesantia').value = PARAMETROS_MO.interesesCesantiaPct;
   document.getElementById('pmo-prima').value = PARAMETROS_MO.primaPct;
@@ -105,6 +115,18 @@ function renderCosteoManoObra() {
   renderDotacionMO();
   renderClasesSalariales();
   renderCuadrillas();
+}
+
+// Muestra en vivo la cuenta "días laborados − ajuste por ausentismo = días netos" mientras
+// se editan esos dos campos, para que quede claro qué número se está usando de verdad en el
+// valor/día (a pedido del usuario, "mostremos el número para mayor claridad de las cuentas").
+function _actualizarDiasNetosMO() {
+  const div = document.getElementById('pmo-dias-netos-preview');
+  if (!div) return;
+  const dias = parseFloat(document.getElementById('pmo-dias-laborados-ano').value) || 0;
+  const ausentismo = parseFloat(document.getElementById('pmo-ausentismo-dias').value) || 0;
+  const neto = Math.max(1, dias - ausentismo);
+  div.textContent = `${dias} − ${ausentismo} = ${neto} días`;
 }
 
 // ── Dotación (editable dentro de Parámetros generales) ──
@@ -137,6 +159,7 @@ function guardarParametrosMO() {
   PARAMETROS_MO.smmlv = parseFloat(document.getElementById('pmo-smmlv').value) || 0;
   PARAMETROS_MO.subsidioTransporte = parseFloat(document.getElementById('pmo-subsidio-transporte').value) || 0;
   PARAMETROS_MO.diasLaboradosAno = parseFloat(document.getElementById('pmo-dias-laborados-ano').value) || 220;
+  PARAMETROS_MO.ausentismoDias = parseFloat(document.getElementById('pmo-ausentismo-dias').value) || 0;
   PARAMETROS_MO.horasSemanales = parseFloat(document.getElementById('pmo-horas-semanales').value) || 42;
   PARAMETROS_MO.cesantiaDias = parseFloat(document.getElementById('pmo-cesantia-dias').value) || 0;
   PARAMETROS_MO.interesesCesantiaPct = parseFloat(document.getElementById('pmo-intereses-cesantia').value) || 0;
@@ -213,7 +236,7 @@ function abrirDetalleClase(nombre) {
   ];
   document.getElementById('detalle-clase-resumen').innerHTML = `
     <span><strong>Hora:</strong> ${_fmt(c.valorRealHora)}</span>
-    <span><strong>Día:</strong> ${_fmt(c.valorRealDiario)}</span>
+    <span><strong>Día:</strong> ${_fmt(c.valorRealDiario)} (÷ ${_diasLaboradosNeto(PARAMETROS_MO)} días netos)</span>
     <span><strong>Semana:</strong> ${_fmt(c.valorRealSemanal)}</span>
     <span><strong>Mes:</strong> ${_fmt(c.valorRealMensual)}</span>
     <span><strong>Año:</strong> ${_fmt(c.valorRealAnual)}</span>`;
@@ -328,7 +351,7 @@ function _totalCuadrilla(cu) {
     const clase = _claseCalculada(r.clase);
     if (clase) mensual += (Number(r.personas) || 0) * clase.valorRealMensual;
   });
-  const diario = (mensual * 12) / (PARAMETROS_MO.diasLaboradosAno || 220);
+  const diario = (mensual * 12) / _diasLaboradosNeto(PARAMETROS_MO);
   return { mensual, diario };
 }
 

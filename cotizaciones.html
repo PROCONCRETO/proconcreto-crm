@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260726h">
+<link rel="stylesheet" href="css/estilos.css?v=20260727a">
 </head>
 <body>
 
@@ -765,10 +765,19 @@
       <div class="form-grupo"><label>Subsidio de transporte (mensual)</label><input type="number" id="pmo-subsidio-transporte" min="0" step="1"></div>
       <div class="form-grupo">
         <label>Días laborados al año (para el valor/día)</label>
-        <input type="number" id="pmo-dias-laborados-ano" min="1" step="1">
+        <input type="number" id="pmo-dias-laborados-ano" min="1" step="1" oninput="_actualizarDiasNetosMO()">
         <div style="font-size:10.5px;color:var(--gris-medio);margin-top:3px;font-weight:400;text-transform:none">Días reales laborados, descontando sábados, domingos, festivos, días de vacaciones y por certificado de votación.</div>
       </div>
+      <div class="form-grupo">
+        <label>Ajuste por ausentismo (días/año)</label>
+        <input type="number" id="pmo-ausentismo-dias" min="0" step="1" oninput="_actualizarDiasNetosMO()">
+        <div style="font-size:10.5px;color:var(--gris-medio);margin-top:3px;font-weight:400;text-transform:none">Se resta de los días laborados — incapacidades, calamidades y permisos.</div>
+      </div>
       <div class="form-grupo"><label>Horas semanales (para el valor/hora)</label><input type="number" id="pmo-horas-semanales" min="1" step="1"></div>
+      <div class="form-grupo" style="grid-column:1/-1">
+        <label>Días laborados netos (usados para el valor/día)</label>
+        <div id="pmo-dias-netos-preview" style="font-size:16px;font-weight:700;color:var(--azul)"></div>
+      </div>
     </div>
     <div style="font-size:11px;font-weight:700;color:var(--gris-medio);margin:12px 0 6px">PRESTACIONES SOCIALES Y SEGURIDAD SOCIAL</div>
     <div class="form-grid-3" style="margin-bottom:10px">
@@ -1789,24 +1798,24 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260726h"></script>
-<script src="js/catalogo.js?v=20260726h"></script>
-<script src="js/navegacion.js?v=20260726h"></script>
-<script src="js/ordenes-produccion.js?v=20260726h"></script>
-<script src="js/produccion-diaria.js?v=20260726h"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260726h"></script>
-<script src="js/costeo-mano-obra.js?v=20260726h"></script>
-<script src="js/calidad-mezclas.js?v=20260726h"></script>
-<script src="js/calidad-estadisticas.js?v=20260726h"></script>
-<script src="js/calidad-trazabilidad.js?v=20260726h"></script>
-<script src="js/logistica.js?v=20260726h"></script>
-<script src="js/estadisticas-logistica.js?v=20260726h"></script>
-<script src="js/auth.js?v=20260726h"></script>
-<script src="js/datos-realtime.js?v=20260726h"></script>
-<script src="js/cotizador.js?v=20260726h"></script>
-<script src="js/historico-clientes-stats.js?v=20260726h"></script>
+<script src="js/config.js?v=20260727a"></script>
+<script src="js/catalogo.js?v=20260727a"></script>
+<script src="js/navegacion.js?v=20260727a"></script>
+<script src="js/ordenes-produccion.js?v=20260727a"></script>
+<script src="js/produccion-diaria.js?v=20260727a"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260727a"></script>
+<script src="js/costeo-mano-obra.js?v=20260727a"></script>
+<script src="js/calidad-mezclas.js?v=20260727a"></script>
+<script src="js/calidad-estadisticas.js?v=20260727a"></script>
+<script src="js/calidad-trazabilidad.js?v=20260727a"></script>
+<script src="js/logistica.js?v=20260727a"></script>
+<script src="js/estadisticas-logistica.js?v=20260727a"></script>
+<script src="js/auth.js?v=20260727a"></script>
+<script src="js/datos-realtime.js?v=20260727a"></script>
+<script src="js/cotizador.js?v=20260727a"></script>
+<script src="js/historico-clientes-stats.js?v=20260727a"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
-<script src="js/migracion-consecutivos.js?v=20260726h"></script>
+<script src="js/migracion-consecutivos.js?v=20260727a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1814,9 +1823,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260726h"></script>
-<script src="js/rut-parser.js?v=20260726h"></script>
-<script src="js/compresor-pdf.js?v=20260726h"></script>
-<script src="js/lector-informes.js?v=20260726h"></script>
+<script src="js/pdf.js?v=20260727a"></script>
+<script src="js/rut-parser.js?v=20260727a"></script>
+<script src="js/compresor-pdf.js?v=20260727a"></script>
+<script src="js/lector-informes.js?v=20260727a"></script>
 </body>
 </html>
