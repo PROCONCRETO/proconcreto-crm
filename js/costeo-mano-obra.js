@@ -38,13 +38,23 @@ function _defaultParametrosMO() {
       { nombre: 'Pantalón de Jean', valorUnitario: 26500, cantidadAnual: 3 },
       { nombre: 'Botas de seguridad', valorUnitario: 76000, cantidadAnual: 3 },
       { nombre: 'Examen médico', valorUnitario: 55000, cantidadAnual: 1 },
-      { nombre: 'Transporte especial para trabajadores', valorUnitario: 8000, cantidadAnual: 240 },
+      // usarDiasLaborados: costos fijos que se pagan aunque el trabajador falte (el bus se
+      // paga igual) — la cantidad/año se iguala a los días laborados al año SIN restar el
+      // ajuste por ausentismo, a diferencia del resto de la dotación.
+      { nombre: 'Transporte especial para trabajadores', valorUnitario: 8000, usarDiasLaborados: true },
     ],
   };
 }
 
+// Cantidad/año de un ítem de dotación: normalmente es un número fijo que se edita a mano,
+// pero si usarDiasLaborados está marcado, se iguala a los días laborados al año del período
+// (sin restar el ajuste por ausentismo — son costos que se pagan aunque el trabajador falte).
+function _cantidadAnualDotacion(d, p) {
+  return d.usarDiasLaborados ? (p.diasLaboradosAno || 0) : (Number(d.cantidadAnual) || 0);
+}
+
 function _dotacionTotalAnual(p) {
-  return (p.dotacion || []).reduce((s, d) => s + (Number(d.valorUnitario) || 0) * (Number(d.cantidadAnual) || 0), 0);
+  return (p.dotacion || []).reduce((s, d) => s + (Number(d.valorUnitario) || 0) * _cantidadAnualDotacion(d, p), 0);
 }
 
 // Días laborados al año, netos de un ajuste por ausentismo (incapacidades, calamidades y
@@ -132,6 +142,7 @@ function _actualizarDiasNetosMO() {
   const ausentismo = parseFloat(document.getElementById('pmo-ausentismo-dias').value) || 0;
   const neto = Math.max(1, dias - ausentismo);
   div.textContent = `${dias} − ${ausentismo} = ${neto} días`;
+  renderDotacionMO(); // los ítems de dotación vinculados a "días laborados" (ej. transporte) también se actualizan en vivo
 }
 
 // ── Dotación (editable dentro de Parámetros generales) ──
@@ -139,14 +150,25 @@ function renderDotacionMO() {
   const body = document.getElementById('dotacion-mo-body');
   if (!body) return;
   const dotacion = PARAMETROS_MO.dotacion || [];
-  body.innerHTML = dotacion.map((d, i) => `
+  // Usa el valor que se está escribiendo en "Días laborados al año" (aunque todavía no se
+  // haya guardado) para que la vista previa de los ítems vinculados quede al día de una vez.
+  const diasInput = document.getElementById('pmo-dias-laborados-ano');
+  const diasLaboradosActual = diasInput ? (parseFloat(diasInput.value) || 0) : (PARAMETROS_MO.diasLaboradosAno || 0);
+  body.innerHTML = dotacion.map((d, i) => {
+    const cantidad = d.usarDiasLaborados ? diasLaboradosActual : (Number(d.cantidadAnual) || 0);
+    return `
     <tr>
       <td><input type="text" value="${d.nombre || ''}" oninput="PARAMETROS_MO.dotacion[${i}].nombre=this.value" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:12px"></td>
       <td><input type="number" min="0" step="1" value="${d.valorUnitario || 0}" oninput="PARAMETROS_MO.dotacion[${i}].valorUnitario=parseFloat(this.value)||0;renderDotacionMO()" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:12px"></td>
-      <td><input type="number" min="0" step="1" value="${d.cantidadAnual || 0}" oninput="PARAMETROS_MO.dotacion[${i}].cantidadAnual=parseFloat(this.value)||0;renderDotacionMO()" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:12px"></td>
-      <td style="text-align:right;font-size:12px">${_fmt((d.valorUnitario || 0) * (d.cantidadAnual || 0))}</td>
+      <td>${d.usarDiasLaborados
+        ? `<input type="number" value="${cantidad}" disabled title="Igual a Días laborados al año, sin restar el ajuste por ausentismo" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:12px;background:#F3F4F6;color:#666">`
+        : `<input type="number" min="0" step="1" value="${d.cantidadAnual || 0}" oninput="PARAMETROS_MO.dotacion[${i}].cantidadAnual=parseFloat(this.value)||0;renderDotacionMO()" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:12px">`
+      }</td>
+      <td style="text-align:center"><input type="checkbox" ${d.usarDiasLaborados ? 'checked' : ''} onchange="PARAMETROS_MO.dotacion[${i}].usarDiasLaborados=this.checked;renderDotacionMO()" title="Costos fijos que se pagan aunque el trabajador falte (ej. transporte)"></td>
+      <td style="text-align:right;font-size:12px">${_fmt((d.valorUnitario || 0) * cantidad)}</td>
       <td><button class="btn btn-rojo btn-xs" onclick="eliminarDotacionMO(${i})">✕</button></td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function agregarDotacionMO() {
