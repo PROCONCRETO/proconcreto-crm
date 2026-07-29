@@ -158,7 +158,7 @@ function renderDotacionMO() {
     const cantidad = d.usarDiasLaborados ? diasLaboradosActual : (Number(d.cantidadAnual) || 0);
     return `
     <tr>
-      <td><input type="text" value="${d.nombre || ''}" oninput="PARAMETROS_MO.dotacion[${i}].nombre=this.value" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:12px"></td>
+      <td style="font-size:12px;padding:5px 7px">${d.nombre || ''}</td>
       <td><input type="number" min="0" step="1" value="${d.valorUnitario || 0}" oninput="PARAMETROS_MO.dotacion[${i}].valorUnitario=parseFloat(this.value)||0;renderDotacionMO()" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:12px"></td>
       <td>${d.usarDiasLaborados
         ? `<input type="number" value="${cantidad}" disabled title="Igual a Días laborados al año, sin restar el ajuste por ausentismo" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:12px;background:#F3F4F6;color:#666">`
@@ -170,8 +170,12 @@ function renderDotacionMO() {
 }
 
 function agregarDotacionMO() {
+  // El nombre ya no se edita en la tabla (columna fija), así que se pide una sola vez al
+  // agregar el ítem.
+  const nombre = (prompt('Nombre del nuevo ítem:') || '').trim();
+  if (!nombre) return;
   if (!PARAMETROS_MO.dotacion) PARAMETROS_MO.dotacion = [];
-  PARAMETROS_MO.dotacion.push({ nombre: '', valorUnitario: 0, cantidadAnual: 1 });
+  PARAMETROS_MO.dotacion.push({ nombre, valorUnitario: 0, cantidadAnual: 1 });
   renderDotacionMO();
 }
 
