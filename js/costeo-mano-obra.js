@@ -164,9 +164,7 @@ function renderDotacionMO() {
         ? `<input type="number" value="${cantidad}" disabled title="Igual a Días laborados al año, sin restar el ajuste por ausentismo" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:12px;background:#F3F4F6;color:#666">`
         : `<input type="number" min="0" step="1" value="${d.cantidadAnual || 0}" oninput="PARAMETROS_MO.dotacion[${i}].cantidadAnual=parseFloat(this.value)||0;renderDotacionMO()" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:12px">`
       }</td>
-      <td style="text-align:center"><input type="checkbox" ${d.usarDiasLaborados ? 'checked' : ''} onchange="PARAMETROS_MO.dotacion[${i}].usarDiasLaborados=this.checked;renderDotacionMO()" title="Costos fijos que se pagan aunque el trabajador falte (ej. transporte)"></td>
       <td style="text-align:right;font-size:12px">${_fmt((d.valorUnitario || 0) * cantidad)}</td>
-      <td><button class="btn btn-rojo btn-xs" onclick="eliminarDotacionMO(${i})">✕</button></td>
     </tr>`;
   }).join('');
 }
@@ -174,11 +172,6 @@ function renderDotacionMO() {
 function agregarDotacionMO() {
   if (!PARAMETROS_MO.dotacion) PARAMETROS_MO.dotacion = [];
   PARAMETROS_MO.dotacion.push({ nombre: '', valorUnitario: 0, cantidadAnual: 1 });
-  renderDotacionMO();
-}
-
-function eliminarDotacionMO(i) {
-  PARAMETROS_MO.dotacion.splice(i, 1);
   renderDotacionMO();
 }
 
