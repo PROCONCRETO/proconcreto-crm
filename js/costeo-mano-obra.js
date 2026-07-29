@@ -38,6 +38,7 @@ function _defaultParametrosMO() {
       { nombre: 'Pantalón de Jean', valorUnitario: 26500, cantidadAnual: 3 },
       { nombre: 'Botas de seguridad', valorUnitario: 76000, cantidadAnual: 3 },
       { nombre: 'Examen médico', valorUnitario: 55000, cantidadAnual: 1 },
+      { nombre: 'Transporte especial para trabajadores', valorUnitario: 8000, cantidadAnual: 240 },
     ],
   };
 }
