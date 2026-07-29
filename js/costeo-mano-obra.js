@@ -26,14 +26,18 @@ function _defaultParametrosMO() {
     arlPct: 6.96,
     aporteOrdinarioPct: 0,
     subsidioFamiliarPct: 4,
+    // Dotación "sin respirador media máscara" — frecuencia convertida a veces/año:
+    // bimensual=6, quincenal=24, mensual=12, cuatrimestral=3, anual=1.
     dotacion: [
-      { nombre: 'Protectores auditivos', valorUnitario: 1575, cantidadAnual: 24 },
-      { nombre: 'Guantes hilaza (trabajo pesado)', valorUnitario: 6825, cantidadAnual: 24 },
-      { nombre: 'Jean', valorUnitario: 36750, cantidadAnual: 3 },
-      { nombre: 'Camiseta', valorUnitario: 31500, cantidadAnual: 6 },
-      { nombre: 'Botas', valorUnitario: 58800, cantidadAnual: 3 },
-      { nombre: 'Transporte especial para trabajadores', valorUnitario: 8000, cantidadAnual: 240 },
-      { nombre: 'Examen ingreso y egreso', valorUnitario: 20000, cantidadAnual: 1 },
+      { nombre: 'Gafas de Seguridad', valorUnitario: 4556, cantidadAnual: 6 },
+      { nombre: 'Tapaoidos de copa', valorUnitario: 17500, cantidadAnual: 1 },
+      { nombre: 'Tapaoidos de Inserción', valorUnitario: 1045, cantidadAnual: 6 },
+      { nombre: 'Tapabocas N95', valorUnitario: 1600, cantidadAnual: 24 },
+      { nombre: 'Guante anticorte', valorUnitario: 15903, cantidadAnual: 12 },
+      { nombre: 'Camibuso cuello redondo', valorUnitario: 26000, cantidadAnual: 3 },
+      { nombre: 'Pantalón de Jean', valorUnitario: 26500, cantidadAnual: 3 },
+      { nombre: 'Botas de seguridad', valorUnitario: 76000, cantidadAnual: 3 },
+      { nombre: 'Examen médico', valorUnitario: 55000, cantidadAnual: 1 },
     ],
   };
 }
