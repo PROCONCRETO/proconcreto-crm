@@ -13,6 +13,11 @@
 let MAQUINARIA_EQUIPOS = [];
 let _baseVidaUtilActualMaquina = 'anos';
 
+// Unidades tomadas de la hoja MAQ-EQUPO del Excel original — desplegable cerrado
+// (en vez de texto libre) para que no queden variantes tipo "golpe"/"Golpes"/"GOLPE".
+const UNIDADES_USO_MAQUINA = { golpe: 'Golpe', dia: 'Día', m3: 'm³', m2: 'm²', banco: 'Banco' };
+function _labelUnidadUso(v) { return UNIDADES_USO_MAQUINA[v] || v || ''; }
+
 function calcularCostoMaquina(m) {
   const valorCompra = Number(m.valorCompra) || 0;
   const rescatePct = Number(m.rescatePct) || 0;
@@ -49,7 +54,7 @@ function renderCosteoMaquinaria() {
     return `
     <tr>
       <td style="font-weight:600">${m.nombre}</td>
-      <td><span style="display:inline-block;background:var(--gris-claro);color:var(--gris-medio);font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">${m.unidadUso || ''}</span></td>
+      <td><span style="display:inline-block;background:var(--gris-claro);color:var(--gris-medio);font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">${_labelUnidadUso(m.unidadUso)}</span></td>
       <td style="font-size:12px;color:var(--gris-medio)">${vidaTexto}</td>
       <td style="text-align:right;font-weight:700;color:var(--azul)">${_fmtMaq(c.costoUnidad)}</td>
       <td>
@@ -101,17 +106,18 @@ function _actualizarDesgloseMaquina() {
   const m = _leerFormularioMaquina();
   const c = calcularCostoMaquina(m);
 
+  const unidadLabel = _labelUnidadUso(m.unidadUso);
   const previewAnos = document.getElementById('m-maquina-capacidad-preview-anos');
-  if (previewAnos) previewAnos.value = `${c.capacidadTotal.toLocaleString('es-CO')} ${m.unidadUso}`;
+  if (previewAnos) previewAnos.value = `${c.capacidadTotal.toLocaleString('es-CO')} ${unidadLabel}`;
 
   div.innerHTML = `
     <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Valor de compra</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${_fmt(m.valorCompra)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:3px 0;color:var(--rojo)"><span>− Valor de rescate (${m.rescatePct}%)</span><span style="font-weight:600;font-variant-numeric:tabular-nums">− ${_fmt(c.valorRescate)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:3px 0"><span>= Valor a depreciar</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${_fmt(c.valorADepreciar)}</span></div>
-    <div style="display:flex;justify-content:space-between;padding:3px 0"><span>÷ Capacidad total de vida útil</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${c.capacidadTotal.toLocaleString('es-CO')} ${m.unidadUso}</span></div>
-    <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Depreciación por ${m.unidadUso}</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${_fmtMaq(c.depreciacion)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:3px 0"><span>÷ Capacidad total de vida útil</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${c.capacidadTotal.toLocaleString('es-CO')} ${unidadLabel}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Depreciación por ${unidadLabel}</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${_fmtMaq(c.depreciacion)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:3px 0"><span>+ Mantenimiento (${m.mantenimientoPct}% de la depreciación)</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${_fmtMaq(c.mantenimiento)}</span></div>
-    <div style="display:flex;justify-content:space-between;padding-top:8px;margin-top:6px;border-top:2px solid var(--azul);font-weight:700;font-size:15px;color:var(--azul)"><span>Costo por ${m.unidadUso}</span><span style="font-variant-numeric:tabular-nums">${_fmtMaq(c.costoUnidad)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding-top:8px;margin-top:6px;border-top:2px solid var(--azul);font-weight:700;font-size:15px;color:var(--azul)"><span>Costo por ${unidadLabel}</span><span style="font-variant-numeric:tabular-nums">${_fmtMaq(c.costoUnidad)}</span></div>
   `;
 }
 
