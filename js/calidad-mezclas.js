@@ -3,6 +3,24 @@
 // ═══════════════════════════════
 let DISENOS_MEZCLA = [];
 
+// Cada material estructural (cemento/metacaolín/agua/arena/grava) y cada aditivo tiene,
+// además de su cantidad, un "producto" que apunta a un ítem real de Costos de Referencia
+// (insumos_costos, categoría materia_prima o insumo_cif) — así Diseño de Mezcla y Costeo de
+// Producto comparten el mismo catálogo de insumos en vez de manejar nombres sueltos sin
+// precio (2026-07-30, a pedido del usuario: "las materias primas e insumos deberán hablarse
+// entre ellos"). Las CANTIDADES siguen viviendo en las mismas llaves fijas de siempre
+// (materiales.cemento/arena/grava/agua/absorcionArena/absorcionTriturado) porque Ajuste
+// Diario de Mezcla (js/calidad-ajuste-mezcla.js) lee exactamente esas llaves — solo se agrega
+// un campo nuevo `<material>Producto` al lado, sin tocar nada de lo que ya funciona ahí.
+const _MATERIALES_DISENO = ['cemento', 'metacaolin', 'agua', 'arena', 'grava'];
+const _LABEL_MATERIAL_DISENO = { cemento: 'Cemento', metacaolin: 'Metacaolín', agua: 'Agua', arena: 'Arena', grava: 'Triturado Grueso' };
+
+function _opcionesProductoCatalogo(seleccionado) {
+  const items = (INSUMOS_COSTOS || []).filter(i => i.categoria === 'materia_prima' || i.categoria === 'insumo_cif');
+  const opciones = items.map(i => `<option value="${i.nombre}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
+  return `<option value="">— Selecciona —</option>${opciones}`;
+}
+
 function siguienteCodigoDiseno() {
   const nums = DISENOS_MEZCLA.map(d => parseInt((d.codigo || '').replace(/\D/g, '')) || 0);
   const max = nums.length ? Math.max(...nums) : 0;
@@ -49,9 +67,13 @@ function renderAditivosDiseno() {
   const tbody = document.getElementById('aditivos-diseno-body');
   if (!tbody) return;
   if (!_aditivosDisenoActual.length) {
-    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega los aditivos usados en esta mezcla (opcional)</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega los aditivos usados en esta mezcla (opcional)</td></tr>`;
     return;
   }
+  // "Tipo" es la categoría funcional que usa Ajuste Diario de Mezcla para sumar dosis
+  // (sumaPorTipo('Superplastificante')/('Acelerante') en calidad-ajuste-mezcla.js) — no se
+  // puede volver un producto libre sin romper ese cálculo. "Producto" es aparte: el ítem
+  // real de Costos de Referencia que le da precio a esta dosis específica.
   tbody.innerHTML = _aditivosDisenoActual.map((a, i) => `
     <tr>
       <td>
@@ -61,13 +83,14 @@ function renderAditivosDiseno() {
           <option value="Acelerante" ${a.tipo === 'Acelerante' ? 'selected' : ''}>Acelerante</option>
         </select>
       </td>
+      <td><select onchange="_aditivosDisenoActual[${i}].producto=this.value">${_opcionesProductoCatalogo(a.producto || '')}</select></td>
       <td><input type="number" value="${a.dosis}" min="0" step="0.01" onchange="_aditivosDisenoActual[${i}].dosis=parseFloat(this.value)||0"></td>
       <td><button class="btn btn-rojo btn-xs" onclick="eliminarAditivoDiseno(${i})">✕</button></td>
     </tr>`).join('');
 }
 
 function agregarAditivoDiseno() {
-  _aditivosDisenoActual.push({ tipo: 'Superplastificante', dosis: 0 });
+  _aditivosDisenoActual.push({ tipo: 'Superplastificante', producto: '', dosis: 0 });
   renderAditivosDiseno();
 }
 
@@ -82,6 +105,10 @@ function abrirModalDiseno() {
   document.getElementById('m-diseno-codigo').value = siguienteCodigoDiseno();
   ['m-diseno-nombre', 'm-diseno-resistencia', 'm-diseno-asentamiento', 'm-diseno-tamano', 'm-diseno-relacion', 'm-diseno-cemento', 'm-diseno-metacaolin', 'm-diseno-arena', 'm-diseno-grava', 'm-diseno-absorcion-arena', 'm-diseno-absorcion-triturado', 'm-diseno-agua', 'm-diseno-obs'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('m-diseno-estado').value = 'Activo';
+  _MATERIALES_DISENO.forEach(k => {
+    const sel = document.getElementById(`m-diseno-${k}-producto`);
+    if (sel) sel.innerHTML = _opcionesProductoCatalogo('');
+  });
   _aditivosDisenoActual = [];
   renderAditivosDiseno();
   document.getElementById('modal-diseno').classList.add('abierto');
@@ -106,6 +133,10 @@ function editarDiseno(id) {
   document.getElementById('m-diseno-absorcion-arena').value = d.materiales?.absorcionArena || '';
   document.getElementById('m-diseno-absorcion-triturado').value = d.materiales?.absorcionTriturado || '';
   document.getElementById('m-diseno-agua').value = d.materiales?.agua || '';
+  _MATERIALES_DISENO.forEach(k => {
+    const sel = document.getElementById(`m-diseno-${k}-producto`);
+    if (sel) sel.innerHTML = _opcionesProductoCatalogo(d.materiales?.[`${k}Producto`] || '');
+  });
   // Migración: diseños antiguos con un solo aditivo de texto libre → lista nueva
   _aditivosDisenoActual = JSON.parse(JSON.stringify(d.materiales?.aditivos || (d.materiales?.aditivo ? [{ tipo: 'Superplastificante', dosis: d.materiales.dosisAditivo || 0 }] : [])));
   renderAditivosDiseno();
@@ -120,16 +151,48 @@ function guardarDiseno() {
   const resistenciaDiseno = parseFloat(document.getElementById('m-diseno-resistencia').value);
   const tamanoMaximo = document.getElementById('m-diseno-tamano').value.trim();
   if (!codigo || !nombre || !(resistenciaDiseno > 0) || !tamanoMaximo) { alert('Completa los campos obligatorios: Código, Nombre, Resistencia de diseño y Tamaño máximo de agregado.'); return; }
+
+  // Cada material con cantidad > 0 debe tener su producto de Costos de Referencia elegido —
+  // "las materias primas e insumos deberán hablarse entre ellos" (2026-07-30): un diseño no
+  // se puede costear si sus insumos no tienen un precio en algún lado.
+  const cantidadesMat = {
+    cemento: parseFloat(document.getElementById('m-diseno-cemento').value) || 0,
+    metacaolin: parseFloat(document.getElementById('m-diseno-metacaolin').value) || 0,
+    agua: parseFloat(document.getElementById('m-diseno-agua').value) || 0,
+    arena: parseFloat(document.getElementById('m-diseno-arena').value) || 0,
+    grava: parseFloat(document.getElementById('m-diseno-grava').value) || 0,
+  };
+  const productosMat = {};
+  for (const k of _MATERIALES_DISENO) {
+    productosMat[k] = document.getElementById(`m-diseno-${k}-producto`)?.value || '';
+    if (cantidadesMat[k] > 0 && !productosMat[k]) {
+      alert(`Selecciona el producto de "${_LABEL_MATERIAL_DISENO[k]}" (columna "Producto (Costos de Referencia)") antes de guardar — si todavía no existe, créalo primero en Costeo → Costos de Referencia.`);
+      return;
+    }
+  }
+  for (let i = 0; i < _aditivosDisenoActual.length; i++) {
+    const a = _aditivosDisenoActual[i];
+    if ((Number(a.dosis) || 0) > 0 && !a.producto) {
+      alert(`Selecciona el producto del aditivo #${i + 1} (${a.tipo}) antes de guardar — si todavía no existe, créalo primero en Costeo → Costos de Referencia.`);
+      return;
+    }
+  }
+
   const editId = document.getElementById('m-diseno-id').value;
   const existente = editId ? DISENOS_MEZCLA.find(x => String(x.id) === String(editId)) : null;
   const materialesNuevos = {
-    cemento: parseFloat(document.getElementById('m-diseno-cemento').value) || 0,
-    metacaolin: parseFloat(document.getElementById('m-diseno-metacaolin').value) || 0,
-    arena: parseFloat(document.getElementById('m-diseno-arena').value) || 0,
-    grava: parseFloat(document.getElementById('m-diseno-grava').value) || 0,
+    cemento: cantidadesMat.cemento,
+    cementoProducto: productosMat.cemento,
+    metacaolin: cantidadesMat.metacaolin,
+    metacaolinProducto: productosMat.metacaolin,
+    arena: cantidadesMat.arena,
+    arenaProducto: productosMat.arena,
+    grava: cantidadesMat.grava,
+    gravaProducto: productosMat.grava,
     absorcionArena: parseFloat(document.getElementById('m-diseno-absorcion-arena').value) || 0,
     absorcionTriturado: parseFloat(document.getElementById('m-diseno-absorcion-triturado').value) || 0,
-    agua: parseFloat(document.getElementById('m-diseno-agua').value) || 0,
+    agua: cantidadesMat.agua,
+    aguaProducto: productosMat.agua,
     aditivos: JSON.parse(JSON.stringify(_aditivosDisenoActual)),
   };
   // Un diseño se va ajustando con el tiempo (materiales, resistencia, consumo de cemento).

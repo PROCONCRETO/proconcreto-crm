@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260730f">
+<link rel="stylesheet" href="css/estilos.css?v=20260730g">
 </head>
 <body>
 
@@ -1159,22 +1159,49 @@
     </div>
 
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:10px 0 8px">MATERIALES POR M³</div>
-    <div class="form-grid-3" style="margin-bottom:10px">
-      <div class="form-grupo"><label>Cemento (kg)</label><input type="number" id="m-diseno-cemento" min="0" step="0.1"></div>
-      <div class="form-grupo"><label>Metacaolín (kg)</label><input type="number" id="m-diseno-metacaolin" min="0" step="0.1" placeholder="Adición cementante"></div>
-      <div class="form-grupo"><label>Agua (L)</label><input type="number" id="m-diseno-agua" min="0" step="0.1"></div>
+    <div style="overflow-x:auto;margin-bottom:4px">
+      <table class="tabla-items" style="width:100%">
+        <thead><tr>
+          <th>Material</th>
+          <th>Producto (Costos de Referencia)</th>
+          <th style="width:100px">Cantidad</th>
+          <th style="width:90px">Absorción %</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:600">Cemento (kg)</td>
+            <td><select id="m-diseno-cemento-producto" style="width:100%"></select></td>
+            <td><input type="number" id="m-diseno-cemento" min="0" step="0.1"></td>
+            <td style="text-align:center;color:var(--gris-medio)">—</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600">Metacaolín (kg) <span style="font-weight:400;color:var(--gris-medio);font-size:11px">Adición cementante</span></td>
+            <td><select id="m-diseno-metacaolin-producto" style="width:100%"></select></td>
+            <td><input type="number" id="m-diseno-metacaolin" min="0" step="0.1"></td>
+            <td style="text-align:center;color:var(--gris-medio)">—</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600">Agua (L)</td>
+            <td><select id="m-diseno-agua-producto" style="width:100%"></select></td>
+            <td><input type="number" id="m-diseno-agua" min="0" step="0.1"></td>
+            <td style="text-align:center;color:var(--gris-medio)">—</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600">Arena (SH) (kg)</td>
+            <td><select id="m-diseno-arena-producto" style="width:100%"></select></td>
+            <td><input type="number" id="m-diseno-arena" min="0" step="0.1"></td>
+            <td><input type="number" id="m-diseno-absorcion-arena" min="0" step="0.1"></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600">Triturado Grueso (SH) (kg)</td>
+            <td><select id="m-diseno-grava-producto" style="width:100%"></select></td>
+            <td><input type="number" id="m-diseno-grava" min="0" step="0.1"></td>
+            <td><input type="number" id="m-diseno-absorcion-triturado" min="0" step="0.1"></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-    <div class="form-grid-3" style="margin-bottom:10px">
-      <div class="form-grupo"><label>Arena (SH) (kg)</label><input type="number" id="m-diseno-arena" min="0" step="0.1"></div>
-      <div class="form-grupo"><label>Absorción Arena (%)</label><input type="number" id="m-diseno-absorcion-arena" min="0" step="0.1"></div>
-      <div class="form-grupo"></div>
-    </div>
-    <div class="form-grid-3" style="margin-bottom:10px">
-      <div class="form-grupo"><label>Triturado Grueso (SH) (kg)</label><input type="number" id="m-diseno-grava" min="0" step="0.1"></div>
-      <div class="form-grupo"><label>Absorción Triturado Grueso (%)</label><input type="number" id="m-diseno-absorcion-triturado" min="0" step="0.1"></div>
-      <div class="form-grupo"></div>
-    </div>
-    <div style="font-size:11px;color:var(--gris-medio);margin:-6px 0 10px">* SH = condición Seco al Horno. Las cantidades de arena y triturado grueso, junto con su absorción, se usan para calcular el ajuste diario por humedad.</div>
+    <div style="font-size:11px;color:var(--gris-medio);margin:0 0 10px">* SH = condición Seco al Horno. Las cantidades de arena y triturado grueso, junto con su absorción, se usan para calcular el ajuste diario por humedad. El <b>Producto</b> es el ítem de Costos de Referencia que le da precio a este material — si el que necesitas no existe todavía, créalo allá primero (no se puede guardar una cantidad sin su producto).</div>
 
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px;display:flex;justify-content:space-between;align-items:center">
       <span>ADITIVOS</span>
@@ -1182,7 +1209,7 @@
     </div>
     <div style="overflow-x:auto;margin-bottom:10px">
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Tipo de aditivo</th><th style="width:160px">Dosis (kg o %)</th><th style="width:36px"></th></tr></thead>
+        <thead><tr><th>Tipo de aditivo</th><th>Producto (Costos de Referencia)</th><th style="width:130px">Dosis (kg o %)</th><th style="width:36px"></th></tr></thead>
         <tbody id="aditivos-diseno-body"></tbody>
       </table>
     </div>
@@ -1982,26 +2009,26 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260730f"></script>
-<script src="js/catalogo.js?v=20260730f"></script>
-<script src="js/navegacion.js?v=20260730f"></script>
-<script src="js/ordenes-produccion.js?v=20260730f"></script>
-<script src="js/produccion-diaria.js?v=20260730f"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260730f"></script>
-<script src="js/costeo-mano-obra.js?v=20260730f"></script>
-<script src="js/costeo-maquinaria.js?v=20260730f"></script>
-<script src="js/costeo-referencia.js?v=20260730f"></script>
-<script src="js/calidad-mezclas.js?v=20260730f"></script>
-<script src="js/calidad-estadisticas.js?v=20260730f"></script>
-<script src="js/calidad-trazabilidad.js?v=20260730f"></script>
-<script src="js/logistica.js?v=20260730f"></script>
-<script src="js/estadisticas-logistica.js?v=20260730f"></script>
-<script src="js/auth.js?v=20260730f"></script>
-<script src="js/datos-realtime.js?v=20260730f"></script>
-<script src="js/cotizador.js?v=20260730f"></script>
-<script src="js/historico-clientes-stats.js?v=20260730f"></script>
+<script src="js/config.js?v=20260730g"></script>
+<script src="js/catalogo.js?v=20260730g"></script>
+<script src="js/navegacion.js?v=20260730g"></script>
+<script src="js/ordenes-produccion.js?v=20260730g"></script>
+<script src="js/produccion-diaria.js?v=20260730g"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260730g"></script>
+<script src="js/costeo-mano-obra.js?v=20260730g"></script>
+<script src="js/costeo-maquinaria.js?v=20260730g"></script>
+<script src="js/costeo-referencia.js?v=20260730g"></script>
+<script src="js/calidad-mezclas.js?v=20260730g"></script>
+<script src="js/calidad-estadisticas.js?v=20260730g"></script>
+<script src="js/calidad-trazabilidad.js?v=20260730g"></script>
+<script src="js/logistica.js?v=20260730g"></script>
+<script src="js/estadisticas-logistica.js?v=20260730g"></script>
+<script src="js/auth.js?v=20260730g"></script>
+<script src="js/datos-realtime.js?v=20260730g"></script>
+<script src="js/cotizador.js?v=20260730g"></script>
+<script src="js/historico-clientes-stats.js?v=20260730g"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
-<script src="js/migracion-consecutivos.js?v=20260730f"></script>
+<script src="js/migracion-consecutivos.js?v=20260730g"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -2009,9 +2036,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260730f"></script>
-<script src="js/rut-parser.js?v=20260730f"></script>
-<script src="js/compresor-pdf.js?v=20260730f"></script>
-<script src="js/lector-informes.js?v=20260730f"></script>
+<script src="js/pdf.js?v=20260730g"></script>
+<script src="js/rut-parser.js?v=20260730g"></script>
+<script src="js/compresor-pdf.js?v=20260730g"></script>
+<script src="js/lector-informes.js?v=20260730g"></script>
 </body>
 </html>
