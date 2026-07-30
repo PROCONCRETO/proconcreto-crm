@@ -42,8 +42,9 @@ function calcularCostoInsumo(i) {
   const valorUnitario = Number(i.valorUnitario) || 0;
   const valorConIva = i.aplicaIva ? valorUnitario * 1.19 : valorUnitario;
   const transporteAdicional = i.transporteIncluido ? 0 : (Number(i.transporteAdicional) || 0);
+  const costoSinIva = valorUnitario + transporteAdicional; // el IVA no aplica sobre el transporte adicional
   const valorFinal = valorConIva + transporteAdicional;
-  return { valorConIva, transporteAdicional, valorFinal };
+  return { valorConIva, transporteAdicional, costoSinIva, valorFinal };
 }
 
 // Combina Mano de Obra (solo Cuadrillas, valor/día) + Maquinaria (costo/unidad de uso) +
@@ -52,15 +53,17 @@ function _listaUnificadaCostos() {
   const lista = [];
   (CUADRILLAS_PRODUCTIVAS || []).forEach(cu => {
     const t = _totalCuadrilla(cu);
-    lista.push({ categoria: 'mano_obra', nombre: cu.nombre, unidad: 'día', costoUnitario: t.diario, soloLectura: true, modificado: cu._modificado });
+    // Mano de obra no tiene concepto de IVA en este modelo — mismo valor en las dos columnas.
+    lista.push({ categoria: 'mano_obra', nombre: cu.nombre, unidad: 'día', costoSinIva: t.diario, costoConIva: t.diario, soloLectura: true, modificado: cu._modificado });
   });
   (MAQUINARIA_EQUIPOS || []).forEach(m => {
     const c = calcularCostoMaquina(m);
-    lista.push({ categoria: 'maquinaria', nombre: m.nombre, unidad: _labelUnidadUso(m.unidadUso), costoUnitario: c.costoUnidad, soloLectura: true, modificado: m._modificado });
+    // Depreciación/mantenimiento tampoco llevan IVA — mismo valor en las dos columnas.
+    lista.push({ categoria: 'maquinaria', nombre: m.nombre, unidad: _labelUnidadUso(m.unidadUso), costoSinIva: c.costoUnidad, costoConIva: c.costoUnidad, soloLectura: true, modificado: m._modificado });
   });
   (INSUMOS_COSTOS || []).forEach(i => {
     const c = calcularCostoInsumo(i);
-    lista.push({ categoria: i.categoria, nombre: i.nombre, unidad: _labelUnidadInsumo(i.unidad), costoUnitario: c.valorFinal, soloLectura: false, modificado: i._modificado });
+    lista.push({ categoria: i.categoria, nombre: i.nombre, unidad: _labelUnidadInsumo(i.unidad), costoSinIva: c.costoSinIva, costoConIva: c.valorFinal, soloLectura: false, modificado: i._modificado });
   });
   return lista;
 }
@@ -83,7 +86,7 @@ function renderCosteoReferencia() {
   const body = document.getElementById('referencia-costos-body');
   if (!body) return;
   if (!filtradas.length) {
-    body.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="icono">📑</div><div>No hay ítems para este filtro.</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">📑</div><div>No hay ítems para este filtro.</div></td></tr>`;
     return;
   }
   body.innerHTML = filtradas.map(x => {
@@ -100,7 +103,8 @@ function renderCosteoReferencia() {
       <td><span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap;background:${cat.bg};color:${cat.fg}">${cat.label}</span></td>
       <td style="font-weight:600">${x.nombre}</td>
       <td><span style="display:inline-block;background:var(--gris-claro);color:var(--gris-medio);font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">${x.unidad}</span></td>
-      <td style="text-align:right;font-weight:700;color:var(--azul)">${_fmtRef(x.costoUnitario)}</td>
+      <td style="text-align:right;color:var(--gris-medio)">${_fmtRef(x.costoSinIva)}</td>
+      <td style="text-align:right;font-weight:700;color:var(--azul)">${_fmtRef(x.costoConIva)}</td>
       <td style="font-size:12px;color:var(--gris-medio)">${_fmtFechaRef(x.modificado)}</td>
       <td>${acciones}</td>
     </tr>`;
@@ -162,9 +166,10 @@ function _actualizarDesgloseInsumo() {
   const unidadLabel = _labelUnidadInsumo(i.unidad);
   div.innerHTML = `
     <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Valor unitario</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${_fmtRef(i.valorUnitario)}</span></div>
-    <div style="display:flex;justify-content:space-between;padding:3px 0"><span>+ IVA (19%)${i.aplicaIva ? '' : ' — no aplica'}</span><span style="font-weight:600;font-variant-numeric:tabular-nums">+ ${_fmtRef(c.valorConIva - i.valorUnitario)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:3px 0"><span>+ Transporte adicional${i.transporteIncluido ? ' — incluido' : ''}</span><span style="font-weight:600;font-variant-numeric:tabular-nums">+ ${_fmtRef(c.transporteAdicional)}</span></div>
-    <div style="display:flex;justify-content:space-between;padding-top:8px;margin-top:6px;border-top:2px solid var(--azul);font-weight:700;font-size:15px;color:var(--azul)"><span>Valor final de referencia / ${unidadLabel}</span><span style="font-variant-numeric:tabular-nums">${_fmtRef(c.valorFinal)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding-top:6px;margin-top:4px;border-top:1px solid #90CAF9;font-weight:700"><span>= Costo sin IVA / ${unidadLabel}</span><span style="font-variant-numeric:tabular-nums">${_fmtRef(c.costoSinIva)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:3px 0;margin-top:4px"><span>+ IVA (19%)${i.aplicaIva ? '' : ' — no aplica'}</span><span style="font-weight:600;font-variant-numeric:tabular-nums">+ ${_fmtRef(c.valorConIva - i.valorUnitario)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding-top:8px;margin-top:6px;border-top:2px solid var(--azul);font-weight:700;font-size:15px;color:var(--azul)"><span>Costo con IVA / ${unidadLabel}</span><span style="font-variant-numeric:tabular-nums">${_fmtRef(c.valorFinal)}</span></div>
   `;
 }
 

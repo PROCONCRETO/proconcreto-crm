@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260730d">
+<link rel="stylesheet" href="css/estilos.css?v=20260730e">
 </head>
 <body>
 
@@ -901,15 +901,16 @@
   <div class="card" style="padding:0;overflow:hidden">
     <table class="tabla-cots" style="table-layout:fixed">
       <thead><tr>
-        <th style="width:16%">CATEGORÍA</th>
-        <th style="width:26%">ÍTEM</th>
-        <th style="width:9%">UNIDAD</th>
-        <th style="width:14%;text-align:right">COSTO UNITARIO</th>
-        <th style="width:14%">ÚLT. MODIFICACIÓN</th>
+        <th style="width:14%">CATEGORÍA</th>
+        <th style="width:21%">ÍTEM</th>
+        <th style="width:7%">UNIDAD</th>
+        <th style="width:12%;text-align:right">COSTO SIN IVA</th>
+        <th style="width:12%;text-align:right">COSTO CON IVA</th>
+        <th style="width:13%">ÚLT. MODIFICACIÓN</th>
         <th style="width:21%">ORIGEN / ACCIONES</th>
       </tr></thead>
       <tbody id="referencia-costos-body">
-        <tr><td colspan="6" class="empty-state"><div class="icono">📑</div><div>No hay ítems para este filtro.</div></td></tr>
+        <tr><td colspan="7" class="empty-state"><div class="icono">📑</div><div>No hay ítems para este filtro.</div></td></tr>
       </tbody>
     </table>
   </div>
@@ -1981,26 +1982,26 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260730d"></script>
-<script src="js/catalogo.js?v=20260730d"></script>
-<script src="js/navegacion.js?v=20260730d"></script>
-<script src="js/ordenes-produccion.js?v=20260730d"></script>
-<script src="js/produccion-diaria.js?v=20260730d"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260730d"></script>
-<script src="js/costeo-mano-obra.js?v=20260730d"></script>
-<script src="js/costeo-maquinaria.js?v=20260730d"></script>
-<script src="js/costeo-referencia.js?v=20260730d"></script>
-<script src="js/calidad-mezclas.js?v=20260730d"></script>
-<script src="js/calidad-estadisticas.js?v=20260730d"></script>
-<script src="js/calidad-trazabilidad.js?v=20260730d"></script>
-<script src="js/logistica.js?v=20260730d"></script>
-<script src="js/estadisticas-logistica.js?v=20260730d"></script>
-<script src="js/auth.js?v=20260730d"></script>
-<script src="js/datos-realtime.js?v=20260730d"></script>
-<script src="js/cotizador.js?v=20260730d"></script>
-<script src="js/historico-clientes-stats.js?v=20260730d"></script>
+<script src="js/config.js?v=20260730e"></script>
+<script src="js/catalogo.js?v=20260730e"></script>
+<script src="js/navegacion.js?v=20260730e"></script>
+<script src="js/ordenes-produccion.js?v=20260730e"></script>
+<script src="js/produccion-diaria.js?v=20260730e"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260730e"></script>
+<script src="js/costeo-mano-obra.js?v=20260730e"></script>
+<script src="js/costeo-maquinaria.js?v=20260730e"></script>
+<script src="js/costeo-referencia.js?v=20260730e"></script>
+<script src="js/calidad-mezclas.js?v=20260730e"></script>
+<script src="js/calidad-estadisticas.js?v=20260730e"></script>
+<script src="js/calidad-trazabilidad.js?v=20260730e"></script>
+<script src="js/logistica.js?v=20260730e"></script>
+<script src="js/estadisticas-logistica.js?v=20260730e"></script>
+<script src="js/auth.js?v=20260730e"></script>
+<script src="js/datos-realtime.js?v=20260730e"></script>
+<script src="js/cotizador.js?v=20260730e"></script>
+<script src="js/historico-clientes-stats.js?v=20260730e"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
-<script src="js/migracion-consecutivos.js?v=20260730d"></script>
+<script src="js/migracion-consecutivos.js?v=20260730e"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -2008,9 +2009,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260730d"></script>
-<script src="js/rut-parser.js?v=20260730d"></script>
-<script src="js/compresor-pdf.js?v=20260730d"></script>
-<script src="js/lector-informes.js?v=20260730d"></script>
+<script src="js/pdf.js?v=20260730e"></script>
+<script src="js/rut-parser.js?v=20260730e"></script>
+<script src="js/compresor-pdf.js?v=20260730e"></script>
+<script src="js/lector-informes.js?v=20260730e"></script>
 </body>
 </html>
