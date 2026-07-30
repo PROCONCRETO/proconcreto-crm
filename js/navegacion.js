@@ -82,5 +82,6 @@ function ir(pantalla) {
   if (pantalla === 'logistica') renderCalendarioLogistica();
   if (pantalla === 'logistica-estadisticas') renderEstadisticasLogistica();
   if (pantalla === 'costeo-mo') renderCosteoManoObra();
+  if (pantalla === 'costeo-maquinaria') renderCosteoMaquinaria();
 }
 

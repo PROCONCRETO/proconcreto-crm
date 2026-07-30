@@ -6,10 +6,13 @@ Módulo nuevo (2026-07-26), construido a partir del Excel real "COSTOS MAESTRO 2
 
 - `js/costeo-mano-obra.js` — costo de mano de obra por clase salarial + cuadrillas productivas.
 - `sql/2026-07-26_costeo_mano_obra.sql` — DDL de las tablas nuevas. **Hay que correrlo una sola vez** en el SQL Editor de Supabase antes de que esta pantalla pueda guardar datos (yo no tengo acceso para crear tablas).
+- `js/costeo-maquinaria.js` — amortización de maquinaria y equipos.
+- `sql/2026-07-29_costeo_maquinaria.sql` — DDL de la tabla `maquinaria_equipos`. **Hay que correrlo una sola vez** en el SQL Editor de Supabase (elegir "Run without RLS", igual que el resto de tablas de la app) antes de que esta pantalla pueda guardar datos.
 
 ## Pantallas (`ir()` en `navegacion.js`, módulo `costeo`)
 
-`costeo-mo` (Costo de Mano de Obra) — única por ahora.
+- `costeo-mo` — Costo de Mano de Obra (Niveles Salariales + Cuadrillas Productivas).
+- `costeo-maquinaria` — Amortización de Maquinaria y Equipos.
 
 ## Datos
 
@@ -18,6 +21,7 @@ Tablas Supabase nuevas (patrón `datos` JSONB, igual al resto de la app):
 - `parametros_mo`: **un solo registro** (`id = 1` fijo). Guarda los valores que cambian con la ley — S.M.M.L.V., subsidio de transporte, días laborados al año y horas semanales (para el valor/día y valor/hora, ver más abajo), y los % de prestaciones sociales/seguridad social/parafiscales (cesantía, intereses cesantía, prima, pensión, salud, ARL, SENA, caja de compensación — **no** vacaciones, ver más abajo por qué), más la lista de ítems de dotación (nombre, valor unitario, cantidad/año — igual para todas las clases, ver más abajo).
 - `clases_salariales`: una fila por clase (`nombre` único, ej. "Clase 1 (Ayudante)"), con `multiplicador` (múltiplo del S.M.M.L.V.) y `aplicaSubsidioTransporte` (booleano, por si algún día se agrega una clase que gane más de 2 S.M.M.L.V. y no le aplique).
 - `cuadrillas_productivas`: una fila por cuadrilla (`nombre` único, ej. "Cuadrilla Tipo 3: 1 Oficial + 3 Ayudantes"), con `roles: [{ rol, personas, clase }]` — `personas` puede ser fraccionaria (ej. 0.1 para un supervisor compartido entre varias cuadrillas).
+- `maquinaria_equipos`: una fila por máquina/equipo (`nombre` único, ej. "Máquina Columbia"), con `valorCompra`, `unidadUso` (texto libre: golpe, día, m³, banco...), `baseVidaUtil` (`'anos'` o `'usos'`), `vidaUtilAnos` + `capacidadAnual` (si `baseVidaUtil` es `'anos'`) o `usosTotal` (si es `'usos'`), `rescatePct`, `mantenimientoPct`.
 
 ## Fórmula de costo real de una clase salarial (`calcularCosteoClase()`)
 
@@ -53,9 +57,23 @@ Cada cuadrilla suma, para cada rol, `personas × valorRealMensual` de la clase a
 
 **Nota de nombres (2026-07-29)**: en la interfaz, "Clases Salariales" pasó a llamarse **"Niveles Salariales"**, y su columna "CLASE" pasó a llamarse **"ROLES"** — es solo un cambio de rótulo visible; internamente el modelo de datos sigue siendo `clases_salariales` / `CLASES_SALARIALES` / campo `clase` en los roles de una cuadrilla, sin cambios de código más allá del texto en pantalla.
 
+## Amortización de Maquinaria y Equipos (`calcularCostoMaquina()` en `js/costeo-maquinaria.js`)
+
+De la pestaña `MAQ-EQUPO` del Excel original. Fórmula de depreciación en línea recta con valor de rescate, más un % de mantenimiento sobre la depreciación — es el método estándar de la industria para este tipo de gasto (referencia clásica: US Army Corps of Engineers, EP 1110-1-8; coincide casi exactamente con la fórmula que ya usaba el Excel para "Máquina Columbia", a la que solo le faltaba restar el valor de rescate). Investigado por request explícito del usuario ("investiguemos en la red, cuál debe ser una fórmula aceptada en la industria") antes de proponerlo, y aprobado primero como mockup antes de construirlo en la app real.
+
+- `Valor de rescate` = Valor de compra × % de rescate.
+- `Valor a depreciar` = Valor de compra − Valor de rescate.
+- `Capacidad total de vida útil` — cada máquina elige **una** de dos formas de fijarla (`baseVidaUtil`):
+  - **Por años** (`'anos'`): Vida útil en años × Unidades de uso por año. Para máquinas cuyo desgaste depende más del calendario que del uso (ej. un montacargas, medido en días de uso al año).
+  - **Por usos totales** (`'usos'`): un número fijo de usos de vida (golpes, m³, ciclos), sin pasar por años — para máquinas cuyo desgaste depende del uso y no de cuántos años tarde en llegar ahí (ej. una cortadora que dura 200.000 golpes).
+- `Depreciación por unidad` = Valor a depreciar ÷ Capacidad total de vida útil.
+- `Mantenimiento por unidad` = Depreciación por unidad × % de mantenimiento y reparación.
+- **Costo por unidad = Depreciación por unidad + Mantenimiento por unidad.** Este es el número que alimentará el costeo de producto (screen 4) multiplicado por las unidades de esa máquina que consuma cada producto.
+
+La pantalla resume: Máquina/Equipo, Unidad de uso, Vida útil (texto: "X años" o "X usos"), Costo/unidad, Acciones (✏️/🗑️). El modal de creación/edición muestra el desglose completo en vivo (`_actualizarDesgloseMaquina()`, en cada `oninput`) con los mismos pasos de arriba, y un control segmentado "Por años" / "Por usos totales" que muestra/oculta los campos correspondientes (`_elegirBaseVidaUtilMaquina()`). CRUD por `nombre` (upsert con `onConflict: 'nombre'`; renombrar borra el registro viejo e inserta el nuevo, mismo patrón que Niveles Salariales y Cuadrillas). Formato de moneda: los montos grandes (valor de compra, valor de rescate, valor a depreciar) usan `_fmt()` sin decimales; los costos por unidad (depreciación, mantenimiento, costo total) usan `_fmtMaq()` con 2 decimales, porque ahí sí suelen importar los centavos (costos por unidad pequeños, ej. $199,50).
+
 ## Pendiente (próximas pantallas del módulo)
 
 - **Listado de referencia de insumos y materias primas** — de la pestaña `LIST.REF` del Excel.
-- **Amortización de maquinaria y equipos** — de la pestaña `MAQ-EQUPO` (depreciación por vida útil o por uso/golpes, según la máquina).
 - **Costeo de producto** — de la pestaña `FICHAS NUEVAS`, combinando materias primas + estas cuadrillas + máquinas + otros CIF para sacar el costo de producción por producto, que alimentará el catálogo de Productos ya existente (`productos` en Supabase, usado en Cotizaciones/Producción/Logística) — la pestaña `LISTA PRECIOS` del Excel es justamente ese catálogo.
 - Sin resolver todavía: qué hacer con las pestañas `BD MEZCLA` / `BD MEZCLA AMOBLAMIENTO` / `BD MEZCLA COLUMBIA` / `BD MEZCLA PRETENSADOS` del Excel (posible relación con Diseño de Mezcla de Calidad, a confirmar).
