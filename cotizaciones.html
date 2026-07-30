@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260729f">
+<link rel="stylesheet" href="css/estilos.css?v=20260729g">
 </head>
 <body>
 
@@ -805,10 +805,10 @@
     <button class="btn btn-primario btn-sm" onclick="abrirModalClaseSalarial()">+ Nueva clase</button>
   </div>
   <div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
-    <table class="tabla-cots" id="tabla-clases-salariales">
+    <table class="tabla-cots" id="tabla-clases-salariales" style="table-layout:fixed">
       <thead><tr>
-        <th>ROLES</th><th style="text-align:center">MÚLT. SMMLV</th><th style="text-align:center">SUBS. TRANSPORTE</th>
-        <th style="text-align:right">VALOR/HORA</th><th style="text-align:right">VALOR/DÍA</th><th style="text-align:right">VALOR/SEMANA</th><th style="text-align:right">VALOR/MES</th><th style="text-align:right">VALOR/AÑO</th>
+        <th style="width:180px">ROLES</th><th style="width:100px;text-align:center">MÚLT. SMMLV</th><th style="width:120px;text-align:center">SUBS. TRANSPORTE</th>
+        <th style="width:100px;text-align:right">VALOR/HORA</th><th style="width:100px;text-align:right">VALOR/DÍA</th><th style="width:110px;text-align:right">VALOR/SEMANA</th><th style="width:110px;text-align:right">VALOR/MES</th><th style="width:120px;text-align:right">VALOR/AÑO</th>
         <th style="min-width:130px">ACCIONES</th>
       </tr></thead>
       <tbody id="clases-salariales-body">
@@ -822,9 +822,9 @@
     <button class="btn btn-primario btn-sm" onclick="abrirModalCuadrilla()">+ Nueva cuadrilla</button>
   </div>
   <div class="card" style="padding:0;overflow:hidden">
-    <table class="tabla-cots" id="tabla-cuadrillas">
+    <table class="tabla-cots" id="tabla-cuadrillas" style="table-layout:fixed">
       <thead><tr>
-        <th>CUADRILLA</th><th style="text-align:right">VALOR/HORA</th><th style="text-align:right">VALOR/DÍA</th><th style="text-align:right">VALOR/SEMANA</th><th style="text-align:right">VALOR/MES</th><th style="text-align:right">VALOR/AÑO</th><th style="min-width:110px">ACCIONES</th>
+        <th style="width:400px">CUADRILLA</th><th style="width:100px;text-align:right">VALOR/HORA</th><th style="width:100px;text-align:right">VALOR/DÍA</th><th style="width:110px;text-align:right">VALOR/SEMANA</th><th style="width:110px;text-align:right">VALOR/MES</th><th style="width:120px;text-align:right">VALOR/AÑO</th><th style="min-width:130px">ACCIONES</th>
       </tr></thead>
       <tbody id="cuadrillas-body">
         <tr><td colspan="5" class="empty-state"><div class="icono">🧑‍🤝‍🧑</div><div>No hay cuadrillas registradas.</div></td></tr>
@@ -1798,24 +1798,24 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260729f"></script>
-<script src="js/catalogo.js?v=20260729f"></script>
-<script src="js/navegacion.js?v=20260729f"></script>
-<script src="js/ordenes-produccion.js?v=20260729f"></script>
-<script src="js/produccion-diaria.js?v=20260729f"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260729f"></script>
-<script src="js/costeo-mano-obra.js?v=20260729f"></script>
-<script src="js/calidad-mezclas.js?v=20260729f"></script>
-<script src="js/calidad-estadisticas.js?v=20260729f"></script>
-<script src="js/calidad-trazabilidad.js?v=20260729f"></script>
-<script src="js/logistica.js?v=20260729f"></script>
-<script src="js/estadisticas-logistica.js?v=20260729f"></script>
-<script src="js/auth.js?v=20260729f"></script>
-<script src="js/datos-realtime.js?v=20260729f"></script>
-<script src="js/cotizador.js?v=20260729f"></script>
-<script src="js/historico-clientes-stats.js?v=20260729f"></script>
+<script src="js/config.js?v=20260729g"></script>
+<script src="js/catalogo.js?v=20260729g"></script>
+<script src="js/navegacion.js?v=20260729g"></script>
+<script src="js/ordenes-produccion.js?v=20260729g"></script>
+<script src="js/produccion-diaria.js?v=20260729g"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260729g"></script>
+<script src="js/costeo-mano-obra.js?v=20260729g"></script>
+<script src="js/calidad-mezclas.js?v=20260729g"></script>
+<script src="js/calidad-estadisticas.js?v=20260729g"></script>
+<script src="js/calidad-trazabilidad.js?v=20260729g"></script>
+<script src="js/logistica.js?v=20260729g"></script>
+<script src="js/estadisticas-logistica.js?v=20260729g"></script>
+<script src="js/auth.js?v=20260729g"></script>
+<script src="js/datos-realtime.js?v=20260729g"></script>
+<script src="js/cotizador.js?v=20260729g"></script>
+<script src="js/historico-clientes-stats.js?v=20260729g"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
-<script src="js/migracion-consecutivos.js?v=20260729f"></script>
+<script src="js/migracion-consecutivos.js?v=20260729g"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1823,9 +1823,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260729f"></script>
-<script src="js/rut-parser.js?v=20260729f"></script>
-<script src="js/compresor-pdf.js?v=20260729f"></script>
-<script src="js/lector-informes.js?v=20260729f"></script>
+<script src="js/pdf.js?v=20260729g"></script>
+<script src="js/rut-parser.js?v=20260729g"></script>
+<script src="js/compresor-pdf.js?v=20260729g"></script>
+<script src="js/lector-informes.js?v=20260729g"></script>
 </body>
 </html>
