@@ -147,10 +147,19 @@ function _toggleTransporteInsumo() {
   _actualizarDesgloseInsumo();
 }
 
+// El Triturado Grueso (rol "grava") es la única materia prima cuyo producto real cambia
+// según una segunda dimensión (el tamaño máximo de agregado, 3/8"/1/2"/3/4"/1") — por eso es
+// el único rol con un campo extra en este modal.
+function _toggleTamanoAgregadoInsumo() {
+  const esGrava = document.getElementById('m-insumo-rol-diseno').value === 'grava';
+  document.getElementById('bloque-tamano-agregado-insumo').style.display = esGrava ? 'block' : 'none';
+}
+
 function _leerFormularioInsumo() {
   return {
     categoria: document.getElementById('m-insumo-categoria').value,
     rolDiseno: document.getElementById('m-insumo-rol-diseno').value,
+    tamanoAgregado: document.getElementById('m-insumo-tamano-agregado').value,
     unidad: document.getElementById('m-insumo-unidad').value,
     valorUnitario: parseFloat(document.getElementById('m-insumo-valor').value) || 0,
     aplicaIva: document.getElementById('m-insumo-iva').checked,
@@ -180,6 +189,8 @@ function abrirModalInsumoCosto() {
   document.getElementById('m-insumo-nombre').value = '';
   document.getElementById('m-insumo-categoria').value = 'materia_prima';
   document.getElementById('m-insumo-rol-diseno').value = '';
+  document.getElementById('m-insumo-tamano-agregado').value = '';
+  _toggleTamanoAgregadoInsumo();
   document.getElementById('m-insumo-unidad').value = 'kg';
   document.getElementById('m-insumo-valor').value = '';
   document.getElementById('m-insumo-iva').checked = true;
@@ -198,6 +209,8 @@ function editarInsumoCosto(nombre) {
   document.getElementById('m-insumo-nombre').value = i.nombre;
   document.getElementById('m-insumo-categoria').value = i.categoria;
   document.getElementById('m-insumo-rol-diseno').value = i.rolDiseno || '';
+  document.getElementById('m-insumo-tamano-agregado').value = i.tamanoAgregado || '';
+  _toggleTamanoAgregadoInsumo();
   document.getElementById('m-insumo-unidad').value = i.unidad;
   document.getElementById('m-insumo-valor').value = i.valorUnitario || 0;
   document.getElementById('m-insumo-iva').checked = i.aplicaIva !== false;
@@ -212,6 +225,10 @@ function guardarInsumoCosto() {
   const nombre = document.getElementById('m-insumo-nombre').value.trim();
   if (!nombre) { alert('El nombre es requerido.'); return; }
   const i = _leerFormularioInsumo();
+  if (i.rolDiseno === 'grava' && !i.tamanoAgregado) {
+    alert('Selecciona el "Tamaño máximo de agregado" de este Triturado Grueso — el producto real cambia según el tamaño (3/8", 1/2", 3/4", 1"), así que es obligatorio para el rol "Triturado Grueso (grava)".');
+    return;
+  }
   i.nombre = nombre;
   const nombreAnterior = document.getElementById('m-insumo-nombre-anterior').value;
   const guardarEnSupabase = () => {

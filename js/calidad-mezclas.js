@@ -19,13 +19,30 @@ const _LABEL_MATERIAL_DISENO = { cemento: 'Cemento', metacaolin: 'Metacaolín', 
 // Ítem, campo "Rol en Diseño de Mezcla") — filtra el desplegable para que, ej., la fila de
 // Cemento solo muestre los ítems del catálogo marcados como rol "cemento", no el catálogo
 // completo. Sin ese rol asignado en el ítem, no aparece en ningún picker de Diseño de Mezcla.
-function _opcionesProductoCatalogo(seleccionado, rol) {
-  const items = (INSUMOS_COSTOS || []).filter(i => i.rolDiseno === rol);
+// El Triturado Grueso (rol "grava") además filtra por `tamano` (el "Tamaño máximo de
+// agregado" del diseño, ej. 3/4") porque no es intercambiable — un Triturado 3/8" y uno de
+// 1" son materias primas distintas con precio distinto (a pedido del usuario, 2026-07-30).
+function _opcionesProductoCatalogo(seleccionado, rol, tamano) {
+  let items = (INSUMOS_COSTOS || []).filter(i => i.rolDiseno === rol);
+  if (rol === 'grava') items = items.filter(i => i.tamanoAgregado === tamano);
   const opciones = items.map(i => `<option value="${i.nombre}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
   if (!items.length) {
-    return `<option value="">— Sin productos con este rol en Costos de Referencia —</option>`;
+    const motivo = rol === 'grava' && !tamano
+      ? 'elige primero el "Tamaño máximo de agregado" del diseño'
+      : 'sin productos con este rol en Costos de Referencia';
+    return `<option value="">— ${motivo} —</option>`;
   }
   return `<option value="">— Selecciona —</option>${opciones}`;
+}
+
+// Cuando cambia el "Tamaño máximo de agregado" del diseño, el Triturado Grueso elegido puede
+// dejar de aplicar (era de otro tamaño) — se refresca el picker con el nuevo filtro y se
+// limpia la selección anterior, para no dejar guardado un producto que ya no corresponde.
+function _actualizarProductoGravaPorTamano() {
+  const sel = document.getElementById('m-diseno-grava-producto');
+  if (!sel) return;
+  const tamano = document.getElementById('m-diseno-tamano').value;
+  sel.innerHTML = _opcionesProductoCatalogo('', 'grava', tamano);
 }
 
 function siguienteCodigoDiseno() {
@@ -114,7 +131,7 @@ function abrirModalDiseno() {
   document.getElementById('m-diseno-estado').value = 'Activo';
   _MATERIALES_DISENO.forEach(k => {
     const sel = document.getElementById(`m-diseno-${k}-producto`);
-    if (sel) sel.innerHTML = _opcionesProductoCatalogo('', k);
+    if (sel) sel.innerHTML = _opcionesProductoCatalogo('', k, document.getElementById('m-diseno-tamano').value);
   });
   _aditivosDisenoActual = [];
   renderAditivosDiseno();
@@ -142,7 +159,7 @@ function editarDiseno(id) {
   document.getElementById('m-diseno-agua').value = d.materiales?.agua || '';
   _MATERIALES_DISENO.forEach(k => {
     const sel = document.getElementById(`m-diseno-${k}-producto`);
-    if (sel) sel.innerHTML = _opcionesProductoCatalogo(d.materiales?.[`${k}Producto`] || '', k);
+    if (sel) sel.innerHTML = _opcionesProductoCatalogo(d.materiales?.[`${k}Producto`] || '', k, document.getElementById('m-diseno-tamano').value);
   });
   // Migración: diseños antiguos con un solo aditivo de texto libre → lista nueva
   _aditivosDisenoActual = JSON.parse(JSON.stringify(d.materiales?.aditivos || (d.materiales?.aditivo ? [{ tipo: 'Superplastificante', dosis: d.materiales.dosisAditivo || 0 }] : [])));
