@@ -8,11 +8,14 @@ Módulo nuevo (2026-07-26), construido a partir del Excel real "COSTOS MAESTRO 2
 - `sql/2026-07-26_costeo_mano_obra.sql` — DDL de las tablas nuevas. **Hay que correrlo una sola vez** en el SQL Editor de Supabase antes de que esta pantalla pueda guardar datos (yo no tengo acceso para crear tablas).
 - `js/costeo-maquinaria.js` — amortización de maquinaria y equipos.
 - `sql/2026-07-29_costeo_maquinaria.sql` — DDL de la tabla `maquinaria_equipos`. **Hay que correrlo una sola vez** en el SQL Editor de Supabase (elegir "Run without RLS", igual que el resto de tablas de la app) antes de que esta pantalla pueda guardar datos.
+- `js/costeo-referencia.js` — Lista de Referencia de Costos (unifica Mano de Obra + Maquinaria + Materias Primas + Insumos/CIF).
+- `sql/2026-07-30_lista_referencia_costos.sql` — DDL de la tabla `insumos_costos`. **Hay que correrlo una sola vez** en el SQL Editor de Supabase (elegir "Run without RLS") antes de que esta pantalla pueda guardar Materias Primas/Insumos.
 
 ## Pantallas (`ir()` en `navegacion.js`, módulo `costeo`)
 
 - `costeo-mo` — Costo de Mano de Obra (Niveles Salariales + Cuadrillas Productivas).
 - `costeo-maquinaria` — Amortización de Maquinaria y Equipos.
+- `costeo-referencia` — Lista de Referencia de Costos.
 
 ## Datos
 
@@ -22,6 +25,7 @@ Tablas Supabase nuevas (patrón `datos` JSONB, igual al resto de la app):
 - `clases_salariales`: una fila por clase (`nombre` único, ej. "Clase 1 (Ayudante)"), con `multiplicador` (múltiplo del S.M.M.L.V.) y `aplicaSubsidioTransporte` (booleano, por si algún día se agrega una clase que gane más de 2 S.M.M.L.V. y no le aplique).
 - `cuadrillas_productivas`: una fila por cuadrilla (`nombre` único, ej. "Cuadrilla Tipo 3: 1 Oficial + 3 Ayudantes"), con `roles: [{ rol, personas, clase }]` — `personas` puede ser fraccionaria (ej. 0.1 para un supervisor compartido entre varias cuadrillas).
 - `maquinaria_equipos`: una fila por máquina/equipo (`nombre` único, ej. "Máquina Columbia"), con `valorCompra`, `unidadUso` (desplegable cerrado, no texto libre — ver más abajo), `baseVidaUtil` (`'anos'` o `'usos'`), `vidaUtilAnos` + `capacidadAnual` (si `baseVidaUtil` es `'anos'`) o `usosTotal` (si es `'usos'`), `rescatePct`, `mantenimientoPct`.
+- `insumos_costos`: una fila por Materia Prima o Insumo/CIF (`nombre` único, ej. "Cemento Estructural Granel"), con `categoria` (`'materia_prima'` o `'insumo_cif'`), `unidad`, `valorUnitario`, `aplicaIva` (booleano, IVA 19%), `transporteIncluido` (booleano) + `transporteAdicional` (solo si no está incluido). **Solo** guarda Materias Primas/Insumos — Mano de Obra y Maquinaria NO se duplican aquí, se leen en vivo de sus propias tablas (ver Lista de Referencia de Costos más abajo).
 
 ## Fórmula de costo real de una clase salarial (`calcularCosteoClase()`)
 
@@ -74,8 +78,21 @@ La pantalla resume: Máquina/Equipo, Unidad de uso, Vida útil (texto: "X años"
 
 **Unidad de uso — desplegable cerrado, no texto libre** (2026-07-30, a pedido del usuario, para evitar variantes tipo "golpe"/"Golpes"/"GOLPE" que romperían el agrupamiento por unidad más adelante en Costeo de Producto). Las opciones son las 5 unidades que realmente aparecen en las 22 máquinas de la hoja `MAQ-EQUPO` del Excel original: **Golpe, Día, m³, m², Banco**. El valor guardado es la clave interna (`golpe`, `dia`, `m3`, `m2`, `banco`); la etiqueta bonita para mostrar (con tilde/superíndice) sale de `UNIDADES_USO_MAQUINA` / `_labelUnidadUso()` en `js/costeo-maquinaria.js`. Si en el futuro aparece una máquina con una unidad distinta, hay que agregar la opción al `<select>` en `cotizaciones.html` y a `UNIDADES_USO_MAQUINA`.
 
+## Lista de Referencia de Costos (`js/costeo-referencia.js`)
+
+De la pestaña `LIST.REF` del Excel original, que ya traía la misma idea: una lista con columna `TIPO` que agrupaba **MATERIA PRIMA** (63 ítems), **MANO DE OBRA** (23, incluida dotación) y **COSTOS INDIRECTOS** (77, mezcla de maquinaria + insumos varios) en un solo lugar. Esta pantalla reproduce esa unificación, pero **sin duplicar datos**: en vez de copiar los costos de Mano de Obra y Maquinaria a una tabla nueva, los lee en vivo de sus propias tablas cada vez que se renderiza (`_listaUnificadaCostos()` combina `CLASES_SALARIALES` + `CUADRILLAS_PRODUCTIVAS` + `MAQUINARIA_EQUIPOS` + `INSUMOS_COSTOS` en una sola lista plana).
+
+- **4 categorías**, cada una con su badge de color: 👷 Mano de Obra (azul), 🔧 Maquinaria (naranja), 🧱 Materia Prima (verde), 📦 Insumo / CIF (morado) — mismos tonos que `.badge-*` de Cotizaciones, aplicados aquí a un grupo semántico nuevo.
+- **Mano de Obra y Maquinaria son de solo lectura aquí** (🔒 + link "Ver en Mano de Obra →" / "Ver en Maquinaria →", que simula un clic real sobre el botón del subnav vía `_irSubnavCosteo()` para que `ir()` reciba un `event.currentTarget` válido) — se editan en sus pantallas ya existentes, para no tener dos fuentes de verdad del mismo dato.
+  - Cada Nivel Salarial y cada Cuadrilla aparece como una fila con unidad **"día"** (`valorRealDiario` / `_totalCuadrilla().diario`) — mismo criterio que usaba el Excel original para las filas `MANO DE OBRA` de `LIST.REF` (todas en `UND=DIA`).
+  - Cada máquina aparece con su `unidadUso` y `costoUnidad` ya calculados en Maquinaria.
+- **Materias Primas e Insumos/CIF se crean y editan directamente aquí** (`insumos_costos`, único CRUD nuevo de esta pantalla) — es la parte que faltaba del plan original ("Listado de referencia de insumos y materias primas").
+- Filtro por categoría (chips con contador en vivo) + buscador por nombre — mismo patrón de estilos inline que el resto de Costeo (sin clases nuevas en `estilos.css`, coherente con Maquinaria).
+- El modal de creación de Materia Prima/Insumo reproduce la lógica de columnas real del Excel (`VALOR UNITARIO` → `IVA` → `TRANSPORTE` → `VALOR PRESENTACIÓN + TRANSPORTE`): Valor unitario → ¿Aplica IVA (19%)? → ¿Transporte incluido en el valor unitario? (si no, campo de transporte adicional/unidad) → **Valor final de referencia** (`calcularCostoInsumo()`), que es el número que se usará en Costeo de Producto.
+- **Unidades de medida** (`UNIDADES_INSUMO` en `js/costeo-referencia.js`): `kg`, `m`, `m²`, `m³`, `L`, `gal`, `kWh`, `un`, `%` — revisadas contra estándar internacional (SI) el 2026-07-30: se corrigieron a minúscula/símbolo correcto (`kg` no `KG`, `m²`/`m³` con superíndice) y se quitó `TON` (cero apariciones reales en las 63 filas de Materia Prima + 77 de CIF del Excel). Dos excepciones deliberadas, no-SI pero mantenidas por uso comercial real en Colombia: **`gal`** (combustible se factura por galón en el surtidor) y **`kWh`** (unidad real de facturación eléctrica — en el Excel original la fila "Energía Eléctrica" tenía el símbolo `$` como unidad, que no tiene sentido físico; se corrigió a `kWh`).
+- **Nota para Costeo de Producto (próxima pantalla)**: el Excel original también tenía dos ítems que no son un costo por unidad física sino un **recargo porcentual sobre otro costo** — "Desperdicio" (`% MP`, 2%) y "Herramienta menor" (`% MO`, 2%). No se modelaron en `insumos_costos` porque no encajan en el patrón "cantidad × valor unitario" del resto de la lista; van a necesitar su propio tratamiento como factor de recargo cuando se construya Costeo de Producto.
+
 ## Pendiente (próximas pantallas del módulo)
 
-- **Listado de referencia de insumos y materias primas** — de la pestaña `LIST.REF` del Excel.
-- **Costeo de producto** — de la pestaña `FICHAS NUEVAS`, combinando materias primas + estas cuadrillas + máquinas + otros CIF para sacar el costo de producción por producto, que alimentará el catálogo de Productos ya existente (`productos` en Supabase, usado en Cotizaciones/Producción/Logística) — la pestaña `LISTA PRECIOS` del Excel es justamente ese catálogo.
-- Sin resolver todavía: qué hacer con las pestañas `BD MEZCLA` / `BD MEZCLA AMOBLAMIENTO` / `BD MEZCLA COLUMBIA` / `BD MEZCLA PRETENSADOS` del Excel (posible relación con Diseño de Mezcla de Calidad, a confirmar).
+- **Costeo de producto** — de la pestaña `FICHAS NUEVAS`, combinando la Lista de Referencia de Costos (materias primas + mano de obra + máquinas + insumos/CIF) para sacar el costo de producción por producto, que alimentará el catálogo de Productos ya existente (`productos` en Supabase, usado en Cotizaciones/Producción/Logística) — la pestaña `LISTA PRECIOS` del Excel es justamente ese catálogo.
+- Sin resolver todavía: qué hacer con las pestañas `BD MEZCLA` / `BD MEZCLA AMOBLAMIENTO` / `BD MEZCLA COLUMBIA` / `BD MEZCLA PRETENSADOS` del Excel (posible relación con Diseño de Mezcla de Calidad, a confirmar), y el tratamiento de los recargos % MP / % MO mencionado arriba.

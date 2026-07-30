@@ -1,5 +1,5 @@
 async function cargarDatosSupabase() {
-  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }, { data: prods, error: e4 }, { data: disenos, error: e5 }, { data: ensayos, error: e6 }, { data: mprima, error: e7 }, { data: nconf, error: e8 }, { data: ajustes, error: e9 }, { data: entregas, error: e10 }, { data: pmo, error: e11 }, { data: clasesMo, error: e12 }, { data: cuadrillas, error: e13 }, { data: maquinas, error: e14 }] = await Promise.all([
+  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }, { data: prods, error: e4 }, { data: disenos, error: e5 }, { data: ensayos, error: e6 }, { data: mprima, error: e7 }, { data: nconf, error: e8 }, { data: ajustes, error: e9 }, { data: entregas, error: e10 }, { data: pmo, error: e11 }, { data: clasesMo, error: e12 }, { data: cuadrillas, error: e13 }, { data: maquinas, error: e14 }, { data: insumos, error: e15 }] = await Promise.all([
     sb.from('cotizaciones').select('datos, estado').order('creado', { ascending: true }),
     sb.from('clientes').select('datos').order('creado', { ascending: true }),
     sb.from('ordenes_servicio').select('datos').order('creado', { ascending: false }),
@@ -13,7 +13,8 @@ async function cargarDatosSupabase() {
     sb.from('parametros_mo').select('datos').eq('id', 1).maybeSingle(),
     sb.from('clases_salariales').select('datos').order('creado', { ascending: true }),
     sb.from('cuadrillas_productivas').select('datos').order('creado', { ascending: true }),
-    sb.from('maquinaria_equipos').select('datos').order('creado', { ascending: true })
+    sb.from('maquinaria_equipos').select('datos').order('creado', { ascending: true }),
+    sb.from('insumos_costos').select('datos').order('creado', { ascending: true })
   ]);
   if (e3) console.warn('Tabla ordenes_servicio no disponible aún.');
   if (e4) console.warn('Tabla producciones no disponible aún.');
@@ -27,6 +28,7 @@ async function cargarDatosSupabase() {
   if (e12) console.warn('Tabla clases_salariales no disponible aún — corre sql/2026-07-26_costeo_mano_obra.sql en Supabase.');
   if (e13) console.warn('Tabla cuadrillas_productivas no disponible aún — corre sql/2026-07-26_costeo_mano_obra.sql en Supabase.');
   if (e14) console.warn('Tabla maquinaria_equipos no disponible aún — corre sql/2026-07-29_costeo_maquinaria.sql en Supabase.');
+  if (e15) console.warn('Tabla insumos_costos no disponible aún — corre sql/2026-07-30_lista_referencia_costos.sql en Supabase.');
   ORDENES = (ords || []).filter(r => r.datos).map(r => r.datos);
   PRODUCCIONES = (prods || []).filter(r => r.datos).map(r => r.datos);
   DISENOS_MEZCLA = (disenos || []).filter(r => r.datos).map(r => r.datos);
@@ -39,6 +41,7 @@ async function cargarDatosSupabase() {
   CLASES_SALARIALES = (clasesMo || []).filter(r => r.datos).map(r => r.datos);
   CUADRILLAS_PRODUCTIVAS = (cuadrillas || []).filter(r => r.datos).map(r => r.datos);
   MAQUINARIA_EQUIPOS = (maquinas || []).filter(r => r.datos).map(r => r.datos);
+  INSUMOS_COSTOS = (insumos || []).filter(r => r.datos).map(r => r.datos);
 
   // Catálogo de productos desde Supabase (con auto-siembra la primera vez)
   await cargarCatalogo();
@@ -118,6 +121,7 @@ function rerenderPantallaActiva() {
     case 'pantalla-logistica-estadisticas': renderEstadisticasLogistica(); break;
     case 'pantalla-costeo-mo': renderCosteoManoObra(); break;
     case 'pantalla-costeo-maquinaria': renderCosteoMaquinaria(); break;
+    case 'pantalla-costeo-referencia': renderCosteoReferencia(); break;
   }
 }
 
@@ -200,6 +204,11 @@ async function recargarMaquinariaRT() {
   MAQUINARIA_EQUIPOS = (data || []).filter(r => r.datos).map(r => r.datos);
   rerenderPantallaActiva();
 }
+async function recargarInsumosCostosRT() {
+  const { data } = await sb.from('insumos_costos').select('datos').order('creado', { ascending: true });
+  INSUMOS_COSTOS = (data || []).filter(r => r.datos).map(r => r.datos);
+  rerenderPantallaActiva();
+}
 
 function suscribirRealtime() {
   if (_canalRealtime) return; // evitar suscripciones duplicadas
@@ -219,6 +228,7 @@ function suscribirRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'clases_salariales' },     () => _rtDebounce('clasessalariales', recargarClasesSalarialesRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'cuadrillas_productivas' }, () => _rtDebounce('cuadrillas', recargarCuadrillasRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'maquinaria_equipos' },      () => _rtDebounce('maquinaria', recargarMaquinariaRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'insumos_costos' },           () => _rtDebounce('insumoscostos', recargarInsumosCostosRT))
     .subscribe((status) => {
       const ind = document.getElementById('rt-indicador');
       if (ind) {

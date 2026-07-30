@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260730b">
+<link rel="stylesheet" href="css/estilos.css?v=20260730c">
 </head>
 <body>
 
@@ -114,6 +114,7 @@
 <nav class="nav" id="subnav-costeo" style="display:none">
   <button class="nav-btn activo" onclick="ir('costeo-mo')">👷 Costo de Mano de Obra</button>
   <button class="nav-btn" onclick="ir('costeo-maquinaria')">🔧 Amortización de Maquinaria y Equipos</button>
+  <button class="nav-btn" onclick="ir('costeo-referencia')">📑 Lista de Referencia de Costos</button>
 </nav>
 
 <!-- ═══════════════════════════════════════
@@ -863,6 +864,49 @@
 </div>
 
 <!-- ═══════════════════════════════════════
+     PANTALLA: LISTA DE REFERENCIA DE COSTOS
+═══════════════════════════════════════ -->
+<div id="pantalla-costeo-referencia" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Lista de Referencia de Costos</div>
+  </div>
+
+  <div class="card" style="background:var(--azul-suave);border:1px solid #90CAF9;box-shadow:none;display:flex;gap:10px;align-items:flex-start;padding:12px 16px">
+    <span style="font-size:16px;flex-shrink:0">ℹ️</span>
+    <div style="font-size:12px;line-height:1.6">Esta pantalla reúne <b>todos</b> los costos unitarios del módulo de Costeo en un solo lugar. Las filas de <b>Mano de Obra</b> y <b>Maquinaria y Equipos</b> vienen de sus propias pantallas (🔒 solo lectura aquí — se editan allá). Las filas de <b>Materias Primas</b> e <b>Insumos y Otros CIF</b> se crean y editan directamente aquí. Esta lista unificada alimentará <b>Costeo de Producto</b> (próxima pantalla del módulo).</div>
+  </div>
+
+  <div class="acciones-row">
+    <div class="flex-gap" style="gap:8px" id="referencia-filtros">
+      <button id="chip-todos" onclick="_filtrarCategoriaReferencia('todos')" style="border:1px solid var(--azul);background:var(--azul);color:white;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">Todos <span id="chip-count-todos" style="background:rgba(255,255,255,0.25);color:white;padding:1px 7px;border-radius:10px;font-size:11px">0</span></button>
+      <button id="chip-mano_obra" onclick="_filtrarCategoriaReferencia('mano_obra')" style="border:1px solid var(--gris-borde);background:white;color:var(--gris-medio);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">👷 Mano de Obra <span id="chip-count-mano_obra" style="background:var(--gris-claro);color:var(--gris-medio);padding:1px 7px;border-radius:10px;font-size:11px">0</span></button>
+      <button id="chip-maquinaria" onclick="_filtrarCategoriaReferencia('maquinaria')" style="border:1px solid var(--gris-borde);background:white;color:var(--gris-medio);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">🔧 Maquinaria <span id="chip-count-maquinaria" style="background:var(--gris-claro);color:var(--gris-medio);padding:1px 7px;border-radius:10px;font-size:11px">0</span></button>
+      <button id="chip-materia_prima" onclick="_filtrarCategoriaReferencia('materia_prima')" style="border:1px solid var(--gris-borde);background:white;color:var(--gris-medio);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">🧱 Materias Primas <span id="chip-count-materia_prima" style="background:var(--gris-claro);color:var(--gris-medio);padding:1px 7px;border-radius:10px;font-size:11px">0</span></button>
+      <button id="chip-insumo_cif" onclick="_filtrarCategoriaReferencia('insumo_cif')" style="border:1px solid var(--gris-borde);background:white;color:var(--gris-medio);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">📦 Insumos y Otros CIF <span id="chip-count-insumo_cif" style="background:var(--gris-claro);color:var(--gris-medio);padding:1px 7px;border-radius:10px;font-size:11px">0</span></button>
+    </div>
+    <div class="flex-gap">
+      <input class="buscador-input" id="referencia-buscador" placeholder="🔍 Buscar ítem..." oninput="_buscarReferencia(this.value)">
+      <button class="btn btn-primario btn-sm" onclick="abrirModalInsumoCosto()">+ Nuevo insumo / materia prima</button>
+    </div>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" style="table-layout:fixed">
+      <thead><tr>
+        <th style="width:18%">CATEGORÍA</th>
+        <th style="width:32%">ÍTEM</th>
+        <th style="width:10%">UNIDAD</th>
+        <th style="width:16%;text-align:right">COSTO UNITARIO</th>
+        <th style="width:24%">ORIGEN / ACCIONES</th>
+      </tr></thead>
+      <tbody id="referencia-costos-body">
+        <tr><td colspan="5" class="empty-state"><div class="icono">📑</div><div>No hay ítems para este filtro.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
      PANTALLA: AJUSTE DIARIO DE MEZCLA
 ═══════════════════════════════════════ -->
 <div id="pantalla-ajuste-mezcla" class="pantalla">
@@ -1243,6 +1287,57 @@
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-maquina')">Cancelar</button>
       <button class="btn btn-primario" onclick="guardarMaquina()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-insumo-costo">
+  <div class="modal" style="width:620px;max-width:95vw">
+    <div class="modal-titulo" id="modal-insumo-titulo">➕ Nuevo Ítem</div>
+    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:16px">Materia Prima / Insumo y Otros CIF — no aplica a Mano de Obra ni Maquinaria (esas se editan en sus propias pantallas)</div>
+    <input type="hidden" id="m-insumo-nombre-anterior">
+
+    <div class="form-grid-3" style="margin-bottom:10px">
+      <div class="form-grupo" style="grid-column: span 2"><label>Nombre *</label><input type="text" id="m-insumo-nombre" placeholder="Ej: Cemento Estructural Granel" oninput="_actualizarDesgloseInsumo()"></div>
+      <div class="form-grupo">
+        <label>Categoría *</label>
+        <select id="m-insumo-categoria" onchange="_actualizarDesgloseInsumo()">
+          <option value="materia_prima">🧱 Materia Prima</option>
+          <option value="insumo_cif">📦 Insumo y Otros CIF</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-grid-3" style="margin-bottom:10px">
+      <div class="form-grupo">
+        <label>Unidad de medida *</label>
+        <select id="m-insumo-unidad" onchange="_actualizarDesgloseInsumo()">
+          <option value="kg">kg</option><option value="m">m</option><option value="m2">m²</option><option value="m3">m³</option>
+          <option value="L">L</option><option value="gal">gal</option><option value="kWh">kWh</option><option value="un">un</option><option value="pct">%</option>
+        </select>
+      </div>
+      <div class="form-grupo"><label>Valor unitario *</label><input type="number" id="m-insumo-valor" min="0" step="1" oninput="_actualizarDesgloseInsumo()"></div>
+      <div class="form-grupo">
+        <label>&nbsp;</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:8px 0;cursor:pointer"><input type="checkbox" id="m-insumo-iva" checked style="width:16px;height:16px" onchange="_actualizarDesgloseInsumo()"> Aplica IVA (19%)</label>
+      </div>
+    </div>
+
+    <div class="form-grid" style="margin-bottom:10px;align-items:end">
+      <div class="form-grupo">
+        <label>&nbsp;</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:8px 0;cursor:pointer"><input type="checkbox" id="m-insumo-transporte-incluido" checked style="width:16px;height:16px" onchange="_toggleTransporteInsumo()"> Transporte incluido en el valor unitario</label>
+      </div>
+      <div class="form-grupo"><label>Transporte adicional / unidad</label><input type="number" id="m-insumo-transporte-adicional" min="0" step="1" value="0" disabled oninput="_actualizarDesgloseInsumo()"></div>
+    </div>
+
+    <div id="insumo-desglose" style="background:var(--azul-suave);border:1px solid #90CAF9;border-radius:var(--radio);padding:14px 16px;margin-top:8px;font-size:13px"></div>
+
+    <div style="font-size:11px;color:var(--gris-medio);margin-top:10px;line-height:1.5">El "Valor final de referencia" es el número que se usará en Costeo de Producto al armar la receta — ya incluye IVA y transporte, para no tener que sumarlos aparte cada vez.</div>
+
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-insumo-costo')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarInsumoCosto()">Guardar</button>
     </div>
   </div>
 </div>
@@ -1877,25 +1972,26 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260730b"></script>
-<script src="js/catalogo.js?v=20260730b"></script>
-<script src="js/navegacion.js?v=20260730b"></script>
-<script src="js/ordenes-produccion.js?v=20260730b"></script>
-<script src="js/produccion-diaria.js?v=20260730b"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260730b"></script>
-<script src="js/costeo-mano-obra.js?v=20260730b"></script>
-<script src="js/costeo-maquinaria.js?v=20260730b"></script>
-<script src="js/calidad-mezclas.js?v=20260730b"></script>
-<script src="js/calidad-estadisticas.js?v=20260730b"></script>
-<script src="js/calidad-trazabilidad.js?v=20260730b"></script>
-<script src="js/logistica.js?v=20260730b"></script>
-<script src="js/estadisticas-logistica.js?v=20260730b"></script>
-<script src="js/auth.js?v=20260730b"></script>
-<script src="js/datos-realtime.js?v=20260730b"></script>
-<script src="js/cotizador.js?v=20260730b"></script>
-<script src="js/historico-clientes-stats.js?v=20260730b"></script>
+<script src="js/config.js?v=20260730c"></script>
+<script src="js/catalogo.js?v=20260730c"></script>
+<script src="js/navegacion.js?v=20260730c"></script>
+<script src="js/ordenes-produccion.js?v=20260730c"></script>
+<script src="js/produccion-diaria.js?v=20260730c"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260730c"></script>
+<script src="js/costeo-mano-obra.js?v=20260730c"></script>
+<script src="js/costeo-maquinaria.js?v=20260730c"></script>
+<script src="js/costeo-referencia.js?v=20260730c"></script>
+<script src="js/calidad-mezclas.js?v=20260730c"></script>
+<script src="js/calidad-estadisticas.js?v=20260730c"></script>
+<script src="js/calidad-trazabilidad.js?v=20260730c"></script>
+<script src="js/logistica.js?v=20260730c"></script>
+<script src="js/estadisticas-logistica.js?v=20260730c"></script>
+<script src="js/auth.js?v=20260730c"></script>
+<script src="js/datos-realtime.js?v=20260730c"></script>
+<script src="js/cotizador.js?v=20260730c"></script>
+<script src="js/historico-clientes-stats.js?v=20260730c"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
-<script src="js/migracion-consecutivos.js?v=20260730b"></script>
+<script src="js/migracion-consecutivos.js?v=20260730c"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1903,9 +1999,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260730b"></script>
-<script src="js/rut-parser.js?v=20260730b"></script>
-<script src="js/compresor-pdf.js?v=20260730b"></script>
-<script src="js/lector-informes.js?v=20260730b"></script>
+<script src="js/pdf.js?v=20260730c"></script>
+<script src="js/rut-parser.js?v=20260730c"></script>
+<script src="js/compresor-pdf.js?v=20260730c"></script>
+<script src="js/lector-informes.js?v=20260730c"></script>
 </body>
 </html>
