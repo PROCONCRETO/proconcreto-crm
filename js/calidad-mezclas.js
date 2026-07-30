@@ -15,9 +15,16 @@ let DISENOS_MEZCLA = [];
 const _MATERIALES_DISENO = ['cemento', 'metacaolin', 'agua', 'arena', 'grava'];
 const _LABEL_MATERIAL_DISENO = { cemento: 'Cemento', metacaolin: 'Metacaolín', agua: 'Agua', arena: 'Arena', grava: 'Triturado Grueso' };
 
-function _opcionesProductoCatalogo(seleccionado) {
-  const items = (INSUMOS_COSTOS || []).filter(i => i.categoria === 'materia_prima' || i.categoria === 'insumo_cif');
+// `rol` es el campo `rolDiseno` que se marca en Costos de Referencia (modal Nuevo/Editar
+// Ítem, campo "Rol en Diseño de Mezcla") — filtra el desplegable para que, ej., la fila de
+// Cemento solo muestre los ítems del catálogo marcados como rol "cemento", no el catálogo
+// completo. Sin ese rol asignado en el ítem, no aparece en ningún picker de Diseño de Mezcla.
+function _opcionesProductoCatalogo(seleccionado, rol) {
+  const items = (INSUMOS_COSTOS || []).filter(i => i.rolDiseno === rol);
   const opciones = items.map(i => `<option value="${i.nombre}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
+  if (!items.length) {
+    return `<option value="">— Sin productos con este rol en Costos de Referencia —</option>`;
+  }
   return `<option value="">— Selecciona —</option>${opciones}`;
 }
 
@@ -83,7 +90,7 @@ function renderAditivosDiseno() {
           <option value="Acelerante" ${a.tipo === 'Acelerante' ? 'selected' : ''}>Acelerante</option>
         </select>
       </td>
-      <td><select onchange="_aditivosDisenoActual[${i}].producto=this.value">${_opcionesProductoCatalogo(a.producto || '')}</select></td>
+      <td><select onchange="_aditivosDisenoActual[${i}].producto=this.value">${_opcionesProductoCatalogo(a.producto || '', 'aditivo')}</select></td>
       <td><input type="number" value="${a.dosis}" min="0" step="0.01" onchange="_aditivosDisenoActual[${i}].dosis=parseFloat(this.value)||0"></td>
       <td><button class="btn btn-rojo btn-xs" onclick="eliminarAditivoDiseno(${i})">✕</button></td>
     </tr>`).join('');
@@ -107,7 +114,7 @@ function abrirModalDiseno() {
   document.getElementById('m-diseno-estado').value = 'Activo';
   _MATERIALES_DISENO.forEach(k => {
     const sel = document.getElementById(`m-diseno-${k}-producto`);
-    if (sel) sel.innerHTML = _opcionesProductoCatalogo('');
+    if (sel) sel.innerHTML = _opcionesProductoCatalogo('', k);
   });
   _aditivosDisenoActual = [];
   renderAditivosDiseno();
@@ -135,7 +142,7 @@ function editarDiseno(id) {
   document.getElementById('m-diseno-agua').value = d.materiales?.agua || '';
   _MATERIALES_DISENO.forEach(k => {
     const sel = document.getElementById(`m-diseno-${k}-producto`);
-    if (sel) sel.innerHTML = _opcionesProductoCatalogo(d.materiales?.[`${k}Producto`] || '');
+    if (sel) sel.innerHTML = _opcionesProductoCatalogo(d.materiales?.[`${k}Producto`] || '', k);
   });
   // Migración: diseños antiguos con un solo aditivo de texto libre → lista nueva
   _aditivosDisenoActual = JSON.parse(JSON.stringify(d.materiales?.aditivos || (d.materiales?.aditivo ? [{ tipo: 'Superplastificante', dosis: d.materiales.dosisAditivo || 0 }] : [])));

@@ -150,6 +150,7 @@ function _toggleTransporteInsumo() {
 function _leerFormularioInsumo() {
   return {
     categoria: document.getElementById('m-insumo-categoria').value,
+    rolDiseno: document.getElementById('m-insumo-rol-diseno').value,
     unidad: document.getElementById('m-insumo-unidad').value,
     valorUnitario: parseFloat(document.getElementById('m-insumo-valor').value) || 0,
     aplicaIva: document.getElementById('m-insumo-iva').checked,
@@ -178,6 +179,7 @@ function abrirModalInsumoCosto() {
   document.getElementById('modal-insumo-titulo').textContent = '➕ Nuevo Ítem';
   document.getElementById('m-insumo-nombre').value = '';
   document.getElementById('m-insumo-categoria').value = 'materia_prima';
+  document.getElementById('m-insumo-rol-diseno').value = '';
   document.getElementById('m-insumo-unidad').value = 'kg';
   document.getElementById('m-insumo-valor').value = '';
   document.getElementById('m-insumo-iva').checked = true;
@@ -195,6 +197,7 @@ function editarInsumoCosto(nombre) {
   document.getElementById('modal-insumo-titulo').textContent = '✏️ Editar Ítem';
   document.getElementById('m-insumo-nombre').value = i.nombre;
   document.getElementById('m-insumo-categoria').value = i.categoria;
+  document.getElementById('m-insumo-rol-diseno').value = i.rolDiseno || '';
   document.getElementById('m-insumo-unidad').value = i.unidad;
   document.getElementById('m-insumo-valor').value = i.valorUnitario || 0;
   document.getElementById('m-insumo-iva').checked = i.aplicaIva !== false;
