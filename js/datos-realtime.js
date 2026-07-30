@@ -12,9 +12,9 @@ async function cargarDatosSupabase() {
     sb.from('entregas_programadas').select('datos').order('creado', { ascending: false }),
     sb.from('parametros_mo').select('datos').eq('id', 1).maybeSingle(),
     sb.from('clases_salariales').select('datos').order('creado', { ascending: true }),
-    sb.from('cuadrillas_productivas').select('datos').order('creado', { ascending: true }),
-    sb.from('maquinaria_equipos').select('datos').order('creado', { ascending: true }),
-    sb.from('insumos_costos').select('datos').order('creado', { ascending: true })
+    sb.from('cuadrillas_productivas').select('datos, modificado').order('creado', { ascending: true }),
+    sb.from('maquinaria_equipos').select('datos, modificado').order('creado', { ascending: true }),
+    sb.from('insumos_costos').select('datos, modificado').order('creado', { ascending: true })
   ]);
   if (e3) console.warn('Tabla ordenes_servicio no disponible aún.');
   if (e4) console.warn('Tabla producciones no disponible aún.');
@@ -39,9 +39,9 @@ async function cargarDatosSupabase() {
   VIAJES = (entregas || []).filter(r => r.datos).map(r => r.datos);
   PARAMETROS_MO = pmo?.datos || _defaultParametrosMO();
   CLASES_SALARIALES = (clasesMo || []).filter(r => r.datos).map(r => r.datos);
-  CUADRILLAS_PRODUCTIVAS = (cuadrillas || []).filter(r => r.datos).map(r => r.datos);
-  MAQUINARIA_EQUIPOS = (maquinas || []).filter(r => r.datos).map(r => r.datos);
-  INSUMOS_COSTOS = (insumos || []).filter(r => r.datos).map(r => r.datos);
+  CUADRILLAS_PRODUCTIVAS = (cuadrillas || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
+  MAQUINARIA_EQUIPOS = (maquinas || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
+  INSUMOS_COSTOS = (insumos || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
 
   // Catálogo de productos desde Supabase (con auto-siembra la primera vez)
   await cargarCatalogo();
@@ -195,18 +195,18 @@ async function recargarClasesSalarialesRT() {
   rerenderPantallaActiva();
 }
 async function recargarCuadrillasRT() {
-  const { data } = await sb.from('cuadrillas_productivas').select('datos').order('creado', { ascending: true });
-  CUADRILLAS_PRODUCTIVAS = (data || []).filter(r => r.datos).map(r => r.datos);
+  const { data } = await sb.from('cuadrillas_productivas').select('datos, modificado').order('creado', { ascending: true });
+  CUADRILLAS_PRODUCTIVAS = (data || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
   rerenderPantallaActiva();
 }
 async function recargarMaquinariaRT() {
-  const { data } = await sb.from('maquinaria_equipos').select('datos').order('creado', { ascending: true });
-  MAQUINARIA_EQUIPOS = (data || []).filter(r => r.datos).map(r => r.datos);
+  const { data } = await sb.from('maquinaria_equipos').select('datos, modificado').order('creado', { ascending: true });
+  MAQUINARIA_EQUIPOS = (data || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
   rerenderPantallaActiva();
 }
 async function recargarInsumosCostosRT() {
-  const { data } = await sb.from('insumos_costos').select('datos').order('creado', { ascending: true });
-  INSUMOS_COSTOS = (data || []).filter(r => r.datos).map(r => r.datos);
+  const { data } = await sb.from('insumos_costos').select('datos, modificado').order('creado', { ascending: true });
+  INSUMOS_COSTOS = (data || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
   rerenderPantallaActiva();
 }
 

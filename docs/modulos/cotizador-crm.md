@@ -14,6 +14,17 @@
 - Tarifas de transporte por municipio están fijas en `TARIFAS_TRANSPORTE` / `TARIFAS_KG_TRANSPORTE` (`js/config.js`), no en base de datos
 - `cliente`: `nombre`, `contacto` (persona que gestiona/recibe), `cel`, `email` (del contacto), `ciudad` (formato "Ciudad, Departamento"), `nit` (formato `NIT-DV`), `emailFacturacion` (el correo del RUT — **distinto** del email del contacto), `regimen` (uno de los 3 códigos de responsabilidad del RUT: `05. Impuesto Sobre la Renta y Complementarios Régimen Ordinario` / `13. Gran contribuyente` / `47. Régimen Simple de Tributación (SIMPLE)`), `proyectos` (arreglo — un cliente puede tener una o varias obras/proyectos a la vez, cada uno con su propio `nombre`, `contacto` y `telefono` en obra, distintos del contacto general del cliente). Todos estos (salvo Contacto/Celular/Email) se pueden autocompletar leyendo el RUT (ver más abajo) o escribirse/elegirse a mano. (No hay campo de Dirección — se evaluó pero no se incluyó, no es un dato relevante para este flujo.)
 
+## Cobro de transporte: por peso vs. por viaje completo
+
+Además de elegir el destino, el ítem de transporte tiene un selector **"Cobro de transporte"** (`#modo-transporte`, en el formulario principal; un `<select>` equivalente por cada opción adicional) con dos modos:
+
+- **Por peso** (por defecto): se cobra `peso real del pedido (kg) × tarifa/kg del destino` — la carga se consolida con otras entregas al mismo destino, así que el cliente solo paga lo que realmente pesa su pedido.
+- **Por viaje completo**: se cobra como si se llevaran `PESO_VIAJE_COMPLETO` = **11.000 kg** (capacidad estándar de un camión, constante en `js/config.js`), sin importar el peso real del pedido — para sitios apartados donde no se puede consolidar carga con otras entregas y hay que cobrar el viaje entero. Se muestra una nota bajo el selector cuando está activo (`#nota-viaje-completo`).
+
+Implementación (2026-07-30): el "peso a cobrar" (`pesoCobro`) se decide antes de multiplicar por la tarifa/kg — `pesoCobro = modoTransporte === 'viaje' ? PESO_VIAJE_COMPLETO : pesoTotal` — en los 4 lugares donde se calcula el transporte: `recalcular()` (totales en vivo del formulario principal), `calcOpcion()` (totales en vivo de una opción adicional), `guardarCotizacion()` (lo que queda guardado) y `construirTablaCotizacion()` (lo que se imprime en el PDF). El modo se guarda como `cot.transporte.modoTransporte` (y `op.transporte.modoTransporte` por opción) — **no** existía antes de esta fecha, así que las cotizaciones viejas caen al valor por defecto `'peso'` vía `|| 'peso'` en cada lectura.
+
+En el PDF (`construirTablaCotizacion()`), la fila de transporte se ve distinto según el modo — "por viaje" no tendría sentido mostrarla como `kg reales × tarifa/kg` porque esa cuenta no cuadraría con el total cobrado (el peso real no es el que se está facturando), así que en ese modo la fila se muestra como `1 viaje × $(tarifa/kg × 11.000)` en vez de `peso real × tarifa/kg`, con el mismo total resultante.
+
 ## Pantallas (`ir()` en `navegacion.js`)
 
 `pipeline`, `historico`, `clientes`, `estadisticas`

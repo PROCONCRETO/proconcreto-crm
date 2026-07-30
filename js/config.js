@@ -38,6 +38,11 @@ const TARIFAS_TRANSPORTE = {
   'Neira': 900000
 };
 
+// Peso asumido para "Por viaje completo" — cobro fijo cuando el destino es apartado y no se
+// puede consolidar carga con otras entregas (se cobra el viaje entero, no lo que realmente
+// pesa el pedido). Es la capacidad estándar de un camión: 11 toneladas.
+const PESO_VIAJE_COMPLETO = 11000;
+
 // kg por viaje para calcular transportes (usamos tarifa por viaje de 10 TON)
 const TARIFAS_KG_TRANSPORTE = {
   'Manizales': 43, 'Pereira': 53, 'Armenia': 106, 'Chinchiná': 21,

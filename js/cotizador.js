@@ -173,8 +173,12 @@ function recalcular() {
   let transporte = 0; // base sin IVA
   const destino = document.getElementById('destino-transporte').value;
   const tarifaManual = parseFloat(document.getElementById('tarifa-manual')?.value) || 0;
+  const modoTransporte = document.getElementById('modo-transporte')?.value || 'peso';
+  const notaViaje = document.getElementById('nota-viaje-completo');
+  if (notaViaje) notaViaje.style.display = modoTransporte === 'viaje' ? 'block' : 'none';
   if (destino && pesoTotal > 0) {
-    const tarifaBase = Math.round(pesoTotal * tarifaKgDe(destino, tarifaManual));
+    const pesoCobro = modoTransporte === 'viaje' ? PESO_VIAJE_COMPLETO : pesoTotal;
+    const tarifaBase = Math.round(pesoCobro * tarifaKgDe(destino, tarifaManual));
     transporte = Math.round(tarifaBase * (1 - descTrans / 100)); // base
     if (tieneIva) iva += Math.round(transporte * 0.19); // transporte grabado solo si el producto tiene IVA
   }
@@ -258,7 +262,8 @@ function calcOpcion(op) {
   const tieneIva = op.items.some(it => it.iva === 'SI');
   let transporte = 0; // base sin IVA
   if (op.destino && pesoTotal > 0) {
-    transporte = Math.round(pesoTotal * tarifaKgDe(op.destino, op.tarifaManual) * (1 - (op.descTrans || 0) / 100));
+    const pesoCobro = op.modoTransporte === 'viaje' ? PESO_VIAJE_COMPLETO : pesoTotal;
+    transporte = Math.round(pesoCobro * tarifaKgDe(op.destino, op.tarifaManual) * (1 - (op.descTrans || 0) / 100));
     if (tieneIva) iva += Math.round(transporte * 0.19);
   }
   let logistica = 0; // base sin IVA (cargue/descargue: servicios SIEMPRE grabados)
@@ -275,7 +280,7 @@ function calcOpcion(op) {
 
 function agregarOpcionExtra() {
   if (opcionesExtra.length >= 3) { alert('Máximo 4 opciones por cotización (Opción 1 + 3 adicionales).'); return; }
-  opcionesExtra.push({ items: [], destino: '', tarifaManual: 0, destinoNombre: '', descTrans: 0, cargue: 'no', descCargue: 0, descargue: 'no', descDescargue: 0 });
+  opcionesExtra.push({ items: [], destino: '', modoTransporte: 'peso', tarifaManual: 0, destinoNombre: '', descTrans: 0, cargue: 'no', descCargue: 0, descargue: 'no', descDescargue: 0 });
   renderOpcionesExtra();
 }
 
@@ -399,6 +404,12 @@ function renderOpcionesExtra() {
               <option value="Otro" ${op.destino === 'Otro' ? 'selected' : ''}>Otro (tarifa manual)</option>
             </select>
           </div>
+          <div class="form-grupo" style="margin-bottom:6px"><label>Cobro</label>
+            <select onchange="actualizarCampoOpcion(${idx},'modoTransporte',this.value)">
+              <option value="peso" ${(op.modoTransporte || 'peso') === 'peso' ? 'selected' : ''}>Por peso</option>
+              <option value="viaje" ${op.modoTransporte === 'viaje' ? 'selected' : ''}>Por viaje completo</option>
+            </select>
+          </div>
           ${op.destino === 'Otro' ? `
           <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:6px;padding:6px;margin-bottom:6px">
             <div class="form-grupo" style="margin-bottom:6px"><label>Nombre destino</label><input type="text" value="${op.destinoNombre || ''}" placeholder="Ej: Leticia" onchange="actualizarCampoOpcion(${idx},'destinoNombre',this.value)"></div>
@@ -448,7 +459,7 @@ function recogerOpcionesExtra() {
     return {
       nombre: 'Opción ' + (i + 2),
       items: JSON.parse(JSON.stringify(op.items)),
-      transporte: { destino: op.destino || '', pesoTotal: t.pesoTotal, grabado: op.items.some(it => it.iva === 'SI'), tarifaManual: op.destino === 'Otro' ? (op.tarifaManual || 0) : 0, destinoNombre: op.destino === 'Otro' ? (op.destinoNombre || '') : '' },
+      transporte: { destino: op.destino || '', modoTransporte: op.modoTransporte || 'peso', pesoTotal: t.pesoTotal, grabado: op.items.some(it => it.iva === 'SI'), tarifaManual: op.destino === 'Otro' ? (op.tarifaManual || 0) : 0, destinoNombre: op.destino === 'Otro' ? (op.destinoNombre || '') : '' },
       cargue: op.cargue, descargue: op.descargue,
       descuentos: { transporte: op.descTrans || 0, cargue: op.descCargue || 0, descargue: op.descDescargue || 0 },
       totales: { subtotal: t.subtotal, iva: t.iva, transporte: t.transporte, logistica: t.logistica, total: t.total }
@@ -460,6 +471,7 @@ function cargarOpcionesExtraDesde(cot) {
   opcionesExtra = (cot.opcionesExtra || []).map(op => ({
     items: JSON.parse(JSON.stringify(op.items || [])),
     destino: op.transporte?.destino || '',
+    modoTransporte: op.transporte?.modoTransporte || 'peso',
     tarifaManual: op.transporte?.tarifaManual || 0,
     destinoNombre: op.transporte?.destinoNombre || '',
     descTrans: op.descuentos?.transporte || 0,
@@ -494,7 +506,7 @@ function valorRepresentativoCot(cot) {
 }
 
 // Construye la tabla HTML del PDF para un set de productos + logística (una opción)
-function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCargue, descargueVal, descDescargue, tarifaManual, destinoNombre) {
+function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCargue, descargueVal, descDescargue, tarifaManual, destinoNombre, modoTransporte) {
   let filasTabla = '', subtotal = 0, ivaTotal = 0, pesoTotal = 0;
   items.forEach(it => {
     const adj = Math.round(it.precio * (1 - it.descuento / 100));
@@ -516,20 +528,33 @@ function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCarg
   const transIva = items.some(it => it.iva === 'SI');
   let transporte = 0; // base sin IVA
   if (destino && pesoTotal > 0) {
+    const esViaje = modoTransporte === 'viaje';
     const tarifaKg = tarifaKgDe(destino, tarifaManual);
     const destLabelNombre = nombreDestino(destino, destinoNombre);
-    const tarifaBase = Math.round(pesoTotal * tarifaKg);
+    const pesoCobro = esViaje ? PESO_VIAJE_COMPLETO : pesoTotal;
+    const tarifaBase = Math.round(pesoCobro * tarifaKg);
     transporte = Math.round(tarifaBase * (1 - descTrans / 100)); // base (el IVA se discrimina abajo)
     if (transIva) ivaTotal += Math.round(transporte * 0.19);
-    const tarifaAjust = tarifaKg * (1 - descTrans / 100);
     const descLabel = descTrans > 0 ? ` (desc. ${descTrans}%)` : '';
-    filasTabla += `<tr>
+    const modoLabel = esViaje ? ' — viaje completo' : '';
+    // "Por viaje": se cobra un valor fijo (1 viaje) en vez de kg × tarifa, para que la fila
+    // cuadre matemáticamente con el total mostrado (no tendría sentido mostrar el peso real
+    // del pedido multiplicado por la tarifa/kg si lo que se está cobrando es el viaje entero).
+    filasTabla += esViaje ? `<tr>
+      <td>1</td><td>viaje</td>
+      <td>Transporte${descLabel}${modoLabel}:<br><span style="font-size:10px;color:#666">Chinchiná – ${destLabelNombre}</span></td>
+      <td style="text-align:center">${transIva ? 'SI' : 'NO'}</td>
+      <td style="text-align:right">$ ${tarifaBase.toLocaleString()}</td>
+      <td style="text-align:center">${descTrans > 0 ? descTrans + '%' : '0%'}</td>
+      <td style="text-align:right">$ ${transporte.toLocaleString()}</td>
+      <td style="text-align:right">$ ${transporte.toLocaleString()}</td>
+    </tr>` : `<tr>
       <td>${Math.round(pesoTotal)}</td><td>kg</td>
       <td>Transporte${descLabel}:<br><span style="font-size:10px;color:#666">Chinchiná – ${destLabelNombre}</span></td>
       <td style="text-align:center">${transIva ? 'SI' : 'NO'}</td>
       <td style="text-align:right">$ ${tarifaKg.toLocaleString()}</td>
       <td style="text-align:center">${descTrans > 0 ? descTrans + '%' : '0%'}</td>
-      <td style="text-align:right">$ ${Number(tarifaAjust.toFixed(2)).toLocaleString()}</td>
+      <td style="text-align:right">$ ${Number((tarifaKg * (1 - descTrans / 100)).toFixed(2)).toLocaleString()}</td>
       <td style="text-align:right">$ ${transporte.toLocaleString()}</td>
     </tr>`;
   }
@@ -602,6 +627,7 @@ function guardarCotizacion() {
     if (it.peso) pesoTotal += it.peso * it.cantidad;
   });
   const destino = document.getElementById('destino-transporte').value;
+  const modoTransporte = document.getElementById('modo-transporte')?.value || 'peso';
   const tieneIva = itemsActuales.some(it => it.iva === 'SI');
   const descTrans = parseFloat(document.getElementById('desc-transporte')?.value) || 0;
   const descCargue = parseFloat(document.getElementById('desc-cargue')?.value) || 0;
@@ -609,7 +635,8 @@ function guardarCotizacion() {
   const tarifaManual = parseFloat(document.getElementById('tarifa-manual')?.value) || 0;
   const destinoNombre = document.getElementById('destino-otro-nombre')?.value || '';
   // Transporte y logística en BASE (sin IVA); el IVA se discrimina en 'iva'.
-  const transporte = destino && pesoTotal > 0 ? Math.round(pesoTotal * tarifaKgDe(destino, tarifaManual) * (1 - descTrans / 100)) : 0;
+  const pesoCobroTransporte = modoTransporte === 'viaje' ? PESO_VIAJE_COMPLETO : pesoTotal;
+  const transporte = destino && pesoTotal > 0 ? Math.round(pesoCobroTransporte * tarifaKgDe(destino, tarifaManual) * (1 - descTrans / 100)) : 0;
   if (tieneIva && transporte > 0) iva += Math.round(transporte * 0.19); // transporte grabado solo si el producto tiene IVA
   let logistica = 0;
   if (document.getElementById('cargue-mano').value === 'si') {
@@ -636,7 +663,7 @@ function guardarCotizacion() {
       proyecto: document.getElementById('cliente-proyecto').value,
     },
     items: JSON.parse(JSON.stringify(itemsActuales)),
-    transporte: { destino, pesoTotal, grabado: tieneIva, tarifaManual: destino === 'Otro' ? tarifaManual : 0, destinoNombre: destino === 'Otro' ? destinoNombre : '' },
+    transporte: { destino, modoTransporte, pesoTotal, grabado: tieneIva, tarifaManual: destino === 'Otro' ? tarifaManual : 0, destinoNombre: destino === 'Otro' ? destinoNombre : '' },
     cargue: document.getElementById('cargue-mano').value,
     descargue: document.getElementById('descargue-mecanico').value,
     descuentos: { transporte: descTrans, cargue: descCargue, descargue: descDescargue },
@@ -707,6 +734,8 @@ function cargarCotizacion(id) {
   poblarSelectProyectosDeCliente('cliente-proyecto', cot.cliente.nombre);
   document.getElementById('cliente-proyecto').value = cot.cliente.proyecto || '';
   document.getElementById('destino-transporte').value = cot.transporte.destino || '';
+  document.getElementById('modo-transporte').value = cot.transporte.modoTransporte || 'peso';
+  document.getElementById('nota-viaje-completo').style.display = cot.transporte.modoTransporte === 'viaje' ? 'block' : 'none';
   document.getElementById('tarifa-manual').value = cot.transporte.tarifaManual || 0;
   document.getElementById('destino-otro-nombre').value = cot.transporte.destinoNombre || '';
   document.getElementById('bloque-otro-transporte').style.display = cot.transporte.destino === 'Otro' ? 'block' : 'none';
@@ -748,6 +777,8 @@ function _resetFormularioCotizacion() {
   document.getElementById('cliente-ciudad').value = '';
   poblarSelectProyectosDeCliente('cliente-proyecto', '');
   document.getElementById('destino-transporte').value = '';
+  document.getElementById('modo-transporte').value = 'peso';
+  document.getElementById('nota-viaje-completo').style.display = 'none';
   document.getElementById('tarifa-manual').value = 0;
   document.getElementById('destino-otro-nombre').value = '';
   document.getElementById('bloque-otro-transporte').style.display = 'none';
@@ -789,6 +820,8 @@ function previsualizarCotizacionById(id) {
   poblarSelectProyectosDeCliente('cliente-proyecto', cot.cliente.nombre);
   document.getElementById('cliente-proyecto').value = cot.cliente.proyecto || '';
   document.getElementById('destino-transporte').value = cot.transporte.destino || '';
+  document.getElementById('modo-transporte').value = cot.transporte.modoTransporte || 'peso';
+  document.getElementById('nota-viaje-completo').style.display = cot.transporte.modoTransporte === 'viaje' ? 'block' : 'none';
   document.getElementById('tarifa-manual').value = cot.transporte.tarifaManual || 0;
   document.getElementById('destino-otro-nombre').value = cot.transporte.destinoNombre || '';
   document.getElementById('bloque-otro-transporte').style.display = cot.transporte.destino === 'Otro' ? 'block' : 'none';
@@ -845,6 +878,7 @@ function previsualizarCotizacion() {
     {
       items: itemsActuales,
       destino: document.getElementById('destino-transporte').value,
+      modoTransporte: document.getElementById('modo-transporte')?.value || 'peso',
       descTrans: parseFloat(document.getElementById('desc-transporte')?.value) || 0,
       cargue: document.getElementById('cargue-mano').value,
       descCargue: parseFloat(document.getElementById('desc-cargue')?.value) || 0,
@@ -860,7 +894,7 @@ function previsualizarCotizacion() {
   let hayTransporte = false;
   const totalesOpciones = [];
   opcionesPDF.forEach((op, i) => {
-    const r = construirTablaCotizacion(op.items, op.destino, op.descTrans, op.cargue, op.descCargue, op.descargue, op.descDescargue, op.tarifaManual, op.destinoNombre);
+    const r = construirTablaCotizacion(op.items, op.destino, op.descTrans, op.cargue, op.descCargue, op.descargue, op.descDescargue, op.tarifaManual, op.destinoNombre, op.modoTransporte);
     if (r.transporte > 0) hayTransporte = true;
     totalesOpciones.push(r.total);
     if (multiOp) tablasHTML += `<div style="background:#003F7F;color:#fff;padding:7px 12px;font-weight:700;font-size:13px;border-radius:4px;margin:${i === 0 ? '4' : '20'}px 0 6px;display:flex;justify-content:space-between"><span>OPCIÓN ${i + 1}</span><span>TOTAL: $ ${r.total.toLocaleString()}</span></div>`;

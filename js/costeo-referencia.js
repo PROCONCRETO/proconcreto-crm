@@ -1,8 +1,14 @@
 // ═══════════════════════════════
-// COSTEO — LISTA DE REFERENCIA DE COSTOS
+// COSTEO — COSTOS DE REFERENCIA
 // ═══════════════════════════════
+// (Pantalla "costeo-referencia" — el nombre visible es "Costos de Referencia" desde
+// 2026-07-30; el id interno, el archivo y el nombre de tabla/función no cambiaron, mismo
+// criterio que el rótulo "Niveles Salariales" en costeo-mano-obra.js.)
 // Reúne en un solo lugar TODOS los costos unitarios del módulo de Costeo:
-//   - Mano de Obra (Niveles Salariales + Cuadrillas)   → solo lectura aquí, se editan en costeo-mo
+//   - Mano de Obra: solo Cuadrillas Productivas (NO Niveles Salariales individuales — se
+//     excluyen a propósito, 2026-07-30, porque lo que de verdad se usa para costear un
+//     producto es el costo de la cuadrilla completa trabajando, no el de un nivel salarial
+//     suelto) → solo lectura aquí, se editan en costeo-mo.
 //   - Maquinaria y Equipos                             → solo lectura aquí, se editan en costeo-maquinaria
 //   - Materias Primas / Insumos y Otros CIF             → se crean y editan directamente aquí
 // (De la hoja LIST.REF del Excel original, que ya unificaba TIPO=MATERIA PRIMA/MANO DE
@@ -27,6 +33,10 @@ const UNIDADES_INSUMO = { kg: 'kg', m: 'm', m2: 'm²', m3: 'm³', L: 'L', gal: '
 function _labelUnidadInsumo(v) { return UNIDADES_INSUMO[v] || v || ''; }
 
 function _fmtRef(n) { return '$' + (n || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 }); }
+function _fmtFechaRef(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
 function calcularCostoInsumo(i) {
   const valorUnitario = Number(i.valorUnitario) || 0;
@@ -36,25 +46,21 @@ function calcularCostoInsumo(i) {
   return { valorConIva, transporteAdicional, valorFinal };
 }
 
-// Combina Mano de Obra (Niveles Salariales + Cuadrillas, valor/día) + Maquinaria (costo/unidad
-// de uso) + Materias Primas/Insumos (valor final de referencia) en una sola lista plana.
+// Combina Mano de Obra (solo Cuadrillas, valor/día) + Maquinaria (costo/unidad de uso) +
+// Materias Primas/Insumos (valor final de referencia) en una sola lista plana.
 function _listaUnificadaCostos() {
   const lista = [];
-  (CLASES_SALARIALES || []).forEach(c => {
-    const r = calcularCosteoClase(c, PARAMETROS_MO);
-    lista.push({ categoria: 'mano_obra', nombre: c.nombre, unidad: 'día', costoUnitario: r.valorRealDiario, soloLectura: true });
-  });
   (CUADRILLAS_PRODUCTIVAS || []).forEach(cu => {
     const t = _totalCuadrilla(cu);
-    lista.push({ categoria: 'mano_obra', nombre: cu.nombre, unidad: 'día', costoUnitario: t.diario, soloLectura: true });
+    lista.push({ categoria: 'mano_obra', nombre: cu.nombre, unidad: 'día', costoUnitario: t.diario, soloLectura: true, modificado: cu._modificado });
   });
   (MAQUINARIA_EQUIPOS || []).forEach(m => {
     const c = calcularCostoMaquina(m);
-    lista.push({ categoria: 'maquinaria', nombre: m.nombre, unidad: _labelUnidadUso(m.unidadUso), costoUnitario: c.costoUnidad, soloLectura: true });
+    lista.push({ categoria: 'maquinaria', nombre: m.nombre, unidad: _labelUnidadUso(m.unidadUso), costoUnitario: c.costoUnidad, soloLectura: true, modificado: m._modificado });
   });
   (INSUMOS_COSTOS || []).forEach(i => {
     const c = calcularCostoInsumo(i);
-    lista.push({ categoria: i.categoria, nombre: i.nombre, unidad: _labelUnidadInsumo(i.unidad), costoUnitario: c.valorFinal, soloLectura: false });
+    lista.push({ categoria: i.categoria, nombre: i.nombre, unidad: _labelUnidadInsumo(i.unidad), costoUnitario: c.valorFinal, soloLectura: false, modificado: i._modificado });
   });
   return lista;
 }
@@ -77,7 +83,7 @@ function renderCosteoReferencia() {
   const body = document.getElementById('referencia-costos-body');
   if (!body) return;
   if (!filtradas.length) {
-    body.innerHTML = `<tr><td colspan="5" class="empty-state"><div class="icono">📑</div><div>No hay ítems para este filtro.</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="icono">📑</div><div>No hay ítems para este filtro.</div></td></tr>`;
     return;
   }
   body.innerHTML = filtradas.map(x => {
@@ -95,6 +101,7 @@ function renderCosteoReferencia() {
       <td style="font-weight:600">${x.nombre}</td>
       <td><span style="display:inline-block;background:var(--gris-claro);color:var(--gris-medio);font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">${x.unidad}</span></td>
       <td style="text-align:right;font-weight:700;color:var(--azul)">${_fmtRef(x.costoUnitario)}</td>
+      <td style="font-size:12px;color:var(--gris-medio)">${_fmtFechaRef(x.modificado)}</td>
       <td>${acciones}</td>
     </tr>`;
   }).join('');
