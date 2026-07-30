@@ -49,7 +49,9 @@ Modal con cada concepto de costo (salario, subsidio, cesantía, intereses, prima
 
 ## Cuadrillas productivas
 
-Cada cuadrilla suma, para cada rol, `personas × valorRealMensual` de la clase asignada a ese rol — igual que `CAP.MO` en el Excel (ej. una cuadrilla de "1 Oficial + 3 Ayudantes" también reparte fracciones de Almacenista/Supervisor compartidas). El valor/día sale de `(total mensual × 12) / diasLaboradosAno`, mismo criterio que el valor/día de una clase salarial.
+Cada cuadrilla suma, para cada rol, `personas × valorRealMensual` de la clase asignada a ese rol — igual que `CAP.MO` en el Excel (ej. una cuadrilla de "1 Oficial + 3 Ayudantes" también reparte fracciones de Almacenista/Supervisor compartidas). La tabla muestra HORA/DÍA/SEMANA/MES/AÑO igual que Niveles Salariales, con los mismos criterios (`_totalCuadrilla()`: anual = mensual×12, diario = anual/`_diasLaboradosNeto()`, semanal = anual/52, hora = semanal/horas semanales) — ya no muestra la columna de roles (se quitó por pedido del usuario, 2026-07-29, no se consideraba relevante en esa tabla; el detalle de roles sigue estando en el modal de editar cuadrilla).
+
+**Nota de nombres (2026-07-29)**: en la interfaz, "Clases Salariales" pasó a llamarse **"Niveles Salariales"**, y su columna "CLASE" pasó a llamarse **"ROLES"** — es solo un cambio de rótulo visible; internamente el modelo de datos sigue siendo `clases_salariales` / `CLASES_SALARIALES` / campo `clase` en los roles de una cuadrilla, sin cambios de código más allá del texto en pantalla.
 
 ## Pendiente (próximas pantallas del módulo)
 

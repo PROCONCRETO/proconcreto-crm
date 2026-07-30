@@ -347,18 +347,19 @@ function renderCuadrillas() {
   const body = document.getElementById('cuadrillas-body');
   if (!body) return;
   if (!CUADRILLAS_PRODUCTIVAS.length) {
-    body.innerHTML = `<tr><td colspan="5" class="empty-state"><div class="icono">🧑‍🤝‍🧑</div><div>No hay cuadrillas registradas.</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">🧑‍🤝‍🧑</div><div>No hay cuadrillas registradas.</div></td></tr>`;
     return;
   }
   body.innerHTML = CUADRILLAS_PRODUCTIVAS.map(cu => {
-    const { mensual, diario } = _totalCuadrilla(cu);
-    const rolesTexto = (cu.roles || []).map(r => `${r.personas}× ${r.rol} (${r.clase})`).join(', ');
+    const t = _totalCuadrilla(cu);
     return `
     <tr>
       <td style="font-weight:600">${cu.nombre}</td>
-      <td style="color:var(--gris-medio);font-size:12px">${rolesTexto || '—'}</td>
-      <td style="text-align:right">${_fmt(mensual)}</td>
-      <td style="text-align:right">${_fmt(diario)}</td>
+      <td style="text-align:right">${_fmt(t.hora)}</td>
+      <td style="text-align:right">${_fmt(t.diario)}</td>
+      <td style="text-align:right">${_fmt(t.semanal)}</td>
+      <td style="text-align:right">${_fmt(t.mensual)}</td>
+      <td style="text-align:right">${_fmt(t.anual)}</td>
       <td>
         <div class="flex-gap">
           <button class="btn btn-primario btn-xs" onclick="editarCuadrilla('${cu.nombre.replace(/'/g, "\\'")}')">✏️</button>
@@ -375,8 +376,11 @@ function _totalCuadrilla(cu) {
     const clase = _claseCalculada(r.clase);
     if (clase) mensual += (Number(r.personas) || 0) * clase.valorRealMensual;
   });
-  const diario = (mensual * 12) / _diasLaboradosNeto(PARAMETROS_MO);
-  return { mensual, diario };
+  const anual = mensual * 12;
+  const diario = anual / _diasLaboradosNeto(PARAMETROS_MO);
+  const semanal = anual / 52;
+  const hora = semanal / (PARAMETROS_MO.horasSemanales || 42);
+  return { mensual, anual, diario, semanal, hora };
 }
 
 function _selectClasesHTML(claseSeleccionada) {
