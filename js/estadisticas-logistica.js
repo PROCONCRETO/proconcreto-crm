@@ -302,11 +302,16 @@ function _chartTendencia(viajesEnPeriodo, periodoDias) {
     const fechas = viajesEnPeriodo.map(v => v.fecha).sort();
     dias = fechas.length ? Math.max(1, Math.round((hoy - new Date(fechas[0] + 'T12:00')) / 86400000) + 1) : 30;
   }
+  // Se omiten los días sin viajes (no solo domingos/festivos: cualquier día sin actividad
+  // registrada) para que la línea no se vaya al piso en cada hueco y se pueda leer la
+  // tendencia real de los días que sí tuvieron operación.
   const labels = [], counts = [];
   for (let i = dias - 1; i >= 0; i--) {
     const f = _fmtISO(_sumarDias(hoy, -i));
+    const n = viajesEnPeriodo.filter(v => v.fecha === f).length;
+    if (n === 0) continue;
     labels.push(new Date(f + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }));
-    counts.push(viajesEnPeriodo.filter(v => v.fecha === f).length);
+    counts.push(n);
   }
   if (_chartTendenciaInst) _chartTendenciaInst.destroy();
   _chartTendenciaInst = new Chart(ctx, {
@@ -319,7 +324,7 @@ function _chartTendencia(viajesEnPeriodo, periodoDias) {
         backgroundColor: 'rgba(42,120,214,0.1)',
         fill: true,
         borderWidth: 2,
-        pointRadius: dias > 31 ? 0 : 4,
+        pointRadius: labels.length > 31 ? 0 : 4,
         pointBackgroundColor: '#2a78d6',
         pointBorderColor: '#fcfcfb',
         pointBorderWidth: 2,
