@@ -3,13 +3,24 @@
 // ═══════════════════════════════
 // Fórmula estándar de la industria (depreciación en línea recta + mantenimiento):
 //   Depreciación por unidad = (Valor de compra − Valor de rescate) / Capacidad total de vida útil
-//   Costo por unidad = Depreciación por unidad + (Depreciación por unidad × % mantenimiento)
+//   Costo por unidad = Depreciación por unidad + Mantenimiento por unidad
 // La "capacidad total de vida útil" se puede fijar de dos formas (una máquina elige una):
 //   - "Por años": vida útil en años × unidades de uso por año (para máquinas cuyo desgaste
 //     depende más del tiempo, ej. un montacargas por día).
 //   - "Por usos totales": un número fijo de usos de vida (golpes, m³, ciclos...), sin pasar
 //     por años — para máquinas cuyo desgaste depende del uso, no del calendario (ej. una
 //     cortadora que dura 200.000 golpes sin importar cuántos años tarde en llegar ahí).
+// El "Mantenimiento por unidad" se calcula distinto según el modo (2026-07-31, corregido a
+// pedido del usuario — la versión original repartía el % una sola vez sobre la depreciación
+// total, lo que daba un mantenimiento anual irrealmente bajo para máquinas caras de vida
+// larga; ver docs/modulos/costeo.md):
+//   - "Por años": el % se cobra CADA AÑO sobre el valor de compra completo (no sobre la
+//     depreciación) — Mantenimiento anual = Valor de compra × %; ese monto se reparte entre
+//     la capacidad anual para sacar el costo por unidad. Así el total en toda la vida útil
+//     es Valor de compra × % × años, un mantenimiento realista para equipo pesado.
+//   - "Por usos totales": no hay una dimensión de años a la que anclar un cargo anual (por
+//     diseño, es para máquinas cuyo desgaste no depende del calendario) — ahí el % se sigue
+//     aplicando proporcional a la depreciación por uso, como antes.
 let MAQUINARIA_EQUIPOS = [];
 let _baseVidaUtilActualMaquina = 'anos';
 
@@ -23,11 +34,33 @@ function calcularCostoMaquina(m) {
   const rescatePct = Number(m.rescatePct) || 0;
   const valorRescate = valorCompra * (rescatePct / 100);
   const valorADepreciar = valorCompra - valorRescate;
-  const capacidadTotal = m.baseVidaUtil === 'usos'
-    ? (Number(m.usosTotal) || 0)
-    : (Number(m.vidaUtilAnos) || 0) * (Number(m.capacidadAnual) || 0);
+  const esPorAnos = m.baseVidaUtil !== 'usos';
+  const capacidadTotal = esPorAnos
+    ? (Number(m.vidaUtilAnos) || 0) * (Number(m.capacidadAnual) || 0)
+    : (Number(m.usosTotal) || 0);
   const depreciacion = capacidadTotal > 0 ? valorADepreciar / capacidadTotal : 0;
-  const mantenimiento = depreciacion * ((Number(m.mantenimientoPct) || 0) / 100);
+
+  // El % de mantenimiento NO se reparte una sola vez sobre la depreciación total — eso
+  // subestimaba mucho el costo real de mantener una máquina cara por muchos años (ej. 10%
+  // de $1.500M en 15 años daba solo $10M/año de mantenimiento, muy bajo para una máquina de
+  // ese valor). Corregido 2026-07-31, a pedido del usuario: para máquinas "por años" el %
+  // se cobra CADA AÑO sobre el valor de compra completo (mantenimiento anual = valorCompra
+  // × %), y ese monto anual se reparte entre la capacidad anual para sacar el costo por
+  // unidad — así si se usa toda la vida útil, el total de mantenimiento sí da
+  // valorCompra × % × vidaUtilAnos, no solo % de la depreciación una vez.
+  // Para máquinas "por usos totales" no hay una dimensión de años a la cual anclar un
+  // mantenimiento anual (por diseño: son máquinas cuyo desgaste depende del uso, no del
+  // calendario) — ahí el % se sigue aplicando proporcional a la depreciación por uso, igual
+  // que antes.
+  let mantenimiento;
+  if (esPorAnos) {
+    const mantenimientoAnual = valorCompra * ((Number(m.mantenimientoPct) || 0) / 100);
+    const capacidadAnual = Number(m.capacidadAnual) || 0;
+    mantenimiento = capacidadAnual > 0 ? mantenimientoAnual / capacidadAnual : 0;
+  } else {
+    mantenimiento = depreciacion * ((Number(m.mantenimientoPct) || 0) / 100);
+  }
+
   const costoUnidad = depreciacion + mantenimiento;
   return { valorRescate, valorADepreciar, capacidadTotal, depreciacion, mantenimiento, costoUnidad };
 }
@@ -110,13 +143,29 @@ function _actualizarDesgloseMaquina() {
   const previewAnos = document.getElementById('m-maquina-capacidad-preview-anos');
   if (previewAnos) previewAnos.value = `${c.capacidadTotal.toLocaleString('es-CO')} ${unidadLabel}`;
 
+  const esPorAnos = m.baseVidaUtil !== 'usos';
+  const capacidadAnual = Number(m.capacidadAnual) || 0;
+  const mantenimientoAnual = m.valorCompra * ((Number(m.mantenimientoPct) || 0) / 100);
+  // "Por años": el mantenimiento se ve como un cargo anual (% del valor de compra) que se
+  // reparte entre la capacidad anual — así queda visible que el total en toda la vida útil
+  // es valorCompra × % × años, no solo % de la depreciación una sola vez.
+  // "Por usos totales": no hay años a los que anclar un cargo anual, sigue proporcional a la
+  // depreciación por uso (igual que siempre para este modo).
+  const filaMantenimiento = esPorAnos
+    ? `
+    <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Mantenimiento anual (${m.mantenimientoPct}% del valor de compra)</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${_fmt(mantenimientoAnual)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:3px 0"><span>÷ Capacidad anual</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${capacidadAnual.toLocaleString('es-CO')} ${unidadLabel}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:3px 0"><span>+ Mantenimiento por ${unidadLabel}</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${_fmtMaq(c.mantenimiento)}</span></div>`
+    : `
+    <div style="display:flex;justify-content:space-between;padding:3px 0"><span>+ Mantenimiento (${m.mantenimientoPct}% de la depreciación)</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${_fmtMaq(c.mantenimiento)}</span></div>`;
+
   div.innerHTML = `
     <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Valor de compra</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${_fmt(m.valorCompra)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:3px 0;color:var(--rojo)"><span>− Valor de rescate (${m.rescatePct}%)</span><span style="font-weight:600;font-variant-numeric:tabular-nums">− ${_fmt(c.valorRescate)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:3px 0"><span>= Valor a depreciar</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${_fmt(c.valorADepreciar)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:3px 0"><span>÷ Capacidad total de vida útil</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${c.capacidadTotal.toLocaleString('es-CO')} ${unidadLabel}</span></div>
     <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Depreciación por ${unidadLabel}</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${_fmtMaq(c.depreciacion)}</span></div>
-    <div style="display:flex;justify-content:space-between;padding:3px 0"><span>+ Mantenimiento (${m.mantenimientoPct}% de la depreciación)</span><span style="font-weight:600;font-variant-numeric:tabular-nums">${_fmtMaq(c.mantenimiento)}</span></div>
+    ${filaMantenimiento}
     <div style="display:flex;justify-content:space-between;padding-top:8px;margin-top:6px;border-top:2px solid var(--azul);font-weight:700;font-size:15px;color:var(--azul)"><span>Costo por ${unidadLabel}</span><span style="font-variant-numeric:tabular-nums">${_fmtMaq(c.costoUnidad)}</span></div>
   `;
 }
