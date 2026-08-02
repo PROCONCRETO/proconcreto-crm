@@ -270,58 +270,86 @@ function calcularCosteoProducto(c) {
   // Materia Prima — cemento/agua/adiciones/aditivos por PESO (se compran por peso);
   // arena/triturado por VOLUMEN (se compran por volumen en la región, 2026-08-02). Arena,
   // triturado y adiciones viven en listas (`materiales.agregados[]`/`adiciones[]`) — puede
-  // haber más de uno de cada uno, se suman todos.
+  // haber más de uno de cada uno, se suman todos. `materiaPrimaDetalle` guarda cada insumo por
+  // separado (cantidad/precio/costo) para el consolidado de solo lectura (➕).
   let materiaPrima = 0;
+  const materiaPrimaDetalle = [];
   const m = diseno?.materiales || {};
   if (unidadesCochada > 0) {
     _MATERIALES_COSTEO_PESO.forEach(k => {
-      const cantidadUnidad = ((m[k] || 0) * capacidadCochadaM3) / unidadesCochada;
-      materiaPrima += cantidadUnidad * _precioInsumoPorNombre(m[`${k}Producto`]);
+      if (!((m[k] || 0) > 0)) return;
+      const cantidad = ((m[k] || 0) * capacidadCochadaM3) / unidadesCochada;
+      const precio = _precioInsumoPorNombre(m[`${k}Producto`]);
+      const costo = cantidad * precio;
+      materiaPrima += costo;
+      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo });
     });
     (m.agregados || []).forEach(a => {
-      const cantidadUnidad = ((Number(a.volumen) || 0) * capacidadCochadaM3) / unidadesCochada;
-      materiaPrima += cantidadUnidad * _precioInsumoPorNombre(a.producto);
+      if (!((Number(a.volumen) || 0) > 0)) return;
+      const cantidad = ((Number(a.volumen) || 0) * capacidadCochadaM3) / unidadesCochada;
+      const precio = _precioInsumoPorNombre(a.producto);
+      const costo = cantidad * precio;
+      materiaPrima += costo;
+      materiaPrimaDetalle.push({ nombre: a.producto || _LABEL_ROL_AGREGADO_COSTEO[a.rolBase] || a.rolBase, unidad: 'm³', cantidad, precio, costo });
     });
     (m.adiciones || []).forEach(a => {
-      const cantidadUnidad = ((Number(a.cantidad) || 0) * capacidadCochadaM3) / unidadesCochada;
-      materiaPrima += cantidadUnidad * _precioInsumoPorNombre(a.producto);
+      if (!((Number(a.cantidad) || 0) > 0)) return;
+      const cantidad = ((Number(a.cantidad) || 0) * capacidadCochadaM3) / unidadesCochada;
+      const precio = _precioInsumoPorNombre(a.producto);
+      const costo = cantidad * precio;
+      materiaPrima += costo;
+      materiaPrimaDetalle.push({ nombre: a.producto || 'Adición', unidad: 'kg', cantidad, precio, costo });
     });
     (m.aditivos || []).forEach(a => {
-      const cantidadUnidad = ((Number(a.dosis) || 0) * capacidadCochadaM3) / unidadesCochada;
-      materiaPrima += cantidadUnidad * _precioInsumoPorNombre(a.producto);
+      if (!((Number(a.dosis) || 0) > 0)) return;
+      const cantidad = ((Number(a.dosis) || 0) * capacidadCochadaM3) / unidadesCochada;
+      const precio = _precioInsumoPorNombre(a.producto);
+      const costo = cantidad * precio;
+      materiaPrima += costo;
+      materiaPrimaDetalle.push({ nombre: a.producto || a.tipo, unidad: 'kg', cantidad, precio, costo });
     });
   }
   const desperdicio = materiaPrima * ((c.pctDesperdicio || 0) / 100);
 
   // Mano de Obra — costo/día de cada cuadrilla de la línea, repartido entre unidades/día.
   let manoObra = 0;
-  if (unidadesDia > 0) {
-    (c.manoObra || []).forEach(row => {
-      const cu = CUADRILLAS_PRODUCTIVAS.find(x => x.nombre === row.nombre);
-      if (cu) manoObra += _totalCuadrilla(cu).diario / unidadesDia;
-    });
-  }
+  const manoObraDetalle = [];
+  (c.manoObra || []).forEach(row => {
+    const cu = CUADRILLAS_PRODUCTIVAS.find(x => x.nombre === row.nombre);
+    const costoDia = cu ? _totalCuadrilla(cu).diario : 0;
+    const costo = (cu && unidadesDia > 0) ? costoDia / unidadesDia : 0;
+    manoObra += costo;
+    manoObraDetalle.push({ nombre: row.nombre, costoDia, costo, noEncontrado: !cu });
+  });
   const herramientaMenor = manoObra * ((c.pctHerramientaMenor || 0) / 100);
 
   // Maquinaria — cada máquina se reparte según su PROPIA unidad de uso: "ciclo" ÷
   // unidades/ciclo (un ciclo produce esas unidades), "día" ÷ unidades/día.
   let maquinaria = 0;
+  const maquinariaDetalle = [];
   (c.maquinas || []).forEach(row => {
     const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
-    if (!maq) return;
+    if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
     const costoUnidad = calcularCostoMaquina(maq).costoUnidad;
-    if (maq.unidadUso === 'ciclo' && r.unidadesCiclo > 0) maquinaria += costoUnidad / r.unidadesCiclo;
-    else if (maq.unidadUso === 'dia' && unidadesDia > 0) maquinaria += costoUnidad / unidadesDia;
+    let costo = 0;
+    if (maq.unidadUso === 'ciclo' && r.unidadesCiclo > 0) costo = costoUnidad / r.unidadesCiclo;
+    else if (maq.unidadUso === 'dia' && unidadesDia > 0) costo = costoUnidad / unidadesDia;
+    maquinaria += costo;
+    maquinariaDetalle.push({ nombre: row.nombre, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad, costo });
   });
 
   // Insumos y consumos — "por estiba" (empaque) ÷ unidades/estiba, "por día" (consumos) ÷ unidades/día.
   let empaque = 0, consumos = 0;
+  const empaqueDetalle = [], consumosDetalle = [];
   (c.insumos || []).forEach(row => {
     const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
     if (!ins) return;
     const precio = calcularCostoInsumo(ins).valorFinal;
-    if (row.reparto === 'dia') { if (unidadesDia > 0) consumos += (row.cantidad * precio) / unidadesDia; }
-    else { if (r.unidadesEstiba > 0) empaque += (row.cantidad * precio) / r.unidadesEstiba; }
+    if (row.reparto === 'dia') {
+      if (unidadesDia > 0) { const costo = (row.cantidad * precio) / unidadesDia; consumos += costo; consumosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, precio, costo }); }
+    } else {
+      if (r.unidadesEstiba > 0) { const costo = (row.cantidad * precio) / r.unidadesEstiba; empaque += costo; empaqueDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, precio, costo }); }
+    }
   });
 
   const totalUnidad = materiaPrima + desperdicio + manoObra + herramientaMenor + maquinaria + empaque + consumos;
@@ -332,7 +360,12 @@ function calcularCosteoProducto(c) {
   const precioSugeridoLista = totalUnidad * (1 + (c.margenLista || 0) / 100);
   const precioSugeridoMinimo = totalUnidad * (1 + (c.margenMinimo || 0) / 100);
 
-  return { capacidadCochadaM3, pesoTotalM3, pesoCochadaKg, unidadesCochada, unidadesDia, materiaPrima, desperdicio, manoObra, herramientaMenor, maquinaria, empaque, consumos, totalUnidad, precioSugeridoLista, precioSugeridoMinimo };
+  return {
+    capacidadCochadaM3, pesoTotalM3, pesoCochadaKg, unidadesCochada, unidadesDia,
+    materiaPrima, desperdicio, manoObra, herramientaMenor, maquinaria, empaque, consumos, totalUnidad,
+    precioSugeridoLista, precioSugeridoMinimo,
+    materiaPrimaDetalle, manoObraDetalle, maquinariaDetalle, empaqueDetalle, consumosDetalle,
+  };
 }
 
 function _actualizarResumenCosteo() {
@@ -582,27 +615,97 @@ function eliminarCosteoProducto(codigo) {
   renderCosteoProductos();
 }
 
-// Consolidado de solo lectura (➕), mismo espíritu que abrirDetalleClase()/abrirDetalleCuadrilla().
+// Fila de una tabla de detalle del consolidado: Nombre | Cantidad (con unidad) | Precio | Costo.
+function _filaDetalleCosteo(nombre, cantidad, unidad, precio, costo, noEncontrado) {
+  const nombreHtml = noEncontrado ? `${nombre} <span style="color:var(--rojo);font-size:11px">(ya no existe)</span>` : nombre;
+  return `<tr>
+    <td>${nombreHtml}</td>
+    <td style="text-align:right;color:var(--gris-medio)">${cantidad != null ? cantidad.toLocaleString('es-CO', { maximumFractionDigits: 4 }) + (unidad ? ' ' + unidad : '') : '—'}</td>
+    <td style="text-align:right;color:var(--gris-medio)">${precio != null ? _fmtCosteoProd(precio) : '—'}</td>
+    <td style="text-align:right;font-weight:700">${_fmtCosteoProd(costo)}</td>
+  </tr>`;
+}
+
+// Una sección con título + tabla de detalle (o un aviso si la lista viene vacía).
+function _seccionDetalleCosteo(titulo, filasHtml, vacioTexto) {
+  return `
+    <div class="seccion-costeo">
+      <div class="seccion-costeo-titulo">${titulo}</div>
+      <table class="tabla-items" style="width:100%">
+        <thead><tr><th>Insumo</th><th style="text-align:right;width:130px">Cantidad</th><th style="text-align:right;width:110px">Precio</th><th style="text-align:right;width:110px">Costo/unidad</th></tr></thead>
+        <tbody>${filasHtml || `<tr><td colspan="4" style="text-align:center;color:var(--gris-medio);font-size:12px">${vacioTexto}</td></tr>`}</tbody>
+      </table>
+    </div>`;
+}
+
+// Consolidado de solo lectura (➕) — muestra CADA input que compone el costo (cada material,
+// cada máquina, cada cuadrilla, cada insumo), no solo el total por categoría (2026-08-02, a
+// pedido del usuario: "está muy resumido, quiero ver cada input").
 function abrirDetalleCosteoProducto(codigo) {
   const c = COSTEO_PRODUCTOS.find(x => x.productoCodigo === codigo);
   if (!c) return;
   const k = calcularCosteoProducto(c);
   const tipo = TIPOS_ESTRUCTURA_COSTEO[c.tipoEstructura] || TIPOS_ESTRUCTURA_COSTEO.vibrocompactado;
+  const diseno = DISENOS_MEZCLA.find(d => d.codigo === c.disenoMezclaCodigo);
+  const r = c.rendimiento || {};
+
   document.getElementById('modal-detalle-costeo-titulo').textContent = `Consolidado — ${c.productoNombre}`;
   document.getElementById('detalle-costeo-resumen').innerHTML = `
     <span>${tipo.label}</span>
-    <span><strong>Diseño:</strong> ${c.disenoMezclaCodigo || '—'}</span>
+    <span><strong>Diseño:</strong> ${diseno ? `${diseno.codigo} — ${diseno.nombre}` : (c.disenoMezclaCodigo || '—')}</span>
     <span><strong>Unidades/cochada:</strong> ${k.unidadesCochada.toLocaleString('es-CO', { maximumFractionDigits: 1 })}</span>
     <span><strong>Unidades/día:</strong> ${k.unidadesDia.toLocaleString('es-CO')}</span>`;
-  document.getElementById('detalle-costeo-body').innerHTML = `
-    <tr><td>🧱 Materia Prima</td><td style="text-align:right">${_fmtCosteoProd(k.materiaPrima)}</td></tr>
-    <tr><td style="padding-left:20px;color:var(--gris-medio);font-size:12px">+ Desperdicio (${c.pctDesperdicio}%)</td><td style="text-align:right">${_fmtCosteoProd(k.desperdicio)}</td></tr>
-    <tr><td>👷 Mano de Obra</td><td style="text-align:right">${_fmtCosteoProd(k.manoObra)}</td></tr>
-    <tr><td style="padding-left:20px;color:var(--gris-medio);font-size:12px">+ Herramienta Menor (${c.pctHerramientaMenor}%)</td><td style="text-align:right">${_fmtCosteoProd(k.herramientaMenor)}</td></tr>
-    <tr><td>🔧 Maquinaria</td><td style="text-align:right">${_fmtCosteoProd(k.maquinaria)}</td></tr>
-    <tr><td>📦 Insumos de empaque</td><td style="text-align:right">${_fmtCosteoProd(k.empaque)}</td></tr>
-    <tr><td>⚡ Consumos</td><td style="text-align:right">${_fmtCosteoProd(k.consumos)}</td></tr>
-    <tr style="font-weight:700;border-top:2px solid var(--gris-borde)"><td>TOTAL POR UNIDAD</td><td style="text-align:right">${_fmtCosteoProd(k.totalUnidad)}</td></tr>`;
+
+  const seccionRendimiento = `
+    <div class="seccion-costeo">
+      <div class="seccion-costeo-titulo">Rendimiento de producción</div>
+      <div class="caja-costeo">
+        <div class="fila"><span>Peso / unidad</span><span>${(r.pesoUnidadKg || 0).toLocaleString('es-CO')} kg</span></div>
+        <div class="fila"><span>Ciclos / día</span><span>${(r.ciclosDia || 0).toLocaleString('es-CO')}</span></div>
+        <div class="fila"><span>Unidades / Ciclo</span><span>${(r.unidadesCiclo || 0).toLocaleString('es-CO')}</span></div>
+        <div class="fila"><span>Unidades / estiba</span><span>${(r.unidadesEstiba || 0).toLocaleString('es-CO')}</span></div>
+      </div>
+    </div>`;
+
+  const filasMP = k.materiaPrimaDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, f.unidad, f.precio, f.costo)).join('')
+    + `<tr style="border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right;color:var(--gris-medio)">+ Desperdicio (${c.pctDesperdicio}%)</td><td style="text-align:right;font-weight:700">${_fmtCosteoProd(k.desperdicio)}</td></tr>
+       <tr style="font-weight:700"><td colspan="3" style="text-align:right">Subtotal Materia Prima</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.materiaPrima + k.desperdicio)}</td></tr>`;
+  const seccionMP = _seccionDetalleCosteo('🧱 Materia Prima <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(por unidad de producto)</span>', filasMP, 'Sin Diseño de Mezcla o sin materiales con cantidad.');
+
+  const filasMO = k.manoObraDetalle.map(f => _filaDetalleCosteo(f.nombre, null, null, f.costoDia ? f.costoDia : null, f.costo, f.noEncontrado)).join('')
+    + (k.manoObraDetalle.length ? `<tr style="border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right;color:var(--gris-medio)">+ Herramienta Menor (${c.pctHerramientaMenor}%)</td><td style="text-align:right;font-weight:700">${_fmtCosteoProd(k.herramientaMenor)}</td></tr>
+       <tr style="font-weight:700"><td colspan="3" style="text-align:right">Subtotal Mano de Obra</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.manoObra + k.herramientaMenor)}</td></tr>` : '');
+  const seccionMO = _seccionDetalleCosteo('👷 Mano de Obra <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(Precio = costo/día de la cuadrilla)</span>', filasMO, 'Sin cuadrillas agregadas.');
+
+  const filasMaq = k.maquinariaDetalle.map(f => _filaDetalleCosteo(f.nombre, null, null, f.costoUnidad ? f.costoUnidad : null, f.costo, f.noEncontrado)).join('')
+    + (k.maquinariaDetalle.length ? `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Maquinaria</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.maquinaria)}</td></tr>` : '');
+  const seccionMaq = _seccionDetalleCosteo('🔧 Maquinaria <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(Precio = costo/ciclo o costo/día de la máquina)</span>', filasMaq, 'Sin máquinas agregadas.');
+
+  const filasEmp = k.empaqueDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, null, f.precio, f.costo)).join('')
+    + (k.empaqueDetalle.length ? `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Empaque</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.empaque)}</td></tr>` : '');
+  const seccionEmp = _seccionDetalleCosteo('📦 Insumos de empaque', filasEmp, 'Sin insumos de empaque.');
+
+  const filasCons = k.consumosDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, null, f.precio, f.costo)).join('')
+    + (k.consumosDetalle.length ? `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Consumos</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.consumos)}</td></tr>` : '');
+  const seccionCons = _seccionDetalleCosteo('⚡ Consumos <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(energía/agua/combustible)</span>', filasCons, 'Sin consumos agregados.');
+
+  const seccionTotal = `
+    <div class="seccion-costeo">
+      <div class="seccion-costeo-titulo">Resumen — costo por unidad</div>
+      <div class="caja-costeo caja-costeo-resumen">
+        <div class="fila"><span>🧱 Materia Prima</span><span>${_fmtCosteoProd(k.materiaPrima)}</span></div>
+        <div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_fmtCosteoProd(k.desperdicio)}</span></div>
+        <div class="fila"><span>👷 Mano de Obra</span><span>${_fmtCosteoProd(k.manoObra)}</span></div>
+        <div class="fila sub"><span>+ Herramienta Menor (${c.pctHerramientaMenor}%)</span><span>${_fmtCosteoProd(k.herramientaMenor)}</span></div>
+        <div class="fila"><span>🔧 Maquinaria</span><span>${_fmtCosteoProd(k.maquinaria)}</span></div>
+        <div class="fila"><span>📦 Insumos de empaque</span><span>${_fmtCosteoProd(k.empaque)}</span></div>
+        <div class="fila"><span>⚡ Consumos</span><span>${_fmtCosteoProd(k.consumos)}</span></div>
+        <div class="fila fila-total"><span>Costo total por unidad</span><span>${_fmtCosteoProd(k.totalUnidad)}</span></div>
+      </div>
+    </div>`;
+
+  document.getElementById('detalle-costeo-contenido').innerHTML = seccionRendimiento + seccionMP + seccionMO + seccionMaq + seccionEmp + seccionCons + seccionTotal;
+
   const producto = CATALOGO.find(p => p.codigo === c.productoCodigo);
   _pintarPrecioSugerido('detalle-costeo-precio', c, k, producto);
   document.getElementById('detalle-costeo-btn-aplicar').onclick = () => aplicarPreciosCatalogoDesdeDetalle(codigo);
