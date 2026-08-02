@@ -97,9 +97,21 @@ function calcularCosteoClase(clase, p) {
     + pension + salud + arl + aporteOrdinario + subsidioFamiliar;
   const valorRealMensual = valorRealAnual / 12;
   const valorRealDiario = valorRealAnual / _diasLaboradosNeto(p);
-  // Semana = año/52; hora = semana / horas semanales legales (42 en Colombia desde jul-2026).
+  // Mes, semana y año son unidades CALENDARIO reales, no techos teóricos — siempre hay 12
+  // meses y 52 semanas en un año, sin importar festivos/vacaciones/ausentismo (el salario y
+  // las prestaciones se siguen devengando en esos días, por eso son "festivos PAGADOS"), así
+  // que anual/12 y anual/52 ya son el costo real de emplear a la persona ese mes/semana. Solo
+  // "hora" se deriva del DÍA real trabajado (horas por día laborado = horas semanales ÷ 5).
+  // Corregido 2026-08-02: antes "hora" salía de anual/52/horasSemanales — esa cuenta asumía
+  // que TODAS las semanas tienen 42 horas completas de trabajo, lo cual sí es falso (un
+  // festivo o una ausencia quita horas reales); por eso subir "días laborados al año" podía
+  // subir el valor/hora en vez de bajarlo (bug real, reportado por el usuario). El error no
+  // estaba en las 52 semanas (esas sí son reales) sino en asumirles 42 horas completas cada
+  // una — se corrigió apuntándole solo a eso, sin tocar semana/mes/año. Ver
+  // docs/modulos/costeo.md para el ejemplo numérico completo y por qué mes/semana no cambian.
+  const horasPorDiaLaborado = (p.horasSemanales || 42) / 5;
   const valorRealSemanal = valorRealAnual / 52;
-  const valorRealHora = valorRealSemanal / (p.horasSemanales || 42);
+  const valorRealHora = horasPorDiaLaborado > 0 ? valorRealDiario / horasPorDiaLaborado : 0;
 
   return {
     valorRealAnual, valorRealMensual, valorRealSemanal, valorRealDiario, valorRealHora,
@@ -378,8 +390,12 @@ function _totalCuadrilla(cu) {
   });
   const anual = mensual * 12;
   const diario = anual / _diasLaboradosNeto(PARAMETROS_MO);
+  // Mismo criterio que calcularCosteoClase(): semana es una unidad calendario real (anual/52,
+  // sin cambios); solo hora se deriva del día real trabajado, porque ahí es donde estaba la
+  // suposición falsa (que todas las semanas tienen horas semanales completas).
+  const horasPorDiaLaborado = (PARAMETROS_MO.horasSemanales || 42) / 5;
   const semanal = anual / 52;
-  const hora = semanal / (PARAMETROS_MO.horasSemanales || 42);
+  const hora = horasPorDiaLaborado > 0 ? diario / horasPorDiaLaborado : 0;
   return { mensual, anual, diario, semanal, hora };
 }
 
