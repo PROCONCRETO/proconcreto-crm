@@ -30,11 +30,6 @@ function activarModulo(modulo) {
     document.getElementById('pantalla-ordenes-servicio').classList.add('activa');
     renderOrdenes();
   }
-  if (modulo === 'productos') {
-    document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
-    document.getElementById('pantalla-productos').classList.add('activa');
-    renderProductosAdmin();
-  }
   if (modulo === 'calidad') {
     document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
     document.getElementById('pantalla-ajuste-mezcla').classList.add('activa');
@@ -44,10 +39,10 @@ function activarModulo(modulo) {
   }
   if (modulo === 'costeo') {
     document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
-    document.getElementById('pantalla-costeo-mo').classList.add('activa');
+    document.getElementById('pantalla-productos').classList.add('activa');
     document.querySelectorAll('#subnav-costeo .nav-btn').forEach(b => b.classList.remove('activo'));
-    document.querySelector('#subnav-costeo .nav-btn[onclick*="costeo-mo"]')?.classList.add('activo');
-    renderCosteoManoObra();
+    document.querySelector('#subnav-costeo .nav-btn[onclick*="productos"]')?.classList.add('activo');
+    renderProductosAdmin();
   }
 }
 
@@ -81,6 +76,7 @@ function ir(pantalla) {
   if (pantalla === 'certificados-calidad') renderCertificadosCalidad();
   if (pantalla === 'logistica') renderCalendarioLogistica();
   if (pantalla === 'logistica-estadisticas') renderEstadisticasLogistica();
+  if (pantalla === 'productos') renderProductosAdmin();
   if (pantalla === 'costeo-mo') renderCosteoManoObra();
   if (pantalla === 'costeo-maquinaria') renderCosteoMaquinaria();
   if (pantalla === 'costeo-referencia') renderCosteoReferencia();

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260802m">
+<link rel="stylesheet" href="css/estilos.css?v=20260802o">
 </head>
 <body>
 
@@ -70,9 +70,8 @@
   <button class="nav-modulo" onclick="activarModulo('produccion')">🏭 Producción</button>
   <button class="nav-modulo" onclick="activarModulo('logistica')">🚛 Logística</button>
   <button class="nav-modulo" onclick="activarModulo('calidad')">🔬 Calidad</button>
-  <button class="nav-modulo" onclick="activarModulo('costeo')">💰 Costeo</button>
-  <button class="nav-modulo" onclick="activarModulo('productos')" style="margin-left:auto">📦 Productos</button>
-  <div id="nav-usuario" style="margin-left:16px">
+  <button class="nav-modulo" onclick="activarModulo('costeo')">💰 Centro de Costos</button>
+  <div id="nav-usuario" style="margin-left:auto">
     <span id="rt-indicador" style="font-size:14px;font-weight:700;color:#999;white-space:nowrap;padding:4px 10px;border-radius:14px;background:rgba(255,255,255,0.12)" title="Estado de sincronización">⚪ Conectando…</span>
     <span id="usuario-email"></span>
     <button class="btn btn-secundario btn-sm" onclick="cerrarSesion()" style="font-size:11px;padding:4px 10px">Salir</button>
@@ -112,9 +111,10 @@
 </nav>
 
 <nav class="nav" id="subnav-costeo" style="display:none">
-  <button class="nav-btn activo" onclick="ir('costeo-mo')">👷 Costo de Mano de Obra</button>
-  <button class="nav-btn" onclick="ir('costeo-maquinaria')">🔧 Amortización de Maquinaria y Equipos</button>
+  <button class="nav-btn activo" onclick="ir('productos')">📦 Productos</button>
   <button class="nav-btn" onclick="ir('costeo-referencia')">📑 Costos de Referencia</button>
+  <button class="nav-btn" onclick="ir('costeo-mo')">👷 Costo de Mano de Obra</button>
+  <button class="nav-btn" onclick="ir('costeo-maquinaria')">🔧 Amortización de Maquinaria y Equipos</button>
   <button class="nav-btn" onclick="ir('costeo-producto')">🏗️ Costeo de Producto</button>
 </nav>
 
@@ -2243,27 +2243,27 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260802m"></script>
-<script src="js/catalogo.js?v=20260802m"></script>
-<script src="js/navegacion.js?v=20260802m"></script>
-<script src="js/ordenes-produccion.js?v=20260802m"></script>
-<script src="js/produccion-diaria.js?v=20260802m"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260802m"></script>
-<script src="js/costeo-mano-obra.js?v=20260802m"></script>
-<script src="js/costeo-maquinaria.js?v=20260802m"></script>
-<script src="js/costeo-referencia.js?v=20260802m"></script>
-<script src="js/costeo-producto.js?v=20260802m"></script>
-<script src="js/calidad-mezclas.js?v=20260802m"></script>
-<script src="js/calidad-estadisticas.js?v=20260802m"></script>
-<script src="js/calidad-trazabilidad.js?v=20260802m"></script>
-<script src="js/logistica.js?v=20260802m"></script>
-<script src="js/estadisticas-logistica.js?v=20260802m"></script>
-<script src="js/auth.js?v=20260802m"></script>
-<script src="js/datos-realtime.js?v=20260802m"></script>
-<script src="js/cotizador.js?v=20260802m"></script>
-<script src="js/historico-clientes-stats.js?v=20260802m"></script>
+<script src="js/config.js?v=20260802o"></script>
+<script src="js/catalogo.js?v=20260802o"></script>
+<script src="js/navegacion.js?v=20260802o"></script>
+<script src="js/ordenes-produccion.js?v=20260802o"></script>
+<script src="js/produccion-diaria.js?v=20260802o"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260802o"></script>
+<script src="js/costeo-mano-obra.js?v=20260802o"></script>
+<script src="js/costeo-maquinaria.js?v=20260802o"></script>
+<script src="js/costeo-referencia.js?v=20260802o"></script>
+<script src="js/costeo-producto.js?v=20260802o"></script>
+<script src="js/calidad-mezclas.js?v=20260802o"></script>
+<script src="js/calidad-estadisticas.js?v=20260802o"></script>
+<script src="js/calidad-trazabilidad.js?v=20260802o"></script>
+<script src="js/logistica.js?v=20260802o"></script>
+<script src="js/estadisticas-logistica.js?v=20260802o"></script>
+<script src="js/auth.js?v=20260802o"></script>
+<script src="js/datos-realtime.js?v=20260802o"></script>
+<script src="js/cotizador.js?v=20260802o"></script>
+<script src="js/historico-clientes-stats.js?v=20260802o"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
-<script src="js/migracion-consecutivos.js?v=20260802m"></script>
+<script src="js/migracion-consecutivos.js?v=20260802o"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -2271,9 +2271,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260802m"></script>
-<script src="js/rut-parser.js?v=20260802m"></script>
-<script src="js/compresor-pdf.js?v=20260802m"></script>
-<script src="js/lector-informes.js?v=20260802m"></script>
+<script src="js/pdf.js?v=20260802o"></script>
+<script src="js/rut-parser.js?v=20260802o"></script>
+<script src="js/compresor-pdf.js?v=20260802o"></script>
+<script src="js/lector-informes.js?v=20260802o"></script>
 </body>
 </html>

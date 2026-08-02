@@ -1,6 +1,8 @@
-# Módulo: Costeo de Productos
+# Módulo: Centro de Costos
 
 Módulo nuevo (2026-07-26), construido a partir del Excel real "COSTOS MAESTRO 2026_V2" que ya usaba la empresa. Se está armando por partes — este archivo se actualiza a medida que se agregan las siguientes pantallas (Listado de Insumos/Materias Primas, Amortización de Maquinaria y Equipos, Costeo de Producto).
+
+**Nombre visible "Centro de Costos" desde 2026-08-02** (antes "Costeo" — el id interno del módulo (`activarModulo('costeo')`), el id del subnav (`subnav-costeo`) y el nombre de este archivo siguen igual, mismo criterio que el rótulo "Niveles Salariales"/"Costos de Referencia"). El mismo día, la pantalla **Productos** (antes su propio módulo de nivel superior, botón "📦 Productos" aparte en la barra principal) se movió a ser la **primera subventana** de Centro de Costos — es la pantalla por defecto al entrar al módulo. El id de la pantalla (`pantalla-productos`) y el archivo (`js/catalogo.js`, `renderProductosAdmin()`) no cambiaron, solo cómo se llega ahí: antes `activarModulo('productos')`, ahora `ir('productos')` dentro del subnav de Costeo.
 
 ## Archivos
 
@@ -15,6 +17,7 @@ Módulo nuevo (2026-07-26), construido a partir del Excel real "COSTOS MAESTRO 2
 
 ## Pantallas (`ir()` en `navegacion.js`, módulo `costeo`)
 
+- `productos` — **Productos** (catálogo — código, precio de lista/mínimo, Diseño de Mezcla asignado). Primera subventana del módulo, y la que se muestra por defecto al entrar a Centro de Costos.
 - `costeo-mo` — Costo de Mano de Obra (Niveles Salariales + Cuadrillas Productivas).
 - `costeo-maquinaria` — Amortización de Maquinaria y Equipos.
 - `costeo-referencia` — **Costos de Referencia** (nombre visible desde 2026-07-30; antes "Lista de Referencia de Costos" — solo cambió el rótulo, el id de la pantalla, el archivo `costeo-referencia.js` y el nombre de tabla `insumos_costos` siguen igual).
