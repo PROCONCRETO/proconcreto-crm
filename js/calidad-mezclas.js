@@ -3,17 +3,49 @@
 // ═══════════════════════════════
 let DISENOS_MEZCLA = [];
 
-// Cada material estructural (cemento/metacaolín/agua/arena/grava) y cada aditivo tiene,
-// además de su cantidad, un "producto" que apunta a un ítem real de Costos de Referencia
+// Cada material estructural (cemento/agua) y cada aditivo/agregado/adición tiene, además de
+// su cantidad, un "producto" que apunta a un ítem real de Costos de Referencia
 // (insumos_costos, categoría materia_prima o insumo_cif) — así Diseño de Mezcla y Costeo de
 // Producto comparten el mismo catálogo de insumos en vez de manejar nombres sueltos sin
 // precio (2026-07-30, a pedido del usuario: "las materias primas e insumos deberán hablarse
-// entre ellos"). Las CANTIDADES siguen viviendo en las mismas llaves fijas de siempre
-// (materiales.cemento/arena/grava/agua/absorcionArena/absorcionTriturado) porque Ajuste
-// Diario de Mezcla (js/calidad-ajuste-mezcla.js) lee exactamente esas llaves — solo se agrega
-// un campo nuevo `<material>Producto` al lado, sin tocar nada de lo que ya funciona ahí.
-const _MATERIALES_DISENO = ['cemento', 'metacaolin', 'agua', 'arena', 'grava'];
-const _LABEL_MATERIAL_DISENO = { cemento: 'Cemento', metacaolin: 'Metacaolín', agua: 'Agua', arena: 'Arena', grava: 'Triturado Grueso' };
+// entre ellos").
+// Cemento/Agua son siempre un solo material por diseño (así vienen en el Excel real) —
+// Arena/Triturado Grueso (`agregados`) y las Adiciones cementantes (`adiciones` — Metacaolín
+// es solo UN ejemplo, puede haber Puzolana, Escoria, etc., 2026-08-02) SÍ pueden tener más de
+// un tipo en la misma receta, así que viven en listas repetibles (mismo patrón que
+// `aditivos`) en vez de un campo fijo.
+const _MATERIALES_DISENO = ['cemento', 'agua'];
+const _LABEL_MATERIAL_DISENO = { cemento: 'Cemento', agua: 'Agua' };
+const _LABEL_ROL_AGREGADO = { arena: 'Arena', grava: 'Triturado Grueso' };
+
+// Normaliza un diseño recién cargado (Supabase o catálogo semilla): si no trae
+// materiales.agregados/adiciones (formato viejo, de antes de 2026-08-02: un solo arena/grava
+// fijos, y metacaolin como único tipo de adición posible), los sintetiza a partir de esos
+// campos viejos — así el resto del código (este archivo, Ajuste Diario de Mezcla, Costeo de
+// Producto) siempre puede asumir que materiales.agregados/adiciones existen y son arreglos,
+// sin importar cuándo se guardó el diseño.
+function _normalizarDiseno(d) {
+  if (!d) return d;
+  const m = d.materiales || (d.materiales = {});
+  if (!Array.isArray(m.agregados)) {
+    const agregados = [];
+    if ((Number(m.arena) || 0) > 0 || m.arenaProducto) {
+      agregados.push({ rolBase: 'arena', producto: m.arenaProducto || '', cantidad: Number(m.arena) || 0, volumen: Number(m.volumenArena) || 0, absorcion: Number(m.absorcionArena) || 0 });
+    }
+    if ((Number(m.grava) || 0) > 0 || m.gravaProducto) {
+      agregados.push({ rolBase: 'grava', producto: m.gravaProducto || '', tamanoAgregado: d.tamanoMaximo || '', cantidad: Number(m.grava) || 0, volumen: Number(m.volumenGrava) || 0, absorcion: Number(m.absorcionTriturado) || 0 });
+    }
+    m.agregados = agregados;
+  }
+  if (!Array.isArray(m.adiciones)) {
+    const adiciones = [];
+    if ((Number(m.metacaolin) || 0) > 0 || m.metacaolinProducto) {
+      adiciones.push({ producto: m.metacaolinProducto || '', cantidad: Number(m.metacaolin) || 0 });
+    }
+    m.adiciones = adiciones;
+  }
+  return d;
+}
 
 // `rol` es el campo `rolDiseno` que se marca en Costos de Referencia (modal Nuevo/Editar
 // Ítem, campo "Rol en Diseño de Mezcla") — filtra el desplegable para que, ej., la fila de
@@ -35,14 +67,85 @@ function _opcionesProductoCatalogo(seleccionado, rol, tamano) {
   return `<option value="">— Selecciona —</option>${opciones}`;
 }
 
-// Cuando cambia el "Tamaño máximo de agregado" del diseño, el Triturado Grueso elegido puede
-// dejar de aplicar (era de otro tamaño) — se refresca el picker con el nuevo filtro y se
-// limpia la selección anterior, para no dejar guardado un producto que ya no corresponde.
-function _actualizarProductoGravaPorTamano() {
-  const sel = document.getElementById('m-diseno-grava-producto');
-  if (!sel) return;
-  const tamano = document.getElementById('m-diseno-tamano').value;
-  sel.innerHTML = _opcionesProductoCatalogo('', 'grava', tamano);
+let _agregadosDisenoActual = [];
+
+// Arena y Triturado Grueso, repetibles — mismo patrón que Aditivos, pero cada fila trae su
+// propia Cantidad (kg)/Volumen (m³)/Absorción (%) en vez de una sola Dosis. El Triturado
+// Grueso además necesita su "Tamaño" (como antes filtraba el picker por el "Tamaño máximo de
+// agregado" del diseño) — ahora es por fila, porque dos filas de triturado podrían en teoría
+// ser de tamaños distintos.
+function renderAgregadosDiseno() {
+  const tbody = document.getElementById('agregados-diseno-body');
+  if (!tbody) return;
+  if (!_agregadosDisenoActual.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega al menos una Arena y un Triturado Grueso</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = _agregadosDisenoActual.map((a, i) => `
+    <tr>
+      <td>
+        <select onchange="_agregadosDisenoActual[${i}].rolBase=this.value;_agregadosDisenoActual[${i}].producto='';_agregadosDisenoActual[${i}].tamanoAgregado='';renderAgregadosDiseno()">
+          <option value="arena" ${a.rolBase === 'arena' ? 'selected' : ''}>Arena</option>
+          <option value="grava" ${a.rolBase === 'grava' ? 'selected' : ''}>Triturado Grueso</option>
+        </select>
+      </td>
+      <td>${a.rolBase === 'grava' ? `
+        <select onchange="_agregadosDisenoActual[${i}].tamanoAgregado=this.value;_agregadosDisenoActual[${i}].producto='';renderAgregadosDiseno()">
+          <option value="">— Tamaño —</option>
+          <option value='1"' ${a.tamanoAgregado === '1"' ? 'selected' : ''}>1"</option>
+          <option value='3/4"' ${a.tamanoAgregado === '3/4"' ? 'selected' : ''}>3/4"</option>
+          <option value='1/2"' ${a.tamanoAgregado === '1/2"' ? 'selected' : ''}>1/2"</option>
+          <option value='3/8"' ${a.tamanoAgregado === '3/8"' ? 'selected' : ''}>3/8"</option>
+        </select>` : `<span style="color:var(--gris-medio)">—</span>`}
+      </td>
+      <td><select onchange="_agregadosDisenoActual[${i}].producto=this.value">${_opcionesProductoCatalogo(a.producto || '', a.rolBase, a.tamanoAgregado)}</select></td>
+      <td><input type="number" value="${a.cantidad}" min="0" step="0.1" onchange="_agregadosDisenoActual[${i}].cantidad=parseFloat(this.value)||0" style="width:80px"></td>
+      <td><input type="number" value="${a.volumen}" min="0" step="0.001" onchange="_agregadosDisenoActual[${i}].volumen=parseFloat(this.value)||0" style="width:80px"></td>
+      <td><input type="number" value="${a.absorcion}" min="0" step="0.1" onchange="_agregadosDisenoActual[${i}].absorcion=parseFloat(this.value)||0" style="width:70px"></td>
+      <td><button class="btn btn-rojo btn-xs" onclick="eliminarAgregadoDiseno(${i})">✕</button></td>
+    </tr>`).join('');
+}
+
+function agregarAgregadoDiseno() {
+  _agregadosDisenoActual.push({ rolBase: 'arena', producto: '', tamanoAgregado: '', cantidad: 0, volumen: 0, absorcion: 0 });
+  renderAgregadosDiseno();
+}
+
+function eliminarAgregadoDiseno(i) {
+  _agregadosDisenoActual.splice(i, 1);
+  renderAgregadosDiseno();
+}
+
+let _adicionesDisenoActual = [];
+
+// Adiciones cementantes, repetibles — el Metacaolín es solo UN ejemplo de adición; puede
+// haber Puzolana, Escoria, etc. en la misma receta (2026-08-02, a pedido del usuario). A
+// diferencia de Aditivos, no necesitan un "Tipo" funcional (todas las adiciones se tratan
+// igual — son polvo cementante adicional, sin una categoría downstream como la de
+// Superplastificante/Acelerante que usa Ajuste Diario) — solo Producto y Cantidad.
+function renderAdicionesDiseno() {
+  const tbody = document.getElementById('adiciones-diseno-body');
+  if (!tbody) return;
+  if (!_adicionesDisenoActual.length) {
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega adiciones cementantes usadas en esta mezcla (opcional — ej. Metacaolín, Puzolana, Escoria)</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = _adicionesDisenoActual.map((a, i) => `
+    <tr>
+      <td><select onchange="_adicionesDisenoActual[${i}].producto=this.value">${_opcionesProductoCatalogo(a.producto || '', 'adicion')}</select></td>
+      <td><input type="number" value="${a.cantidad}" min="0" step="0.1" onchange="_adicionesDisenoActual[${i}].cantidad=parseFloat(this.value)||0"></td>
+      <td><button class="btn btn-rojo btn-xs" onclick="eliminarAdicionDiseno(${i})">✕</button></td>
+    </tr>`).join('');
+}
+
+function agregarAdicionDiseno() {
+  _adicionesDisenoActual.push({ producto: '', cantidad: 0 });
+  renderAdicionesDiseno();
+}
+
+function eliminarAdicionDiseno(i) {
+  _adicionesDisenoActual.splice(i, 1);
+  renderAdicionesDiseno();
 }
 
 function siguienteCodigoDiseno() {
@@ -127,14 +230,18 @@ function abrirModalDiseno() {
   document.getElementById('m-diseno-id').value = '';
   document.getElementById('modal-diseno-titulo').textContent = '🧪 Nuevo Diseño de Mezcla';
   document.getElementById('m-diseno-codigo').value = siguienteCodigoDiseno();
-  ['m-diseno-nombre', 'm-diseno-resistencia', 'm-diseno-asentamiento', 'm-diseno-tamano', 'm-diseno-relacion', 'm-diseno-cemento', 'm-diseno-metacaolin', 'm-diseno-arena', 'm-diseno-grava', 'm-diseno-absorcion-arena', 'm-diseno-absorcion-triturado', 'm-diseno-volumen-arena', 'm-diseno-volumen-grava', 'm-diseno-agua', 'm-diseno-obs'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['m-diseno-nombre', 'm-diseno-resistencia', 'm-diseno-asentamiento', 'm-diseno-tamano', 'm-diseno-relacion', 'm-diseno-cemento', 'm-diseno-agua', 'm-diseno-obs'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('m-diseno-estado').value = 'Activo';
   _MATERIALES_DISENO.forEach(k => {
     const sel = document.getElementById(`m-diseno-${k}-producto`);
-    if (sel) sel.innerHTML = _opcionesProductoCatalogo('', k, document.getElementById('m-diseno-tamano').value);
+    if (sel) sel.innerHTML = _opcionesProductoCatalogo('', k, '');
   });
+  _agregadosDisenoActual = [];
+  renderAgregadosDiseno();
   _aditivosDisenoActual = [];
   renderAditivosDiseno();
+  _adicionesDisenoActual = [];
+  renderAdicionesDiseno();
   document.getElementById('modal-diseno').classList.add('abierto');
 }
 
@@ -151,21 +258,18 @@ function editarDiseno(id) {
   document.getElementById('m-diseno-tamano').value = d.tamanoMaximo || '';
   document.getElementById('m-diseno-relacion').value = d.relacionAguaCemento || '';
   document.getElementById('m-diseno-cemento').value = d.materiales?.cemento || '';
-  document.getElementById('m-diseno-metacaolin').value = d.materiales?.metacaolin || '';
-  document.getElementById('m-diseno-arena').value = d.materiales?.arena || '';
-  document.getElementById('m-diseno-grava').value = d.materiales?.grava || '';
-  document.getElementById('m-diseno-absorcion-arena').value = d.materiales?.absorcionArena || '';
-  document.getElementById('m-diseno-absorcion-triturado').value = d.materiales?.absorcionTriturado || '';
-  document.getElementById('m-diseno-volumen-arena').value = d.materiales?.volumenArena || '';
-  document.getElementById('m-diseno-volumen-grava').value = d.materiales?.volumenGrava || '';
   document.getElementById('m-diseno-agua').value = d.materiales?.agua || '';
   _MATERIALES_DISENO.forEach(k => {
     const sel = document.getElementById(`m-diseno-${k}-producto`);
-    if (sel) sel.innerHTML = _opcionesProductoCatalogo(d.materiales?.[`${k}Producto`] || '', k, document.getElementById('m-diseno-tamano').value);
+    if (sel) sel.innerHTML = _opcionesProductoCatalogo(d.materiales?.[`${k}Producto`] || '', k, '');
   });
+  _agregadosDisenoActual = JSON.parse(JSON.stringify(d.materiales?.agregados || []));
+  renderAgregadosDiseno();
   // Migración: diseños antiguos con un solo aditivo de texto libre → lista nueva
   _aditivosDisenoActual = JSON.parse(JSON.stringify(d.materiales?.aditivos || (d.materiales?.aditivo ? [{ tipo: 'Superplastificante', dosis: d.materiales.dosisAditivo || 0 }] : [])));
   renderAditivosDiseno();
+  _adicionesDisenoActual = JSON.parse(JSON.stringify(d.materiales?.adiciones || []));
+  renderAdicionesDiseno();
   document.getElementById('m-diseno-estado').value = d.estado || 'Activo';
   document.getElementById('m-diseno-obs').value = d.observaciones || '';
   document.getElementById('modal-diseno').classList.add('abierto');
@@ -183,16 +287,32 @@ function guardarDiseno() {
   // se puede costear si sus insumos no tienen un precio en algún lado.
   const cantidadesMat = {
     cemento: parseFloat(document.getElementById('m-diseno-cemento').value) || 0,
-    metacaolin: parseFloat(document.getElementById('m-diseno-metacaolin').value) || 0,
     agua: parseFloat(document.getElementById('m-diseno-agua').value) || 0,
-    arena: parseFloat(document.getElementById('m-diseno-arena').value) || 0,
-    grava: parseFloat(document.getElementById('m-diseno-grava').value) || 0,
   };
   const productosMat = {};
   for (const k of _MATERIALES_DISENO) {
     productosMat[k] = document.getElementById(`m-diseno-${k}-producto`)?.value || '';
     if (cantidadesMat[k] > 0 && !productosMat[k]) {
       alert(`Selecciona el producto de "${_LABEL_MATERIAL_DISENO[k]}" (columna "Producto (Costos de Referencia)") antes de guardar — si todavía no existe, créalo primero en Costeo → Costos de Referencia.`);
+      return;
+    }
+  }
+  if (!_agregadosDisenoActual.some(a => a.rolBase === 'arena' && (Number(a.cantidad) || 0) > 0)) {
+    alert('Agrega al menos una Arena con cantidad mayor a 0.');
+    return;
+  }
+  if (!_agregadosDisenoActual.some(a => a.rolBase === 'grava' && (Number(a.cantidad) || 0) > 0)) {
+    alert('Agrega al menos un Triturado Grueso con cantidad mayor a 0.');
+    return;
+  }
+  for (let i = 0; i < _agregadosDisenoActual.length; i++) {
+    const a = _agregadosDisenoActual[i];
+    if (a.rolBase === 'grava' && !a.tamanoAgregado) {
+      alert(`Selecciona el "Tamaño" del Triturado Grueso #${i + 1} antes de guardar.`);
+      return;
+    }
+    if ((Number(a.cantidad) || 0) > 0 && !a.producto) {
+      alert(`Selecciona el producto de "${_LABEL_ROL_AGREGADO[a.rolBase] || a.rolBase}" #${i + 1} antes de guardar — si todavía no existe, créalo primero en Costeo → Costos de Referencia.`);
       return;
     }
   }
@@ -203,28 +323,29 @@ function guardarDiseno() {
       return;
     }
   }
+  for (let i = 0; i < _adicionesDisenoActual.length; i++) {
+    const a = _adicionesDisenoActual[i];
+    if ((Number(a.cantidad) || 0) > 0 && !a.producto) {
+      alert(`Selecciona el producto de la adición #${i + 1} antes de guardar — si todavía no existe, créalo primero en Costeo → Costos de Referencia.`);
+      return;
+    }
+  }
 
   const editId = document.getElementById('m-diseno-id').value;
   const existente = editId ? DISENOS_MEZCLA.find(x => String(x.id) === String(editId)) : null;
   const materialesNuevos = {
     cemento: cantidadesMat.cemento,
     cementoProducto: productosMat.cemento,
-    metacaolin: cantidadesMat.metacaolin,
-    metacaolinProducto: productosMat.metacaolin,
-    arena: cantidadesMat.arena,
-    arenaProducto: productosMat.arena,
-    grava: cantidadesMat.grava,
-    gravaProducto: productosMat.grava,
-    absorcionArena: parseFloat(document.getElementById('m-diseno-absorcion-arena').value) || 0,
-    absorcionTriturado: parseFloat(document.getElementById('m-diseno-absorcion-triturado').value) || 0,
-    // Volumen (m³) de arena/triturado, aparte del peso (kg) de arriba — los agregados se
-    // compran por volumen en la región, así que Costeo de Producto usa este dato (no el
-    // peso) para costear; Ajuste Diario de Mezcla sigue usando el peso, sin cambios.
-    volumenArena: parseFloat(document.getElementById('m-diseno-volumen-arena').value) || 0,
-    volumenGrava: parseFloat(document.getElementById('m-diseno-volumen-grava').value) || 0,
     agua: cantidadesMat.agua,
     aguaProducto: productosMat.agua,
+    // Arena y Triturado Grueso, repetibles (2026-08-02) — cada fila trae su propia cantidad
+    // (kg, para Ajuste Diario), volumen (m³, los agregados se compran por volumen en la
+    // región — Costeo de Producto usa este dato, no el peso) y absorción (%).
+    agregados: JSON.parse(JSON.stringify(_agregadosDisenoActual)),
     aditivos: JSON.parse(JSON.stringify(_aditivosDisenoActual)),
+    // Adiciones cementantes, repetibles (2026-08-02) — Metacaolín es solo un ejemplo, puede
+    // haber Puzolana, Escoria, etc. Solo Producto + Cantidad (kg), sin "Tipo" funcional.
+    adiciones: JSON.parse(JSON.stringify(_adicionesDisenoActual)),
   };
   // Un diseño se va ajustando con el tiempo (materiales, resistencia, consumo de cemento).
   // Cada vez que un cambio así se guarda sobre un diseño existente, queda una marca de
@@ -257,6 +378,7 @@ function guardarDiseno() {
     .then(({ error }) => { if (error) console.error('Error guardando diseño:', error.message); });
   cerrarModal('modal-diseno');
   renderDisenosMezcla();
+  _revisarImpactoPrecios(`Diseño de Mezcla "${codigo}" actualizado en Calidad`);
 }
 
 function eliminarDiseno(id) {

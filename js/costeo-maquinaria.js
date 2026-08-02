@@ -7,9 +7,9 @@
 // La "capacidad total de vida útil" se puede fijar de dos formas (una máquina elige una):
 //   - "Por años": vida útil en años × unidades de uso por año (para máquinas cuyo desgaste
 //     depende más del tiempo, ej. un montacargas por día).
-//   - "Por usos totales": un número fijo de usos de vida (golpes, m³, ciclos...), sin pasar
-//     por años — para máquinas cuyo desgaste depende del uso, no del calendario (ej. una
-//     cortadora que dura 200.000 golpes sin importar cuántos años tarde en llegar ahí).
+//   - "Por usos totales": un número fijo de usos de vida (ciclos, m³...), sin pasar por
+//     años — para máquinas cuyo desgaste depende del uso, no del calendario (ej. una
+//     cortadora que dura 200.000 ciclos sin importar cuántos años tarde en llegar ahí).
 // El "Mantenimiento por unidad" se calcula distinto según el modo (2026-07-31, corregido a
 // pedido del usuario — la versión original repartía el % una sola vez sobre la depreciación
 // total, lo que daba un mantenimiento anual irrealmente bajo para máquinas caras de vida
@@ -25,8 +25,9 @@ let MAQUINARIA_EQUIPOS = [];
 let _baseVidaUtilActualMaquina = 'anos';
 
 // Unidades tomadas de la hoja MAQ-EQUPO del Excel original — desplegable cerrado
-// (en vez de texto libre) para que no queden variantes tipo "golpe"/"Golpes"/"GOLPE".
-const UNIDADES_USO_MAQUINA = { golpe: 'Golpe', dia: 'Día', m3: 'm³', m2: 'm²', banco: 'Banco' };
+// (en vez de texto libre) para que no queden variantes tipo "ciclo"/"Ciclos"/"CICLO".
+// "golpe" se renombró a "ciclo" (2026-08-02, a pedido del usuario, en toda la app).
+const UNIDADES_USO_MAQUINA = { ciclo: 'Ciclo', dia: 'Día', m3: 'm³', m2: 'm²', banco: 'Banco' };
 function _labelUnidadUso(v) { return UNIDADES_USO_MAQUINA[v] || v || ''; }
 
 function calcularCostoMaquina(m) {
@@ -211,7 +212,7 @@ function guardarMaquina() {
   const nombre = document.getElementById('m-maquina-nombre').value.trim();
   if (!nombre) { alert('El nombre es requerido.'); return; }
   const m = _leerFormularioMaquina();
-  if (!m.unidadUso) { alert('La unidad de uso es requerida (ej: golpe, día, m³).'); return; }
+  if (!m.unidadUso) { alert('La unidad de uso es requerida (ej: ciclo, día, m³).'); return; }
   m.nombre = nombre;
   const nombreAnterior = document.getElementById('m-maquina-nombre-anterior').value;
   const guardarEnSupabase = () => {
@@ -230,6 +231,7 @@ function guardarMaquina() {
   }
   cerrarModal('modal-maquina');
   renderCosteoMaquinaria();
+  _revisarImpactoPrecios(`Máquina "${nombre}" actualizada en Maquinaria y Equipos`);
 }
 
 function eliminarMaquina(nombre) {

@@ -282,3 +282,21 @@
   .log-cal-viaje-flechas span { cursor: pointer; opacity: 0.75; }
   .log-cal-viaje-flechas span:hover { opacity: 1; }
   #usuario-email { font-size: 12px; color: rgba(255,255,255,0.65); }
+
+  /* ── COSTEO DE PRODUCTO: formulario único por secciones ── */
+  .seccion-costeo { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--gris-borde); }
+  .seccion-costeo:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+  .seccion-costeo-titulo { font-size: 13px; font-weight: 700; color: var(--azul); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .seccion-costeo-titulo .num { width: 22px; height: 22px; border-radius: 50%; background: var(--azul); color: white; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .form-grupo label .hint { font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .tipo-chip { border: 1.5px solid var(--gris-borde); background: white; color: var(--gris-medio); padding: 7px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .tipo-chip.activo { border-color: var(--azul); background: var(--azul); color: white; }
+  .caja-costeo { background: var(--azul-suave); border: 1px solid #90CAF9; border-radius: var(--radio); padding: 10px 12px; margin-top: 10px; font-size: 12px; }
+  .caja-costeo .fila { display: flex; justify-content: space-between; padding: 3px 0; }
+  .caja-costeo .fila span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .caja-costeo .fila.sub span:first-child { padding-left: 14px; color: var(--gris-medio); font-size: 11.5px; }
+  .caja-costeo-punteada { background: #F8FBFF; border: 1px dashed #90CAF9; margin-top: 0; }
+  .caja-costeo-resumen { padding: 14px 16px; }
+  .caja-costeo-resumen .fila { font-size: 12.5px; }
+  .caja-costeo-resumen .fila-total { border-top: 2px solid var(--azul); margin-top: 8px; padding-top: 10px; font-weight: 700; font-size: 17px; color: var(--azul); }
+  .caja-costeo-resumen .fila-total span:last-child { font-weight: 700; color: var(--azul); }

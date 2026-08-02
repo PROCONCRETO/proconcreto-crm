@@ -342,6 +342,7 @@ function guardarClaseSalarial() {
   cerrarModal('modal-clase-salarial');
   renderClasesSalariales();
   renderCuadrillas();
+  _revisarImpactoPrecios(`Nivel salarial "${nombre}" actualizado en Costo de Mano de Obra`);
 }
 
 function eliminarClaseSalarial(nombre) {
@@ -513,6 +514,7 @@ function guardarCuadrilla() {
   }
   cerrarModal('modal-cuadrilla');
   renderCuadrillas();
+  _revisarImpactoPrecios(`Cuadrilla "${nombre}" actualizada en Costo de Mano de Obra`);
 }
 
 function eliminarCuadrilla(nombre) {

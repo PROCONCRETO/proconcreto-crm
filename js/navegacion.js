@@ -84,5 +84,6 @@ function ir(pantalla) {
   if (pantalla === 'costeo-mo') renderCosteoManoObra();
   if (pantalla === 'costeo-maquinaria') renderCosteoMaquinaria();
   if (pantalla === 'costeo-referencia') renderCosteoReferencia();
+  if (pantalla === 'costeo-producto') renderCosteoProductos();
 }
 

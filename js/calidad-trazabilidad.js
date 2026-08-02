@@ -270,11 +270,9 @@ function buscarTrazabilidad() {
       <div style="padding-top:10px;border-top:1px dashed var(--gris-borde);margin-bottom:10px">
         <div style="font-size:10px;color:#888;margin-bottom:6px">CORRECCIÓN DE HUMEDAD — CILINDRO ${ajuste.cilindroNo}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <span style="background:#F2F4F7;padding:4px 10px;border-radius:4px;font-size:12px"><strong>Hum. arena:</strong> ${(ajuste.humedadArena||0).toFixed(1)}%</span>
-          <span style="background:#F2F4F7;padding:4px 10px;border-radius:4px;font-size:12px"><strong>Hum. triturado:</strong> ${(ajuste.humedadTriturado||0).toFixed(1)}%</span>
+          ${(ajuste.agregados || []).map(ag => `<span style="background:#F2F4F7;padding:4px 10px;border-radius:4px;font-size:12px"><strong>Hum. ${ag.producto || (ag.rolBase === 'arena' ? 'arena' : 'triturado')}:</strong> ${(ag.humedad||0).toFixed(1)}%</span>`).join('')}
           <span style="background:#F2F4F7;padding:4px 10px;border-radius:4px;font-size:12px"><strong>Agua ajustada:</strong> ${(ajuste.materiales?.agua?.ajustada||0).toFixed(1)} L</span>
-          <span style="background:#F2F4F7;padding:4px 10px;border-radius:4px;font-size:12px"><strong>Arena ajustada:</strong> ${(ajuste.materiales?.arena?.ajustada||0).toFixed(1)} kg</span>
-          <span style="background:#F2F4F7;padding:4px 10px;border-radius:4px;font-size:12px"><strong>Triturado ajustado:</strong> ${(ajuste.materiales?.triturado?.ajustada||0).toFixed(1)} kg</span>
+          ${(ajuste.agregados || []).map(ag => `<span style="background:#F2F4F7;padding:4px 10px;border-radius:4px;font-size:12px"><strong>${ag.producto || (ag.rolBase === 'arena' ? 'Arena' : 'Triturado')} ajustado:</strong> ${(ag.ajustada||0).toFixed(1)} kg</span>`).join('')}
         </div>
       </div>` : ''}
       <div style="padding-top:10px;border-top:1px dashed var(--gris-borde)">

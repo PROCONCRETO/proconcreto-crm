@@ -247,6 +247,7 @@ function guardarInsumoCosto() {
   }
   cerrarModal('modal-insumo-costo');
   renderCosteoReferencia();
+  _revisarImpactoPrecios(`Insumo "${nombre}" actualizado en Costos de Referencia`);
 }
 
 function eliminarInsumoCosto(nombre) {

@@ -4,6 +4,23 @@
 let AJUSTES_MEZCLA = [];
 let _clientesAdicionalesAjuste = [];
 
+// Normaliza un ajuste recién cargado: si no trae `agregados` (formato viejo, de antes de
+// 2026-08-02, cuando Diseño de Mezcla solo permitía una Arena y un Triturado Grueso fijos),
+// lo sintetiza a partir de los campos viejos `a.arena`/`a.triturado`/`a.materiales.arena`/
+// `a.materiales.triturado` — así el resto del código (este archivo, Trazabilidad) siempre
+// puede asumir que `agregados` existe, sin importar cuándo se guardó el ajuste. Un ajuste
+// histórico real de producción NUNCA se debe perder ni cambiar de valor por esta migración.
+function _normalizarAjuste(a) {
+  if (!a) return a;
+  if (!Array.isArray(a.agregados)) {
+    const agregados = [];
+    if (a.arena) agregados.push({ rolBase: 'arena', producto: '', pesoRecipiente: a.arena.pesoRecipiente || 0, pesoHumedo: a.arena.pesoHumedo || 0, pesoSeco: a.arena.pesoSeco || 0, absorcion: a.arena.absorcion || 0, disenoCantidad: a.materiales?.arena?.diseno || 0, humedad: a.humedadArena || 0, ajustada: a.materiales?.arena?.ajustada || 0, unidad: 'kg' });
+    if (a.triturado) agregados.push({ rolBase: 'grava', producto: '', pesoRecipiente: a.triturado.pesoRecipiente || 0, pesoHumedo: a.triturado.pesoHumedo || 0, pesoSeco: a.triturado.pesoSeco || 0, absorcion: a.triturado.absorcion || 0, disenoCantidad: a.materiales?.triturado?.diseno || 0, humedad: a.humedadTriturado || 0, ajustada: a.materiales?.triturado?.ajustada || 0, unidad: 'kg' });
+    a.agregados = agregados;
+  }
+  return a;
+}
+
 // Un mismo ajuste (misma mezcla, mismo cilindro) a veces se fabrica para varios
 // clientes/proyectos a la vez; esta tabla solo aparece cuando hay más de un cliente.
 function renderClientesAdicionalesAjuste() {
@@ -344,10 +361,10 @@ function _productoDesdeTextoAjuste(texto) {
 // Reinicia los campos que dependen del diseño de mezcla (se usa cuando el producto
 // elegido no tiene diseño asignado, para no dejar en pantalla datos de un producto anterior).
 function _limpiarCamposDisenoAjuste() {
-  ['m-ajuste-resistencia', 'm-ajuste-tamano', 'm-ajuste-arena-absorcion', 'm-ajuste-triturado-absorcion',
-    'm-ajuste-mat-agua', 'm-ajuste-mat-cemento', 'm-ajuste-mat-adicion', 'm-ajuste-mat-plastificante',
-    'm-ajuste-mat-arena', 'm-ajuste-mat-triturado', 'm-ajuste-mat-acelerante'
+  ['m-ajuste-resistencia', 'm-ajuste-tamano',
+    'm-ajuste-mat-agua', 'm-ajuste-mat-cemento', 'm-ajuste-mat-adicion', 'm-ajuste-mat-plastificante', 'm-ajuste-mat-acelerante'
   ].forEach(id => { const el = document.getElementById(id); if (el) el.value = id.includes('tamano') ? '' : 0; });
+  _agregadosAjusteActual = [];
   recalcularAjusteMezcla();
 }
 
@@ -372,6 +389,13 @@ function cargarDesdeProducto() {
   renderProductosAdicionalesAjuste();
 }
 
+// Agregados (Arena/Triturado Grueso) del ajuste en curso — una fila por cada agregado del
+// Diseño de Mezcla elegido (puede haber más de una Arena o más de un Triturado a la vez desde
+// 2026-08-02). Cada fila trae su absorción y su "cantidad diseño" ya congeladas desde el
+// Diseño (igual que antes) más las 3 pesadas del día (recipiente/húmedo/seco) que llena el
+// operario — de ahí sale su humedad y su corrección de agua, sumadas entre todas las filas.
+let _agregadosAjusteActual = [];
+
 function cargarBaseDesdeDiseno() {
   const codigo = document.getElementById('m-ajuste-diseno').value;
   const d = DISENOS_MEZCLA.find(x => x.codigo === codigo);
@@ -380,42 +404,74 @@ function cargarBaseDesdeDiseno() {
   document.getElementById('m-ajuste-tamano').value = d.tamanoMaximo || '';
   document.getElementById('m-ajuste-mat-agua').value = d.materiales?.agua || 0;
   document.getElementById('m-ajuste-mat-cemento').value = d.materiales?.cemento || 0;
-  document.getElementById('m-ajuste-mat-adicion').value = d.materiales?.metacaolin || 0;
-  document.getElementById('m-ajuste-mat-arena').value = d.materiales?.arena || 0;
-  document.getElementById('m-ajuste-mat-triturado').value = d.materiales?.grava || 0;
-  document.getElementById('m-ajuste-arena-absorcion').value = d.materiales?.absorcionArena || 0;
-  document.getElementById('m-ajuste-triturado-absorcion').value = d.materiales?.absorcionTriturado || 0;
+  // Adición = suma de todas las adiciones cementantes del diseño (Metacaolín, Puzolana,
+  // Escoria... pueden ser varias a la vez, 2026-08-02) — no necesitan corrección de humedad
+  // individual como Arena/Triturado, así que en Ajuste Diario basta con el total.
+  document.getElementById('m-ajuste-mat-adicion').value = (d.materiales?.adiciones || []).reduce((s, a) => s + (Number(a.cantidad) || 0), 0);
   const aditivos = d.materiales?.aditivos || [];
   const sumaPorTipo = (tipo) => aditivos.filter(a => a.tipo === tipo).reduce((s, a) => s + (Number(a.dosis) || 0), 0);
   document.getElementById('m-ajuste-mat-plastificante').value = sumaPorTipo('Superplastificante');
   document.getElementById('m-ajuste-mat-acelerante').value = sumaPorTipo('Acelerante');
+  _agregadosAjusteActual = (d.materiales?.agregados || []).map(a => ({
+    rolBase: a.rolBase, producto: a.producto || '', absorcion: Number(a.absorcion) || 0,
+    disenoCantidad: Number(a.cantidad) || 0, pesoRecipiente: 0, pesoHumedo: 0, pesoSeco: 0, humedad: 0, ajustada: 0,
+  }));
   recalcularAjusteMezcla();
+}
+
+// Repinta la tabla de agregados completa — se usa cuando cambia CUÁLES filas hay (cargar un
+// diseño nuevo, o abrir un ajuste guardado), no en cada tecla (eso lo hace
+// _recalcularAgregadoAjuste, que solo actualiza las celdas calculadas sin perder el foco).
+function renderAgregadosAjuste() {
+  const tbody = document.getElementById('ajuste-agregados-body');
+  if (!tbody) return;
+  if (!_agregadosAjusteActual.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Elige el producto a fabricar para traer los agregados de su Diseño de Mezcla</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = _agregadosAjusteActual.map((row, i) => `
+    <tr>
+      <td style="font-weight:600">${row.producto || (row.rolBase === 'arena' ? 'Arena' : 'Triturado Grueso')}</td>
+      <td><input type="number" value="${row.pesoRecipiente || 0}" oninput="_agregadosAjusteActual[${i}].pesoRecipiente=parseFloat(this.value)||0;_recalcularAgregadoAjuste(${i})"></td>
+      <td><input type="number" value="${row.pesoHumedo || 0}" oninput="_agregadosAjusteActual[${i}].pesoHumedo=parseFloat(this.value)||0;_recalcularAgregadoAjuste(${i})"></td>
+      <td><input type="number" value="${row.pesoSeco || 0}" oninput="_agregadosAjusteActual[${i}].pesoSeco=parseFloat(this.value)||0;_recalcularAgregadoAjuste(${i})"></td>
+      <td style="text-align:center;font-weight:700" id="ajuste-agregado-humedad-${i}">${(row.humedad || 0).toFixed(1)}%</td>
+      <td><input type="number" value="${row.absorcion || 0}" step="0.1" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td>
+      <td style="text-align:right;color:var(--gris-medio)">${(row.disenoCantidad || 0).toFixed(1)}</td>
+      <td style="text-align:right;font-weight:700" id="ajuste-agregado-ajustada-${i}">${(row.ajustada || 0).toFixed(1)} kg</td>
+    </tr>`).join('');
+}
+
+// Recalcula UNA fila de agregado (humedad + cantidad ajustada) y el agua ajustada total —
+// solo toca esas celdas puntuales, sin reconstruir la tabla, para no perder el foco/cursor
+// del input que el operario está llenando en ese momento.
+function _recalcularAgregadoAjuste(i) {
+  const row = _agregadosAjusteActual[i];
+  if (!row) return;
+  row.humedad = calcularHumedadAgregado(row.pesoRecipiente, row.pesoHumedo, row.pesoSeco);
+  row.ajustada = (row.disenoCantidad || 0) * (1 + row.humedad / 100);
+  const humCell = document.getElementById(`ajuste-agregado-humedad-${i}`);
+  if (humCell) humCell.textContent = row.humedad.toFixed(1) + '%';
+  const ajCell = document.getElementById(`ajuste-agregado-ajustada-${i}`);
+  if (ajCell) ajCell.textContent = row.ajustada.toFixed(1) + ' kg';
+  _recalcularAguaAjustada();
+}
+
+// El agua ajustada resta el aporte de humedad de TODOS los agregados a la vez (antes solo
+// arena+triturado, ahora la suma de cuantas filas haya) — cada agregado húmedo por encima de
+// su absorción "regala" agua a la mezcla, que hay que descontar del agua a dosificar.
+function _recalcularAguaAjustada() {
+  const disenoAgua = parseFloat(document.getElementById('m-ajuste-mat-agua').value) || 0;
+  const totalAporte = _agregadosAjusteActual.reduce((s, row) => s + (row.disenoCantidad || 0) * ((row.humedad || 0) - (row.absorcion || 0)) / 100, 0);
+  const el = document.getElementById('m-ajuste-ajustada-agua');
+  if (el) el.textContent = (disenoAgua - totalAporte).toFixed(1) + ' L';
 }
 
 function recalcularAjusteMezcla() {
   const g = id => parseFloat(document.getElementById(id).value) || 0;
-
-  const humArena = calcularHumedadAgregado(g('m-ajuste-arena-recipiente'), g('m-ajuste-arena-humedo'), g('m-ajuste-arena-seco'));
-  const humTriturado = calcularHumedadAgregado(g('m-ajuste-triturado-recipiente'), g('m-ajuste-triturado-humedo'), g('m-ajuste-triturado-seco'));
-  document.getElementById('m-ajuste-arena-humedad-display').textContent = humArena.toFixed(1) + '%';
-  document.getElementById('m-ajuste-triturado-humedad-display').textContent = humTriturado.toFixed(1) + '%';
-
-  const absArena = g('m-ajuste-arena-absorcion');
-  const absTriturado = g('m-ajuste-triturado-absorcion');
-  const disenoAgua = g('m-ajuste-mat-agua');
-  const disenoArena = g('m-ajuste-mat-arena');
-  const disenoTriturado = g('m-ajuste-mat-triturado');
-
-  const aporteArena = disenoArena * (humArena - absArena) / 100;
-  const aporteTriturado = disenoTriturado * (humTriturado - absTriturado) / 100;
-
-  const aguaAjustada = disenoAgua - aporteArena - aporteTriturado;
-  const arenaAjustada = disenoArena * (1 + humArena / 100);
-  const trituradoAjustada = disenoTriturado * (1 + humTriturado / 100);
-
-  document.getElementById('m-ajuste-ajustada-agua').textContent = aguaAjustada.toFixed(1) + ' L';
-  document.getElementById('m-ajuste-ajustada-arena').textContent = arenaAjustada.toFixed(1) + ' kg';
-  document.getElementById('m-ajuste-ajustada-triturado').textContent = trituradoAjustada.toFixed(1) + ' kg';
+  _agregadosAjusteActual.forEach(row => { row.humedad = calcularHumedadAgregado(row.pesoRecipiente, row.pesoHumedo, row.pesoSeco); row.ajustada = (row.disenoCantidad || 0) * (1 + row.humedad / 100); });
+  renderAgregadosAjuste();
+  _recalcularAguaAjustada();
   document.getElementById('m-ajuste-ajustada-cemento').textContent = g('m-ajuste-mat-cemento').toFixed(1) + ' kg';
   document.getElementById('m-ajuste-ajustada-adicion').textContent = g('m-ajuste-mat-adicion').toFixed(1) + ' kg';
   document.getElementById('m-ajuste-ajustada-plastificante').textContent = g('m-ajuste-mat-plastificante').toFixed(1) + ' g';
@@ -442,11 +498,10 @@ function abrirModalAjusteMezcla() {
   _productosAdicionalesAjuste = [];
   renderProductosAdicionalesAjuste();
   ['m-ajuste-resistencia', 'm-ajuste-cliente', 'm-ajuste-tamano',
-    'm-ajuste-arena-recipiente', 'm-ajuste-arena-humedo', 'm-ajuste-arena-seco', 'm-ajuste-arena-absorcion',
-    'm-ajuste-triturado-recipiente', 'm-ajuste-triturado-humedo', 'm-ajuste-triturado-seco', 'm-ajuste-triturado-absorcion',
     'm-ajuste-mat-agua', 'm-ajuste-mat-cemento', 'm-ajuste-mat-adicion', 'm-ajuste-mat-plastificante',
-    'm-ajuste-mat-arena', 'm-ajuste-mat-triturado', 'm-ajuste-mat-acelerante', 'm-ajuste-obs'
+    'm-ajuste-mat-acelerante', 'm-ajuste-obs'
   ].forEach(id => { const el = document.getElementById(id); if (el) el.value = id.includes('obs') || id.includes('cliente') || id.includes('tamano') ? '' : 0; });
+  _agregadosAjusteActual = [];
   _alCambiarClienteAjuste(); // deja el select de Proyecto deshabilitado hasta elegir cliente
   recalcularAjusteMezcla();
   document.getElementById('modal-ajuste-mezcla').classList.add('abierto');
@@ -473,12 +528,6 @@ function editarAjusteMezcla(id) {
   renderClientesAdicionalesAjuste();
   _productosAdicionalesAjuste = (a.productosAdicionales || []).map(p => `${p.codigo} — ${p.nombre}`);
   renderProductosAdicionalesAjuste();
-  document.getElementById('m-ajuste-arena-recipiente').value = a.arena?.pesoRecipiente || 0;
-  document.getElementById('m-ajuste-arena-humedo').value = a.arena?.pesoHumedo || 0;
-  document.getElementById('m-ajuste-arena-seco').value = a.arena?.pesoSeco || 0;
-  document.getElementById('m-ajuste-triturado-recipiente').value = a.triturado?.pesoRecipiente || 0;
-  document.getElementById('m-ajuste-triturado-humedo').value = a.triturado?.pesoHumedo || 0;
-  document.getElementById('m-ajuste-triturado-seco').value = a.triturado?.pesoSeco || 0;
   document.getElementById('m-ajuste-obs').value = a.observaciones || '';
 
   // Un Diseño de Mezcla se va ajustando con el tiempo (disponibilidad y calidad de
@@ -495,11 +544,9 @@ function editarAjusteMezcla(id) {
   document.getElementById('m-ajuste-mat-cemento').value = a.materiales?.cemento?.diseno || 0;
   document.getElementById('m-ajuste-mat-adicion').value = a.materiales?.adicion?.diseno || 0;
   document.getElementById('m-ajuste-mat-plastificante').value = a.materiales?.plastificante?.diseno || 0;
-  document.getElementById('m-ajuste-mat-arena').value = a.materiales?.arena?.diseno || 0;
-  document.getElementById('m-ajuste-mat-triturado').value = a.materiales?.triturado?.diseno || 0;
   document.getElementById('m-ajuste-mat-acelerante').value = a.materiales?.acelerante?.diseno || 0;
-  document.getElementById('m-ajuste-arena-absorcion').value = a.arena?.absorcion || 0;
-  document.getElementById('m-ajuste-triturado-absorcion').value = a.triturado?.absorcion || 0;
+  _normalizarAjuste(a);
+  _agregadosAjusteActual = JSON.parse(JSON.stringify(a.agregados || []));
 
   recalcularAjusteMezcla();
   document.getElementById('modal-ajuste-mezcla').classList.add('abierto');
@@ -540,18 +587,17 @@ function guardarAjusteMezcla() {
   }
   const g = id => parseFloat(document.getElementById(id).value) || 0;
 
-  const humArena = calcularHumedadAgregado(g('m-ajuste-arena-recipiente'), g('m-ajuste-arena-humedo'), g('m-ajuste-arena-seco'));
-  const humTriturado = calcularHumedadAgregado(g('m-ajuste-triturado-recipiente'), g('m-ajuste-triturado-humedo'), g('m-ajuste-triturado-seco'));
-  const absArena = g('m-ajuste-arena-absorcion');
-  const absTriturado = g('m-ajuste-triturado-absorcion');
+  // Cada agregado (Arena/Triturado, puede haber más de uno) se recalcula limpio al guardar,
+  // en vez de confiar en los campos transitorios `row.humedad`/`row.ajustada` que solo se
+  // usan para pintar la pantalla — y el agua ajustada resta el aporte de TODOS a la vez.
   const disenoAgua = g('m-ajuste-mat-agua');
-  const disenoArena = g('m-ajuste-mat-arena');
-  const disenoTriturado = g('m-ajuste-mat-triturado');
-  const aporteArena = disenoArena * (humArena - absArena) / 100;
-  const aporteTriturado = disenoTriturado * (humTriturado - absTriturado) / 100;
-  const aguaAjustada = disenoAgua - aporteArena - aporteTriturado;
-  const arenaAjustada = disenoArena * (1 + humArena / 100);
-  const trituradoAjustada = disenoTriturado * (1 + humTriturado / 100);
+  const agregadosFinal = _agregadosAjusteActual.map(row => {
+    const humedad = calcularHumedadAgregado(row.pesoRecipiente, row.pesoHumedo, row.pesoSeco);
+    const ajustada = (row.disenoCantidad || 0) * (1 + humedad / 100);
+    return { rolBase: row.rolBase, producto: row.producto || '', pesoRecipiente: row.pesoRecipiente || 0, pesoHumedo: row.pesoHumedo || 0, pesoSeco: row.pesoSeco || 0, absorcion: row.absorcion || 0, disenoCantidad: row.disenoCantidad || 0, humedad, ajustada, unidad: 'kg' };
+  });
+  const totalAporteAgua = agregadosFinal.reduce((s, row) => s + row.disenoCantidad * (row.humedad - row.absorcion) / 100, 0);
+  const aguaAjustada = disenoAgua - totalAporteAgua;
 
   const editId = document.getElementById('m-ajuste-id').value;
   const ajuste = {
@@ -566,17 +612,12 @@ function guardarAjusteMezcla() {
     proyecto: document.getElementById('m-ajuste-proyecto').value.trim(),
     clientesAdicionales: _clientesAdicionalesAjuste.filter(c => c.cliente.trim() || c.proyecto.trim()),
     tamanoMaximo: document.getElementById('m-ajuste-tamano').value.trim(),
-    arena: { pesoRecipiente: g('m-ajuste-arena-recipiente'), pesoHumedo: g('m-ajuste-arena-humedo'), pesoSeco: g('m-ajuste-arena-seco'), absorcion: absArena },
-    triturado: { pesoRecipiente: g('m-ajuste-triturado-recipiente'), pesoHumedo: g('m-ajuste-triturado-humedo'), pesoSeco: g('m-ajuste-triturado-seco'), absorcion: absTriturado },
-    humedadArena: humArena,
-    humedadTriturado: humTriturado,
+    agregados: agregadosFinal,
     materiales: {
       agua: { diseno: disenoAgua, ajustada: aguaAjustada, unidad: 'L' },
       cemento: { diseno: g('m-ajuste-mat-cemento'), ajustada: g('m-ajuste-mat-cemento'), unidad: 'kg' },
       adicion: { diseno: g('m-ajuste-mat-adicion'), ajustada: g('m-ajuste-mat-adicion'), unidad: 'kg' },
       plastificante: { diseno: g('m-ajuste-mat-plastificante'), ajustada: g('m-ajuste-mat-plastificante'), unidad: 'g' },
-      arena: { diseno: disenoArena, ajustada: arenaAjustada, unidad: 'kg' },
-      triturado: { diseno: disenoTriturado, ajustada: trituradoAjustada, unidad: 'kg' },
       acelerante: { diseno: g('m-ajuste-mat-acelerante'), ajustada: g('m-ajuste-mat-acelerante'), unidad: 'g' },
     },
     observaciones: document.getElementById('m-ajuste-obs').value.trim(),
@@ -678,8 +719,9 @@ function _tablaVolumenFormatoProduccion(a, volumen) {
     _filaFormatoProduccion('Cemento', m.cemento?.ajustada || 0, volumen, false, 'kg'),
     _filaFormatoProduccion('Adición', m.adicion?.ajustada || 0, volumen, false, 'kg'),
     _filaFormatoProduccion('Plastificante', m.plastificante?.ajustada || 0, volumen, false, 'g'),
-    _filaFormatoProduccion('Arena', m.arena?.ajustada || 0, volumen, true, 'kg'),
-    _filaFormatoProduccion('Triturado', m.triturado?.ajustada || 0, volumen, true, 'kg'),
+    // Cada agregado (Arena/Triturado, puede haber más de uno desde 2026-08-02) se carga en
+    // buggy aparte — una fila por cada uno, con su propio nombre de producto.
+    ...(a.agregados || []).map(ag => _filaFormatoProduccion(ag.producto || (ag.rolBase === 'arena' ? 'Arena' : 'Triturado'), ag.ajustada || 0, volumen, true, 'kg')),
   ];
   // El +1e-9 evita que un valor como 365*0.7=255.49999999999997 (imprecisión de punto
   // flotante) redondee hacia abajo cuando matemáticamente cae justo en 255.5 → 256.
@@ -744,9 +786,10 @@ function verFormatoProduccionAjuste(id) {
           <div style="font-size:10.5px;margin-top:6px"><b>DISEÑO DE MEZCLA:</b> ${diseno ? `${diseno.codigo} — ${diseno.nombre}` : (a.disenoCodigo || '—')}</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px;font-size:10.5px">
             <div><b>RESISTENCIA DE DISEÑO:</b> ${a.resistenciaDiseno || '—'} MPa</div>
-            <div><b>HUMEDAD AGREGADO FINO:</b> ${a.humedadArena != null ? a.humedadArena.toFixed(1) + '%' : '—'}</div>
             <div><b>TAMAÑO MÁXIMO DE AGREGADO:</b> ${a.tamanoMaximo || '—'}</div>
-            <div><b>TRITURADO AGREGADO GRUESO:</b> ${a.humedadTriturado != null ? a.humedadTriturado.toFixed(1) + '%' : '—'}</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;font-size:10.5px">
+            ${(a.agregados || []).map(ag => `<span><b>HUMEDAD ${(ag.producto || (ag.rolBase === 'arena' ? 'ARENA' : 'TRITURADO')).toUpperCase()}:</b> ${ag.humedad != null ? ag.humedad.toFixed(1) + '%' : '—'}</span>`).join('')}
           </div>
         </div>
         ${pares.map(([izq, der]) => `

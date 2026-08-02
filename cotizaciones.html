@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260802c">
+<link rel="stylesheet" href="css/estilos.css?v=20260802k">
 </head>
 <body>
 
@@ -115,6 +115,7 @@
   <button class="nav-btn activo" onclick="ir('costeo-mo')">👷 Costo de Mano de Obra</button>
   <button class="nav-btn" onclick="ir('costeo-maquinaria')">🔧 Amortización de Maquinaria y Equipos</button>
   <button class="nav-btn" onclick="ir('costeo-referencia')">📑 Costos de Referencia</button>
+  <button class="nav-btn" onclick="ir('costeo-producto')">🏗️ Costeo de Producto</button>
 </nav>
 
 <!-- ═══════════════════════════════════════
@@ -917,6 +918,45 @@
 </div>
 
 <!-- ═══════════════════════════════════════
+     PANTALLA: COSTEO DE PRODUCTO
+═══════════════════════════════════════ -->
+<div id="pantalla-costeo-producto" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Costeo de Producto</div>
+  </div>
+
+  <div class="acciones-row">
+    <div class="flex-gap">
+      <input class="buscador-input" id="costeo-producto-buscador" placeholder="🔍 Buscar producto..." oninput="_filtrarCosteoProductos()">
+      <select id="costeo-producto-filtro-tipo" onchange="_filtrarCosteoProductos()" style="padding:8px 12px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <option value="">Todos los tipos</option>
+        <option value="vibrocompactado">Vibrocompactado</option>
+        <option value="pretensado">Pretensado</option>
+        <option value="pretensado_moldeado">Pretensado Moldeado</option>
+        <option value="reforzado">Reforzado</option>
+      </select>
+    </div>
+    <button class="btn btn-primario btn-sm" onclick="abrirModalCosteoProducto()">+ Nuevo Costeo</button>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" style="table-layout:fixed">
+      <thead><tr>
+        <th style="width:34%">PRODUCTO</th>
+        <th style="width:14%">TIPO</th>
+        <th style="width:12%;text-align:right">COSTO/UNIDAD</th>
+        <th style="width:14%">DISEÑO DE MEZCLA</th>
+        <th style="width:12%">ÚLT. MODIFICACIÓN</th>
+        <th style="width:14%">ACCIONES</th>
+      </tr></thead>
+      <tbody id="costeo-producto-body">
+        <tr><td colspan="6" class="empty-state"><div class="icono">🏗️</div><div>No hay costeos de producto registrados.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
      PANTALLA: AJUSTE DIARIO DE MEZCLA
 ═══════════════════════════════════════ -->
 <div id="pantalla-ajuste-mezcla" class="pantalla">
@@ -1137,7 +1177,7 @@
       <div class="form-grupo"><label>Código *</label><input type="text" id="m-diseno-codigo" placeholder="DM-001"></div>
       <div class="form-grupo"><label>Resistencia de diseño f'c (MPa) *</label><input type="number" id="m-diseno-resistencia" min="0" step="0.1"></div>
       <div class="form-grupo"><label>Tamaño máximo de agregado *</label>
-        <select id="m-diseno-tamano" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px" onchange="_actualizarProductoGravaPorTamano()">
+        <select id="m-diseno-tamano" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
           <option value="">— Selecciona —</option>
           <option value='1"'>1"</option>
           <option value='3/4"'>3/4"</option>
@@ -1177,37 +1217,36 @@
             <td style="text-align:center;color:var(--gris-medio)">—</td>
           </tr>
           <tr>
-            <td style="font-weight:600">Metacaolín (kg) <span style="font-weight:400;color:var(--gris-medio);font-size:11px">Adición cementante</span></td>
-            <td><select id="m-diseno-metacaolin-producto" style="width:100%"></select></td>
-            <td><input type="number" id="m-diseno-metacaolin" min="0" step="0.1"></td>
-            <td style="text-align:center;color:var(--gris-medio)">—</td>
-            <td style="text-align:center;color:var(--gris-medio)">—</td>
-          </tr>
-          <tr>
             <td style="font-weight:600">Agua (L)</td>
             <td><select id="m-diseno-agua-producto" style="width:100%"></select></td>
             <td><input type="number" id="m-diseno-agua" min="0" step="0.1"></td>
             <td style="text-align:center;color:var(--gris-medio)">—</td>
             <td style="text-align:center;color:var(--gris-medio)">—</td>
           </tr>
-          <tr>
-            <td style="font-weight:600">Arena (SH) (kg)</td>
-            <td><select id="m-diseno-arena-producto" style="width:100%"></select></td>
-            <td><input type="number" id="m-diseno-arena" min="0" step="0.1"></td>
-            <td><input type="number" id="m-diseno-volumen-arena" min="0" step="0.001"></td>
-            <td><input type="number" id="m-diseno-absorcion-arena" min="0" step="0.1"></td>
-          </tr>
-          <tr>
-            <td style="font-weight:600">Triturado Grueso (SH) (kg)</td>
-            <td><select id="m-diseno-grava-producto" style="width:100%"></select></td>
-            <td><input type="number" id="m-diseno-grava" min="0" step="0.1"></td>
-            <td><input type="number" id="m-diseno-volumen-grava" min="0" step="0.001"></td>
-            <td><input type="number" id="m-diseno-absorcion-triturado" min="0" step="0.1"></td>
-          </tr>
         </tbody>
       </table>
     </div>
-    <div style="font-size:11px;color:var(--gris-medio);margin:0 0 10px">* SH = condición Seco al Horno. Las cantidades de arena y triturado grueso (en peso), junto con su absorción, se usan para calcular el ajuste diario por humedad. El <b>Volumen (m³)</b> es aparte — los agregados se compran por volumen en la región, así que Costeo de Producto usa ese dato (no el peso) para costear. El <b>Producto</b> es el ítem de Costos de Referencia que le da precio a este material — si el que necesitas no existe todavía, créalo allá primero (no se puede guardar una cantidad sin su producto).</div>
+    <div style="font-size:11px;color:var(--gris-medio);margin:0 0 10px">El <b>Producto</b> es el ítem de Costos de Referencia que le da precio a este material — si el que necesitas no existe todavía, créalo allá primero (no se puede guardar una cantidad sin su producto).</div>
+
+    <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px;display:flex;justify-content:space-between;align-items:center">
+      <span>AGREGADOS (Arena / Triturado Grueso)</span>
+      <button type="button" class="btn btn-secundario btn-xs" onclick="agregarAgregadoDiseno()">+ Agregar agregado</button>
+    </div>
+    <div style="overflow-x:auto;margin-bottom:4px">
+      <table class="tabla-items" style="width:100%">
+        <thead><tr>
+          <th>Tipo</th>
+          <th style="width:110px">Tamaño</th>
+          <th>Producto (Costos de Referencia)</th>
+          <th style="width:90px">Cantidad (kg)*</th>
+          <th style="width:90px">Volumen (m³)</th>
+          <th style="width:80px">Absorción %</th>
+          <th style="width:36px"></th>
+        </tr></thead>
+        <tbody id="agregados-diseno-body"></tbody>
+      </table>
+    </div>
+    <div style="font-size:11px;color:var(--gris-medio);margin:0 0 10px">* Cantidad en condición Seco al Horno (SH) — junto con la Absorción, se usa para calcular el ajuste diario por humedad de cada agregado por separado. El <b>Volumen (m³)</b> es aparte — los agregados se compran por volumen en la región, así que Costeo de Producto usa ese dato (no el peso) para costear. Una mezcla puede tener más de una Arena o más de un Triturado Grueso a la vez (ej. Arena de Trituración + Arena Gruesa juntas) — agrega una fila por cada una.</div>
 
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px;display:flex;justify-content:space-between;align-items:center">
       <span>ADITIVOS</span>
@@ -1217,6 +1256,17 @@
       <table class="tabla-items" style="width:100%">
         <thead><tr><th>Tipo de aditivo</th><th>Producto (Costos de Referencia)</th><th style="width:130px">Dosis (kg o %)</th><th style="width:36px"></th></tr></thead>
         <tbody id="aditivos-diseno-body"></tbody>
+      </table>
+    </div>
+
+    <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px;display:flex;justify-content:space-between;align-items:center">
+      <span>ADICIONES <span style="font-weight:400;text-transform:none">(cementantes — ej. Metacaolín, Puzolana, Escoria)</span></span>
+      <button type="button" class="btn btn-secundario btn-xs" onclick="agregarAdicionDiseno()">+ Agregar adición</button>
+    </div>
+    <div style="overflow-x:auto;margin-bottom:10px">
+      <table class="tabla-items" style="width:100%">
+        <thead><tr><th>Producto (Costos de Referencia)</th><th style="width:130px">Cantidad (kg)</th><th style="width:36px"></th></tr></thead>
+        <tbody id="adiciones-diseno-body"></tbody>
       </table>
     </div>
     <div class="form-grupo" style="margin-bottom:16px"><label>Observaciones</label><textarea id="m-diseno-obs" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical"></textarea></div>
@@ -1309,7 +1359,7 @@
       <div class="form-grupo"><label>Unidad de uso *</label>
         <select id="m-maquina-unidad-uso" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px" onchange="_actualizarDesgloseMaquina()">
           <option value="">Selecciona...</option>
-          <option value="golpe">Golpe</option>
+          <option value="ciclo">Ciclo</option>
           <option value="dia">Día</option>
           <option value="m3">m³</option>
           <option value="m2">m²</option>
@@ -1377,7 +1427,7 @@
         <select id="m-insumo-rol-diseno" onchange="_toggleTamanoAgregadoInsumo()">
           <option value="">— Ninguno (no aplica a Diseño de Mezcla) —</option>
           <option value="cemento">Cemento</option>
-          <option value="metacaolin">Metacaolín (adición cementante)</option>
+          <option value="adicion">Adición cementante (Metacaolín, Puzolana, Escoria...)</option>
           <option value="arena">Arena</option>
           <option value="grava">Triturado Grueso (grava)</option>
           <option value="agua">Agua</option>
@@ -1427,6 +1477,157 @@
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-insumo-costo')">Cancelar</button>
       <button class="btn btn-primario" onclick="guardarInsumoCosto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Costeo de Producto — un solo formulario con todo el flujo, sin pasos (2026-08-02, a
+     pedido del usuario: "intentemos montarlo en una sola ventana para tener mayor claridad
+     en una sola imagen de los datos ingresados"). -->
+<datalist id="datalist-productos-costeo"></datalist>
+<div class="modal-overlay" id="modal-costeo-producto">
+  <div class="modal" style="width:860px;max-width:95vw">
+    <div class="modal-titulo" id="modal-costeo-producto-titulo">🏗️ Nuevo Costeo de Producto</div>
+    <input type="hidden" id="m-costeo-producto-codigo-anterior">
+
+    <!-- 1. Producto y tipo -->
+    <div class="seccion-costeo">
+      <div class="seccion-costeo-titulo"><span class="num">1</span> Producto y tipo de estructura</div>
+      <div class="form-grupo" style="margin-bottom:10px">
+        <label>Producto *</label>
+        <input type="text" id="m-costeo-producto" list="datalist-productos-costeo" placeholder="Busca por código o nombre..." oninput="cargarProductoCosteo()">
+      </div>
+      <div id="costeo-tipo-chips" style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="tipo-chip" data-tipo="vibrocompactado" onclick="_elegirTipoEstructuraCosteo('vibrocompactado')">🧱 Vibrocompactado</div>
+        <div class="tipo-chip" data-tipo="pretensado" onclick="_elegirTipoEstructuraCosteo('pretensado')">➰ Pretensado</div>
+        <div class="tipo-chip" data-tipo="pretensado_moldeado" onclick="_elegirTipoEstructuraCosteo('pretensado_moldeado')">🏗️ Pretensado Moldeado</div>
+        <div class="tipo-chip" data-tipo="reforzado" onclick="_elegirTipoEstructuraCosteo('reforzado')">🔩 Reforzado</div>
+      </div>
+      <input type="hidden" id="m-costeo-tipo" value="">
+    </div>
+
+    <!-- La estructura de las preguntas siguientes depende por completo del tipo elegido
+         arriba (Vibrocompactado se arma distinto a Pretensado, etc. — ver BD MEZCLA
+         VIBROCOMPACTADOS del Excel) — por eso quedan ocultas hasta elegir un tipo. -->
+    <div id="costeo-tipo-placeholder" class="caja-costeo caja-costeo-punteada"></div>
+    <div id="costeo-secciones-tipo" style="display:none">
+
+    <!-- 2. Diseño de Mezcla -->
+    <div class="seccion-costeo">
+      <div class="seccion-costeo-titulo"><span class="num">2</span> Diseño de Mezcla</div>
+      <div class="form-grupo" style="margin-bottom:10px">
+        <label>Diseño *</label>
+        <select id="m-costeo-diseno" onchange="_actualizarResumenCosteo()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      </div>
+      <div id="costeo-diseno-preview" class="caja-costeo caja-costeo-punteada"></div>
+    </div>
+
+    <!-- 3. Rendimiento -->
+    <div class="seccion-costeo">
+      <div class="seccion-costeo-titulo"><span class="num">3</span> Rendimiento de producción <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(propio del producto/molde — no del Diseño de Mezcla)</span></div>
+      <div class="form-grid-3">
+        <div class="form-grupo"><label>Peso / unidad (kg)</label><input type="number" id="m-costeo-peso-unidad" min="0" step="0.01" oninput="_actualizarResumenCosteo()"></div>
+        <div class="form-grupo"><label>Ciclos / día</label><input type="number" id="m-costeo-ciclos-dia" min="0" step="1" oninput="_actualizarResumenCosteo()"></div>
+        <div class="form-grupo"><label>Unidades / Ciclo</label><input type="number" id="m-costeo-unidades-ciclo" min="0" step="1" oninput="_actualizarResumenCosteo()"></div>
+      </div>
+      <div class="form-grid" style="margin-top:10px">
+        <div class="form-grupo"><label>Unidades / estiba</label><input type="number" id="m-costeo-unidades-estiba" min="0" step="1" oninput="_actualizarResumenCosteo()"></div>
+        <div class="form-grupo"></div>
+      </div>
+      <div id="costeo-calculo-vivo" class="caja-costeo"></div>
+    </div>
+
+    <!-- 4. Máquinas -->
+    <div class="seccion-costeo">
+      <div class="seccion-costeo-titulo"><span class="num">4</span> Máquinas involucradas</div>
+      <table class="tabla-items" style="width:100%">
+        <thead><tr><th>Máquina</th><th style="width:140px">Costo</th><th style="width:36px"></th></tr></thead>
+        <tbody id="costeo-maquinas-body"></tbody>
+      </table>
+      <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarMaquinaCosteo()">+ Agregar máquina</button>
+    </div>
+
+    <!-- 5. Mano de obra -->
+    <div class="seccion-costeo">
+      <div class="seccion-costeo-titulo"><span class="num">5</span> Mano de obra involucrada</div>
+      <table class="tabla-items" style="width:100%">
+        <thead><tr><th>Cuadrilla</th><th style="width:140px">Costo</th><th style="width:36px"></th></tr></thead>
+        <tbody id="costeo-mano-obra-body"></tbody>
+      </table>
+      <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarManoObraCosteo()">+ Agregar cuadrilla</button>
+    </div>
+
+    <!-- 6. Insumos y recargos -->
+    <div class="seccion-costeo">
+      <div class="seccion-costeo-titulo"><span class="num">6</span> Insumos de empaque, consumos y recargos</div>
+      <table class="tabla-items" style="width:100%">
+        <thead><tr><th>Insumo</th><th style="width:120px">Precio</th><th style="width:100px">Cantidad</th><th style="width:110px">Se reparte</th><th style="width:36px"></th></tr></thead>
+        <tbody id="costeo-insumos-body"></tbody>
+      </table>
+      <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarInsumoCosteo()">+ Agregar insumo</button>
+      <div class="form-grid" style="margin-top:14px">
+        <div class="form-grupo"><label>% Desperdicio <span class="hint">(sobre Materia Prima)</span></label><input type="number" id="m-costeo-pct-desperdicio" min="0" step="0.1" value="4" oninput="_actualizarResumenCosteo()"></div>
+        <div class="form-grupo"><label>% Herramienta Menor <span class="hint">(sobre Mano de Obra)</span></label><input type="number" id="m-costeo-pct-herramienta" min="0" step="0.1" value="2" oninput="_actualizarResumenCosteo()"></div>
+      </div>
+    </div>
+
+    <!-- 7. Resumen -->
+    <div class="seccion-costeo">
+      <div class="seccion-costeo-titulo"><span class="num">7</span> Resumen — costo por unidad</div>
+      <div id="costeo-resumen" class="caja-costeo caja-costeo-resumen"></div>
+    </div>
+
+    <!-- 8. Precio de venta sugerido -->
+    <div class="seccion-costeo">
+      <div class="seccion-costeo-titulo"><span class="num">8</span> Precio de venta sugerido <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(costo + margen — no cambia el catálogo hasta que se aplique)</span></div>
+      <div class="form-grid">
+        <div class="form-grupo"><label>% Margen — Precio Lista</label><input type="number" id="m-costeo-margen-lista" min="0" step="0.1" value="30" oninput="_actualizarResumenCosteo()"></div>
+        <div class="form-grupo"><label>% Margen — Precio Mínimo</label><input type="number" id="m-costeo-margen-minimo" min="0" step="0.1" value="15" oninput="_actualizarResumenCosteo()"></div>
+      </div>
+      <div id="costeo-precio-sugerido" class="caja-costeo"></div>
+      <button class="btn btn-verde btn-sm" style="margin-top:10px" onclick="aplicarPreciosCatalogoCosteo()">💲 Aplicar precios al catálogo</button>
+    </div>
+
+    </div>
+    <!-- /costeo-secciones-tipo -->
+
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-costeo-producto')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarCosteoProducto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-detalle-costeo">
+  <div class="modal" style="width:520px;max-width:95vw">
+    <div class="modal-titulo" id="modal-detalle-costeo-titulo">Consolidado</div>
+    <div id="detalle-costeo-resumen" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--gris-medio)"></div>
+    <table class="tabla-items" style="width:100%">
+      <tbody id="detalle-costeo-body"></tbody>
+    </table>
+    <div style="font-size:12px;font-weight:700;color:var(--azul);margin-top:16px;margin-bottom:4px">Precio de venta sugerido</div>
+    <div id="detalle-costeo-precio" class="caja-costeo"></div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-detalle-costeo')">Cerrar</button>
+      <button class="btn btn-verde" id="detalle-costeo-btn-aplicar">💲 Aplicar precios al catálogo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Aviso de impacto en el catálogo — aparece solo si el cambio recién guardado (insumo,
+     máquina, cuadrilla, nivel salarial o diseño de mezcla) mueve el precio sugerido de uno o
+     más productos ya costeados (2026-08-02, a pedido del usuario). -->
+<div class="modal-overlay" id="modal-impacto-precios">
+  <div class="modal" style="width:620px;max-width:95vw">
+    <div class="modal-titulo">⚠️ Este cambio afecta precios de catálogo</div>
+    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:14px"><span id="impacto-precios-origen"></span> — <span id="impacto-precios-count"></span> producto(s) costeado(s) cambian de precio sugerido. Las cotizaciones ya guardadas no se ven afectadas, solo las nuevas de aquí en adelante.</div>
+    <table class="tabla-items" style="width:100%">
+      <thead><tr><th>Producto</th><th style="text-align:right;width:150px">Precio Lista</th><th style="text-align:right;width:150px">Precio Mínimo</th></tr></thead>
+      <tbody id="impacto-precios-body"></tbody>
+    </table>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cancelarImpactoPrecios()">Revisar después</button>
+      <button class="btn btn-verde" onclick="confirmarImpactoPrecios()">💲 Aplicar todos</button>
     </div>
   </div>
 </div>
@@ -1579,27 +1780,12 @@
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px">CORRECCIÓN DE HUMEDAD DE AGREGADOS</div>
     <div style="overflow-x:auto;margin-bottom:10px">
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Agregado</th><th>Peso recipiente</th><th>Peso recip.+húmedo</th><th>Peso recip.+seco</th><th>Humedad</th><th>Absorción (%) <span style="font-weight:400;text-transform:none">(automática)</span></th></tr></thead>
-        <tbody>
-          <tr>
-            <td style="font-weight:600">Arena (fino)</td>
-            <td><input type="number" id="m-ajuste-arena-recipiente" value="0" oninput="recalcularAjusteMezcla()"></td>
-            <td><input type="number" id="m-ajuste-arena-humedo" value="0" oninput="recalcularAjusteMezcla()"></td>
-            <td><input type="number" id="m-ajuste-arena-seco" value="0" oninput="recalcularAjusteMezcla()"></td>
-            <td style="text-align:center;font-weight:700" id="m-ajuste-arena-humedad-display">0.0%</td>
-            <td><input type="number" id="m-ajuste-arena-absorcion" value="0" step="0.1" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td>
-          </tr>
-          <tr>
-            <td style="font-weight:600">Triturado (grueso)</td>
-            <td><input type="number" id="m-ajuste-triturado-recipiente" value="0" oninput="recalcularAjusteMezcla()"></td>
-            <td><input type="number" id="m-ajuste-triturado-humedo" value="0" oninput="recalcularAjusteMezcla()"></td>
-            <td><input type="number" id="m-ajuste-triturado-seco" value="0" oninput="recalcularAjusteMezcla()"></td>
-            <td style="text-align:center;font-weight:700" id="m-ajuste-triturado-humedad-display">0.0%</td>
-            <td><input type="number" id="m-ajuste-triturado-absorcion" value="0" step="0.1" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td>
-          </tr>
+        <thead><tr><th>Agregado</th><th style="width:110px">Peso recipiente</th><th style="width:110px">Peso recip.+húmedo</th><th style="width:110px">Peso recip.+seco</th><th style="width:80px">Humedad</th><th style="width:100px">Absorción (%) <span style="font-weight:400;text-transform:none">(automática)</span></th><th style="width:100px">Cantidad diseño <span style="font-weight:400;text-transform:none">(kg)</span></th><th style="width:110px">Cantidad ajustada</th></tr></thead>
+        <tbody id="ajuste-agregados-body">
+          <tr><td colspan="8" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Elige el producto a fabricar para traer los agregados de su Diseño de Mezcla</td></tr>
         </tbody>
       </table>
-      <div style="font-size:11px;color:var(--gris-medio);margin-top:4px">* La absorción se trae automáticamente del Diseño de Mezcla base y no se puede editar aquí — si necesitas cambiarla, edítala en el Diseño de Mezcla.</div>
+      <div style="font-size:11px;color:var(--gris-medio);margin-top:4px">* Los agregados (una fila por cada Arena/Triturado del Diseño de Mezcla) y su absorción se traen automáticamente y no se pueden editar aquí — si necesitas cambiarlos, edítalos en el Diseño de Mezcla.</div>
     </div>
 
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px">MATERIALES POR M³ — DISEÑO vs. AJUSTADO</div>
@@ -1609,10 +1795,8 @@
         <tbody>
           <tr><td style="font-weight:600">Agua</td><td><input type="number" id="m-ajuste-mat-agua" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>Litros</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-agua">0.0 L</td></tr>
           <tr><td style="font-weight:600">Cemento</td><td><input type="number" id="m-ajuste-mat-cemento" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-cemento">0.0 kg</td></tr>
-          <tr><td style="font-weight:600">Adición (Metacaolín/puzolana)</td><td><input type="number" id="m-ajuste-mat-adicion" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-adicion">0.0 kg</td></tr>
+          <tr><td style="font-weight:600">Adición <span style="font-weight:400;color:var(--gris-medio);font-size:11px">(suma de todas — Metacaolín, Puzolana...)</span></td><td><input type="number" id="m-ajuste-mat-adicion" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-adicion">0.0 kg</td></tr>
           <tr><td style="font-weight:600">Plastificante</td><td><input type="number" id="m-ajuste-mat-plastificante" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>gramos</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-plastificante">0.0 g</td></tr>
-          <tr><td style="font-weight:600">Arena</td><td><input type="number" id="m-ajuste-mat-arena" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-arena">0.0 kg</td></tr>
-          <tr><td style="font-weight:600">Triturado</td><td><input type="number" id="m-ajuste-mat-triturado" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>kg</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-triturado">0.0 kg</td></tr>
           <tr><td style="font-weight:600">Acelerante</td><td><input type="number" id="m-ajuste-mat-acelerante" value="0" readonly style="background:#F7FAFC;color:var(--gris-medio)"></td><td>gramos</td><td style="text-align:right;font-weight:700" id="m-ajuste-ajustada-acelerante">0.0 g</td></tr>
         </tbody>
       </table>
@@ -2061,26 +2245,27 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260802c"></script>
-<script src="js/catalogo.js?v=20260802c"></script>
-<script src="js/navegacion.js?v=20260802c"></script>
-<script src="js/ordenes-produccion.js?v=20260802c"></script>
-<script src="js/produccion-diaria.js?v=20260802c"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260802c"></script>
-<script src="js/costeo-mano-obra.js?v=20260802c"></script>
-<script src="js/costeo-maquinaria.js?v=20260802c"></script>
-<script src="js/costeo-referencia.js?v=20260802c"></script>
-<script src="js/calidad-mezclas.js?v=20260802c"></script>
-<script src="js/calidad-estadisticas.js?v=20260802c"></script>
-<script src="js/calidad-trazabilidad.js?v=20260802c"></script>
-<script src="js/logistica.js?v=20260802c"></script>
-<script src="js/estadisticas-logistica.js?v=20260802c"></script>
-<script src="js/auth.js?v=20260802c"></script>
-<script src="js/datos-realtime.js?v=20260802c"></script>
-<script src="js/cotizador.js?v=20260802c"></script>
-<script src="js/historico-clientes-stats.js?v=20260802c"></script>
+<script src="js/config.js?v=20260802k"></script>
+<script src="js/catalogo.js?v=20260802k"></script>
+<script src="js/navegacion.js?v=20260802k"></script>
+<script src="js/ordenes-produccion.js?v=20260802k"></script>
+<script src="js/produccion-diaria.js?v=20260802k"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260802k"></script>
+<script src="js/costeo-mano-obra.js?v=20260802k"></script>
+<script src="js/costeo-maquinaria.js?v=20260802k"></script>
+<script src="js/costeo-referencia.js?v=20260802k"></script>
+<script src="js/costeo-producto.js?v=20260802k"></script>
+<script src="js/calidad-mezclas.js?v=20260802k"></script>
+<script src="js/calidad-estadisticas.js?v=20260802k"></script>
+<script src="js/calidad-trazabilidad.js?v=20260802k"></script>
+<script src="js/logistica.js?v=20260802k"></script>
+<script src="js/estadisticas-logistica.js?v=20260802k"></script>
+<script src="js/auth.js?v=20260802k"></script>
+<script src="js/datos-realtime.js?v=20260802k"></script>
+<script src="js/cotizador.js?v=20260802k"></script>
+<script src="js/historico-clientes-stats.js?v=20260802k"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
-<script src="js/migracion-consecutivos.js?v=20260802c"></script>
+<script src="js/migracion-consecutivos.js?v=20260802k"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -2088,9 +2273,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260802c"></script>
-<script src="js/rut-parser.js?v=20260802c"></script>
-<script src="js/compresor-pdf.js?v=20260802c"></script>
-<script src="js/lector-informes.js?v=20260802c"></script>
+<script src="js/pdf.js?v=20260802k"></script>
+<script src="js/rut-parser.js?v=20260802k"></script>
+<script src="js/compresor-pdf.js?v=20260802k"></script>
+<script src="js/lector-informes.js?v=20260802k"></script>
 </body>
 </html>
