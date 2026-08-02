@@ -91,6 +91,8 @@ La pantalla resume: Máquina/Equipo, Unidad de uso, Vida útil (texto: "X años"
 
 **Unidad de uso — desplegable cerrado, no texto libre** (2026-07-30, a pedido del usuario, para evitar variantes tipo "golpe"/"Golpes"/"GOLPE" que romperían el agrupamiento por unidad más adelante en Costeo de Producto). Las opciones son las 5 unidades que realmente aparecen en las 22 máquinas de la hoja `MAQ-EQUPO` del Excel original: **Golpe, Día, m³, m², Banco**. El valor guardado es la clave interna (`golpe`, `dia`, `m3`, `m2`, `banco`); la etiqueta bonita para mostrar (con tilde/superíndice) sale de `UNIDADES_USO_MAQUINA` / `_labelUnidadUso()` en `js/costeo-maquinaria.js`. Si en el futuro aparece una máquina con una unidad distinta, hay que agregar la opción al `<select>` en `cotizaciones.html` y a `UNIDADES_USO_MAQUINA`.
 
+**`capacidadCochadaM3`** (2026-08-02): campo nuevo, opcional, solo aplica a mezcladoras (0 para el resto). Es el volumen que mezcla una tanda de esa mezcladora — dato real: "Mezcladora Columbia" = 0,6 m³. Lo usará Costeo de Producto para convertir un Diseño de Mezcla (dado por m³) a "por cochada" — ver `docs/modulos/calidad.md` (sección "Volumen (m³) de Arena y Triturado") y la sección de Costeo de Producto más abajo.
+
 ## Costos de Referencia (`js/costeo-referencia.js`)
 
 **Nombre visible "Costos de Referencia" desde 2026-07-30** (antes "Lista de Referencia de Costos" — solo cambió el rótulo del subnav y el título de la pantalla; el id `costeo-referencia`, el archivo y todo el código interno siguen igual, mismo criterio que el rótulo "Niveles Salariales").
@@ -112,7 +114,38 @@ De la pestaña `LIST.REF` del Excel original, que ya traía la misma idea: una l
 - **Campo "Rol en Diseño de Mezcla"** en el modal Nuevo/Editar Ítem (`m-insumo-rol-diseno` → guarda `rolDiseno`: `'cemento'|'metacaolin'|'arena'|'grava'|'agua'|'aditivo'|''`): opcional, casi ningún ítem de Insumo/CIF lo necesita (ej. "Ensayo de absorción", "Combustible ACPM" no tienen nada que ver con una receta de mezcla). Sirve exclusivamente para que el picker de "Producto" en Diseño de Mezcla sepa qué ítems ofrecer en cada fila — sin este campo, ese picker mostraría el catálogo completo sin ningún filtro (bug real detectado y corregido el mismo día: el picker de "Cemento" también ofrecía "Agua", "Arena", etc.).
 - **El rol `grava` (Triturado Grueso) tiene una segunda dimensión: `tamanoAgregado`** (`'1"'|'3/4"'|'1/2"'|'3/8"'`, campo "Tamaño máximo de agregado *" que solo aparece en el modal cuando el rol es `grava`, obligatorio ahí) — un Triturado 3/8" y uno de 1" son materias primas distintas con precio distinto, un solo ítem no alcanza. Ítems sembrados: `Triturado Grueso 3/8"`, `Triturado Grueso 1/2"`, `Triturado Grueso 3/4"`, `Triturado Grueso 1"` (los 4 con `valorUnitario: 0`, pendientes de precio real). En Diseño de Mezcla, el picker de Triturado se filtra por rol `grava` **y** por `tamanoAgregado` igual al "Tamaño máximo de agregado" ya elegido en el diseño — se refresca solo cuando ese campo cambia.
 
-## Pendiente (próximas pantallas del módulo)
+## Costeo de Producto (en diseño, 2026-08-02 — todavía no construido)
 
-- **Costeo de producto** — de la pestaña `FICHAS NUEVAS`, combinando la Lista de Referencia de Costos (materias primas + mano de obra + máquinas + insumos/CIF) para sacar el costo de producción por producto, que alimentará el catálogo de Productos ya existente (`productos` en Supabase, usado en Cotizaciones/Producción/Logística) — la pestaña `LISTA PRECIOS` del Excel es justamente ese catálogo.
-- Sin resolver todavía: qué hacer con las pestañas `BD MEZCLA` / `BD MEZCLA AMOBLAMIENTO` / `BD MEZCLA COLUMBIA` / `BD MEZCLA PRETENSADOS` del Excel (posible relación con Diseño de Mezcla de Calidad, a confirmar), y el tratamiento de los recargos % MP / % MO mencionado arriba.
+Última pantalla del módulo, la más grande — combina Mano de Obra + Maquinaria + Costos de Referencia + Diseño de Mezcla para sacar el costo de producción real de cada producto. El usuario pidió armarla como **4 "estructuras tipo"** según el tipo de producto: **Vibrocompactados** (Máquina Columbia), **Pretensados**, **Pretensados Moldeados**, **Reforzados** — cada una con su propia receta porque los insumos/máquinas/mano de obra que intervienen son distintos. Se está construyendo por partes, empezando por Vibrocompactados.
+
+### La fuente real: `FICHAS NUEVAS` + `BD MEZCLA COLUMBIA` del Excel
+
+Investigando el Excel original se encontró la estructura completa, con datos reales verificados al peso:
+
+- **`FICHAS NUEVAS`** (1508 filas, 46 productos): una ficha por producto (código, nombre, unidad), con líneas `MP` (materia prima) / `MOD` (mano de obra directa) / `CIF` (costos indirectos), cada una con: nombre del insumo, unidad, **cantidad por 1 unidad de producto**, valor unitario, valor total. Verificado al peso: para "Bloque a=9 b=40 h=20 (8 MPa)", Cemento = 0,678261 kg/unidad × $648,6/kg = $439,9 — cuadra exacto.
+- **`BD MEZCLA COLUMBIA`**: la fuente de la que salen las cantidades `MP` de `FICHAS NUEVAS`, en dos tablas:
+  1. **Mezcla por resistencia** (esto es, en esencia, un Diseño de Mezcla): dosis de Arena de Trituración/Arena Gruesa/Triturado 3/8/Cemento/Quimides 1101 (aditivo) + 3 pigmentos, **por cochada**, según resistencia (8/10/13 MPa) o tipo (Adoquín, Gramoquín).
+  2. **Ficha de rendimiento por producto**: cada producto apunta a una resistencia de la tabla anterior, y define Peso/unidad, Placas/día (golpes/día de la máquina), **Unidades/placa** (varía por producto: 6 para un bloque, 12 para un adoquín), Unidades/canasta, **Unidades/cochada**, Unidades/estiba, insumos de empaque por estiba (stretch/zuncho/grapas), consumos diarios de máquina (kVA, m³ agua, galones ACPM), y **Unidades/día** = Placas/día × Unidades/placa.
+  - Verificación numérica: Tabla 1 dice Cemento = 78 kg/cochada (8 MPa); Tabla 2 dice Unidades/Cochada = 115 para ese bloque → 78÷115 = 0,678 kg/unidad = exactamente lo que aparece en `FICHAS NUEVAS`.
+
+### Cómo se arma el costo de un producto Vibrocompactado (Máquina Columbia)
+
+1. **Materia Prima** = (dosis por cochada del Diseño de Mezcla, convertida a m³/kg) ÷ Unidades/Cochada × precio (Costos de Referencia).
+2. **Mano de Obra** = costo/día de la cuadrilla ÷ Unidades/día (mismo criterio para Máquina Columbia, Montacargas, Minicargador).
+3. **Maquinaria** = costo/golpe de la máquina ÷ Unidades/placa (1 golpe = 1 placa).
+4. **CIF/Insumos**: empaque ÷ Unidades/estiba; consumos de máquina (energía/agua/combustible) ÷ Unidades/día.
+5. **Recargos %, configurables por producto** (decisión del usuario, 2026-08-02 — no globales): **Desperdicio** (sobre el subtotal de MP, 4% en el Excel) y **Herramienta Menor** (sobre el subtotal de MOD, 2% en el Excel) — confirmado que en el Excel se calculan así, no como líneas individuales de costo.
+
+### Decisión: reusar Diseño de Mezcla, no duplicar la receta
+
+El usuario pidió explícitamente reusar el Diseño de Mezcla ya construido en Calidad en vez de crear una tercera fuente de la receta de mezcla — esto obligó a resolver una diferencia real: Diseño de Mezcla se hace técnicamente **por peso** (kg), pero los agregados se compran **por volumen** (m³) en la región. La solución (ver `docs/modulos/calidad.md`): Diseño de Mezcla ahora guarda **ambos** datos para Arena y Triturado (`materiales.arena`/`grava` en kg como siempre, más `materiales.volumenArena`/`volumenGrava` en m³, independientes, a mano) — Costeo de Producto usará el volumen, Ajuste Diario de Mezcla sigue usando el peso, sin tocarse.
+
+Para convertir la mezcla (dada por m³ en el Diseño) a "por cochada" (lo que usa la Máquina Columbia), se agregó `capacidadCochadaM3` a la máquina "Mezcladora Columbia" en Amortización de Maquinaria (0,6 m³ real) — un dato de la máquina, no del diseño ni del producto.
+
+### Pendiente de definir antes de construir la pantalla
+
+- Estructura exacta de la "ficha de rendimiento por producto" (Peso/unidad, Placas/día, Unidades/placa, Unidades/cochada, Unidades/estiba, consumos diarios) — se propuso un modelo, falta el mockup y la confirmación final.
+- Cómo se relacionan las Unidades/Cochada con el volumen real de la cochada (0,6 m³) y el Diseño de Mezcla — falta cerrar la fórmula de conversión exacta.
+- Las otras 3 estructuras tipo (Pretensados, Pretensados Moldeados, Reforzados) — ni empezadas; usan máquinas Prensoland/bancos de pretensado/acero de refuerzo, con una lógica seguramente distinta a la de golpes/placas de Columbia.
+- El tratamiento de "Ensayo de compresión/absorción" como línea CIF — la cantidad/unidad en el Excel (0,000356) no se ha explicado del todo (parece ligada a la frecuencia de muestreo de calidad, a confirmar con el usuario).
+- Sin resolver todavía: qué hacer con `BD MEZCLA` / `BD MEZCLA AMOBLAMIENTO` / `BD MEZCLA PRETENSADOS` (las hojas equivalentes a `BD MEZCLA COLUMBIA` para los otros tipos de producto).

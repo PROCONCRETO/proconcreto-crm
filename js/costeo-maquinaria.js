@@ -130,6 +130,9 @@ function _leerFormularioMaquina() {
     usosTotal: parseFloat(document.getElementById('m-maquina-usos-total').value) || 0,
     rescatePct: parseFloat(document.getElementById('m-maquina-rescate-pct').value) || 0,
     mantenimientoPct: parseFloat(document.getElementById('m-maquina-mantenimiento-pct').value) || 0,
+    // Volumen de una tanda de mezcla — solo aplica a mezcladoras; lo usa Costeo de Producto
+    // para convertir un Diseño de Mezcla (por m³) a "por cochada". 0 para el resto de máquinas.
+    capacidadCochadaM3: parseFloat(document.getElementById('m-maquina-capacidad-cochada').value) || 0,
   };
 }
 
@@ -181,6 +184,7 @@ function abrirModalMaquina() {
   document.getElementById('m-maquina-usos-total').value = '';
   document.getElementById('m-maquina-rescate-pct').value = 0;
   document.getElementById('m-maquina-mantenimiento-pct').value = 0;
+  document.getElementById('m-maquina-capacidad-cochada').value = 0;
   _elegirBaseVidaUtilMaquina('anos');
   document.getElementById('modal-maquina').classList.add('abierto');
 }
@@ -198,6 +202,7 @@ function editarMaquina(nombre) {
   document.getElementById('m-maquina-usos-total').value = m.usosTotal || '';
   document.getElementById('m-maquina-rescate-pct').value = m.rescatePct || 0;
   document.getElementById('m-maquina-mantenimiento-pct').value = m.mantenimientoPct || 0;
+  document.getElementById('m-maquina-capacidad-cochada').value = m.capacidadCochadaM3 || 0;
   _elegirBaseVidaUtilMaquina(m.baseVidaUtil === 'usos' ? 'usos' : 'anos');
   document.getElementById('modal-maquina').classList.add('abierto');
 }

@@ -127,7 +127,7 @@ function abrirModalDiseno() {
   document.getElementById('m-diseno-id').value = '';
   document.getElementById('modal-diseno-titulo').textContent = '🧪 Nuevo Diseño de Mezcla';
   document.getElementById('m-diseno-codigo').value = siguienteCodigoDiseno();
-  ['m-diseno-nombre', 'm-diseno-resistencia', 'm-diseno-asentamiento', 'm-diseno-tamano', 'm-diseno-relacion', 'm-diseno-cemento', 'm-diseno-metacaolin', 'm-diseno-arena', 'm-diseno-grava', 'm-diseno-absorcion-arena', 'm-diseno-absorcion-triturado', 'm-diseno-agua', 'm-diseno-obs'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['m-diseno-nombre', 'm-diseno-resistencia', 'm-diseno-asentamiento', 'm-diseno-tamano', 'm-diseno-relacion', 'm-diseno-cemento', 'm-diseno-metacaolin', 'm-diseno-arena', 'm-diseno-grava', 'm-diseno-absorcion-arena', 'm-diseno-absorcion-triturado', 'm-diseno-volumen-arena', 'm-diseno-volumen-grava', 'm-diseno-agua', 'm-diseno-obs'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('m-diseno-estado').value = 'Activo';
   _MATERIALES_DISENO.forEach(k => {
     const sel = document.getElementById(`m-diseno-${k}-producto`);
@@ -156,6 +156,8 @@ function editarDiseno(id) {
   document.getElementById('m-diseno-grava').value = d.materiales?.grava || '';
   document.getElementById('m-diseno-absorcion-arena').value = d.materiales?.absorcionArena || '';
   document.getElementById('m-diseno-absorcion-triturado').value = d.materiales?.absorcionTriturado || '';
+  document.getElementById('m-diseno-volumen-arena').value = d.materiales?.volumenArena || '';
+  document.getElementById('m-diseno-volumen-grava').value = d.materiales?.volumenGrava || '';
   document.getElementById('m-diseno-agua').value = d.materiales?.agua || '';
   _MATERIALES_DISENO.forEach(k => {
     const sel = document.getElementById(`m-diseno-${k}-producto`);
@@ -215,6 +217,11 @@ function guardarDiseno() {
     gravaProducto: productosMat.grava,
     absorcionArena: parseFloat(document.getElementById('m-diseno-absorcion-arena').value) || 0,
     absorcionTriturado: parseFloat(document.getElementById('m-diseno-absorcion-triturado').value) || 0,
+    // Volumen (m³) de arena/triturado, aparte del peso (kg) de arriba — los agregados se
+    // compran por volumen en la región, así que Costeo de Producto usa este dato (no el
+    // peso) para costear; Ajuste Diario de Mezcla sigue usando el peso, sin cambios.
+    volumenArena: parseFloat(document.getElementById('m-diseno-volumen-arena').value) || 0,
+    volumenGrava: parseFloat(document.getElementById('m-diseno-volumen-grava').value) || 0,
     agua: cantidadesMat.agua,
     aguaProducto: productosMat.agua,
     aditivos: JSON.parse(JSON.stringify(_aditivosDisenoActual)),
