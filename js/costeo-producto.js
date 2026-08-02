@@ -101,9 +101,16 @@ const _MATERIALES_COSTEO_PESO = ['cemento', 'agua'];
 const _LABEL_MAT_COSTEO = { cemento: 'Cemento', agua: 'Agua' };
 const _LABEL_ROL_AGREGADO_COSTEO = { arena: 'Arena', grava: 'Triturado Grueso' };
 
-function _precioInsumoPorNombre(nombre) {
+// Regla tributaria real (2026-08-02, a pedido del usuario): si el producto final GENERA IVA,
+// el IVA que se paga por sus insumos es descontable (se recupera vía la declaración de IVA)
+// — no es un costo real, así que se asume el precio SIN IVA del insumo. Si el producto es
+// EXCLUIDO de IVA, ese IVA no es descontable — sí es un costo real, así que se asume el
+// precio CON IVA. `productoGeneraIva` viene del campo `iva` ('SI'/'NO') del catálogo.
+function _precioInsumoPorNombre(nombre, productoGeneraIva) {
   const i = INSUMOS_COSTOS.find(x => x.nombre === nombre);
-  return i ? calcularCostoInsumo(i).valorFinal : 0;
+  if (!i) return 0;
+  const costo = calcularCostoInsumo(i);
+  return productoGeneraIva ? costo.costoSinIva : costo.valorFinal;
 }
 
 // Peso total de la mezcla (kg/m³, aprox — agua en L se trata como kg) — se usa para sacar
@@ -227,9 +234,13 @@ function agregarInsumoCosteo() { _insumosCosteoActual.push({ nombre: '', cantida
 
 // ── Cálculo del costeo completo ──
 function _leerFormularioCosteo() {
+  // Se resuelve aquí también (no solo en guardarCosteoProducto()) para que el cálculo en vivo
+  // (_actualizarResumenCosteo()) ya sepa si el producto genera IVA o no mientras se arma el
+  // costeo, sin esperar a guardar (ver calcularCosteoProducto() → productoGeneraIva).
+  const productoEnCurso = _productoDesdeTextoCosteo(document.getElementById('m-costeo-producto').value);
   return {
-    productoCodigo: '', // se completa en guardarCosteo()
-    productoNombre: '',
+    productoCodigo: productoEnCurso ? productoEnCurso.codigo : '',
+    productoNombre: productoEnCurso ? productoEnCurso.nombre : '',
     tipoEstructura: document.getElementById('m-costeo-tipo').value || 'vibrocompactado',
     disenoMezclaCodigo: document.getElementById('m-costeo-diseno').value,
     rendimiento: {
@@ -267,6 +278,13 @@ function calcularCosteoProducto(c) {
   const unidadesCochada = r.pesoUnidadKg > 0 ? pesoCochadaKg / r.pesoUnidadKg : 0;
   const unidadesDia = (r.ciclosDia || 0) * (r.unidadesCiclo || 0);
 
+  // Si el producto GENERA IVA, el IVA de sus insumos es descontable → se asume el precio SIN
+  // IVA. Si es EXCLUIDO de IVA, ese IVA no es descontable → se asume el precio CON IVA (ver
+  // _precioInsumoPorNombre()). El campo `iva` ('SI'/'NO') ya existe en el catálogo de
+  // productos — se arrastra tal cual, no se vuelve a preguntar en el costeo.
+  const productoCosteo = CATALOGO.find(p => p.codigo === c.productoCodigo);
+  const productoGeneraIva = productoCosteo?.iva === 'SI';
+
   // Materia Prima — cemento/agua/adiciones/aditivos por PESO (se compran por peso);
   // arena/triturado por VOLUMEN (se compran por volumen en la región, 2026-08-02). Arena,
   // triturado y adiciones viven en listas (`materiales.agregados[]`/`adiciones[]`) — puede
@@ -279,7 +297,7 @@ function calcularCosteoProducto(c) {
     _MATERIALES_COSTEO_PESO.forEach(k => {
       if (!((m[k] || 0) > 0)) return;
       const cantidad = ((m[k] || 0) * capacidadCochadaM3) / unidadesCochada;
-      const precio = _precioInsumoPorNombre(m[`${k}Producto`]);
+      const precio = _precioInsumoPorNombre(m[`${k}Producto`], productoGeneraIva);
       const costo = cantidad * precio;
       materiaPrima += costo;
       materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo });
@@ -287,7 +305,7 @@ function calcularCosteoProducto(c) {
     (m.agregados || []).forEach(a => {
       if (!((Number(a.volumen) || 0) > 0)) return;
       const cantidad = ((Number(a.volumen) || 0) * capacidadCochadaM3) / unidadesCochada;
-      const precio = _precioInsumoPorNombre(a.producto);
+      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
       const costo = cantidad * precio;
       materiaPrima += costo;
       materiaPrimaDetalle.push({ nombre: a.producto || _LABEL_ROL_AGREGADO_COSTEO[a.rolBase] || a.rolBase, unidad: 'm³', cantidad, precio, costo });
@@ -295,7 +313,7 @@ function calcularCosteoProducto(c) {
     (m.adiciones || []).forEach(a => {
       if (!((Number(a.cantidad) || 0) > 0)) return;
       const cantidad = ((Number(a.cantidad) || 0) * capacidadCochadaM3) / unidadesCochada;
-      const precio = _precioInsumoPorNombre(a.producto);
+      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
       const costo = cantidad * precio;
       materiaPrima += costo;
       materiaPrimaDetalle.push({ nombre: a.producto || 'Adición', unidad: 'kg', cantidad, precio, costo });
@@ -303,7 +321,7 @@ function calcularCosteoProducto(c) {
     (m.aditivos || []).forEach(a => {
       if (!((Number(a.dosis) || 0) > 0)) return;
       const cantidad = ((Number(a.dosis) || 0) * capacidadCochadaM3) / unidadesCochada;
-      const precio = _precioInsumoPorNombre(a.producto);
+      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
       const costo = cantidad * precio;
       materiaPrima += costo;
       materiaPrimaDetalle.push({ nombre: a.producto || a.tipo, unidad: 'kg', cantidad, precio, costo });
@@ -339,12 +357,14 @@ function calcularCosteoProducto(c) {
   });
 
   // Insumos y consumos — "por estiba" (empaque) ÷ unidades/estiba, "por día" (consumos) ÷ unidades/día.
+  // Misma regla de IVA descontable/no descontable que la Materia Prima (ver arriba).
   let empaque = 0, consumos = 0;
   const empaqueDetalle = [], consumosDetalle = [];
   (c.insumos || []).forEach(row => {
     const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
     if (!ins) return;
-    const precio = calcularCostoInsumo(ins).valorFinal;
+    const costoIns = calcularCostoInsumo(ins);
+    const precio = productoGeneraIva ? costoIns.costoSinIva : costoIns.valorFinal;
     if (row.reparto === 'dia') {
       if (unidadesDia > 0) { const costo = (row.cantidad * precio) / unidadesDia; consumos += costo; consumosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, precio, costo }); }
     } else {
@@ -374,11 +394,21 @@ function _actualizarResumenCosteo() {
   _actualizarPreviewDiseno();
   const c = _leerFormularioCosteo();
   const k = calcularCosteoProducto(c);
+  const producto = _productoDesdeTextoCosteo(document.getElementById('m-costeo-producto').value);
   document.getElementById('costeo-calculo-vivo').innerHTML = `
     <div class="fila"><span>Peso de la cochada (${k.capacidadCochadaM3} m³ × ${k.pesoTotalM3.toLocaleString('es-CO')} kg/m³)</span><span>${k.pesoCochadaKg.toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg</span></div>
     <div class="fila"><span>Unidades / cochada</span><span>${k.unidadesCochada.toLocaleString('es-CO', { maximumFractionDigits: 1 })} unidades</span></div>
     <div class="fila"><span>Unidades / día (ciclos/día × unidades/ciclo)</span><span>${k.unidadesDia.toLocaleString('es-CO')} unidades</span></div>`;
+  // El régimen de IVA del PRODUCTO (ya definido en el catálogo) decide si los insumos se
+  // costean con o sin IVA — ver calcularCosteoProducto()/_precioInsumoPorNombre(). Se muestra
+  // aquí explícito para que no sea una regla invisible.
+  const notaIva = producto
+    ? (producto.iva === 'SI'
+      ? '🧾 Producto <b>genera IVA</b> → insumos y materias primas costeados <b>SIN IVA</b> (descontable)'
+      : '🧾 Producto <b>excluido de IVA</b> → insumos y materias primas costeados <b>CON IVA</b> (no descontable)')
+    : '🧾 Selecciona un producto para saber si sus insumos se costean con o sin IVA';
   div.innerHTML = `
+    <div style="font-size:11px;color:var(--gris-medio);margin-bottom:8px">${notaIva}</div>
     <div class="fila"><span>🧱 Materia Prima</span><span>${_fmtCosteoProd(k.materiaPrima)}</span></div>
     <div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_fmtCosteoProd(k.desperdicio)}</span></div>
     <div class="fila"><span>👷 Mano de Obra</span><span>${_fmtCosteoProd(k.manoObra)}</span></div>
@@ -387,7 +417,6 @@ function _actualizarResumenCosteo() {
     <div class="fila"><span>📦 Insumos de empaque</span><span>${_fmtCosteoProd(k.empaque)}</span></div>
     <div class="fila"><span>⚡ Consumos (energía/agua/combustible)</span><span>${_fmtCosteoProd(k.consumos)}</span></div>
     <div class="fila fila-total"><span>Costo total por unidad</span><span>${_fmtCosteoProd(k.totalUnidad)}</span></div>`;
-  const producto = _productoDesdeTextoCosteo(document.getElementById('m-costeo-producto').value);
   _pintarPrecioSugerido('costeo-precio-sugerido', c, k, producto);
 }
 
@@ -667,10 +696,16 @@ function abrirDetalleCosteoProducto(codigo) {
       </div>
     </div>`;
 
+  const productoDetalle = CATALOGO.find(p => p.codigo === c.productoCodigo);
+  const notaIvaDetalle = productoDetalle
+    ? (productoDetalle.iva === 'SI'
+      ? '🧾 Producto <b>genera IVA</b> → insumos costeados <b>SIN IVA</b> (descontable)'
+      : '🧾 Producto <b>excluido de IVA</b> → insumos costeados <b>CON IVA</b> (no descontable)')
+    : '';
   const filasMP = k.materiaPrimaDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, f.unidad, f.precio, f.costo)).join('')
     + `<tr style="border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right;color:var(--gris-medio)">+ Desperdicio (${c.pctDesperdicio}%)</td><td style="text-align:right;font-weight:700">${_fmtCosteoProd(k.desperdicio)}</td></tr>
        <tr style="font-weight:700"><td colspan="3" style="text-align:right">Subtotal Materia Prima</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.materiaPrima + k.desperdicio)}</td></tr>`;
-  const seccionMP = _seccionDetalleCosteo('🧱 Materia Prima <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(por unidad de producto)</span>', filasMP, 'Sin Diseño de Mezcla o sin materiales con cantidad.');
+  const seccionMP = `<div style="font-size:11px;color:var(--gris-medio);margin:14px 0 -8px">${notaIvaDetalle}</div>` + _seccionDetalleCosteo('🧱 Materia Prima <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(por unidad de producto)</span>', filasMP, 'Sin Diseño de Mezcla o sin materiales con cantidad.');
 
   const filasMO = k.manoObraDetalle.map(f => _filaDetalleCosteo(f.nombre, null, null, f.costoDia ? f.costoDia : null, f.costo, f.noEncontrado)).join('')
     + (k.manoObraDetalle.length ? `<tr style="border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right;color:var(--gris-medio)">+ Herramienta Menor (${c.pctHerramientaMenor}%)</td><td style="text-align:right;font-weight:700">${_fmtCosteoProd(k.herramientaMenor)}</td></tr>
