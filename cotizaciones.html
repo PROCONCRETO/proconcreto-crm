@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260802a">
+<link rel="stylesheet" href="css/estilos.css?v=20260802b">
 </head>
 <body>
 
@@ -1278,6 +1278,21 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-detalle-cuadrilla">
+  <div class="modal" style="width:560px;max-width:95vw">
+    <div class="modal-titulo" id="modal-detalle-cuadrilla-titulo">Discriminado de Cuadrilla</div>
+    <div id="detalle-cuadrilla-resumen" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--gris-medio)"></div>
+    <table class="tabla-items" style="width:100%">
+      <thead><tr><th>Rol</th><th>Nivel salarial</th><th style="text-align:right;width:70px">Personas</th><th style="text-align:right;width:110px">Valor/mes</th><th style="text-align:right;width:80px">% del total</th></tr></thead>
+      <tbody id="detalle-cuadrilla-body"></tbody>
+    </table>
+    <div style="font-size:11px;color:var(--gris-medio);margin-top:8px">Valor/mes de cada rol = Personas × Valor/mes real del Nivel Salarial asignado (personas puede ser fraccionaria, ej. 0,1 para un supervisor compartido entre varias cuadrillas). El detalle salarial de cada Nivel se ve con el ➕ en Niveles Salariales.</div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-detalle-cuadrilla')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-maquina">
   <div class="modal" style="width:640px;max-width:95vw">
     <div class="modal-titulo" id="modal-maquina-titulo">🔧 Nueva Máquina</div>
@@ -2035,26 +2050,26 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260802a"></script>
-<script src="js/catalogo.js?v=20260802a"></script>
-<script src="js/navegacion.js?v=20260802a"></script>
-<script src="js/ordenes-produccion.js?v=20260802a"></script>
-<script src="js/produccion-diaria.js?v=20260802a"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260802a"></script>
-<script src="js/costeo-mano-obra.js?v=20260802a"></script>
-<script src="js/costeo-maquinaria.js?v=20260802a"></script>
-<script src="js/costeo-referencia.js?v=20260802a"></script>
-<script src="js/calidad-mezclas.js?v=20260802a"></script>
-<script src="js/calidad-estadisticas.js?v=20260802a"></script>
-<script src="js/calidad-trazabilidad.js?v=20260802a"></script>
-<script src="js/logistica.js?v=20260802a"></script>
-<script src="js/estadisticas-logistica.js?v=20260802a"></script>
-<script src="js/auth.js?v=20260802a"></script>
-<script src="js/datos-realtime.js?v=20260802a"></script>
-<script src="js/cotizador.js?v=20260802a"></script>
-<script src="js/historico-clientes-stats.js?v=20260802a"></script>
+<script src="js/config.js?v=20260802b"></script>
+<script src="js/catalogo.js?v=20260802b"></script>
+<script src="js/navegacion.js?v=20260802b"></script>
+<script src="js/ordenes-produccion.js?v=20260802b"></script>
+<script src="js/produccion-diaria.js?v=20260802b"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260802b"></script>
+<script src="js/costeo-mano-obra.js?v=20260802b"></script>
+<script src="js/costeo-maquinaria.js?v=20260802b"></script>
+<script src="js/costeo-referencia.js?v=20260802b"></script>
+<script src="js/calidad-mezclas.js?v=20260802b"></script>
+<script src="js/calidad-estadisticas.js?v=20260802b"></script>
+<script src="js/calidad-trazabilidad.js?v=20260802b"></script>
+<script src="js/logistica.js?v=20260802b"></script>
+<script src="js/estadisticas-logistica.js?v=20260802b"></script>
+<script src="js/auth.js?v=20260802b"></script>
+<script src="js/datos-realtime.js?v=20260802b"></script>
+<script src="js/cotizador.js?v=20260802b"></script>
+<script src="js/historico-clientes-stats.js?v=20260802b"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
-<script src="js/migracion-consecutivos.js?v=20260802a"></script>
+<script src="js/migracion-consecutivos.js?v=20260802b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -2062,9 +2077,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<script src="js/pdf.js?v=20260802a"></script>
-<script src="js/rut-parser.js?v=20260802a"></script>
-<script src="js/compresor-pdf.js?v=20260802a"></script>
-<script src="js/lector-informes.js?v=20260802a"></script>
+<script src="js/pdf.js?v=20260802b"></script>
+<script src="js/rut-parser.js?v=20260802b"></script>
+<script src="js/compresor-pdf.js?v=20260802b"></script>
+<script src="js/lector-informes.js?v=20260802b"></script>
 </body>
 </html>

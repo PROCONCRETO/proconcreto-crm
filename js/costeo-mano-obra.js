@@ -374,12 +374,47 @@ function renderCuadrillas() {
       <td style="text-align:right">${_fmt(t.anual)}</td>
       <td>
         <div class="flex-gap">
+          <button class="btn btn-secundario btn-xs" onclick="abrirDetalleCuadrilla('${cu.nombre.replace(/'/g, "\\'")}')" title="Ver qué conforma esta cuadrilla">➕</button>
           <button class="btn btn-primario btn-xs" onclick="editarCuadrilla('${cu.nombre.replace(/'/g, "\\'")}')">✏️</button>
           <button class="btn btn-rojo btn-xs" onclick="eliminarCuadrilla('${cu.nombre.replace(/'/g, "\\'")}')">🗑️</button>
         </div>
       </td>
     </tr>`;
   }).join('');
+}
+
+// Discriminado de una cuadrilla — qué roles la conforman y cuánto pesa cada uno en el total
+// mensual, mismo espíritu que abrirDetalleClase() pero por rol en vez de por concepto de costo.
+function abrirDetalleCuadrilla(nombre) {
+  const cu = CUADRILLAS_PRODUCTIVAS.find(c => c.nombre === nombre);
+  if (!cu) return;
+  const t = _totalCuadrilla(cu);
+  document.getElementById('modal-detalle-cuadrilla-titulo').textContent = `Discriminado de Cuadrilla — ${cu.nombre}`;
+  document.getElementById('detalle-cuadrilla-resumen').innerHTML = `
+    <span><strong>Hora:</strong> ${_fmt(t.hora)}</span>
+    <span><strong>Día:</strong> ${_fmt(t.diario)} (÷ ${_diasLaboradosNeto(PARAMETROS_MO)} días netos)</span>
+    <span><strong>Semana:</strong> ${_fmt(t.semanal)}</span>
+    <span><strong>Mes:</strong> ${_fmt(t.mensual)}</span>
+    <span><strong>Año:</strong> ${_fmt(t.anual)}</span>`;
+  const filas = (cu.roles || []).map(r => {
+    const clase = _claseCalculada(r.clase);
+    const valorMes = (Number(r.personas) || 0) * (clase?.valorRealMensual || 0);
+    return { rol: r.rol || '—', claseNombre: r.clase || '—', personas: Number(r.personas) || 0, valorMes, existe: !!clase };
+  });
+  document.getElementById('detalle-cuadrilla-body').innerHTML = filas.map(f => `
+    <tr>
+      <td>${f.rol}</td>
+      <td>${f.claseNombre}${f.existe ? '' : ' <span style="color:var(--rojo);font-size:11px">(nivel salarial eliminado)</span>'}</td>
+      <td style="text-align:right">${f.personas.toFixed(2)}</td>
+      <td style="text-align:right">${_fmt(f.valorMes)}</td>
+      <td style="text-align:right">${t.mensual ? (f.valorMes / t.mensual * 100).toFixed(1) : '0.0'}%</td>
+    </tr>`).join('') + `
+    <tr style="font-weight:700;border-top:2px solid var(--gris-borde)">
+      <td colspan="3">TOTAL (valor/mes)</td>
+      <td style="text-align:right">${_fmt(t.mensual)}</td>
+      <td style="text-align:right">100.0%</td>
+    </tr>`;
+  document.getElementById('modal-detalle-cuadrilla').classList.add('abierto');
 }
 
 function _totalCuadrilla(cu) {
