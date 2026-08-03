@@ -99,6 +99,10 @@ function _elegirTipoEstructuraCosteo(tipo) {
 // adiciones, como el cemento, se costean por PESO (se compran por peso).
 const _MATERIALES_COSTEO_PESO = ['cemento', 'agua'];
 const _LABEL_MAT_COSTEO = { cemento: 'Cemento', agua: 'Agua' };
+// Unidad real que usa la receta para cada material — solo Agua tiene una unidad de compra
+// habitual (m³, acueducto) distinta de su unidad de receta (L); Cemento se compra y se dosifica
+// igual en kg, no necesita conversión. Ver _precioInsumoPorNombre().
+const _UNIDAD_RECETA_MATERIAL = { agua: 'L' };
 const _LABEL_ROL_AGREGADO_COSTEO = { arena: 'Arena', grava: 'Triturado Grueso' };
 
 // Regla tributaria real (2026-08-02, a pedido del usuario): si el producto final GENERA IVA,
@@ -106,11 +110,26 @@ const _LABEL_ROL_AGREGADO_COSTEO = { arena: 'Arena', grava: 'Triturado Grueso' }
 // — no es un costo real, así que se asume el precio SIN IVA del insumo. Si el producto es
 // EXCLUIDO de IVA, ese IVA no es descontable — sí es un costo real, así que se asume el
 // precio CON IVA. `productoGeneraIva` viene del campo `iva` ('SI'/'NO') del catálogo.
-function _precioInsumoPorNombre(nombre, productoGeneraIva) {
+//
+// Conversión de unidad (2026-08-03, a pedido del usuario): el Agua del Diseño de Mezcla
+// siempre está en LITROS (mismo criterio que Ajuste Diario/Formato de Producción), pero el
+// acueducto factura por m³ — si en Costos de Referencia el ítem quedó cargado en m³ (precio
+// real de la factura, sin tener que hacer la cuenta a mano), aquí se convierte el precio a
+// $/L antes de costear. Es una conversión física EXACTA (1 m³ = 1000 L), a diferencia de
+// kg↔m³ que necesitaría una densidad supuesta — por eso solo se automatiza para volumen.
+// `unidadReceta` es la unidad que de verdad usa la receta para ese material (ej. 'L' para
+// agua); si no se pasa, o si el insumo ya está en esa unidad, no se convierte nada.
+const _CONVERSION_UNIDAD_VOLUMEN = { 'm3->L': 1000, 'L->m3': 0.001 };
+function _precioInsumoPorNombre(nombre, productoGeneraIva, unidadReceta) {
   const i = INSUMOS_COSTOS.find(x => x.nombre === nombre);
   if (!i) return 0;
   const costo = calcularCostoInsumo(i);
-  return productoGeneraIva ? costo.costoSinIva : costo.valorFinal;
+  let precio = productoGeneraIva ? costo.costoSinIva : costo.valorFinal;
+  if (unidadReceta && i.unidad && i.unidad !== unidadReceta) {
+    const factor = _CONVERSION_UNIDAD_VOLUMEN[`${i.unidad}->${unidadReceta}`];
+    if (factor) precio = precio / factor;
+  }
+  return precio;
 }
 
 // Peso total de la mezcla (kg/m³, aprox — agua en L se trata como kg) — se usa para sacar
@@ -304,7 +323,7 @@ function calcularCosteoProducto(c) {
     _MATERIALES_COSTEO_PESO.forEach(k => {
       if (!((m[k] || 0) > 0)) return;
       const cantidad = ((m[k] || 0) * capacidadCochadaM3) / unidadesBache;
-      const precio = _precioInsumoPorNombre(m[`${k}Producto`], productoGeneraIva);
+      const precio = _precioInsumoPorNombre(m[`${k}Producto`], productoGeneraIva, _UNIDAD_RECETA_MATERIAL[k]);
       const costo = cantidad * precio;
       materiaPrima += costo;
       materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo });
