@@ -418,7 +418,7 @@ function renderClientes(lista) {
       <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">
         <button class="btn btn-primario btn-xs" onclick="usarCliente('${c.id}')">+ Cotizar</button>
         <button class="btn btn-secundario btn-xs" onclick="editarCliente('${c.id}')">✏️ Editar</button>
-        <button class="btn btn-secundario btn-xs" onclick="verCotizacionesCliente('${c.nombre.replace(/'/g,"\\'")}')">📋 Ver cots.</button>
+        <button class="btn btn-secundario btn-xs" onclick="verCotizacionesCliente('${_escNombreOnclick(c.nombre)}')">📋 Ver cots.</button>
         <button class="btn btn-rojo btn-xs" onclick="eliminarCliente('${c.id}')">🗑️</button>
       </div>
       ${latestCots.length ? `<div style="font-size:11px;color:var(--gris-medio);margin-top:6px">${cotLabel}</div>` : ''}

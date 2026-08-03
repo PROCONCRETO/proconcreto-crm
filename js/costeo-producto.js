@@ -542,7 +542,7 @@ function renderCosteoProductos() {
   tbody.innerHTML = data.map(c => {
     const k = calcularCosteoProducto(c);
     const tipo = TIPOS_ESTRUCTURA_COSTEO[c.tipoEstructura] || TIPOS_ESTRUCTURA_COSTEO.vibrocompactado;
-    const nombreEsc = c.productoCodigo.replace(/'/g, "\\'");
+    const nombreEsc = _escNombreOnclick(c.productoCodigo);
     return `<tr>
       <td style="font-weight:600">${c.productoNombre}</td>
       <td><span class="badge-tipo" style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:600;background:${tipo.bg};color:${tipo.fg}">${tipo.label}</span></td>

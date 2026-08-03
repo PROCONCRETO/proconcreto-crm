@@ -11,6 +11,16 @@ let CLASES_SALARIALES = [];
 let CUADRILLAS_PRODUCTIVAS = [];
 let _rolesCuadrillaActual = [];
 
+// Escapa un nombre para meterlo dentro de onclick="fn('...')" — comilla simple (rompería el
+// string JS de una sola comilla) y comilla doble (rompería el atributo onclick="...", que va
+// entre comillas dobles). Nombres reales con comilla doble (ej. 'Triturado Grueso 3/8"', la
+// marca de pulgada) dejaban el botón ✏️/🗑️ roto sin este segundo escape (bug real reportado
+// 2026-08-03: "hay unos precios unitarios que no me deja editar"). Se usa en cualquier botón
+// que arme un onclick a partir de un nombre que puede traer comillas.
+function _escNombreOnclick(nombre) {
+  return (nombre || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
 function _defaultParametrosMO() {
   return {
     smmlv: 1751000,
@@ -236,9 +246,9 @@ function renderClasesSalariales() {
       <td style="text-align:right">${_fmt(r.valorRealAnual)}</td>
       <td>
         <div class="flex-gap">
-          <button class="btn btn-secundario btn-xs" onclick="abrirDetalleClase('${c.nombre.replace(/'/g, "\\'")}')" title="Ver discriminado del costo">➕</button>
-          <button class="btn btn-primario btn-xs" onclick="editarClaseSalarial('${c.nombre.replace(/'/g, "\\'")}')">✏️</button>
-          <button class="btn btn-rojo btn-xs" onclick="eliminarClaseSalarial('${c.nombre.replace(/'/g, "\\'")}')">🗑️</button>
+          <button class="btn btn-secundario btn-xs" onclick="abrirDetalleClase('${_escNombreOnclick(c.nombre)}')" title="Ver discriminado del costo">➕</button>
+          <button class="btn btn-primario btn-xs" onclick="editarClaseSalarial('${_escNombreOnclick(c.nombre)}')">✏️</button>
+          <button class="btn btn-rojo btn-xs" onclick="eliminarClaseSalarial('${_escNombreOnclick(c.nombre)}')">🗑️</button>
         </div>
       </td>
     </tr>`;
@@ -375,9 +385,9 @@ function renderCuadrillas() {
       <td style="text-align:right">${_fmt(t.anual)}</td>
       <td>
         <div class="flex-gap">
-          <button class="btn btn-secundario btn-xs" onclick="abrirDetalleCuadrilla('${cu.nombre.replace(/'/g, "\\'")}')" title="Ver qué conforma esta cuadrilla">➕</button>
-          <button class="btn btn-primario btn-xs" onclick="editarCuadrilla('${cu.nombre.replace(/'/g, "\\'")}')">✏️</button>
-          <button class="btn btn-rojo btn-xs" onclick="eliminarCuadrilla('${cu.nombre.replace(/'/g, "\\'")}')">🗑️</button>
+          <button class="btn btn-secundario btn-xs" onclick="abrirDetalleCuadrilla('${_escNombreOnclick(cu.nombre)}')" title="Ver qué conforma esta cuadrilla">➕</button>
+          <button class="btn btn-primario btn-xs" onclick="editarCuadrilla('${_escNombreOnclick(cu.nombre)}')">✏️</button>
+          <button class="btn btn-rojo btn-xs" onclick="eliminarCuadrilla('${_escNombreOnclick(cu.nombre)}')">🗑️</button>
         </div>
       </td>
     </tr>`;

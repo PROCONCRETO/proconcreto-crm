@@ -93,8 +93,8 @@ function renderCosteoMaquinaria() {
       <td style="text-align:right;font-weight:700;color:var(--azul)">${_fmtMaq(c.costoUnidad)}</td>
       <td>
         <div class="flex-gap">
-          <button class="btn btn-primario btn-xs" onclick="editarMaquina('${m.nombre.replace(/'/g, "\\'")}')">✏️</button>
-          <button class="btn btn-rojo btn-xs" onclick="eliminarMaquina('${m.nombre.replace(/'/g, "\\'")}')">🗑️</button>
+          <button class="btn btn-primario btn-xs" onclick="editarMaquina('${_escNombreOnclick(m.nombre)}')">✏️</button>
+          <button class="btn btn-rojo btn-xs" onclick="eliminarMaquina('${_escNombreOnclick(m.nombre)}')">🗑️</button>
         </div>
       </td>
     </tr>`;

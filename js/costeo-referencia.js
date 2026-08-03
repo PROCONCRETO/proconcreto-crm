@@ -91,7 +91,11 @@ function renderCosteoReferencia() {
   }
   body.innerHTML = filtradas.map(x => {
     const cat = CATEGORIAS_REFERENCIA[x.categoria];
-    const nombreEsc = x.nombre.replace(/'/g, "\\'");
+    // Items reales como 'Triturado Grueso 3/8"' tienen comilla doble en el nombre (la marca
+    // de pulgada) — _escNombreOnclick() (js/costeo-mano-obra.js) escapa comilla simple Y
+    // doble; sin el segundo escape el botón ✏️/🗑️ quedaba roto/sin funcionar (bug real
+    // reportado 2026-08-03: "hay unos precios unitarios que no me deja editar").
+    const nombreEsc = _escNombreOnclick(x.nombre);
     const acciones = x.soloLectura
       ? `<span style="font-size:11px;color:var(--gris-medio)">🔒 <b onclick="_irSubnavCosteo('${cat.origen}')" style="color:var(--azul-medio);font-weight:600;cursor:pointer">Ver en ${cat.origenLabel} →</b></span>`
       : `<div class="flex-gap">
