@@ -287,6 +287,13 @@ async function cargarCatalogo() {
 // ═══════════════════════════════
 function _normHdr(s) { return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,''); }
 
+// Un producto "Desde Costeo" no se edita a mano — su precio lo calcula el Costeo de Producto
+// en Centro de Costos (2026-08-04, a pedido del usuario: bloquear la edición manual para que
+// no se desincronice del costo real).
+function _productoTieneCosteo(codigo) {
+  return typeof COSTEO_PRODUCTOS !== 'undefined' && COSTEO_PRODUCTOS.some(c => c.productoCodigo === codigo);
+}
+
 function renderProductosAdmin() {
   const tbody = document.getElementById('productos-adm-body');
   const resumen = document.getElementById('prod-adm-resumen');
@@ -314,12 +321,24 @@ function renderProductosAdmin() {
   const esDuplicado = p => conteoNombres[_normNombreDup(p.nombre)] > 1;
   const totalDuplicados = CATALOGO.filter(esDuplicado).length;
 
+  // Productos con precio arrastrado desde un Costeo de Producto — se resaltan y se ordenan
+  // arriba del listado, en el mismo orden en que se fueron creando los costeos (COSTEO_PRODUCTOS
+  // ya llega ordenado por `creado` ascendente desde Supabase, ver datos-realtime.js) (2026-08-04,
+  // a pedido del usuario: "saber cuales ya están arrastrando el precio desde el costeo").
+  const _ordenCosteo = new Map(COSTEO_PRODUCTOS.map((c, i) => [c.productoCodigo, i]));
+  const tieneCosteo = p => _ordenCosteo.has(p.codigo);
+
   let data = [...CATALOGO];
   if (!verOcultos) data = data.filter(p => p.activo !== false);
   if (grupo) data = data.filter(p => p.grupo === grupo);
   if (q) data = data.filter(p => (p.nombre + ' ' + p.codigo + ' ' + (p.medidas||'')).toLowerCase().includes(q));
   if (soloDuplicados) data = data.filter(esDuplicado);
-  data.sort((a,b) => a.nombre.localeCompare(b.nombre) || a.grupo.localeCompare(b.grupo));
+  data.sort((a, b) => {
+    const ca = _ordenCosteo.has(a.codigo), cb = _ordenCosteo.has(b.codigo);
+    if (ca && cb) return _ordenCosteo.get(a.codigo) - _ordenCosteo.get(b.codigo);
+    if (ca !== cb) return ca ? -1 : 1;
+    return a.nombre.localeCompare(b.nombre) || a.grupo.localeCompare(b.grupo);
+  });
 
   const activos = CATALOGO.filter(p => p.activo !== false).length;
   const ocultos = CATALOGO.length - activos;
@@ -333,14 +352,19 @@ function renderProductosAdmin() {
   tbody.innerHTML = data.map(p => {
     const inactivo = p.activo === false;
     const dup = esDuplicado(p);
-    return `<tr style="border-top:1px solid var(--gris-borde);${inactivo?'opacity:.55':''}${dup ? ';background:#FFF8E1' : ''}">
+    const costeo = tieneCosteo(p);
+    return `<tr style="border-top:1px solid var(--gris-borde);${inactivo?'opacity:.55':''}${dup ? ';background:#FFF8E1' : ''}${costeo ? ';border-left:4px solid var(--azul)' : ';border-left:4px solid transparent'}">
       <td style="font-weight:600;color:var(--azul);font-size:12px">${p.codigo}</td>
-      <td><div style="font-weight:600;font-size:13px">${p.nombre}${dup ? ' <span style="font-size:10px;font-weight:700;color:#E65100;background:#FFF3E0;padding:1px 6px;border-radius:8px;vertical-align:middle" title="Otro producto activo/oculto tiene este mismo nombre">⚠️ Duplicado</span>' : ''}</div><div style="font-size:11px;color:var(--gris-medio)">${p.medidas||''}</div></td>
+      <td><div style="font-weight:600;font-size:13px">${p.nombre}${costeo ? ' <span style="font-size:10px;font-weight:700;color:var(--azul);background:#E3F2FD;padding:1px 6px;border-radius:8px;vertical-align:middle" title="El precio de este producto se calcula desde un Costeo de Producto guardado (Centro de Costos)">🏗️ Desde Costeo</span>' : ''}${dup ? ' <span style="font-size:10px;font-weight:700;color:#E65100;background:#FFF3E0;padding:1px 6px;border-radius:8px;vertical-align:middle" title="Otro producto activo/oculto tiene este mismo nombre">⚠️ Duplicado</span>' : ''}</div><div style="font-size:11px;color:var(--gris-medio)">${p.medidas||''}</div></td>
       <td style="color:var(--gris-medio)">${p.grupo}</td>
       <td style="text-align:center">${p.unidad}</td>
       <td style="text-align:center"><span style="color:${p.iva==='SI'?'var(--rojo)':'var(--verde)'};font-weight:700;font-size:12px">${p.iva}</span></td>
-      <td style="text-align:right"><input type="number" value="${p.lista}" onchange="actualizarPrecioProducto('${p.codigo}','lista',this.value)" style="width:100px;text-align:right;padding:4px 6px;border:1px solid var(--gris-borde);border-radius:4px"></td>
-      <td style="text-align:right"><input type="number" value="${p.minimo}" onchange="actualizarPrecioProducto('${p.codigo}','minimo',this.value)" style="width:100px;text-align:right;padding:4px 6px;border:1px solid var(--gris-borde);border-radius:4px"></td>
+      <td style="text-align:right">${costeo
+        ? `<input type="number" value="${p.lista}" disabled title="Se calcula desde el Costeo de Producto — edítalo en Centro de Costos › Costeo de Producto" style="width:100px;text-align:right;padding:4px 6px;border:1px solid var(--gris-borde);border-radius:4px;background:#F5F5F5;color:var(--gris-medio);cursor:not-allowed">`
+        : `<input type="number" value="${p.lista}" onchange="actualizarPrecioProducto('${p.codigo}','lista',this.value)" style="width:100px;text-align:right;padding:4px 6px;border:1px solid var(--gris-borde);border-radius:4px">`}</td>
+      <td style="text-align:right">${costeo
+        ? `<input type="number" value="${p.minimo}" disabled title="Se calcula desde el Costeo de Producto — edítalo en Centro de Costos › Costeo de Producto" style="width:100px;text-align:right;padding:4px 6px;border:1px solid var(--gris-borde);border-radius:4px;background:#F5F5F5;color:var(--gris-medio);cursor:not-allowed">`
+        : `<input type="number" value="${p.minimo}" onchange="actualizarPrecioProducto('${p.codigo}','minimo',this.value)" style="width:100px;text-align:right;padding:4px 6px;border:1px solid var(--gris-borde);border-radius:4px">`}</td>
       <td><span class="badge" style="background:${inactivo?'#FFEBEE':'#E8F5E9'};color:${inactivo?'#C62828':'#2E7D32'}">${inactivo?'Oculto':'Activo'}</span></td>
       <td><div class="flex-gap">
         <button class="btn btn-primario btn-xs" onclick="abrirModalProducto('${p.codigo}')">✏️ Editar</button>
@@ -394,6 +418,11 @@ function abrirModalProducto(codigo) {
   document.getElementById('mp-iva').value = p?.iva || 'NO';
   document.getElementById('mp-lista').value = p?.lista ?? '';
   document.getElementById('mp-minimo').value = p?.minimo ?? '';
+  const bloqueadoPorCosteo = esEdit && _productoTieneCosteo(codigo);
+  document.getElementById('mp-lista').disabled = bloqueadoPorCosteo;
+  document.getElementById('mp-minimo').disabled = bloqueadoPorCosteo;
+  const avisoCosteo = document.getElementById('mp-aviso-costeo');
+  if (avisoCosteo) avisoCosteo.style.display = bloqueadoPorCosteo ? 'block' : 'none';
   if (typeof poblarSelectDisenos === 'function') poblarSelectDisenos('mp-diseno-mezcla');
   document.getElementById('mp-diseno-mezcla').value = p?.disenoMezcla || '';
   document.getElementById('modal-producto').classList.add('abierto');
@@ -403,10 +432,14 @@ function guardarProducto() {
   const codigo = document.getElementById('mp-codigo').value.trim();
   const nombre = document.getElementById('mp-nombre').value.trim();
   const grupo = document.getElementById('mp-grupo').value.trim();
-  const lista = parseFloat(document.getElementById('mp-lista').value);
-  const minimo = parseFloat(document.getElementById('mp-minimo').value);
-  if (!codigo || !nombre || !grupo || !(lista >= 0) || !(minimo >= 0)) { alert('Completa: Código, Nombre, Grupo, Precio Lista y Precio Mínimo.'); return; }
   const orig = document.getElementById('mp-codigo-orig').value;
+  const existente = orig ? CATALOGO.find(x => x.codigo === orig) : null;
+  // Si el producto tiene Costeo, el precio no se toca desde este modal aunque el campo se
+  // vuelva a habilitar por algún medio — el catálogo se mantiene igual al valor ya guardado.
+  const bloqueadoPorCosteo = !!existente && _productoTieneCosteo(orig);
+  const lista = bloqueadoPorCosteo ? existente.lista : parseFloat(document.getElementById('mp-lista').value);
+  const minimo = bloqueadoPorCosteo ? existente.minimo : parseFloat(document.getElementById('mp-minimo').value);
+  if (!codigo || !nombre || !grupo || !(lista >= 0) || !(minimo >= 0)) { alert('Completa: Código, Nombre, Grupo, Precio Lista y Precio Mínimo.'); return; }
   if (!orig && CATALOGO.find(x => x.codigo === codigo)) { alert('Ya existe un producto con ese código.'); return; }
   const pesoVal = document.getElementById('mp-peso').value;
   const prod = {
