@@ -175,6 +175,14 @@ El campo "Unidad" de un insumo en Costos de Referencia es solo una etiqueta para
 
 Al elegir el tipo "Vibrocompactado" en un costeo nuevo (o uno guardado sin máquinas), la sección 4 se precarga sola con la línea completa que el usuario definió: `Columbia 16`, `Mezcladora Columbia`, `Anaqueles Columbia`, `Moldes Columbia 16`, `Placas Columbia 16`, `Banda transportadora Columbia 16`, `Minicargador`, `Montacargas 3 TON` (`_MAQUINAS_DEFECTO_VIBROCOMPACTADO` en `js/costeo-producto.js`). Solo se precarga si el costeo todavía no tiene ninguna máquina — si ya hay alguna (editando uno guardado, o si el usuario ya las tocó a mano) no se sobreescribe.
 
+### Buscador de producto — desplegable propio, no `<datalist>` nativo (2026-08-04)
+
+El campo "Producto" (sección 1) filtra sobre `PRODUCTOS` en JS y pinta sus propias sugerencias en `#costeo-producto-sugerencias` (`_filtrarProductosCosteo()`/`_pintarSugerenciasProductoCosteo()`/`_elegirProductoCosteo()` en `js/costeo-producto.js`), en vez del `<input list>+<datalist>` que se usaba antes (mismo patrón que Ajuste Diario/Ensayos). Motivo: el `<datalist>` nativo recorta/trunca los nombres largos en el desplegable del navegador y su ancho no se puede controlar por CSS — a pedido del usuario, para poder leer el nombre completo del producto mientras filtra. Cada sugerencia muestra nombre completo + código + grupo + medidas; soporta flechas ↑/↓ y Enter, y clic (con `onmousedown` para ganarle al blur del input). El contrato interno no cambió: el input sigue guardando exactamente `"codigo — nombre"` y `_productoDesdeTextoCosteo()` sigue resolviéndolo por match exacto contra `PRODUCTOS`.
+
+### Insumos por defecto de la línea Vibrocompactada (2026-08-04)
+
+Mismo criterio que las máquinas: al elegir "Vibrocompactado" en un costeo nuevo (o uno guardado sin insumos), la sección 6 se precarga con los insumos de empaque/consumos/recargos que se repiten igual en todo producto de esta línea (`_INSUMOS_DEFECTO_VIBROCOMPACTADO` en `js/costeo-producto.js`): Zuncho PET 16mm (9, por estiba), Grapa para zuncho 16mm (2, por estiba), Estiba de madera (1, por estiba), Combustible ACPM (16, por día), Agua (5, por día), Energía (200, por día), Ensayo a compresión de bloques (2, por día), Ensayo de absorción (2, por día). Solo se precarga si el costeo todavía no tiene ningún insumo — no sobreescribe uno guardado o ya tocado a mano.
+
 ### Pendiente (no bloquea el uso de Vibrocompactados)
 
 - Las otras 3 estructuras tipo (Pretensados, Pretensados Moldeados, Reforzados) — ni empezadas; usan máquinas Prensoland/bancos de pretensado/acero de refuerzo, con una lógica seguramente distinta a la de ciclos/placas de Columbia. Requiere revisar `BD MEZCLA` / `BD MEZCLA AMOBLAMIENTO` / `BD MEZCLA PRETENSADOS` en el Excel.

@@ -1485,7 +1485,6 @@
 <!-- Costeo de Producto — un solo formulario con todo el flujo, sin pasos (2026-08-02, a
      pedido del usuario: "intentemos montarlo en una sola ventana para tener mayor claridad
      en una sola imagen de los datos ingresados"). -->
-<datalist id="datalist-productos-costeo"></datalist>
 <div class="modal-overlay" id="modal-costeo-producto">
   <div class="modal" style="width:860px;max-width:95vw">
     <div class="modal-titulo" id="modal-costeo-producto-titulo">🏗️ Nuevo Costeo de Producto</div>
@@ -1494,9 +1493,12 @@
     <!-- 1. Producto y tipo -->
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo"><span class="num">1</span> Producto y tipo de estructura</div>
-      <div class="form-grupo" style="margin-bottom:10px">
+      <div class="form-grupo" style="margin-bottom:10px;position:relative">
         <label>Producto *</label>
-        <input type="text" id="m-costeo-producto" list="datalist-productos-costeo" placeholder="Busca por código o nombre..." oninput="cargarProductoCosteo()">
+        <input type="text" id="m-costeo-producto" placeholder="Busca por código o nombre..." autocomplete="off"
+               oninput="_filtrarProductosCosteo()" onfocus="_filtrarProductosCosteo()"
+               onblur="_cerrarSugerenciasProductoCosteoDiferido()" onkeydown="_teclaSugerenciasProductoCosteo(event)">
+        <div id="costeo-producto-sugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--gris-borde);border-radius:var(--radio);max-height:280px;overflow-y:auto;z-index:60;box-shadow:0 4px 14px rgba(0,0,0,.15);margin-top:2px"></div>
       </div>
       <div id="costeo-tipo-chips" style="display:flex;gap:8px;flex-wrap:wrap">
         <div class="tipo-chip" data-tipo="vibrocompactado" onclick="_elegirTipoEstructuraCosteo('vibrocompactado')">🧱 Vibrocompactado</div>
@@ -2256,7 +2258,7 @@
 <script src="js/costeo-mano-obra.js?v=20260804a"></script>
 <script src="js/costeo-maquinaria.js?v=20260804a"></script>
 <script src="js/costeo-referencia.js?v=20260804a"></script>
-<script src="js/costeo-producto.js?v=20260804b"></script>
+<script src="js/costeo-producto.js?v=20260804d"></script>
 <script src="js/calidad-mezclas.js?v=20260804a"></script>
 <script src="js/calidad-estadisticas.js?v=20260804a"></script>
 <script src="js/calidad-trazabilidad.js?v=20260804a"></script>

@@ -25,18 +25,82 @@ function _fmtCosteoProd(n) {
   return '$' + (n || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// ── Buscador de producto (mismo patrón <input>+<datalist> que Ajuste Diario/Ensayos) ──
+// ── Buscador de producto — desplegable propio en vez de <input>+<datalist> nativo. El
+// datalist del navegador recorta/trunca los nombres largos en la lista de sugerencias y su
+// ancho no se puede controlar por CSS (2026-08-04, a pedido del usuario: "permite que se vea
+// el nombre completo del producto en el desplegable que va filtrando").
 function _textoProductoCosteo(p) { return `${p.codigo} — ${p.nombre}`; }
-function poblarDatalistProductosCosteo() {
-  const dl = document.getElementById('datalist-productos-costeo');
-  if (!dl) return;
-  const activos = [...PRODUCTOS].sort((a, b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre));
-  dl.innerHTML = activos.map(p => `<option value="${_textoProductoCosteo(p)}">`).join('');
-}
 function _productoDesdeTextoCosteo(texto) {
   const t = (texto || '').trim();
   if (!t) return null;
   return PRODUCTOS.find(p => _textoProductoCosteo(p) === t) || null;
+}
+
+let _sugerenciasProductoCosteo = [];
+let _indiceSugerenciaCosteo = -1;
+
+function _filtrarProductosCosteo() {
+  const input = document.getElementById('m-costeo-producto');
+  if (!input) return;
+  const q = input.value.trim().toLowerCase();
+  _sugerenciasProductoCosteo = (q
+    ? PRODUCTOS.filter(p => (p.codigo + ' ' + p.nombre + ' ' + (p.medidas || '')).toLowerCase().includes(q))
+    : [...PRODUCTOS]
+  ).sort((a, b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre)).slice(0, 60);
+  _indiceSugerenciaCosteo = -1;
+  _pintarSugerenciasProductoCosteo();
+  cargarProductoCosteo();
+}
+
+function _pintarSugerenciasProductoCosteo() {
+  const box = document.getElementById('costeo-producto-sugerencias');
+  if (!box) return;
+  if (!_sugerenciasProductoCosteo.length) {
+    box.innerHTML = `<div style="padding:10px 12px;color:var(--gris-medio);font-size:12px">Sin resultados.</div>`;
+    box.style.display = 'block';
+    return;
+  }
+  box.innerHTML = _sugerenciasProductoCosteo.map((p, i) => `
+    <div onmousedown="_elegirProductoCosteo(${i})" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--gris-borde);${i === _indiceSugerenciaCosteo ? 'background:var(--azul-suave)' : 'background:white'}">
+      <div style="font-weight:600;font-size:13px">${p.nombre}</div>
+      <div style="font-size:11px;color:var(--gris-medio)">${p.codigo} · ${p.grupo}${p.medidas ? ' · ' + p.medidas : ''}</div>
+    </div>`).join('');
+  box.style.display = 'block';
+}
+
+function _elegirProductoCosteo(i) {
+  const p = _sugerenciasProductoCosteo[i];
+  if (!p) return;
+  document.getElementById('m-costeo-producto').value = _textoProductoCosteo(p);
+  document.getElementById('costeo-producto-sugerencias').style.display = 'none';
+  cargarProductoCosteo();
+}
+
+// Delay para que el onmousedown de una sugerencia alcance a dispararse antes de que el blur
+// del input la oculte.
+function _cerrarSugerenciasProductoCosteoDiferido() {
+  setTimeout(() => {
+    const box = document.getElementById('costeo-producto-sugerencias');
+    if (box) box.style.display = 'none';
+  }, 150);
+}
+
+function _teclaSugerenciasProductoCosteo(ev) {
+  const box = document.getElementById('costeo-producto-sugerencias');
+  if (!box || box.style.display === 'none' || !_sugerenciasProductoCosteo.length) return;
+  if (ev.key === 'ArrowDown') {
+    ev.preventDefault();
+    _indiceSugerenciaCosteo = Math.min(_indiceSugerenciaCosteo + 1, _sugerenciasProductoCosteo.length - 1);
+    _pintarSugerenciasProductoCosteo();
+  } else if (ev.key === 'ArrowUp') {
+    ev.preventDefault();
+    _indiceSugerenciaCosteo = Math.max(_indiceSugerenciaCosteo - 1, 0);
+    _pintarSugerenciasProductoCosteo();
+  } else if (ev.key === 'Enter') {
+    if (_indiceSugerenciaCosteo >= 0) { ev.preventDefault(); _elegirProductoCosteo(_indiceSugerenciaCosteo); }
+  } else if (ev.key === 'Escape') {
+    box.style.display = 'none';
+  }
 }
 
 // Al elegir/cambiar el producto, si tiene un Diseño de Mezcla asignado en el catálogo
@@ -58,6 +122,20 @@ function cargarProductoCosteo() {
 const _MAQUINAS_DEFECTO_VIBROCOMPACTADO = [
   'Columbia 16', 'Mezcladora Columbia', 'Anaqueles Columbia', 'Moldes Columbia 16',
   'Placas Columbia 16', 'Banda transportadora Columbia 16', 'Minicargador', 'Montacargas 3 TON',
+];
+
+// Mismo criterio que las máquinas por defecto: insumos de empaque/consumos/recargos que se
+// repiten igual en todo costeo de Vibrocompactado (2026-08-04, a pedido del usuario, con la
+// lista real que él mismo armó) — solo se precargan si la lista de insumos está vacía.
+const _INSUMOS_DEFECTO_VIBROCOMPACTADO = [
+  { nombre: 'Zuncho PET 16mm', cantidad: 9, reparto: 'estiba' },
+  { nombre: 'Grapa para zuncho 16mm', cantidad: 2, reparto: 'estiba' },
+  { nombre: 'Estiba de madera', cantidad: 1, reparto: 'estiba' },
+  { nombre: 'Combustible ACPM', cantidad: 16, reparto: 'dia' },
+  { nombre: 'Agua', cantidad: 5, reparto: 'dia' },
+  { nombre: 'Energía', cantidad: 200, reparto: 'dia' },
+  { nombre: 'Ensayo a compresión de bloques', cantidad: 2, reparto: 'dia' },
+  { nombre: 'Ensayo de absorción', cantidad: 2, reparto: 'dia' },
 ];
 
 // La estructura completa del cuestionario (Diseño de Mezcla, Rendimiento, Máquinas...) depende
@@ -86,6 +164,10 @@ function _elegirTipoEstructuraCosteo(tipo) {
     if (!_maquinasCosteoActual.length) {
       _maquinasCosteoActual = _MAQUINAS_DEFECTO_VIBROCOMPACTADO.map(nombre => ({ nombre }));
       renderMaquinasCosteo();
+    }
+    if (!_insumosCosteoActual.length) {
+      _insumosCosteoActual = JSON.parse(JSON.stringify(_INSUMOS_DEFECTO_VIBROCOMPACTADO));
+      renderInsumosCosteo();
     }
     _actualizarResumenCosteo();
   }
@@ -617,7 +699,7 @@ function abrirModalCosteoProducto() {
   renderMaquinasCosteo();
   renderManoObraCosteo();
   renderInsumosCosteo();
-  poblarDatalistProductosCosteo();
+  document.getElementById('costeo-producto-sugerencias').style.display = 'none';
   _elegirTipoEstructuraCosteo(''); // sin tipo elegido todavía — oculta las secciones 2-8
   document.getElementById('modal-costeo-producto').classList.add('abierto');
 }
@@ -627,7 +709,7 @@ function editarCosteoProducto(codigo) {
   if (!c) return;
   document.getElementById('m-costeo-producto-codigo-anterior').value = c.productoCodigo;
   document.getElementById('modal-costeo-producto-titulo').textContent = `✏️ Editar Costeo — ${c.productoNombre}`;
-  poblarDatalistProductosCosteo();
+  document.getElementById('costeo-producto-sugerencias').style.display = 'none';
   document.getElementById('m-costeo-producto').value = c.productoCodigo + ' — ' + c.productoNombre;
   poblarSelectDisenos('m-costeo-diseno');
   agregarOpcionSiNoExiste('m-costeo-diseno', c.disenoMezclaCodigo);
