@@ -303,26 +303,39 @@ function renderProductosAdmin() {
   const q = (document.getElementById('buscar-prod-adm')?.value || '').toLowerCase().trim();
   const grupo = selG.value;
   const verOcultos = document.getElementById('ver-ocultos-prod')?.checked;
+  const soloDuplicados = document.getElementById('ver-duplicados-prod')?.checked;
+
+  // Nombres duplicados — se cuentan sobre TODO el catálogo (activos + ocultos), normalizando
+  // may/min y espacios sobrantes, para detectar productos cargados dos veces con distinto
+  // código (2026-08-04, a pedido del usuario: "revisa productos que tengan el mismo nombre").
+  const _normNombreDup = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const conteoNombres = {};
+  CATALOGO.forEach(p => { const n = _normNombreDup(p.nombre); conteoNombres[n] = (conteoNombres[n] || 0) + 1; });
+  const esDuplicado = p => conteoNombres[_normNombreDup(p.nombre)] > 1;
+  const totalDuplicados = CATALOGO.filter(esDuplicado).length;
 
   let data = [...CATALOGO];
   if (!verOcultos) data = data.filter(p => p.activo !== false);
   if (grupo) data = data.filter(p => p.grupo === grupo);
   if (q) data = data.filter(p => (p.nombre + ' ' + p.codigo + ' ' + (p.medidas||'')).toLowerCase().includes(q));
-  data.sort((a,b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre));
+  if (soloDuplicados) data = data.filter(esDuplicado);
+  data.sort((a,b) => a.nombre.localeCompare(b.nombre) || a.grupo.localeCompare(b.grupo));
 
   const activos = CATALOGO.filter(p => p.activo !== false).length;
   const ocultos = CATALOGO.length - activos;
   resumen.innerHTML = `
     <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--verde);min-width:130px"><div style="font-size:10px;font-weight:700;color:var(--verde);text-transform:uppercase">Productos activos</div><div style="font-size:18px;font-weight:800">${activos}</div></div>
     <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid #C62828;min-width:130px"><div style="font-size:10px;font-weight:700;color:#C62828;text-transform:uppercase">Ocultos</div><div style="font-size:18px;font-weight:800">${ocultos}</div></div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid ${totalDuplicados ? '#E65100' : 'var(--gris-borde)'};min-width:130px;cursor:pointer" onclick="document.getElementById('ver-duplicados-prod').checked=true;renderProductosAdmin()" title="Clic para filtrar solo los duplicados"><div style="font-size:10px;font-weight:700;color:${totalDuplicados ? '#E65100' : 'var(--gris-medio)'};text-transform:uppercase">Nombres duplicados</div><div style="font-size:18px;font-weight:800">${totalDuplicados}</div></div>
     <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--azul);min-width:130px"><div style="font-size:10px;font-weight:700;color:var(--azul);text-transform:uppercase">Mostrados</div><div style="font-size:18px;font-weight:800">${data.length}</div></div>`;
 
-  if (!data.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">📦</div><div>Sin productos para este filtro.</div></td></tr>`; return; }
+  if (!data.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">📦</div><div>${soloDuplicados ? 'No hay productos con nombre duplicado.' : 'Sin productos para este filtro.'}</div></td></tr>`; return; }
   tbody.innerHTML = data.map(p => {
     const inactivo = p.activo === false;
-    return `<tr style="border-top:1px solid var(--gris-borde);${inactivo?'opacity:.55':''}">
+    const dup = esDuplicado(p);
+    return `<tr style="border-top:1px solid var(--gris-borde);${inactivo?'opacity:.55':''}${dup ? ';background:#FFF8E1' : ''}">
       <td style="font-weight:600;color:var(--azul);font-size:12px">${p.codigo}</td>
-      <td><div style="font-weight:600;font-size:13px">${p.nombre}</div><div style="font-size:11px;color:var(--gris-medio)">${p.medidas||''}</div></td>
+      <td><div style="font-weight:600;font-size:13px">${p.nombre}${dup ? ' <span style="font-size:10px;font-weight:700;color:#E65100;background:#FFF3E0;padding:1px 6px;border-radius:8px;vertical-align:middle" title="Otro producto activo/oculto tiene este mismo nombre">⚠️ Duplicado</span>' : ''}</div><div style="font-size:11px;color:var(--gris-medio)">${p.medidas||''}</div></td>
       <td style="color:var(--gris-medio)">${p.grupo}</td>
       <td style="text-align:center">${p.unidad}</td>
       <td style="text-align:center"><span style="color:${p.iva==='SI'?'var(--rojo)':'var(--verde)'};font-weight:700;font-size:12px">${p.iva}</span></td>

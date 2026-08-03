@@ -400,11 +400,22 @@ function calcularCosteoProducto(c) {
 
   const totalUnidad = materiaPrima + desperdicio + manoObra + herramientaMenor + maquinaria + empaque + consumos;
 
-  // Precio de venta sugerido = costo + margen, configurable por producto (2026-08-02, a
-  // pedido del usuario) — informativo hasta que se presione "Aplicar al catálogo"; nunca
-  // se escribe solo en `productos` (ver _aplicarPreciosCatalogo()).
-  const precioSugeridoLista = totalUnidad * (1 + (c.margenLista || 0) / 100);
-  const precioSugeridoMinimo = totalUnidad * (1 + (c.margenMinimo || 0) / 100);
+  // Precio de venta sugerido, configurable por producto (2026-08-02, a pedido del usuario)
+  // — informativo hasta que se presione "Aplicar al catálogo"; nunca se escribe solo en
+  // `productos` (ver _aplicarPreciosCatalogo()).
+  // "% Margen" aquí es margen sobre el PRECIO DE VENTA (utilidad / precio), no recargo
+  // sobre el costo — así se maneja históricamente en Pro Concreto (verificado contra
+  // COSTEO Y LISTA DE PRECIOS.xlsx: costo $1.718 + margen 30% -> precio $2.450, y
+  // (2450-1718)/2450 = 30% exacto; con recargo sobre costo hubiera dado 42,6%, no 30%).
+  // Fórmula: precio = costo / (1 - margen/100). Corregido 2026-08-03 — antes se calculaba
+  // como recargo sobre costo (costo * (1 + margen/100)), lo que entregaba un margen real
+  // por debajo del % configurado.
+  const _precioPorMargenSobreVenta = (costo, margenPct) => {
+    const factor = 1 - (margenPct || 0) / 100;
+    return factor > 0 ? costo / factor : costo;
+  };
+  const precioSugeridoLista = _precioPorMargenSobreVenta(totalUnidad, c.margenLista);
+  const precioSugeridoMinimo = _precioPorMargenSobreVenta(totalUnidad, c.margenMinimo);
 
   return {
     capacidadCochadaM3, unidadesBache, unidadesDia,
