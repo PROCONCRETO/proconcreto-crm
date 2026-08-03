@@ -21,6 +21,18 @@ function _escNombreOnclick(nombre) {
   return (nombre || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
+// Escapa un nombre para meterlo dentro de un atributo HTML normal, ej. <option value="...">
+// — mismo problema que _escNombreOnclick() pero sin el contexto de string JS de por medio:
+// un nombre con comilla doble (ej. 'Triturado Grueso 3/8"') rompía el atributo `value`, así
+// que el <option> quedaba con un value truncado/corrupto y no coincidía con el nombre real al
+// buscarlo (`INSUMOS_COSTOS.find(x => x.nombre === ...)`) — el picker de "Producto" en Diseño
+// de Mezcla dejaba guardado un valor que nunca hacía match, así que el precio nunca se
+// arrastraba (bug real reportado 2026-08-03: "no me está arrastrando el precio del triturado
+// de 3/8"). Se usa en cualquier <option value="..."> armado a partir de un nombre real.
+function _escAttr(nombre) {
+  return (nombre || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
 function _defaultParametrosMO() {
   return {
     smmlv: 1751000,
@@ -447,7 +459,7 @@ function _totalCuadrilla(cu) {
 
 function _selectClasesHTML(claseSeleccionada) {
   if (!CLASES_SALARIALES.length) return '<option value="">Sin clases registradas</option>';
-  return CLASES_SALARIALES.map(c => `<option value="${c.nombre}" ${c.nombre === claseSeleccionada ? 'selected' : ''}>${c.nombre}</option>`).join('');
+  return CLASES_SALARIALES.map(c => `<option value="${_escAttr(c.nombre)}" ${c.nombre === claseSeleccionada ? 'selected' : ''}>${c.nombre}</option>`).join('');
 }
 
 function renderRolesCuadrilla() {

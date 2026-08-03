@@ -170,7 +170,7 @@ function renderMaquinasCosteo() {
 }
 function _opcionesMaquinariaCosteo(seleccionado) {
   if (!MAQUINARIA_EQUIPOS.length) return '<option value="">Sin máquinas registradas</option>';
-  return '<option value="">— Selecciona —</option>' + MAQUINARIA_EQUIPOS.map(m => `<option value="${m.nombre}" ${m.nombre === seleccionado ? 'selected' : ''}>${m.nombre}</option>`).join('');
+  return '<option value="">— Selecciona —</option>' + MAQUINARIA_EQUIPOS.map(m => `<option value="${_escAttr(m.nombre)}" ${m.nombre === seleccionado ? 'selected' : ''}>${m.nombre}</option>`).join('');
 }
 function agregarMaquinaCosteo() { _maquinasCosteoActual.push({ nombre: '' }); renderMaquinasCosteo(); }
 
@@ -195,7 +195,7 @@ function renderManoObraCosteo() {
 }
 function _opcionesCuadrillaCosteo(seleccionado) {
   if (!CUADRILLAS_PRODUCTIVAS.length) return '<option value="">Sin cuadrillas registradas</option>';
-  return '<option value="">— Selecciona —</option>' + CUADRILLAS_PRODUCTIVAS.map(c => `<option value="${c.nombre}" ${c.nombre === seleccionado ? 'selected' : ''}>${c.nombre}</option>`).join('');
+  return '<option value="">— Selecciona —</option>' + CUADRILLAS_PRODUCTIVAS.map(c => `<option value="${_escAttr(c.nombre)}" ${c.nombre === seleccionado ? 'selected' : ''}>${c.nombre}</option>`).join('');
 }
 function agregarManoObraCosteo() { _manoObraCosteoActual.push({ nombre: '' }); renderManoObraCosteo(); }
 
@@ -228,7 +228,7 @@ function renderInsumosCosteo() {
 }
 function _opcionesInsumoCosteo(seleccionado) {
   if (!INSUMOS_COSTOS.length) return '<option value="">Sin insumos registrados</option>';
-  return '<option value="">— Selecciona —</option>' + INSUMOS_COSTOS.map(i => `<option value="${i.nombre}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
+  return '<option value="">— Selecciona —</option>' + INSUMOS_COSTOS.map(i => `<option value="${_escAttr(i.nombre)}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
 }
 function agregarInsumoCosteo() { _insumosCosteoActual.push({ nombre: '', cantidad: 0, reparto: 'estiba' }); renderInsumosCosteo(); }
 

@@ -57,7 +57,7 @@ function _normalizarDiseno(d) {
 function _opcionesProductoCatalogo(seleccionado, rol, tamano) {
   let items = (INSUMOS_COSTOS || []).filter(i => i.rolDiseno === rol);
   if (rol === 'grava') items = items.filter(i => i.tamanoAgregado === tamano);
-  const opciones = items.map(i => `<option value="${i.nombre}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
+  const opciones = items.map(i => `<option value="${_escAttr(i.nombre)}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
   if (!items.length) {
     const motivo = rol === 'grava' && !tamano
       ? 'elige primero el "Tamaño máximo de agregado" del diseño'
