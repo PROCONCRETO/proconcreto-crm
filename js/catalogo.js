@@ -478,6 +478,7 @@ function renderProductosAdmin() {
     if (ca !== cb) return ca ? -1 : 1;
     return a.nombre.localeCompare(b.nombre) || a.grupo.localeCompare(b.grupo);
   });
+  _productosAdmVisibleActual = data; // para "Exportar Excel" — exporta lo que se ve, con los mismos filtros aplicados
 
   const activos = CATALOGO.filter(p => p.activo !== false).length;
   const ocultos = CATALOGO.length - activos;
@@ -630,6 +631,28 @@ function guardarProducto() {
   });
   cerrarModal('modal-producto');
   renderProductosAdmin();
+}
+
+// ── EXPORTAR A EXCEL (2026-08-04, a pedido del usuario) ──
+// Exporta exactamente lo que está en pantalla en Catálogo de Productos — respeta los filtros
+// activos (grupo, búsqueda, ver/solo ocultos, solo duplicados) y el orden actual, no siempre
+// el catálogo completo. `_productosAdmVisibleActual` se actualiza en cada render.
+let _productosAdmVisibleActual = [];
+
+function exportarCatalogoExcel() {
+  if (typeof XLSX === 'undefined') { alert('La librería de Excel no cargó. Verifica tu conexión.'); return; }
+  if (!_productosAdmVisibleActual.length) { alert('No hay productos para exportar con los filtros actuales.'); return; }
+  const rows = [['Código', 'Producto', 'Grupo', 'Medidas', 'Unidad', 'Peso (kg)', 'IVA', 'Precio Lista', 'Precio Mínimo', 'Estado', 'Desde Costeo']];
+  _productosAdmVisibleActual.forEach(p => rows.push([
+    p.codigo, p.nombre, p.grupo, p.medidas || '', p.unidad, p.peso ?? '', p.iva,
+    p.lista, p.minimo, p.activo === false ? 'Oculto' : 'Activo',
+    _productoTieneCosteo(p.codigo) ? 'Sí' : 'No',
+  ]));
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Catálogo');
+  const fecha = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `Catalogo_Productos_Proconcreto_${fecha}.xlsx`);
 }
 
 // ── IMPORTACIÓN DESDE EXCEL / CSV ──

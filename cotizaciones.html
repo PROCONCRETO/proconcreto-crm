@@ -633,6 +633,7 @@
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="solo-ocultos-prod" onchange="renderProductosAdmin()"> Solo ocultos</label>
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="ver-duplicados-prod" onchange="renderProductosAdmin()"> Solo duplicados</label>
       <button class="btn btn-secundario" onclick="abrirModalResolverDuplicados()">🔗 Resolver duplicados</button>
+      <button class="btn btn-secundario" onclick="exportarCatalogoExcel()">⬇️ Exportar Excel</button>
       <button class="btn btn-secundario" onclick="abrirModalImportar()">⬆️ Importar Excel</button>
       <button class="btn btn-primario" onclick="abrirModalProducto()">+ Nuevo producto</button>
     </div>
@@ -2272,7 +2273,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=20260804a"></script>
-<script src="js/catalogo.js?v=20260804g"></script>
+<script src="js/catalogo.js?v=20260804h"></script>
 <script src="js/navegacion.js?v=20260804a"></script>
 <script src="js/ordenes-produccion.js?v=20260804a"></script>
 <script src="js/produccion-diaria.js?v=20260804a"></script>
