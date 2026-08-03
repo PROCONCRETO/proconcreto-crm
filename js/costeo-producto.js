@@ -38,15 +38,25 @@ function _productoDesdeTextoCosteo(texto) {
 
 let _sugerenciasProductoCosteo = [];
 let _indiceSugerenciaCosteo = -1;
+let _sugerenciasOcultasPorCosteo = false;
 
+// El desplegable solo ofrece productos que TODAVÍA no tienen un Costeo de Producto guardado,
+// para no volver a costear el mismo producto dos veces (2026-08-04, a pedido del usuario). El
+// producto que se está editando en este momento (`m-costeo-producto-codigo-anterior`) es la
+// única excepción — sigue apareciendo aunque ya tenga costeo, porque es el suyo.
 function _filtrarProductosCosteo() {
   const input = document.getElementById('m-costeo-producto');
   if (!input) return;
   const q = input.value.trim().toLowerCase();
-  _sugerenciasProductoCosteo = (q
-    ? PRODUCTOS.filter(p => (p.codigo + ' ' + p.nombre + ' ' + (p.medidas || '')).toLowerCase().includes(q))
-    : [...PRODUCTOS]
-  ).sort((a, b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre)).slice(0, 60);
+  const codigoEnEdicion = document.getElementById('m-costeo-producto-codigo-anterior')?.value || '';
+  const disponibles = PRODUCTOS.filter(p =>
+    p.codigo === codigoEnEdicion || !COSTEO_PRODUCTOS.some(c => c.productoCodigo === p.codigo));
+  const _matchTexto = p => (p.codigo + ' ' + p.nombre + ' ' + (p.medidas || '')).toLowerCase().includes(q);
+  _sugerenciasProductoCosteo = (q ? disponibles.filter(_matchTexto) : disponibles)
+    .sort((a, b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre)).slice(0, 60);
+  // Si no hay sugerencias pero SÍ hay un producto real que matchea (solo que ya tiene costeo),
+  // el mensaje de "sin resultados" lo aclara en vez de sugerir que el producto no existe.
+  _sugerenciasOcultasPorCosteo = !_sugerenciasProductoCosteo.length && q && PRODUCTOS.some(_matchTexto);
   _indiceSugerenciaCosteo = -1;
   _pintarSugerenciasProductoCosteo();
   cargarProductoCosteo();
@@ -56,7 +66,7 @@ function _pintarSugerenciasProductoCosteo() {
   const box = document.getElementById('costeo-producto-sugerencias');
   if (!box) return;
   if (!_sugerenciasProductoCosteo.length) {
-    box.innerHTML = `<div style="padding:10px 12px;color:var(--gris-medio);font-size:12px">Sin resultados.</div>`;
+    box.innerHTML = `<div style="padding:10px 12px;color:var(--gris-medio);font-size:12px">${_sugerenciasOcultasPorCosteo ? 'Ese producto ya tiene un Costeo de Producto guardado.' : 'Sin resultados.'}</div>`;
     box.style.display = 'block';
     return;
   }
