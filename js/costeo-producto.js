@@ -247,6 +247,7 @@ function _leerFormularioCosteo() {
       pesoUnidadKg: parseFloat(document.getElementById('m-costeo-peso-unidad').value) || 0,
       ciclosDia: parseFloat(document.getElementById('m-costeo-ciclos-dia').value) || 0,
       unidadesCiclo: parseFloat(document.getElementById('m-costeo-unidades-ciclo').value) || 0,
+      unidadesBache: parseFloat(document.getElementById('m-costeo-unidades-bache').value) || 0,
       unidadesEstiba: parseFloat(document.getElementById('m-costeo-unidades-estiba').value) || 0,
     },
     maquinas: JSON.parse(JSON.stringify(_maquinasCosteoActual)).filter(x => x.nombre),
@@ -273,9 +274,13 @@ function calcularCosteoProducto(c) {
   const diseno = DISENOS_MEZCLA.find(d => d.codigo === c.disenoMezclaCodigo);
   const r = c.rendimiento || {};
   const capacidadCochadaM3 = _capacidadCochadaDeLinea(c);
-  const pesoTotalM3 = _pesoTotalMezclaM3(diseno);
-  const pesoCochadaKg = capacidadCochadaM3 * pesoTotalM3;
-  const unidadesCochada = r.pesoUnidadKg > 0 ? pesoCochadaKg / r.pesoUnidadKg : 0;
+  // Unidades/Bache: para Vibrocompactados, en la fábrica esto NO se calcula desde el peso — es
+  // un dato real que ya se conoce (cuántas unidades rinde una mezclada completa de la
+  // mezcladora, ej. 0,68 m³) y se digita directo (2026-08-03, a pedido del usuario, corrigiendo
+  // el modelo anterior que lo derivaba de Peso/unidad × peso teórico de la mezcla — esa relación
+  // no es como de verdad se dosifica en planta). `pesoUnidadKg` queda como dato informativo del
+  // producto, ya no participa en este cálculo.
+  const unidadesBache = r.unidadesBache || 0;
   const unidadesDia = (r.ciclosDia || 0) * (r.unidadesCiclo || 0);
 
   // Si el producto GENERA IVA, el IVA de sus insumos es descontable → se asume el precio SIN
@@ -285,18 +290,20 @@ function calcularCosteoProducto(c) {
   const productoCosteo = CATALOGO.find(p => p.codigo === c.productoCodigo);
   const productoGeneraIva = productoCosteo?.iva === 'SI';
 
-  // Materia Prima — cemento/agua/adiciones/aditivos por PESO (se compran por peso);
-  // arena/triturado por VOLUMEN (se compran por volumen en la región, 2026-08-02). Arena,
-  // triturado y adiciones viven en listas (`materiales.agregados[]`/`adiciones[]`) — puede
-  // haber más de uno de cada uno, se suman todos. `materiaPrimaDetalle` guarda cada insumo por
-  // separado (cantidad/precio/costo) para el consolidado de solo lectura (➕).
+  // Materia Prima — cantidad por unidad = (cantidad por m³ del Diseño × capacidad de la
+  // mezcladora) ÷ Unidades/Bache. Cemento/agua/adiciones/aditivos se compran por PESO (se
+  // toma su cantidad en kg/m³); arena/triturado se compran por VOLUMEN en la región (se toma
+  // su `volumen`, m³/m³) — arena, triturado y adiciones viven en listas
+  // (`materiales.agregados[]`/`adiciones[]`) porque puede haber más de uno de cada uno, se
+  // suman todos. `materiaPrimaDetalle` guarda cada insumo por separado (cantidad/precio/costo)
+  // para el consolidado de solo lectura (➕).
   let materiaPrima = 0;
   const materiaPrimaDetalle = [];
   const m = diseno?.materiales || {};
-  if (unidadesCochada > 0) {
+  if (unidadesBache > 0) {
     _MATERIALES_COSTEO_PESO.forEach(k => {
       if (!((m[k] || 0) > 0)) return;
-      const cantidad = ((m[k] || 0) * capacidadCochadaM3) / unidadesCochada;
+      const cantidad = ((m[k] || 0) * capacidadCochadaM3) / unidadesBache;
       const precio = _precioInsumoPorNombre(m[`${k}Producto`], productoGeneraIva);
       const costo = cantidad * precio;
       materiaPrima += costo;
@@ -304,7 +311,7 @@ function calcularCosteoProducto(c) {
     });
     (m.agregados || []).forEach(a => {
       if (!((Number(a.volumen) || 0) > 0)) return;
-      const cantidad = ((Number(a.volumen) || 0) * capacidadCochadaM3) / unidadesCochada;
+      const cantidad = ((Number(a.volumen) || 0) * capacidadCochadaM3) / unidadesBache;
       const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
       const costo = cantidad * precio;
       materiaPrima += costo;
@@ -312,7 +319,7 @@ function calcularCosteoProducto(c) {
     });
     (m.adiciones || []).forEach(a => {
       if (!((Number(a.cantidad) || 0) > 0)) return;
-      const cantidad = ((Number(a.cantidad) || 0) * capacidadCochadaM3) / unidadesCochada;
+      const cantidad = ((Number(a.cantidad) || 0) * capacidadCochadaM3) / unidadesBache;
       const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
       const costo = cantidad * precio;
       materiaPrima += costo;
@@ -320,7 +327,7 @@ function calcularCosteoProducto(c) {
     });
     (m.aditivos || []).forEach(a => {
       if (!((Number(a.dosis) || 0) > 0)) return;
-      const cantidad = ((Number(a.dosis) || 0) * capacidadCochadaM3) / unidadesCochada;
+      const cantidad = ((Number(a.dosis) || 0) * capacidadCochadaM3) / unidadesBache;
       const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
       const costo = cantidad * precio;
       materiaPrima += costo;
@@ -381,7 +388,7 @@ function calcularCosteoProducto(c) {
   const precioSugeridoMinimo = totalUnidad * (1 + (c.margenMinimo || 0) / 100);
 
   return {
-    capacidadCochadaM3, pesoTotalM3, pesoCochadaKg, unidadesCochada, unidadesDia,
+    capacidadCochadaM3, unidadesBache, unidadesDia,
     materiaPrima, desperdicio, manoObra, herramientaMenor, maquinaria, empaque, consumos, totalUnidad,
     precioSugeridoLista, precioSugeridoMinimo,
     materiaPrimaDetalle, manoObraDetalle, maquinariaDetalle, empaqueDetalle, consumosDetalle,
@@ -396,8 +403,7 @@ function _actualizarResumenCosteo() {
   const k = calcularCosteoProducto(c);
   const producto = _productoDesdeTextoCosteo(document.getElementById('m-costeo-producto').value);
   document.getElementById('costeo-calculo-vivo').innerHTML = `
-    <div class="fila"><span>Peso de la cochada (${k.capacidadCochadaM3} m³ × ${k.pesoTotalM3.toLocaleString('es-CO')} kg/m³)</span><span>${k.pesoCochadaKg.toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg</span></div>
-    <div class="fila"><span>Unidades / cochada</span><span>${k.unidadesCochada.toLocaleString('es-CO', { maximumFractionDigits: 1 })} unidades</span></div>
+    <div class="fila"><span>Capacidad de bache (de la mezcladora de la línea)</span><span>${k.capacidadCochadaM3.toLocaleString('es-CO')} m³</span></div>
     <div class="fila"><span>Unidades / día (ciclos/día × unidades/ciclo)</span><span>${k.unidadesDia.toLocaleString('es-CO')} unidades</span></div>`;
   // El régimen de IVA del PRODUCTO (ya definido en el catálogo) decide si los insumos se
   // costean con o sin IVA — ver calcularCosteoProducto()/_precioInsumoPorNombre(). Se muestra
@@ -564,6 +570,7 @@ function abrirModalCosteoProducto() {
   document.getElementById('m-costeo-peso-unidad').value = '';
   document.getElementById('m-costeo-ciclos-dia').value = '';
   document.getElementById('m-costeo-unidades-ciclo').value = '';
+  document.getElementById('m-costeo-unidades-bache').value = '';
   document.getElementById('m-costeo-unidades-estiba').value = '';
   document.getElementById('m-costeo-pct-desperdicio').value = 4;
   document.getElementById('m-costeo-pct-herramienta').value = 2;
@@ -594,6 +601,7 @@ function editarCosteoProducto(codigo) {
   document.getElementById('m-costeo-peso-unidad').value = r.pesoUnidadKg || '';
   document.getElementById('m-costeo-ciclos-dia').value = r.ciclosDia || '';
   document.getElementById('m-costeo-unidades-ciclo').value = r.unidadesCiclo || '';
+  document.getElementById('m-costeo-unidades-bache').value = r.unidadesBache || '';
   document.getElementById('m-costeo-unidades-estiba').value = r.unidadesEstiba || '';
   document.getElementById('m-costeo-pct-desperdicio').value = c.pctDesperdicio || 0;
   document.getElementById('m-costeo-pct-herramienta').value = c.pctHerramientaMenor || 0;
@@ -682,16 +690,17 @@ function abrirDetalleCosteoProducto(codigo) {
   document.getElementById('detalle-costeo-resumen').innerHTML = `
     <span>${tipo.label}</span>
     <span><strong>Diseño:</strong> ${diseno ? `${diseno.codigo} — ${diseno.nombre}` : (c.disenoMezclaCodigo || '—')}</span>
-    <span><strong>Unidades/cochada:</strong> ${k.unidadesCochada.toLocaleString('es-CO', { maximumFractionDigits: 1 })}</span>
+    <span><strong>Unidades/Bache:</strong> ${(r.unidadesBache || 0).toLocaleString('es-CO')}</span>
     <span><strong>Unidades/día:</strong> ${k.unidadesDia.toLocaleString('es-CO')}</span>`;
 
   const seccionRendimiento = `
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo">Rendimiento de producción</div>
       <div class="caja-costeo">
-        <div class="fila"><span>Peso / unidad</span><span>${(r.pesoUnidadKg || 0).toLocaleString('es-CO')} kg</span></div>
+        <div class="fila"><span>Peso / unidad <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(informativo)</span></span><span>${(r.pesoUnidadKg || 0).toLocaleString('es-CO')} kg</span></div>
         <div class="fila"><span>Ciclos / día</span><span>${(r.ciclosDia || 0).toLocaleString('es-CO')}</span></div>
         <div class="fila"><span>Unidades / Ciclo</span><span>${(r.unidadesCiclo || 0).toLocaleString('es-CO')}</span></div>
+        <div class="fila"><span>Unidades / Bache</span><span>${(r.unidadesBache || 0).toLocaleString('es-CO')}</span></div>
         <div class="fila"><span>Unidades / estiba</span><span>${(r.unidadesEstiba || 0).toLocaleString('es-CO')}</span></div>
       </div>
     </div>`;
