@@ -771,11 +771,17 @@ function guardarCosteoProducto() {
   renderCosteoProductos();
 }
 
+// Compartido con el "Resolver duplicados" de Productos — borra un costeo sin pedir
+// confirmación individual, porque ese flujo ya tiene su propia confirmación agregada.
+function _borrarCosteoProductoDB(codigo) {
+  COSTEO_PRODUCTOS = COSTEO_PRODUCTOS.filter(x => x.productoCodigo !== codigo);
+  return sb.from('costeo_productos').delete().eq('producto_codigo', codigo);
+}
+
 function eliminarCosteoProducto(codigo) {
   const c = COSTEO_PRODUCTOS.find(x => x.productoCodigo === codigo);
   if (!c || !confirm(`¿Eliminar el costeo de "${c.productoNombre}"?`)) return;
-  COSTEO_PRODUCTOS = COSTEO_PRODUCTOS.filter(x => x.productoCodigo !== codigo);
-  sb.from('costeo_productos').delete().eq('producto_codigo', codigo).then(({ error }) => { if (error) console.error('Error eliminando costeo de producto:', error.message); });
+  _borrarCosteoProductoDB(codigo).then(({ error }) => { if (error) console.error('Error eliminando costeo de producto:', error.message); });
   renderCosteoProductos();
 }
 

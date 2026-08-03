@@ -294,6 +294,140 @@ function _productoTieneCosteo(codigo) {
   return typeof COSTEO_PRODUCTOS !== 'undefined' && COSTEO_PRODUCTOS.some(c => c.productoCodigo === codigo);
 }
 
+// ── Resolver duplicados ──
+// Los productos duplicados vienen migrados de un programa contable que genera un código
+// nuevo (sufijo -01/-02/-03...) cada vez que cambia la receta, con el mismo nombre. El
+// usuario decidió que el código SIN sufijo es el vigente (2026-08-04). Nunca se borra un
+// producto — solo se oculta (mismo mecanismo que "🚫 Ocultar", `activo=false`), porque
+// Cotizaciones/Producción/Calidad ya guardan su propia copia de nombre/precio en el momento
+// y no dependen de que el producto siga activo en el catálogo (verificado antes de construir
+// esto). Lo único que sí se borra de verdad es el Costeo de Producto redundante en Centro de
+// Costos, que es donde el usuario explícitamente no quiere duplicados.
+function _tieneSufijoVersion(codigo) { return /-\d+$/.test(String(codigo || '').trim()); }
+
+function _gruposDuplicadosResolver() {
+  const _normNombreDup = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const porNombre = {};
+  CATALOGO.forEach(p => { const n = _normNombreDup(p.nombre); (porNombre[n] = porNombre[n] || []).push(p); });
+  return Object.values(porNombre)
+    .filter(items => items.length > 1)
+    .map(items => {
+      const sinSufijo = items.filter(p => !_tieneSufijoVersion(p.codigo));
+      return {
+        nombre: items[0].nombre,
+        items: [...items].sort((a, b) => a.codigo.localeCompare(b.codigo)),
+        elegido: sinSufijo.length === 1 ? sinSufijo[0].codigo : null,
+        borrarCosteo: true,
+      };
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+
+let _gruposResolverDuplicadosActual = [];
+
+function abrirModalResolverDuplicados() {
+  _gruposResolverDuplicadosActual = _gruposDuplicadosResolver();
+  if (!_gruposResolverDuplicadosActual.length) { alert('No hay productos duplicados por nombre en el catálogo.'); return; }
+  _renderResolverDuplicados();
+  document.getElementById('modal-resolver-duplicados').classList.add('abierto');
+}
+
+function _elegirCandidatoResolverDuplicados(i, codigo) {
+  _gruposResolverDuplicadosActual[i].elegido = codigo;
+  _renderResolverDuplicados();
+}
+
+function _toggleBorrarCosteoResolverDuplicados(i, checked) {
+  _gruposResolverDuplicadosActual[i].borrarCosteo = checked;
+}
+
+function _renderResolverDuplicados() {
+  const box = document.getElementById('resolver-duplicados-body');
+  const resumen = document.getElementById('resolver-duplicados-resumen');
+  if (!box) return;
+  const listos = _gruposResolverDuplicadosActual.filter(g => g.elegido).length;
+  if (resumen) resumen.textContent = `${listos} de ${_gruposResolverDuplicadosActual.length} grupo(s) listo(s) para aplicar` +
+    (listos < _gruposResolverDuplicadosActual.length ? ' — los resaltados en amarillo necesitan que elijas cuál código se queda activo.' : '.');
+  box.innerHTML = _gruposResolverDuplicadosActual.map((g, i) => {
+    const codigosConCosteoAOcultar = g.items.filter(p => p.codigo !== g.elegido && COSTEO_PRODUCTOS.some(c => c.productoCodigo === p.codigo));
+    const hayCosteoParaBorrar = g.elegido && codigosConCosteoAOcultar.length > 0;
+    return `
+    <div style="border:1px solid var(--gris-borde);border-radius:8px;padding:10px 14px;margin-bottom:10px;${!g.elegido ? 'background:#FFF8E1' : ''}">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px">${g.nombre}${!g.elegido ? ' <span style="font-size:11px;font-weight:700;color:#E65100">— elige cuál dejar activo</span>' : ''}</div>
+      ${g.items.map(p => {
+        const oculto = p.activo === false;
+        const tieneCosteo = COSTEO_PRODUCTOS.some(c => c.productoCodigo === p.codigo);
+        return `<label style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;cursor:pointer">
+          <input type="radio" name="resolver-dup-${i}" ${g.elegido === p.codigo ? 'checked' : ''} onchange="_elegirCandidatoResolverDuplicados(${i},'${p.codigo}')">
+          <span style="font-weight:600;color:var(--azul);min-width:110px">${p.codigo}</span>
+          <span style="color:var(--gris-medio);flex:1">${p.medidas || ''}</span>
+          <span class="badge" style="background:${oculto ? '#FFEBEE' : '#E8F5E9'};color:${oculto ? '#C62828' : '#2E7D32'}">${oculto ? 'Oculto' : 'Activo'}</span>
+          ${tieneCosteo ? '<span class="badge" style="background:#E3F2FD;color:var(--azul)">🏗️ Con costeo</span>' : ''}
+        </label>`;
+      }).join('')}
+      ${hayCosteoParaBorrar ? `
+      <label style="display:flex;align-items:center;gap:6px;margin-top:6px;padding-top:6px;border-top:1px dashed var(--gris-borde);font-size:11.5px;color:var(--gris-medio);cursor:pointer">
+        <input type="checkbox" ${g.borrarCosteo ? 'checked' : ''} onchange="_toggleBorrarCosteoResolverDuplicados(${i},this.checked)">
+        También borrar el Costeo de Producto de ${codigosConCosteoAOcultar.map(p => p.codigo).join(', ')}
+      </label>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function aplicarResolverDuplicados() {
+  const listos = _gruposResolverDuplicadosActual.filter(g => g.elegido);
+  if (!listos.length) { alert('Elige al menos un grupo antes de aplicar.'); return; }
+  const aOcultar = [];
+  const aBorrarCosteo = [];
+  listos.forEach(g => {
+    g.items.forEach(p => {
+      if (p.codigo === g.elegido) return;
+      if (p.activo !== false) aOcultar.push(p);
+      if (g.borrarCosteo && COSTEO_PRODUCTOS.some(c => c.productoCodigo === p.codigo)) aBorrarCosteo.push(p.codigo);
+    });
+  });
+  if (!aOcultar.length && !aBorrarCosteo.length) { alert('No hay cambios pendientes en los grupos elegidos — ya estaban resueltos.'); return; }
+  const resumen = `Se van a ocultar ${aOcultar.length} producto(s) duplicado(s)` +
+    (aBorrarCosteo.length ? ` y borrar ${aBorrarCosteo.length} Costeo(s) de Producto asociado(s)` : '') +
+    `.\n\nNo se borra ningún producto — solo se ocultan (dejan de aparecer en cotizaciones nuevas). Cotizaciones, producción y calidad ya guardadas no se ven afectadas.\n\n¿Confirmas?`;
+  if (!confirm(resumen)) return;
+  aOcultar.forEach(p => { p.activo = false; _upsertProducto(p); });
+  aBorrarCosteo.forEach(codigo => _borrarCosteoProductoDB(codigo).then(({ error }) => { if (error) console.error('Error borrando costeo duplicado:', error.message); }));
+  PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
+  cerrarModal('modal-resolver-duplicados');
+  renderProductosAdmin();
+  if (typeof renderCosteoProductos === 'function') renderCosteoProductos();
+  alert(`Listo. ${aOcultar.length} producto(s) ocultado(s)${aBorrarCosteo.length ? `, ${aBorrarCosteo.length} costeo(s) borrado(s)` : ''}.`);
+}
+
+// Atajos de clic sobre las tarjetas del resumen — cada una deja el set de checkboxes en el
+// estado exacto que representa (2026-08-04, a pedido del usuario: que las 4 tarjetas filtren
+// al hacer clic, igual que ya pasaba con "Nombres duplicados").
+function _filtroProdAdmActivos() {
+  document.getElementById('solo-ocultos-prod').checked = false;
+  document.getElementById('ver-ocultos-prod').checked = false;
+  document.getElementById('ver-duplicados-prod').checked = false;
+  renderProductosAdmin();
+}
+function _filtroProdAdmOcultos() {
+  document.getElementById('solo-ocultos-prod').checked = true;
+  document.getElementById('ver-duplicados-prod').checked = false;
+  renderProductosAdmin();
+}
+function _filtroProdAdmDuplicados() {
+  document.getElementById('solo-ocultos-prod').checked = false;
+  document.getElementById('ver-duplicados-prod').checked = true;
+  renderProductosAdmin();
+}
+function _filtroProdAdmTodos() {
+  document.getElementById('buscar-prod-adm').value = '';
+  document.getElementById('filtro-grupo-prod-adm').value = '';
+  document.getElementById('solo-ocultos-prod').checked = false;
+  document.getElementById('ver-ocultos-prod').checked = true;
+  document.getElementById('ver-duplicados-prod').checked = false;
+  renderProductosAdmin();
+}
+
 function renderProductosAdmin() {
   const tbody = document.getElementById('productos-adm-body');
   const resumen = document.getElementById('prod-adm-resumen');
@@ -310,6 +444,7 @@ function renderProductosAdmin() {
   const q = (document.getElementById('buscar-prod-adm')?.value || '').toLowerCase().trim();
   const grupo = selG.value;
   const verOcultos = document.getElementById('ver-ocultos-prod')?.checked;
+  const soloOcultos = document.getElementById('solo-ocultos-prod')?.checked;
   const soloDuplicados = document.getElementById('ver-duplicados-prod')?.checked;
 
   // Nombres duplicados — se cuentan sobre TODO el catálogo (activos + ocultos), normalizando
@@ -329,7 +464,11 @@ function renderProductosAdmin() {
   const tieneCosteo = p => _ordenCosteo.has(p.codigo);
 
   let data = [...CATALOGO];
-  if (!verOcultos) data = data.filter(p => p.activo !== false);
+  // "Solo ocultos" manda sobre "Ver ocultos" — muestra únicamente los inactivos en vez de
+  // mezclarlos con los activos (2026-08-04, a pedido del usuario, para poder filtrarlos desde
+  // la tarjeta-resumen "Ocultos" igual que ya funcionaba con "Nombres duplicados").
+  if (soloOcultos) data = data.filter(p => p.activo === false);
+  else if (!verOcultos) data = data.filter(p => p.activo !== false);
   if (grupo) data = data.filter(p => p.grupo === grupo);
   if (q) data = data.filter(p => (p.nombre + ' ' + p.codigo + ' ' + (p.medidas||'')).toLowerCase().includes(q));
   if (soloDuplicados) data = data.filter(esDuplicado);
@@ -343,10 +482,10 @@ function renderProductosAdmin() {
   const activos = CATALOGO.filter(p => p.activo !== false).length;
   const ocultos = CATALOGO.length - activos;
   resumen.innerHTML = `
-    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--verde);min-width:130px"><div style="font-size:10px;font-weight:700;color:var(--verde);text-transform:uppercase">Productos activos</div><div style="font-size:18px;font-weight:800">${activos}</div></div>
-    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid #C62828;min-width:130px"><div style="font-size:10px;font-weight:700;color:#C62828;text-transform:uppercase">Ocultos</div><div style="font-size:18px;font-weight:800">${ocultos}</div></div>
-    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid ${totalDuplicados ? '#E65100' : 'var(--gris-borde)'};min-width:130px;cursor:pointer" onclick="document.getElementById('ver-duplicados-prod').checked=true;renderProductosAdmin()" title="Clic para filtrar solo los duplicados"><div style="font-size:10px;font-weight:700;color:${totalDuplicados ? '#E65100' : 'var(--gris-medio)'};text-transform:uppercase">Nombres duplicados</div><div style="font-size:18px;font-weight:800">${totalDuplicados}</div></div>
-    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--azul);min-width:130px"><div style="font-size:10px;font-weight:700;color:var(--azul);text-transform:uppercase">Mostrados</div><div style="font-size:18px;font-weight:800">${data.length}</div></div>`;
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--verde);min-width:130px;cursor:pointer" onclick="_filtroProdAdmActivos()" title="Clic para ver solo los productos activos"><div style="font-size:10px;font-weight:700;color:var(--verde);text-transform:uppercase">Productos activos</div><div style="font-size:18px;font-weight:800">${activos}</div></div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid #C62828;min-width:130px;cursor:pointer" onclick="_filtroProdAdmOcultos()" title="Clic para ver solo los ocultos"><div style="font-size:10px;font-weight:700;color:#C62828;text-transform:uppercase">Ocultos</div><div style="font-size:18px;font-weight:800">${ocultos}</div></div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid ${totalDuplicados ? '#E65100' : 'var(--gris-borde)'};min-width:130px;cursor:pointer" onclick="_filtroProdAdmDuplicados()" title="Clic para filtrar solo los duplicados"><div style="font-size:10px;font-weight:700;color:${totalDuplicados ? '#E65100' : 'var(--gris-medio)'};text-transform:uppercase">Nombres duplicados</div><div style="font-size:18px;font-weight:800">${totalDuplicados}</div></div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--azul);min-width:130px;cursor:pointer" onclick="_filtroProdAdmTodos()" title="Clic para ver todo el catálogo sin filtros"><div style="font-size:10px;font-weight:700;color:var(--azul);text-transform:uppercase">Mostrados</div><div style="font-size:18px;font-weight:800">${data.length}</div></div>`;
 
   if (!data.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">📦</div><div>${soloDuplicados ? 'No hay productos con nombre duplicado.' : 'Sin productos para este filtro.'}</div></td></tr>`; return; }
   tbody.innerHTML = data.map(p => {
@@ -371,6 +510,9 @@ function renderProductosAdmin() {
         ${inactivo
           ? `<button class="btn btn-verde btn-xs" onclick="toggleOcultarProducto('${p.codigo}',false)">↩️ Reactivar</button>`
           : `<button class="btn btn-secundario btn-xs" onclick="toggleOcultarProducto('${p.codigo}',true)">🚫 Ocultar</button>`}
+        ${inactivo && !costeo
+          ? `<button class="btn btn-rojo btn-xs" onclick="eliminarProductoDefinitivo('${p.codigo}')" title="Solo disponible para productos ocultos y sin Costeo de Producto">🗑️ Eliminar</button>`
+          : ''}
       </div></td>
     </tr>`;
   }).join('');
@@ -400,6 +542,25 @@ function toggleOcultarProducto(codigo, ocultar) {
   p.activo = !ocultar;
   PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
   _upsertProducto(p).then(({ error }) => { if (error) alert('Error: ' + error.message); });
+  renderProductosAdmin();
+}
+
+// Borrado real (2026-08-04, a pedido del usuario: "no me gusta cargar basura"). Restringido a
+// productos ya ocultos y sin Costeo de Producto asociado — no hay forma de verificar desde
+// acá que el código no aparezca en alguna cotización/orden histórica (esos módulos guardan su
+// propia copia de nombre/precio, así que seguirían mostrando el texto bien, pero cualquier
+// función que vuelva a buscar el código en el catálogo ya no lo encontraría), por eso el
+// aviso explícito antes de confirmar.
+function eliminarProductoDefinitivo(codigo) {
+  const p = CATALOGO.find(x => x.codigo === codigo);
+  if (!p) return;
+  if (p.activo !== false) { alert('Solo se pueden eliminar productos que ya estén ocultos.'); return; }
+  if (_productoTieneCosteo(codigo)) { alert('Este producto tiene un Costeo de Producto asociado — bórralo primero desde Centro de Costos.'); return; }
+  const ok = confirm(`¿Eliminar DEFINITIVAMENTE "${p.nombre}" (${codigo})?\n\nEsto SÍ borra el producto de la base de datos — no se puede deshacer. No hay forma de garantizar al 100% que este código no aparezca en alguna cotización u orden histórica ya guardada (esos módulos guardaron su propia copia de nombre y precio, así que seguirán mostrándose bien, pero si algo intenta volver a buscar este código en el catálogo, ya no lo va a encontrar).\n\n¿Continuar?`);
+  if (!ok) return;
+  CATALOGO = CATALOGO.filter(x => x.codigo !== codigo);
+  PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
+  sb.from('productos').delete().eq('codigo', codigo).then(({ error }) => { if (error) alert('No se pudo eliminar: ' + error.message); });
   renderProductosAdmin();
 }
 
