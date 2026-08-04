@@ -70,8 +70,8 @@ function filtrarClienteAdicionalAjuste(i) {
   const res = CLIENTES.filter(c => c.nombre.toLowerCase().includes(q)).slice(0, 18);
   div.innerHTML = res.length
     ? res.map(c => `
-      <div data-cliente="${(c.nombre || '').replace(/"/g, '&quot;')}" onclick="elegirClienteAdicionalAjuste(${i},this.dataset.cliente)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
-        <div style="font-weight:600;font-size:13px;color:#1e293b">${c.nombre}</div>
+      <div data-cliente="${_esc(c.nombre)}" onclick="elegirClienteAdicionalAjuste(${i},this.dataset.cliente)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
+        <div style="font-weight:600;font-size:13px;color:#1e293b">${_esc(c.nombre)}</div>
       </div>`).join('')
     : '<div style="padding:10px 14px;color:#888;font-size:12px">Sin resultados para esta búsqueda.</div>';
   div.style.display = 'block';
@@ -112,8 +112,8 @@ function filtrarClienteAjuste() {
   const res = CLIENTES.filter(c => c.nombre.toLowerCase().includes(q)).slice(0, 18);
   div.innerHTML = res.length
     ? res.map(c => `
-      <div data-cliente="${(c.nombre || '').replace(/"/g, '&quot;')}" onclick="elegirClienteAjuste(this.dataset.cliente)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
-        <div style="font-weight:600;font-size:13px;color:#1e293b">${c.nombre}</div>
+      <div data-cliente="${_esc(c.nombre)}" onclick="elegirClienteAjuste(this.dataset.cliente)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
+        <div style="font-weight:600;font-size:13px;color:#1e293b">${_esc(c.nombre)}</div>
       </div>`).join('')
     : '<div style="padding:10px 14px;color:#888;font-size:12px">Sin resultados para esta búsqueda.</div>';
   div.style.display = 'block';
@@ -160,7 +160,7 @@ function poblarSelectProyectosDeCliente(selectId, nombreCliente) {
     return;
   }
   sel.disabled = false;
-  sel.innerHTML = '<option value="">Elige un proyecto...</option>' + proyectos.map(p => `<option value="${p.nombre}">${p.nombre}</option>`).join('');
+  sel.innerHTML = '<option value="">Elige un proyecto...</option>' + proyectos.map(p => `<option value="${_esc(p.nombre)}">${_esc(p.nombre)}</option>`).join('');
 }
 
 let _productosAdicionalesAjuste = []; // cada entrada es el texto tecleado "CODIGO — Nombre"
@@ -219,6 +219,11 @@ function agregarOpcionSiNoExiste(selectId, valor) {
 
 // Nombre del cliente principal de un ajuste, con respaldo al campo viejo "clienteElemento"
 // (registros guardados antes de separar Cliente/Proyecto), y aviso si hay clientes adicionales.
+// OJO: NO escapar acá adentro — _textoCilindroEnsayo() reutiliza este texto para el
+// <option value> del datalist de cilindros y hace match exacto por string contra lo que el
+// navegador devuelve ya decodificado; si esta función escapara, esa comparación se rompería
+// para cualquier cliente con &/</>/comillas en el nombre. El escape va en cada sitio donde
+// esto se pinta como HTML de solo lectura (ver renderAjustesMezcla()).
 function _clienteResumenAjuste(a) {
   const principal = a.cliente || a.clienteElemento || '';
   const extra = (a.clientesAdicionales || []).length;
@@ -232,7 +237,7 @@ function _productoResumenAjuste(a) {
   const principal = a.productoNombre || '';
   const extra = (a.productosAdicionales || []).length;
   if (!principal && !extra) return '';
-  return principal + (extra ? ` (+${extra} más)` : '');
+  return _esc(principal) + (extra ? ` (+${extra} más)` : '');
 }
 
 function siguienteCilindroNo() {
@@ -318,18 +323,18 @@ function renderAjustesMezcla() {
   tbody.innerHTML = data.map(a => {
     const revision = _proximaRevisionDiseno(a.disenoCodigo, a.fecha);
     const notaRevision = revision
-      ? `<span title="Diseño revisado el ${new Date(revision.fecha + 'T12:00').toLocaleDateString('es-CO')}${revision.modificadoPor ? ' por ' + (USUARIOS_CRM[revision.modificadoPor]?.nombre || revision.modificadoPor) : ''} — este ajuste usa la versión anterior de la receta." style="cursor:help;margin-left:5px">🔄</span>`
+      ? `<span title="Diseño revisado el ${new Date(revision.fecha + 'T12:00').toLocaleDateString('es-CO')}${revision.modificadoPor ? ' por ' + _esc(USUARIOS_CRM[revision.modificadoPor]?.nombre || revision.modificadoPor) : ''} — este ajuste usa la versión anterior de la receta." style="cursor:help;margin-left:5px">🔄</span>`
       : '';
     return `
     <tr style="border-top:2px solid var(--azul-oscuro)">
-      <td style="font-weight:700;color:var(--azul)">${a.cilindroNo}</td>
+      <td style="font-weight:700;color:var(--azul)">${_esc(a.cilindroNo)}</td>
       <td>${a.fecha ? new Date(a.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
-      <td>${a.disenoCodigo ? `<span style="font-size:11px;background:var(--gris-borde);color:#333;padding:2px 6px;border-radius:3px;font-weight:600">${a.disenoCodigo}</span>` : '—'}${notaRevision}</td>
-      <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${_clienteResumenAjuste(a)}">${_clienteResumenAjuste(a) || '—'}</td>
-      <td>${USUARIOS_CRM[a.creadoPor]?.nombre || a.creadoPor || '—'}</td>
+      <td>${a.disenoCodigo ? `<span style="font-size:11px;background:var(--gris-borde);color:#333;padding:2px 6px;border-radius:3px;font-weight:600">${_esc(a.disenoCodigo)}</span>` : '—'}${notaRevision}</td>
+      <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${_esc(_clienteResumenAjuste(a))}">${_esc(_clienteResumenAjuste(a)) || '—'}</td>
+      <td>${_esc(USUARIOS_CRM[a.creadoPor]?.nombre || a.creadoPor) || '—'}</td>
       <td style="text-align:center">${a.resistenciaDiseno || '—'} MPa</td>
       <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${_productoResumenAjuste(a)}">${_productoResumenAjuste(a) || '—'}</td>
-      <td>${a.proyecto || '—'}</td>
+      <td>${_esc(a.proyecto) || '—'}</td>
       <td>
         <div class="flex-gap">
           <button class="btn btn-secundario btn-xs" onclick="verFormatoProduccionAjuste('${a.id}')">🖨️ Formato</button>
@@ -744,7 +749,7 @@ function _tablaVolumenFormatoProduccion(a, volumen) {
       <tbody>
         ${filas.map(f => `
           <tr>
-            <td style="padding:1.5px 5px;border-bottom:1px solid #eee;font-weight:600">${f.nombre}</td>
+            <td style="padding:1.5px 5px;border-bottom:1px solid #eee;font-weight:600">${_esc(f.nombre)}</td>
             <td style="padding:1.5px 5px;border-bottom:1px solid #eee;text-align:center;font-weight:700">${fmt(f.pesoACargar, f.unidad)}</td>
             <td style="padding:1.5px 5px;border-bottom:1px solid #eee;text-align:center">${f.cantBuggies === 'N/A' ? 'N/A' : f.cantBuggies + ' buggies'}</td>
             <td style="padding:1.5px 5px;border-bottom:1px solid #eee;text-align:center;color:#888">${fmt(f.pesoTeorico, f.unidad)}</td>
@@ -764,7 +769,7 @@ function verFormatoProduccionAjuste(id) {
   }
   const html = `
     <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
-      <span style="font-weight:700">Formato de Producción — Cilindro N° ${a.cilindroNo || ''}</span>
+      <span style="font-weight:700">Formato de Producción — Cilindro N° ${_esc(a.cilindroNo)}</span>
       <div style="flex:1"></div>
       <button onclick="descargarFormatoProduccionAjuste('${a.id}')" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700">⬇️ Descargar PDF</button>
       <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-ajuste-mezcla').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
@@ -777,16 +782,16 @@ function verFormatoProduccionAjuste(id) {
         <div style="text-align:center;font-size:12px;font-weight:700;color:#003F7F;letter-spacing:0.03em;margin-bottom:8px">FORMATO DE PRODUCCIÓN — MEZCLA AJUSTADA POR HUMEDAD</div>
         <div style="padding-bottom:6px;border-bottom:1px solid #eee;margin-bottom:8px">
           <div style="display:flex;justify-content:space-between;align-items:baseline">
-            <div style="font-size:14px;font-weight:700;color:#003F7F">CILINDRO No. ${a.cilindroNo || '—'}</div>
+            <div style="font-size:14px;font-weight:700;color:#003F7F">CILINDRO No. ${_esc(a.cilindroNo) || '—'}</div>
             <div style="font-size:11px;color:#555">${a.fecha ? new Date(a.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</div>
           </div>
-          <div style="font-size:12px;font-weight:600;margin-top:2px">${a.cliente || a.clienteElemento || '—'}${a.proyecto ? ' — ' + a.proyecto : ''}</div>
-          ${(a.clientesAdicionales || []).map(c => `<div style="font-size:12px;font-weight:600;margin-top:2px">${c.cliente}${c.proyecto ? ' — ' + c.proyecto : ''}</div>`).join('')}
-          <div style="font-size:10.5px;margin-top:6px"><b>PRODUCTO:</b> ${a.productoNombre || '—'}${(a.productosAdicionales && a.productosAdicionales.length) ? ` + ${a.productosAdicionales.map(p => p.nombre).join(', ')}` : ''}</div>
-          <div style="font-size:10.5px;margin-top:6px"><b>DISEÑO DE MEZCLA:</b> ${diseno ? `${diseno.codigo} — ${diseno.nombre}` : (a.disenoCodigo || '—')}</div>
+          <div style="font-size:12px;font-weight:600;margin-top:2px">${_esc(a.cliente || a.clienteElemento) || '—'}${a.proyecto ? ' — ' + _esc(a.proyecto) : ''}</div>
+          ${(a.clientesAdicionales || []).map(c => `<div style="font-size:12px;font-weight:600;margin-top:2px">${_esc(c.cliente)}${c.proyecto ? ' — ' + _esc(c.proyecto) : ''}</div>`).join('')}
+          <div style="font-size:10.5px;margin-top:6px"><b>PRODUCTO:</b> ${_esc(a.productoNombre) || '—'}${(a.productosAdicionales && a.productosAdicionales.length) ? ` + ${_esc(a.productosAdicionales.map(p => p.nombre).join(', '))}` : ''}</div>
+          <div style="font-size:10.5px;margin-top:6px"><b>DISEÑO DE MEZCLA:</b> ${diseno ? `${_esc(diseno.codigo)} — ${_esc(diseno.nombre)}` : _esc(a.disenoCodigo) || '—'}</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px;font-size:10.5px">
             <div><b>RESISTENCIA DE DISEÑO:</b> ${a.resistenciaDiseno || '—'} MPa</div>
-            <div><b>TAMAÑO MÁXIMO DE AGREGADO:</b> ${a.tamanoMaximo || '—'}</div>
+            <div><b>TAMAÑO MÁXIMO DE AGREGADO:</b> ${_esc(a.tamanoMaximo) || '—'}</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;font-size:10.5px">
             ${(a.agregados || []).map(ag => `<span><b>HUMEDAD ${(ag.producto || (ag.rolBase === 'arena' ? 'ARENA' : 'TRITURADO')).toUpperCase()}:</b> ${ag.humedad != null ? ag.humedad.toFixed(1) + '%' : '—'}</span>`).join('')}

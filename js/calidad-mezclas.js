@@ -168,11 +168,11 @@ function renderDisenosMezcla() {
   tbody.innerHTML = data.map(d => {
     const inactivo = d.estado === 'Inactivo';
     const ultimoActor = d.modificadoPor || d.creadoPor;
-    const nombreActor = USUARIOS_CRM[ultimoActor]?.nombre || ultimoActor || '—';
+    const nombreActor = _esc(USUARIOS_CRM[ultimoActor]?.nombre || ultimoActor) || '—';
     const etiquetaActor = d.modificadoPor ? 'Modificó' : 'Elaboró';
     return `<tr style="border-top:2px solid var(--azul-oscuro);${inactivo ? 'opacity:.55' : ''}">
-      <td style="font-weight:700;color:var(--azul)">${d.codigo}</td>
-      <td style="font-weight:600">${d.nombre}</td>
+      <td style="font-weight:700;color:var(--azul)">${_esc(d.codigo)}</td>
+      <td style="font-weight:600">${_esc(d.nombre)}</td>
       <td style="text-align:center;font-weight:700">${d.resistenciaDiseno || '—'} MPa</td>
       <td style="text-align:center">${d.asentamiento || '—'} cm</td>
       <td style="text-align:center">${d.tamanoMaximo || '—'}</td>
@@ -396,7 +396,7 @@ function poblarSelectDisenos(selectId) {
   const sel = document.getElementById(selectId);
   if (!sel) return;
   const activos = DISENOS_MEZCLA.filter(d => d.estado !== 'Inactivo').sort((a, b) => a.codigo.localeCompare(b.codigo));
-  sel.innerHTML = '<option value="">— Selecciona un diseño —</option>' + activos.map(d => `<option value="${d.codigo}">${d.codigo} — ${d.nombre} (${d.resistenciaDiseno} MPa)</option>`).join('');
+  sel.innerHTML = '<option value="">— Selecciona un diseño —</option>' + activos.map(d => `<option value="${_esc(d.codigo)}">${_esc(d.codigo)} — ${_esc(d.nombre)} (${d.resistenciaDiseno} MPa)</option>`).join('');
 }
 
 // La revisión más próxima (la primera) que ocurrió DESPUÉS de una fecha dada — se usa
@@ -471,9 +471,9 @@ function poblarFiltrosEnsayosLista() {
   });
   const prevCliente = selCliente.value, prevProyecto = selProyecto.value;
   selCliente.innerHTML = '<option value="">Todos los clientes</option>' +
-    [...clientes].sort().map(c => `<option value="${c}">${c}</option>`).join('');
+    [...clientes].sort().map(c => `<option value="${_esc(c)}">${_esc(c)}</option>`).join('');
   selProyecto.innerHTML = '<option value="">Todos los proyectos</option>' +
-    [...proyectos].sort().map(p => `<option value="${p}">${p}</option>`).join('');
+    [...proyectos].sort().map(p => `<option value="${_esc(p)}">${_esc(p)}</option>`).join('');
   if (prevCliente) selCliente.value = prevCliente;
   if (prevProyecto) selProyecto.value = prevProyecto;
 
@@ -482,7 +482,7 @@ function poblarFiltrosEnsayosLista() {
     .sort((a, b) => a.codigo.localeCompare(b.codigo));
   const prevResistencia = selResistencia.value;
   selResistencia.innerHTML = '<option value="">Todas las resistencias</option>' +
-    disenosConEnsayo.map(d => `<option value="${d.codigo}">${d.codigo}${d.nombre ? ' — ' + d.nombre : ''}</option>`).join('');
+    disenosConEnsayo.map(d => `<option value="${_esc(d.codigo)}">${_esc(d.codigo)}${d.nombre ? ' — ' + _esc(d.nombre) : ''}</option>`).join('');
   if (prevResistencia) selResistencia.value = prevResistencia;
 }
 
@@ -530,14 +530,14 @@ function renderEnsayosCalidad() {
   tbody.innerHTML = data.map(e => {
     const ultimaResistencia = (e.resultados || []).length ? e.resultados[e.resultados.length - 1] : null;
     return `<tr style="border-top:2px solid var(--azul-oscuro)">
-      <td style="font-weight:700;color:var(--azul)">${e.cilindroNo || '—'}</td>
+      <td style="font-weight:700;color:var(--azul)">${_esc(e.cilindroNo) || '—'}</td>
       <td>${e.fecha ? new Date(e.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
-      <td>${e.disenoCodigo ? `<span style="font-size:11px;background:var(--gris-borde);color:#333;padding:2px 6px;border-radius:3px;font-weight:600">${e.disenoCodigo}</span>` : '—'}</td>
-      <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e.elemento || ''}">${e.elemento || '—'}</td>
+      <td>${e.disenoCodigo ? `<span style="font-size:11px;background:var(--gris-borde);color:#333;padding:2px 6px;border-radius:3px;font-weight:600">${_esc(e.disenoCodigo)}</span>` : '—'}</td>
+      <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${_esc(e.elemento)}">${_esc(e.elemento) || '—'}</td>
       <td style="text-align:center">${e.resistenciaObjetivo || '—'} MPa</td>
       <td style="text-align:center">${ultimaResistencia ? Number(ultimaResistencia.resistencia).toFixed(1) + ' MPa (' + ultimaResistencia.edad + 'd)' : '—'}</td>
       <td><span class="badge" style="background:${bgEstado[e._estado]};color:${colorEstado[e._estado]}">${e._estado}</span></td>
-      <td>${USUARIOS_CRM[e.creadoPor]?.nombre || e.creadoPor || '—'}</td>
+      <td>${_esc(USUARIOS_CRM[e.creadoPor]?.nombre || e.creadoPor) || '—'}</td>
       <td>
         <div class="flex-gap">
           ${e.pdfPath ? `<button class="btn btn-secundario btn-xs" onclick="verPdfEnsayo('${e.id}')">📄 Ver PDF</button>` : ''}
@@ -914,16 +914,16 @@ function _renderZonaPdfLaboratorio() {
   const kb = (n) => (n / 1024).toFixed(0) + ' KB';
   const l = _ultimaLecturaInforme;
   const resumenLectura = l
-    ? ` · 📋 ${l.laboratorio || 'laboratorio no identificado'}${l.fechaEnsayo ? `, ensayo ${l.fechaEnsayo}` : ''}${l.probetas.length ? `, ${l.probetas.join('/')} MPa` : ', sin resistencias reconocidas — revisa a mano'}`
+    ? ` · 📋 ${_esc(l.laboratorio) || 'laboratorio no identificado'}${l.fechaEnsayo ? `, ensayo ${_esc(l.fechaEnsayo)}` : ''}${l.probetas.length ? `, ${_esc(l.probetas.join('/'))} MPa` : ', sin resistencias reconocidas — revisa a mano'}`
     : (!_ajusteDesdeTextoCilindroEnsayo(document.getElementById('m-ensayo-cilindro')?.value.trim() || '') ? ' · 💡 elige primero el N° de Cilindro para autocompletar los datos del informe' : '');
   if (_pdfLaboratorioPendiente?.reusado) {
     const p = _pdfLaboratorioPendiente;
-    el.innerHTML = `<span style="color:var(--azul)">🔗 ${p.nombre} — mismo informe que el ensayo ${p.ensayoOrigen || 'ya subido'}, no se duplica</span>${resumenLectura} · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
+    el.innerHTML = `<span style="color:var(--azul)">🔗 ${_esc(p.nombre)} — mismo informe que el ensayo ${_esc(p.ensayoOrigen) || 'ya subido'}, no se duplica</span>${resumenLectura} · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
   } else if (_pdfLaboratorioPendiente) {
     const p = _pdfLaboratorioPendiente;
-    el.innerHTML = `<span style="color:var(--verde)">✅ ${p.nombre} — ${p.comprimido ? `comprimido de ${kb(p.tamanoOriginal)} a ${kb(p.tamanoFinal)}` : kb(p.tamanoFinal)}</span>${resumenLectura} · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
+    el.innerHTML = `<span style="color:var(--verde)">✅ ${_esc(p.nombre)} — ${p.comprimido ? `comprimido de ${kb(p.tamanoOriginal)} a ${kb(p.tamanoFinal)}` : kb(p.tamanoFinal)}</span>${resumenLectura} · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
   } else if (_pdfLaboratorioExistente) {
-    el.innerHTML = `<span style="color:var(--gris-medio)">📄 ${_pdfLaboratorioExistente.nombre || 'PDF adjunto'}</span> · <a href="#" onclick="event.stopPropagation();verPdfLaboratorio();return false">ver</a> · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
+    el.innerHTML = `<span style="color:var(--gris-medio)">📄 ${_esc(_pdfLaboratorioExistente.nombre) || 'PDF adjunto'}</span> · <a href="#" onclick="event.stopPropagation();verPdfLaboratorio();return false">ver</a> · <a href="#" onclick="event.stopPropagation();quitarPdfLaboratorio();return false" style="color:var(--rojo)">quitar</a>`;
   } else {
     el.textContent = '';
   }
@@ -969,9 +969,27 @@ function _marcarZonaPdfError(esError) {
   if (zona) zona.style.background = esError ? '#FFEBEE' : '#FAFBFC';
 }
 
+// `file.type` lo deriva el navegador de la EXTENSIÓN del archivo, no de su contenido real — un
+// archivo malicioso renombrado a "algo.pdf" pasa esa validación igual. Esto lee de verdad los
+// primeros bytes y confirma la firma real de un PDF ("%PDF-") antes de aceptarlo (2026-08-04,
+// auditoría de seguridad: "validación de archivo subido solo del lado del cliente").
+async function _esRealmentePdf(file) {
+  try {
+    const buffer = await file.slice(0, 5).arrayBuffer();
+    const firma = String.fromCharCode(...new Uint8Array(buffer));
+    return firma === '%PDF-';
+  } catch {
+    return false;
+  }
+}
+
+const _PDF_LABORATORIO_TAMANO_MAXIMO = 25 * 1024 * 1024; // 25 MB — generoso para un escaneo, evita abuso/DoS de espacio
+
 async function manejarArchivoLaboratorio(file) {
   if (!file) return;
   if (file.type !== 'application/pdf') { alert('Ese archivo no es un PDF.'); return; }
+  if (file.size > _PDF_LABORATORIO_TAMANO_MAXIMO) { alert(`El archivo pesa ${(file.size/1024/1024).toFixed(1)} MB — el máximo permitido es 25 MB.`); return; }
+  if (!(await _esRealmentePdf(file))) { alert('Ese archivo no es un PDF válido (no tiene la firma esperada) — puede estar dañado o ser otro tipo de archivo renombrado.'); return; }
   if (typeof pdfjsLib === 'undefined' || typeof window.jspdf === 'undefined') { alert('No se pudo cargar el procesador de PDF — revisa tu conexión.'); return; }
 
   const el = document.getElementById('ensayo-pdf-estado');

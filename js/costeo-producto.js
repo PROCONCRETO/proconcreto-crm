@@ -72,8 +72,8 @@ function _pintarSugerenciasProductoCosteo() {
   }
   box.innerHTML = _sugerenciasProductoCosteo.map((p, i) => `
     <div onmousedown="_elegirProductoCosteo(${i})" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--gris-borde);${i === _indiceSugerenciaCosteo ? 'background:var(--azul-suave)' : 'background:white'}">
-      <div style="font-weight:600;font-size:13px">${p.nombre}</div>
-      <div style="font-size:11px;color:var(--gris-medio)">${p.codigo} · ${p.grupo}${p.medidas ? ' · ' + p.medidas : ''}</div>
+      <div style="font-weight:600;font-size:13px">${_esc(p.nombre)}</div>
+      <div style="font-size:11px;color:var(--gris-medio)">${_esc(p.codigo)} · ${_esc(p.grupo)}${p.medidas ? ' · ' + _esc(p.medidas) : ''}</div>
     </div>`).join('');
   box.style.display = 'block';
 }
@@ -629,7 +629,7 @@ function _revisarImpactoPrecios(origenLabel) {
   document.getElementById('impacto-precios-count').textContent = afectados.length;
   document.getElementById('impacto-precios-body').innerHTML = afectados.map(a => `
     <tr>
-      <td style="font-weight:600">${a.nombre}</td>
+      <td style="font-weight:600">${_esc(a.nombre)}</td>
       <td style="text-align:right;white-space:nowrap">${_fmt(a.listaActual)} → <b style="color:var(--azul)">${_fmt(a.listaNueva)}</b></td>
       <td style="text-align:right;white-space:nowrap">${_fmt(a.minimoActual)} → <b style="color:var(--azul)">${_fmt(a.minimoNueva)}</b></td>
     </tr>`).join('');
@@ -671,10 +671,10 @@ function renderCosteoProductos() {
     const tipo = TIPOS_ESTRUCTURA_COSTEO[c.tipoEstructura] || TIPOS_ESTRUCTURA_COSTEO.vibrocompactado;
     const nombreEsc = _escNombreOnclick(c.productoCodigo);
     return `<tr>
-      <td style="font-weight:600">${c.productoNombre}</td>
+      <td style="font-weight:600">${_esc(c.productoNombre)}</td>
       <td><span class="badge-tipo" style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:600;background:${tipo.bg};color:${tipo.fg}">${tipo.label}</span></td>
       <td style="text-align:right;font-weight:700;color:var(--azul)">${_fmtCosteoProd(k.totalUnidad)}</td>
-      <td style="font-size:12px;color:var(--gris-medio)">${c.disenoMezclaCodigo || '—'}</td>
+      <td style="font-size:12px;color:var(--gris-medio)">${_esc(c.disenoMezclaCodigo) || '—'}</td>
       <td style="font-size:12px;color:var(--gris-medio)">${c._modificado ? new Date(c._modificado).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
       <td>
         <div class="flex-gap">
@@ -785,14 +785,22 @@ function eliminarCosteoProducto(codigo) {
   renderCosteoProductos();
 }
 
-// Fila de una tabla de detalle del consolidado: Nombre | Cantidad (con unidad) | Precio | Costo.
-function _filaDetalleCosteo(nombre, cantidad, unidad, precio, costo, noEncontrado) {
-  const nombreHtml = noEncontrado ? `${nombre} <span style="color:var(--rojo);font-size:11px">(ya no existe)</span>` : nombre;
+// % que representa un costo frente al costo total por unidad del producto (2026-08-04, a
+// pedido del usuario, para ver de un vistazo qué insumos pesan más en el costo).
+function _pctCosteoProd(costo, totalUnidad) {
+  if (!totalUnidad) return '—';
+  return ((costo || 0) / totalUnidad * 100).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+}
+
+// Fila de una tabla de detalle del consolidado: Nombre | Cantidad (con unidad) | Precio | Costo | % del costo total.
+function _filaDetalleCosteo(nombre, cantidad, unidad, precio, costo, noEncontrado, totalUnidad) {
+  const nombreHtml = noEncontrado ? `${_esc(nombre)} <span style="color:var(--rojo);font-size:11px">(ya no existe)</span>` : _esc(nombre);
   return `<tr>
     <td>${nombreHtml}</td>
-    <td style="text-align:right;color:var(--gris-medio)">${cantidad != null ? cantidad.toLocaleString('es-CO', { maximumFractionDigits: 4 }) + (unidad ? ' ' + unidad : '') : '—'}</td>
+    <td style="text-align:right;color:var(--gris-medio)">${cantidad != null ? cantidad.toLocaleString('es-CO', { maximumFractionDigits: 4 }) + (unidad ? ' ' + _esc(unidad) : '') : '—'}</td>
     <td style="text-align:right;color:var(--gris-medio)">${precio != null ? _fmtCosteoProd(precio) : '—'}</td>
     <td style="text-align:right;font-weight:700">${_fmtCosteoProd(costo)}</td>
+    <td style="text-align:right;color:var(--gris-medio);font-size:12px">${_pctCosteoProd(costo, totalUnidad)}</td>
   </tr>`;
 }
 
@@ -802,8 +810,8 @@ function _seccionDetalleCosteo(titulo, filasHtml, vacioTexto) {
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo">${titulo}</div>
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Insumo</th><th style="text-align:right;width:130px">Cantidad</th><th style="text-align:right;width:110px">Precio</th><th style="text-align:right;width:110px">Costo/unidad</th></tr></thead>
-        <tbody>${filasHtml || `<tr><td colspan="4" style="text-align:center;color:var(--gris-medio);font-size:12px">${vacioTexto}</td></tr>`}</tbody>
+        <thead><tr><th>Insumo</th><th style="text-align:right;width:130px">Cantidad</th><th style="text-align:right;width:110px">Precio</th><th style="text-align:right;width:110px">Costo/unidad</th><th style="text-align:right;width:70px">% Costo</th></tr></thead>
+        <tbody>${filasHtml || `<tr><td colspan="5" style="text-align:center;color:var(--gris-medio);font-size:12px">${vacioTexto}</td></tr>`}</tbody>
       </table>
     </div>`;
 }
@@ -820,26 +828,26 @@ function _seccionesDetalleCosteo(c, k) {
       ? '🧾 Producto <b>genera IVA</b> → insumos costeados <b>SIN IVA</b> (descontable)'
       : '🧾 Producto <b>excluido de IVA</b> → insumos costeados <b>CON IVA</b> (no descontable)')
     : '';
-  const filasMP = k.materiaPrimaDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, f.unidad, f.precio, f.costo)).join('')
-    + `<tr style="border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right;color:var(--gris-medio)">+ Desperdicio (${c.pctDesperdicio}%)</td><td style="text-align:right;font-weight:700">${_fmtCosteoProd(k.desperdicio)}</td></tr>
-       <tr style="font-weight:700"><td colspan="3" style="text-align:right">Subtotal Materia Prima</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.materiaPrima + k.desperdicio)}</td></tr>`;
+  const filasMP = k.materiaPrimaDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, f.unidad, f.precio, f.costo, false, k.totalUnidad)).join('')
+    + `<tr style="border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right;color:var(--gris-medio)">+ Desperdicio (${c.pctDesperdicio}%)</td><td style="text-align:right;font-weight:700">${_fmtCosteoProd(k.desperdicio)}</td><td style="text-align:right;color:var(--gris-medio);font-size:12px">${_pctCosteoProd(k.desperdicio, k.totalUnidad)}</td></tr>
+       <tr style="font-weight:700"><td colspan="3" style="text-align:right">Subtotal Materia Prima</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.materiaPrima + k.desperdicio)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.materiaPrima + k.desperdicio, k.totalUnidad)}</td></tr>`;
   const seccionMP = `<div style="font-size:11px;color:var(--gris-medio);margin:14px 0 -8px">${notaIvaDetalle}</div>` + _seccionDetalleCosteo('🧱 Materia Prima <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(por unidad de producto)</span>', filasMP, 'Sin Diseño de Mezcla o sin materiales con cantidad.');
 
-  const filasMO = k.manoObraDetalle.map(f => _filaDetalleCosteo(f.nombre, null, null, f.costoDia ? f.costoDia : null, f.costo, f.noEncontrado)).join('')
-    + (k.manoObraDetalle.length ? `<tr style="border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right;color:var(--gris-medio)">+ Herramienta Menor (${c.pctHerramientaMenor}%)</td><td style="text-align:right;font-weight:700">${_fmtCosteoProd(k.herramientaMenor)}</td></tr>
-       <tr style="font-weight:700"><td colspan="3" style="text-align:right">Subtotal Mano de Obra</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.manoObra + k.herramientaMenor)}</td></tr>` : '');
+  const filasMO = k.manoObraDetalle.map(f => _filaDetalleCosteo(f.nombre, null, null, f.costoDia ? f.costoDia : null, f.costo, f.noEncontrado, k.totalUnidad)).join('')
+    + (k.manoObraDetalle.length ? `<tr style="border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right;color:var(--gris-medio)">+ Herramienta Menor (${c.pctHerramientaMenor}%)</td><td style="text-align:right;font-weight:700">${_fmtCosteoProd(k.herramientaMenor)}</td><td style="text-align:right;color:var(--gris-medio);font-size:12px">${_pctCosteoProd(k.herramientaMenor, k.totalUnidad)}</td></tr>
+       <tr style="font-weight:700"><td colspan="3" style="text-align:right">Subtotal Mano de Obra</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.manoObra + k.herramientaMenor)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.manoObra + k.herramientaMenor, k.totalUnidad)}</td></tr>` : '');
   const seccionMO = _seccionDetalleCosteo('👷 Mano de Obra <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(Precio = costo/día de la cuadrilla)</span>', filasMO, 'Sin cuadrillas agregadas.');
 
-  const filasMaq = k.maquinariaDetalle.map(f => _filaDetalleCosteo(f.nombre, null, null, f.costoUnidad ? f.costoUnidad : null, f.costo, f.noEncontrado)).join('')
-    + (k.maquinariaDetalle.length ? `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Maquinaria</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.maquinaria)}</td></tr>` : '');
+  const filasMaq = k.maquinariaDetalle.map(f => _filaDetalleCosteo(f.nombre, null, null, f.costoUnidad ? f.costoUnidad : null, f.costo, f.noEncontrado, k.totalUnidad)).join('')
+    + (k.maquinariaDetalle.length ? `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Maquinaria</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.maquinaria)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.maquinaria, k.totalUnidad)}</td></tr>` : '');
   const seccionMaq = _seccionDetalleCosteo('🔧 Maquinaria <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(Precio = costo/ciclo o costo/día de la máquina)</span>', filasMaq, 'Sin máquinas agregadas.');
 
-  const filasEmp = k.empaqueDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, null, f.precio, f.costo)).join('')
-    + (k.empaqueDetalle.length ? `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Empaque</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.empaque)}</td></tr>` : '');
+  const filasEmp = k.empaqueDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, null, f.precio, f.costo, false, k.totalUnidad)).join('')
+    + (k.empaqueDetalle.length ? `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Empaque</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.empaque)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.empaque, k.totalUnidad)}</td></tr>` : '');
   const seccionEmp = _seccionDetalleCosteo('📦 Insumos de empaque', filasEmp, 'Sin insumos de empaque.');
 
-  const filasCons = k.consumosDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, null, f.precio, f.costo)).join('')
-    + (k.consumosDetalle.length ? `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Consumos</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.consumos)}</td></tr>` : '');
+  const filasCons = k.consumosDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, null, f.precio, f.costo, false, k.totalUnidad)).join('')
+    + (k.consumosDetalle.length ? `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Consumos</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.consumos)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.consumos, k.totalUnidad)}</td></tr>` : '');
   const seccionCons = _seccionDetalleCosteo('⚡ Consumos <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(energía/agua/combustible)</span>', filasCons, 'Sin consumos agregados.');
 
   return seccionMP + seccionMO + seccionMaq + seccionEmp + seccionCons;
@@ -859,7 +867,7 @@ function abrirDetalleCosteoProducto(codigo) {
   document.getElementById('modal-detalle-costeo-titulo').textContent = `Consolidado — ${c.productoNombre}`;
   document.getElementById('detalle-costeo-resumen').innerHTML = `
     <span>${tipo.label}</span>
-    <span><strong>Diseño:</strong> ${diseno ? `${diseno.codigo} — ${diseno.nombre}` : (c.disenoMezclaCodigo || '—')}</span>
+    <span><strong>Diseño:</strong> ${diseno ? `${_esc(diseno.codigo)} — ${_esc(diseno.nombre)}` : (_esc(c.disenoMezclaCodigo) || '—')}</span>
     <span><strong>Unidades/Bache:</strong> ${(r.unidadesBache || 0).toLocaleString('es-CO')}</span>
     <span><strong>Unidades/día:</strong> ${k.unidadesDia.toLocaleString('es-CO')}</span>`;
 

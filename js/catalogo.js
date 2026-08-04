@@ -353,14 +353,14 @@ function _renderResolverDuplicados() {
     const hayCosteoParaBorrar = g.elegido && codigosConCosteoAOcultar.length > 0;
     return `
     <div style="border:1px solid var(--gris-borde);border-radius:8px;padding:10px 14px;margin-bottom:10px;${!g.elegido ? 'background:#FFF8E1' : ''}">
-      <div style="font-weight:700;font-size:13px;margin-bottom:6px">${g.nombre}${!g.elegido ? ' <span style="font-size:11px;font-weight:700;color:#E65100">— elige cuál dejar activo</span>' : ''}</div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px">${_esc(g.nombre)}${!g.elegido ? ' <span style="font-size:11px;font-weight:700;color:#E65100">— elige cuál dejar activo</span>' : ''}</div>
       ${g.items.map(p => {
         const oculto = p.activo === false;
         const tieneCosteo = COSTEO_PRODUCTOS.some(c => c.productoCodigo === p.codigo);
         return `<label style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;cursor:pointer">
-          <input type="radio" name="resolver-dup-${i}" ${g.elegido === p.codigo ? 'checked' : ''} onchange="_elegirCandidatoResolverDuplicados(${i},'${p.codigo}')">
-          <span style="font-weight:600;color:var(--azul);min-width:110px">${p.codigo}</span>
-          <span style="color:var(--gris-medio);flex:1">${p.medidas || ''}</span>
+          <input type="radio" name="resolver-dup-${i}" ${g.elegido === p.codigo ? 'checked' : ''} onchange="_elegirCandidatoResolverDuplicados(${i},'${_escNombreOnclick(p.codigo)}')">
+          <span style="font-weight:600;color:var(--azul);min-width:110px">${_esc(p.codigo)}</span>
+          <span style="color:var(--gris-medio);flex:1">${_esc(p.medidas)}</span>
           <span class="badge" style="background:${oculto ? '#FFEBEE' : '#E8F5E9'};color:${oculto ? '#C62828' : '#2E7D32'}">${oculto ? 'Oculto' : 'Activo'}</span>
           ${tieneCosteo ? '<span class="badge" style="background:#E3F2FD;color:var(--azul)">🏗️ Con costeo</span>' : ''}
         </label>`;
@@ -494,11 +494,11 @@ function renderProductosAdmin() {
     const dup = esDuplicado(p);
     const costeo = tieneCosteo(p);
     return `<tr style="border-top:1px solid var(--gris-borde);${inactivo?'opacity:.55':''}${dup ? ';background:#FFF8E1' : ''}${costeo ? ';border-left:4px solid var(--azul)' : ';border-left:4px solid transparent'}">
-      <td style="font-weight:600;color:var(--azul);font-size:12px">${p.codigo}</td>
-      <td><div style="font-weight:600;font-size:13px">${p.nombre}${costeo ? ' <span style="font-size:10px;font-weight:700;color:var(--azul);background:#E3F2FD;padding:1px 6px;border-radius:8px;vertical-align:middle" title="El precio de este producto se calcula desde un Costeo de Producto guardado (Centro de Costos)">🏗️ Desde Costeo</span>' : ''}${dup ? ' <span style="font-size:10px;font-weight:700;color:#E65100;background:#FFF3E0;padding:1px 6px;border-radius:8px;vertical-align:middle" title="Otro producto activo/oculto tiene este mismo nombre">⚠️ Duplicado</span>' : ''}</div><div style="font-size:11px;color:var(--gris-medio)">${p.medidas||''}</div></td>
-      <td style="color:var(--gris-medio)">${p.grupo}</td>
-      <td style="text-align:center">${p.unidad}</td>
-      <td style="text-align:center"><span style="color:${p.iva==='SI'?'var(--rojo)':'var(--verde)'};font-weight:700;font-size:12px">${p.iva}</span></td>
+      <td style="font-weight:600;color:var(--azul);font-size:12px">${_esc(p.codigo)}</td>
+      <td><div style="font-weight:600;font-size:13px">${_esc(p.nombre)}${costeo ? ' <span style="font-size:10px;font-weight:700;color:var(--azul);background:#E3F2FD;padding:1px 6px;border-radius:8px;vertical-align:middle" title="El precio de este producto se calcula desde un Costeo de Producto guardado (Centro de Costos)">🏗️ Desde Costeo</span>' : ''}${dup ? ' <span style="font-size:10px;font-weight:700;color:#E65100;background:#FFF3E0;padding:1px 6px;border-radius:8px;vertical-align:middle" title="Otro producto activo/oculto tiene este mismo nombre">⚠️ Duplicado</span>' : ''}</div><div style="font-size:11px;color:var(--gris-medio)">${_esc(p.medidas)}</div></td>
+      <td style="color:var(--gris-medio)">${_esc(p.grupo)}</td>
+      <td style="text-align:center">${_esc(p.unidad)}</td>
+      <td style="text-align:center"><span style="color:${p.iva==='SI'?'var(--rojo)':'var(--verde)'};font-weight:700;font-size:12px">${_esc(p.iva)}</span></td>
       <td style="text-align:right">${costeo
         ? `<input type="number" value="${p.lista}" disabled title="Se calcula desde el Costeo de Producto — edítalo en Centro de Costos › Costeo de Producto" style="width:100px;text-align:right;padding:4px 6px;border:1px solid var(--gris-borde);border-radius:4px;background:#F5F5F5;color:var(--gris-medio);cursor:not-allowed">`
         : `<input type="number" value="${p.lista}" onchange="actualizarPrecioProducto('${p.codigo}','lista',this.value)" style="width:100px;text-align:right;padding:4px 6px;border:1px solid var(--gris-borde);border-radius:4px">`}</td>
@@ -507,12 +507,12 @@ function renderProductosAdmin() {
         : `<input type="number" value="${p.minimo}" onchange="actualizarPrecioProducto('${p.codigo}','minimo',this.value)" style="width:100px;text-align:right;padding:4px 6px;border:1px solid var(--gris-borde);border-radius:4px">`}</td>
       <td><span class="badge" style="background:${inactivo?'#FFEBEE':'#E8F5E9'};color:${inactivo?'#C62828':'#2E7D32'}">${inactivo?'Oculto':'Activo'}</span></td>
       <td><div class="flex-gap">
-        <button class="btn btn-primario btn-xs" onclick="abrirModalProducto('${p.codigo}')">✏️ Editar</button>
+        <button class="btn btn-primario btn-xs" onclick="abrirModalProducto('${_escNombreOnclick(p.codigo)}')">✏️ Editar</button>
         ${inactivo
-          ? `<button class="btn btn-verde btn-xs" onclick="toggleOcultarProducto('${p.codigo}',false)">↩️ Reactivar</button>`
-          : `<button class="btn btn-secundario btn-xs" onclick="toggleOcultarProducto('${p.codigo}',true)">🚫 Ocultar</button>`}
+          ? `<button class="btn btn-verde btn-xs" onclick="toggleOcultarProducto('${_escNombreOnclick(p.codigo)}',false)">↩️ Reactivar</button>`
+          : `<button class="btn btn-secundario btn-xs" onclick="toggleOcultarProducto('${_escNombreOnclick(p.codigo)}',true)">🚫 Ocultar</button>`}
         ${inactivo && !costeo
-          ? `<button class="btn btn-rojo btn-xs" onclick="eliminarProductoDefinitivo('${p.codigo}')" title="Solo disponible para productos ocultos y sin Costeo de Producto">🗑️ Eliminar</button>`
+          ? `<button class="btn btn-rojo btn-xs" onclick="eliminarProductoDefinitivo('${_escNombreOnclick(p.codigo)}')" title="Solo disponible para productos ocultos y sin Costeo de Producto">🗑️ Eliminar</button>`
           : ''}
       </div></td>
     </tr>`;

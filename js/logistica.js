@@ -410,14 +410,14 @@ function renderCalendarioLogistica() {
     celdas += `
       <div class="${clases}" onclick="abrirModalViaje('${fechaStr}')" ondragover="permitirSoltarViaje(event)" ondragleave="quitarResaltadoSoltar(event)" ondrop="soltarViajeEnDia(event,'${fechaStr}')">
         <div class="log-cal-dia-num">${dia}${esHoy ? ' <span class="log-cal-hoy-badge">HOY</span>' : ''}${viajesDia.length ? `<span onclick="event.stopPropagation();imprimirProgramacionDia('${fechaStr}')" title="Imprimir programación del día" style="float:right;cursor:pointer">🖨️</span>` : ''}</div>
-        ${festivoNombre ? `<div class="log-cal-festivo-nombre" title="${festivoNombre}">🎉 ${festivoNombre}</div>` : ''}
+        ${festivoNombre ? `<div class="log-cal-festivo-nombre" title="${_esc(festivoNombre)}">🎉 ${_esc(festivoNombre)}</div>` : ''}
         <div class="log-cal-viajes">
           ${viajesDia.map((v, idxViaje) => {
             const nEntregas = _entregasDeViaje(v).length;
             const peso = Number(v.pesoTotal) || 0;
             const pct = pctCumplidoViaje(v);
             const pctTxt = (fechaStr <= hoyStr && pct !== null) ? ` — ${pct}% cumplido` : '';
-            const tituloTip = `${v.destino || ''}${v.vehiculo ? ' — ' + v.vehiculo : ''} — ${nEntregas} entrega${nEntregas === 1 ? '' : 's'} — ${peso.toFixed(2)} ton${v.estado ? ' — ' + v.estado : ''}${pctTxt}`;
+            const tituloTip = `${_esc(v.destino)}${v.vehiculo ? ' — ' + _esc(v.vehiculo) : ''} — ${nEntregas} entrega${nEntregas === 1 ? '' : 's'} — ${peso.toFixed(2)} ton${v.estado ? ' — ' + _esc(v.estado) : ''}${pctTxt}`;
             const flechas = viajesDia.length > 1 ? `
               <span class="log-cal-viaje-flechas">
                 ${idxViaje > 0 ? `<span onclick="event.stopPropagation();moverViajeOrden('${v.id}',-1)" title="Subir prioridad">▲</span>` : ''}
@@ -425,7 +425,7 @@ function renderCalendarioLogistica() {
               </span>` : '';
             return `
             <div class="log-cal-viaje" draggable="${!diaBloqueado}" ondragstart="iniciarArrastreViaje(event,'${v.id}')" ondragend="terminarArrastreViaje(event)" ondragover="permitirSoltarViaje(event)" ondrop="soltarViajeSobreViaje(event,'${v.id}')" style="background:${COLOR_VEHICULO_VIAJE[v.vehiculo] || '#607D8B'}${v.estado === 'Cancelada' ? ';opacity:.5;text-decoration:line-through' : ''}" onclick="event.stopPropagation();editarViaje('${v.id}')" title="${tituloTip}${diaBloqueado ? '' : ' — arrastra para mover o reordenar'}">
-              <span class="log-cal-viaje-texto">${v.destino || 'Viaje'} · ${nEntregas} ent · ${peso.toFixed(1)}t${fechaStr <= hoyStr && pct !== null ? ` · ${pct}%` : ''}</span>${flechas}
+              <span class="log-cal-viaje-texto">${_esc(v.destino) || 'Viaje'} · ${nEntregas} ent · ${peso.toFixed(1)}t${fechaStr <= hoyStr && pct !== null ? ` · ${pct}%` : ''}</span>${flechas}
             </div>`;
           }).join('')}
         </div>
@@ -538,13 +538,13 @@ function renderEntregasViaje() {
       return `
       <div class="card" style="padding:12px;margin-bottom:10px;background:#FAFBFC;box-shadow:none;border:1px solid var(--gris-borde)">
         <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
-          <div style="font-size:13px;font-weight:700">${e.cliente || 'Sin cliente'}${e.destino ? ' — ' + e.destino : ''}</div>
-          <div style="font-size:11px;font-weight:700">${_ETIQUETA_CUMPLIDO[c.estado] || _ETIQUETA_CUMPLIDO.pendiente}${c.estado === 'reprogramada' && c.nuevaFecha ? ` → ${c.nuevaFecha}` : ''}${_countReprogramaciones(e) ? ` <span style="color:var(--naranja)">🔁×${_countReprogramaciones(e)}</span>` : ''}</div>
+          <div style="font-size:13px;font-weight:700">${_esc(e.cliente) || 'Sin cliente'}${e.destino ? ' — ' + _esc(e.destino) : ''}</div>
+          <div style="font-size:11px;font-weight:700">${_ETIQUETA_CUMPLIDO[c.estado] || _ETIQUETA_CUMPLIDO.pendiente}${c.estado === 'reprogramada' && c.nuevaFecha ? ` → ${_esc(c.nuevaFecha)}` : ''}${_countReprogramaciones(e) ? ` <span style="color:var(--naranja)">🔁×${_countReprogramaciones(e)}</span>` : ''}</div>
         </div>
-        <div style="font-size:11px;color:var(--gris-medio);margin-bottom:2px">Orden: ${e.ordenNumero || 'N/A — sin orden asociada'}</div>
-        <div style="font-size:11px;color:var(--gris-medio);margin-bottom:6px">Contacto en obra: ${e.contactoObraNombre ? e.contactoObraNombre + (e.contactoObraTelefono ? ' — ' + e.contactoObraTelefono : '') : '—'}</div>
-        ${c.estado === 'cancelada' && c.causa ? `<div style="font-size:11px;color:var(--rojo);margin-bottom:6px">Causa: ${c.causa}</div>` : ''}
-        ${(e.productos || []).map(p => `<div style="font-size:12px;padding:3px 0;border-top:1px solid #eee">• ${p.producto || ''} — ${p.cantidad || 0} (${(Number(p.peso) || 0).toFixed(2)} ton)</div>`).join('')}
+        <div style="font-size:11px;color:var(--gris-medio);margin-bottom:2px">Orden: ${_esc(e.ordenNumero) || 'N/A — sin orden asociada'}</div>
+        <div style="font-size:11px;color:var(--gris-medio);margin-bottom:6px">Contacto en obra: ${e.contactoObraNombre ? _esc(e.contactoObraNombre) + (e.contactoObraTelefono ? ' — ' + _esc(e.contactoObraTelefono) : '') : '—'}</div>
+        ${c.estado === 'cancelada' && c.causa ? `<div style="font-size:11px;color:var(--rojo);margin-bottom:6px">Causa: ${_esc(c.causa)}</div>` : ''}
+        ${(e.productos || []).map(p => `<div style="font-size:12px;padding:3px 0;border-top:1px solid #eee">• ${_esc(p.producto) || ''} — ${p.cantidad || 0} (${(Number(p.peso) || 0).toFixed(2)} ton)</div>`).join('')}
       </div>`;
     }).join('');
     return;
@@ -557,13 +557,13 @@ function renderEntregasViaje() {
         <label>Orden de Producción asociada</label>
         <select onchange="aplicarOrdenAEntrega(${ei},this.value)" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
           <option value="">N/A — sin orden asociada</option>
-          ${_opcionesOrdenes.map(o => `<option value="${o.id}" ${String(e.ordenId || '') === String(o.id) ? 'selected' : ''}>${o.numero} — ${o.cliente || ''} — ${(o.descripcion || '').slice(0, 40)}</option>`).join('')}
+          ${_opcionesOrdenes.map(o => `<option value="${_esc(o.id)}" ${String(e.ordenId || '') === String(o.id) ? 'selected' : ''}>${_esc(o.numero)} — ${_esc(o.cliente)} — ${_esc((o.descripcion || '').slice(0, 40))}</option>`).join('')}
         </select>
       </div>
       <div class="form-grid" style="margin-bottom:8px">
         <div class="form-grupo"><label>Cliente</label>
           <div class="buscador-cliente" style="position:relative">
-            <input type="text" id="entrega-cliente-input-${ei}" value="${e.cliente || ''}" title="${e.cliente || ''}" oninput="filtrarClienteEntrega(${ei})" placeholder="Busca un cliente existente..." style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:8px;font-size:13px">
+            <input type="text" id="entrega-cliente-input-${ei}" value="${_esc(e.cliente)}" title="${_esc(e.cliente)}" oninput="filtrarClienteEntrega(${ei})" placeholder="Busca un cliente existente..." style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:8px;font-size:13px">
             <div id="entrega-cliente-resultados-${ei}" style="display:none;position:absolute;z-index:60;left:0;right:0;margin-top:2px;border:1.5px solid #93C5FD;border-radius:8px;background:#fff;max-height:220px;overflow-y:auto;box-shadow:var(--sombra-md)"></div>
           </div>
         </div>
@@ -572,14 +572,14 @@ function renderEntregasViaje() {
         </div>
       </div>
       <div class="form-grid" style="margin-bottom:8px">
-        <div class="form-grupo"><label>Contacto en obra <span style="font-weight:400;text-transform:none">(por defecto del proyecto — se puede ajustar)</span></label><input type="text" id="entrega-contacto-nombre-${ei}" value="${e.contactoObraNombre || ''}" oninput="_entregasViajeActual[${ei}].contactoObraNombre=this.value" placeholder="Nombre de quien recibe en obra"></div>
-        <div class="form-grupo"><label>Teléfono contacto en obra</label><input type="text" id="entrega-contacto-tel-${ei}" value="${e.contactoObraTelefono || ''}" oninput="_entregasViajeActual[${ei}].contactoObraTelefono=this.value" placeholder="Ej: 3101234567"></div>
+        <div class="form-grupo"><label>Contacto en obra <span style="font-weight:400;text-transform:none">(por defecto del proyecto — se puede ajustar)</span></label><input type="text" id="entrega-contacto-nombre-${ei}" value="${_esc(e.contactoObraNombre)}" oninput="_entregasViajeActual[${ei}].contactoObraNombre=this.value" placeholder="Nombre de quien recibe en obra"></div>
+        <div class="form-grupo"><label>Teléfono contacto en obra</label><input type="text" id="entrega-contacto-tel-${ei}" value="${_esc(e.contactoObraTelefono)}" oninput="_entregasViajeActual[${ei}].contactoObraTelefono=this.value" placeholder="Ej: 3101234567"></div>
       </div>
       <div style="margin-bottom:6px">
         ${e.productos.map((p, pi) => `
           <div style="border:1px solid var(--gris-borde);border-radius:var(--radio);padding:8px;margin-bottom:6px;background:white">
             <div class="entrega-prod-buscador" style="position:relative;margin-bottom:6px">
-              <input type="text" id="viaje-prod-input-${ei}-${pi}" value="${p.producto || ''}" title="${p.producto || ''}" oninput="filtrarProductosEntrega(${ei},${pi})" placeholder="Buscar por nombre o código..." style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:6px 8px;font-size:13px">
+              <input type="text" id="viaje-prod-input-${ei}-${pi}" value="${_esc(p.producto)}" title="${_esc(p.producto)}" oninput="filtrarProductosEntrega(${ei},${pi})" placeholder="Buscar por nombre o código..." style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:6px 8px;font-size:13px">
               <div id="viaje-prod-resultados-${ei}-${pi}" style="display:none;position:absolute;z-index:50;left:0;right:0;margin-top:2px;border:1.5px solid #93C5FD;border-radius:8px;background:#fff;max-height:220px;overflow-y:auto;box-shadow:var(--sombra-md)"></div>
             </div>
             <div style="display:flex;align-items:center;gap:10px">
@@ -652,8 +652,8 @@ function filtrarClienteEntrega(ei) {
   const res = (typeof CLIENTES !== 'undefined' ? CLIENTES : []).filter(c => c.nombre.toLowerCase().includes(q)).slice(0, 18);
   div.innerHTML = res.length
     ? res.map(c => `
-      <div data-cliente="${(c.nombre || '').replace(/"/g, '&quot;')}" onclick="elegirClienteEntrega(${ei},this.dataset.cliente)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
-        <div style="font-weight:600;font-size:13px;color:#1e293b">${c.nombre}</div>
+      <div data-cliente="${_esc(c.nombre)}" onclick="elegirClienteEntrega(${ei},this.dataset.cliente)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
+        <div style="font-weight:600;font-size:13px;color:#1e293b">${_esc(c.nombre)}</div>
       </div>`).join('')
     : '<div style="padding:10px 14px;color:#888;font-size:12px">Sin resultados para esta búsqueda.</div>';
   div.style.display = 'block';
@@ -683,8 +683,8 @@ function filtrarProductosEntrega(ei, pi) {
   div.innerHTML = res.length
     ? res.map(p => `
       <div onclick="elegirProductoEntrega(${ei},${pi},'${p.codigo}')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
-        <div style="font-weight:600;font-size:13px;color:#1e293b">${p.nombre}</div>
-        <div style="font-size:11px;color:#64748b">${p.codigo}</div>
+        <div style="font-weight:600;font-size:13px;color:#1e293b">${_esc(p.nombre)}</div>
+        <div style="font-size:11px;color:#64748b">${_esc(p.codigo)}</div>
       </div>`).join('')
     : '<div style="padding:10px 14px;color:#888;font-size:12px">Sin resultados para esta búsqueda.</div>';
   div.style.display = 'block';
@@ -960,8 +960,8 @@ function renderListaCumplidos() {
     return `
     <div class="card" style="padding:10px 12px;margin-bottom:8px;border:1px solid var(--gris-borde);box-shadow:none">
       <div style="margin-bottom:8px">
-        <div style="font-size:12.5px;font-weight:700;text-transform:capitalize">${fechaLegible} — ${f.entrega.cliente || 'Sin cliente'}${vecesRepro ? ` <span style="color:var(--naranja);font-size:11px">🔁×${vecesRepro}</span>` : ''}</div>
-        <div style="font-size:11px;color:var(--gris-medio)">${f.entrega.destino || f.destinoViaje || ''} · ${f.vehiculo || ''} · ${pesoEntrega.toFixed(2)} ton</div>
+        <div style="font-size:12.5px;font-weight:700;text-transform:capitalize">${fechaLegible} — ${_esc(f.entrega.cliente) || 'Sin cliente'}${vecesRepro ? ` <span style="color:var(--naranja);font-size:11px">🔁×${vecesRepro}</span>` : ''}</div>
+        <div style="font-size:11px;color:var(--gris-medio)">${_esc(f.entrega.destino || f.destinoViaje)} · ${_esc(f.vehiculo)} · ${pesoEntrega.toFixed(2)} ton</div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <button class="btn btn-primario btn-xs" onclick="marcarCumplidoEntrega('${f.viajeId}',${f.entregaIndex},'hecha')">✅ Hecha</button>
@@ -1076,23 +1076,23 @@ function imprimirProgramacionDia(fechaStr) {
     const excedido = capacidad && peso > capacidad;
     const entregasHTML = _entregasDeViaje(v).map(e => `
       <div style="margin:8px 0;padding:8px;border:1px solid #eee;border-radius:5px">
-        <div style="font-size:12px;font-weight:700">${e.cliente || '—'}${e.destino ? ' — ' + e.destino : ''}</div>
-        <div style="font-size:10.5px;color:#555;margin-bottom:4px">Contacto en obra: ${e.contactoObraNombre ? e.contactoObraNombre + (e.contactoObraTelefono ? ' — ' + e.contactoObraTelefono : '') : '—'}</div>
+        <div style="font-size:12px;font-weight:700">${_esc(e.cliente) || '—'}${e.destino ? ' — ' + _esc(e.destino) : ''}</div>
+        <div style="font-size:10.5px;color:#555;margin-bottom:4px">Contacto en obra: ${e.contactoObraNombre ? _esc(e.contactoObraNombre) + (e.contactoObraTelefono ? ' — ' + _esc(e.contactoObraTelefono) : '') : '—'}</div>
         <table style="width:100%;border-collapse:collapse;font-size:10.5px">
-          ${(e.productos || []).map(p => `<tr><td style="padding:2px 0">• ${p.producto || ''}</td><td style="padding:2px 0;text-align:center;width:70px">${p.cantidad || 0}</td><td style="padding:2px 0;text-align:right;width:80px">${(Number(p.peso) || 0).toFixed(2)} ton</td></tr>`).join('')}
+          ${(e.productos || []).map(p => `<tr><td style="padding:2px 0">• ${_esc(p.producto) || ''}</td><td style="padding:2px 0;text-align:center;width:70px">${p.cantidad || 0}</td><td style="padding:2px 0;text-align:right;width:80px">${(Number(p.peso) || 0).toFixed(2)} ton</td></tr>`).join('')}
         </table>
       </div>`).join('');
     return `
       <div style="margin-bottom:16px">
         <div style="background:#003F7F;color:white;padding:6px 10px;border-radius:5px 5px 0 0;display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12px;font-weight:700">
           <span style="background:#1D9E75;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">${idxViaje + 1}</span>
-          <span>🚛 ${v.vehiculo || '—'}</span>
-          <span>Destino: ${v.destino || '—'}</span>
+          <span>🚛 ${_esc(v.vehiculo) || '—'}</span>
+          <span>Destino: ${_esc(v.destino) || '—'}</span>
           <span style="margin-left:auto;color:${excedido ? '#FFCDD2' : 'white'}">${peso.toFixed(2)}${capacidad ? ' / ' + capacidad : ''} ton${excedido ? ' ⚠' : ''}</span>
         </div>
         <div style="border:1px solid #ddd;border-top:none;padding:6px 10px 10px">
           ${entregasHTML}
-          ${v.observaciones ? `<div style="font-size:10px;color:#777;margin-top:4px"><b>Obs:</b> ${v.observaciones}</div>` : ''}
+          ${v.observaciones ? `<div style="font-size:10px;color:#777;margin-top:4px"><b>Obs:</b> ${_esc(v.observaciones)}</div>` : ''}
         </div>
       </div>`;
   }).join('');

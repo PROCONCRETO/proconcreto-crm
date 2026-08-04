@@ -29,8 +29,8 @@ function filtrarProductos() {
     div.innerHTML = res.map(p =>
       `<div onclick="agregarItem('${p.codigo}')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:8px" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
         <div>
-          <div style="font-weight:600;font-size:13px;color:#1e293b">${p.nombre}</div>
-          <div style="font-size:11px;color:#64748b">${p.codigo}${p.medidas ? ' · ' + p.medidas : ''} · ${p.unidad}</div>
+          <div style="font-weight:600;font-size:13px;color:#1e293b">${_esc(p.nombre)}</div>
+          <div style="font-size:11px;color:#64748b">${_esc(p.codigo)}${p.medidas ? ' · ' + _esc(p.medidas) : ''} · ${_esc(p.unidad)}</div>
         </div>
         <div style="text-align:right;white-space:nowrap">
           <div style="font-weight:700;font-size:13px;color:#1565C0">$${Number(p.lista).toLocaleString('es-CO')}</div>
@@ -124,9 +124,9 @@ function renderItems() {
       <td><input type="number" min="0.1" step="0.1" value="${it.cantidad}" style="width:70px" onchange="actualizarItem(${i},'cantidad',this.value)"></td>
       <td><span style="background:var(--gris-claro);padding:3px 6px;border-radius:4px;font-size:11px;font-weight:700">${it.unidad}</span></td>
       <td>
-        <div style="font-weight:600;font-size:13px">${it.nombre}</div>
-        <div style="font-size:11px;color:var(--gris-medio)">${it.medidas}</div>
-        <div style="font-size:10px;color:#90A4AE">${it.codigo}</div>
+        <div style="font-weight:600;font-size:13px">${_esc(it.nombre)}</div>
+        <div style="font-size:11px;color:var(--gris-medio)">${_esc(it.medidas)}</div>
+        <div style="font-size:10px;color:#90A4AE">${_esc(it.codigo)}</div>
       </td>
       <td><span style="color:${it.iva==='SI'?'var(--rojo)':'var(--verde)'};font-weight:700;font-size:12px">${it.iva}</span></td>
       <td><input type="number" value="${it.precio}" style="width:90px" onchange="actualizarItem(${i},'precio',this.value)"></td>
@@ -244,8 +244,8 @@ function optsProductosHTML() {
   PRODUCTOS.forEach(p => { (grupos[p.grupo] = grupos[p.grupo] || []).push(p); });
   let h = '<option value="">— Selecciona producto —</option>';
   Object.keys(grupos).sort().forEach(g => {
-    h += `<optgroup label="${g}">`;
-    grupos[g].forEach(p => { h += `<option value="${p.codigo}">${p.nombre}</option>`; });
+    h += `<optgroup label="${_esc(g)}">`;
+    grupos[g].forEach(p => { h += `<option value="${_esc(p.codigo)}">${_esc(p.nombre)}</option>`; });
     h += '</optgroup>';
   });
   return h;
@@ -308,8 +308,8 @@ function filtrarProductosOpcion(idx) {
     div.innerHTML = res.map(p =>
       `<div onclick="agregarItemOpcionCodigo(${idx},'${p.codigo}')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:8px" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
         <div>
-          <div style="font-weight:600;font-size:13px;color:#1e293b">${p.nombre}</div>
-          <div style="font-size:11px;color:#64748b">${p.codigo}${p.medidas ? ' · ' + p.medidas : ''} · ${p.unidad}</div>
+          <div style="font-weight:600;font-size:13px;color:#1e293b">${_esc(p.nombre)}</div>
+          <div style="font-size:11px;color:#64748b">${_esc(p.codigo)}${p.medidas ? ' · ' + _esc(p.medidas) : ''} · ${_esc(p.unidad)}</div>
         </div>
         <div style="text-align:right;white-space:nowrap">
           <div style="font-weight:700;font-size:13px;color:#1565C0">$${Number(p.lista).toLocaleString('es-CO')}</div>
@@ -363,7 +363,7 @@ function renderOpcionesExtra() {
       return `<tr>
         <td><input type="number" min="0.1" step="0.1" value="${it.cantidad}" style="width:64px" onchange="actualizarItemOpcion(${idx},${i},'cantidad',this.value)"></td>
         <td><span style="background:var(--gris-claro);padding:3px 6px;border-radius:4px;font-size:11px;font-weight:700">${it.unidad}</span></td>
-        <td><div style="font-weight:600;font-size:13px">${it.nombre}</div><div style="font-size:11px;color:var(--gris-medio)">${it.medidas}</div></td>
+        <td><div style="font-weight:600;font-size:13px">${_esc(it.nombre)}</div><div style="font-size:11px;color:var(--gris-medio)">${_esc(it.medidas)}</div></td>
         <td><span style="color:${it.iva === 'SI' ? 'var(--rojo)' : 'var(--verde)'};font-weight:700;font-size:12px">${it.iva}</span></td>
         <td><input type="number" value="${it.precio}" style="width:84px" onchange="actualizarItemOpcion(${idx},${i},'precio',this.value)"></td>
         <td><input type="number" min="0" max="50" value="${it.descuento}" style="width:54px" onchange="actualizarItemOpcion(${idx},${i},'descuento',this.value)">%</td>
@@ -517,7 +517,7 @@ function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCarg
     filasTabla += `<tr>
       <td style="width:55px">${it.cantidad}</td>
       <td style="width:40px">${it.unidad}</td>
-      <td>${it.nombre}<br><span style="font-size:10px;color:#666">${it.medidas}</span>${it.peso ? `<br><span style="font-size:10px;color:#888">Peso unitario: ${it.peso} kg/${it.unidad}</span>` : ''}</td>
+      <td>${_esc(it.nombre)}<br><span style="font-size:10px;color:#666">${_esc(it.medidas)}</span>${it.peso ? `<br><span style="font-size:10px;color:#888">Peso unitario: ${it.peso} kg/${_esc(it.unidad)}</span>` : ''}</td>
       <td style="width:40px;text-align:center">${it.iva}</td>
       <td style="width:80px;text-align:right">$ ${it.precio.toLocaleString()}</td>
       <td style="width:50px;text-align:center">${it.descuento}%</td>
@@ -936,14 +936,14 @@ function previsualizarCotizacion() {
         </div>
         <div class="preview-cliente-box">
           <div style="font-size:12px;color:#555">Señores</div>
-          <div style="font-weight:700;font-size:15px;color:#1a1a1a">${cliente.nombre}</div>
-          ${cliente.contacto ? `<div style="font-size:12px">Atte. ${cliente.contacto}</div>` : ''}
-          ${cliente.cel ? `<div style="font-size:12px">Cel: ${cliente.cel}</div>` : ''}
-          ${cliente.ciudad ? `<div style="font-size:12px">${cliente.ciudad}</div>` : ''}
+          <div style="font-weight:700;font-size:15px;color:#1a1a1a">${_esc(cliente.nombre)}</div>
+          ${cliente.contacto ? `<div style="font-size:12px">Atte. ${_esc(cliente.contacto)}</div>` : ''}
+          ${cliente.cel ? `<div style="font-size:12px">Cel: ${_esc(cliente.cel)}</div>` : ''}
+          ${cliente.ciudad ? `<div style="font-size:12px">${_esc(cliente.ciudad)}</div>` : ''}
         </div>
         <div class="preview-intro">
           Cordial Saludo<br><br>
-          Atendiendo su solicitud, a continuación, hacemos entrega de la cotización de suministro de prefabricados en concreto${cliente.proyecto ? `, requeridos para el proyecto <strong>${cliente.proyecto}</strong>` : ''}, así:
+          Atendiendo su solicitud, a continuación, hacemos entrega de la cotización de suministro de prefabricados en concreto${cliente.proyecto ? `, requeridos para el proyecto <strong>${_esc(cliente.proyecto)}</strong>` : ''}, así:
         </div>
         ${resumenOpciones}
         ${tablasHTML}

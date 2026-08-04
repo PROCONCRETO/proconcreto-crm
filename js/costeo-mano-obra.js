@@ -248,7 +248,7 @@ function renderClasesSalariales() {
     const r = calcularCosteoClase(c, PARAMETROS_MO);
     return `
     <tr>
-      <td style="font-weight:600">${c.nombre}</td>
+      <td style="font-weight:600">${_esc(c.nombre)}</td>
       <td style="text-align:center">${Number(c.multiplicador).toFixed(2)}×</td>
       <td style="text-align:center">${c.aplicaSubsidioTransporte === false ? 'No' : 'Sí'}</td>
       <td style="text-align:right">${_fmt(r.valorRealHora)}</td>
@@ -304,7 +304,7 @@ function abrirDetalleClase(nombre) {
   // cuánto más cuesta un trabajador que su sueldo (el total da ~180-190% del salario).
   document.getElementById('detalle-clase-body').innerHTML = conceptos.map(x => `
     <tr>
-      <td>${x.nombre}</td>
+      <td>${_esc(x.nombre)}</td>
       <td style="text-align:right">${_fmt(x.valor)}</td>
       <td style="text-align:right">${c.valorRealAnual ? (x.valor / c.valorRealAnual * 100).toFixed(1) : '0.0'}%</td>
       <td style="text-align:right">${c.salarioAnual ? (x.valor / c.salarioAnual * 100).toFixed(1) : '0.0'}%</td>
@@ -389,7 +389,7 @@ function renderCuadrillas() {
     const t = _totalCuadrilla(cu);
     return `
     <tr>
-      <td style="font-weight:600">${cu.nombre}</td>
+      <td style="font-weight:600">${_esc(cu.nombre)}</td>
       <td style="text-align:right">${_fmt(t.hora)}</td>
       <td style="text-align:right">${_fmt(t.diario)}</td>
       <td style="text-align:right">${_fmt(t.semanal)}</td>
@@ -426,8 +426,8 @@ function abrirDetalleCuadrilla(nombre) {
   });
   document.getElementById('detalle-cuadrilla-body').innerHTML = filas.map(f => `
     <tr>
-      <td>${f.rol}</td>
-      <td>${f.claseNombre}${f.existe ? '' : ' <span style="color:var(--rojo);font-size:11px">(nivel salarial eliminado)</span>'}</td>
+      <td>${_esc(f.rol)}</td>
+      <td>${_esc(f.claseNombre)}${f.existe ? '' : ' <span style="color:var(--rojo);font-size:11px">(nivel salarial eliminado)</span>'}</td>
       <td style="text-align:right">${f.personas.toFixed(2)}</td>
       <td style="text-align:right">${_fmt(f.valorMes)}</td>
       <td style="text-align:right">${t.mensual ? (f.valorMes / t.mensual * 100).toFixed(1) : '0.0'}%</td>

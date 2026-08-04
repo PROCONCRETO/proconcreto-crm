@@ -32,7 +32,7 @@ function _poblarFiltrosPeriodoVendedor(prefijo) {
 
   const vendedores = [...new Set(COTIZACIONES.map(c => c.vendedor?.nombre).filter(Boolean))].sort();
   const prevVendedor = selVendedor.value;
-  selVendedor.innerHTML = '<option value="">Todos los vendedores</option>' + vendedores.map(v => `<option value="${v}">${v}</option>`).join('');
+  selVendedor.innerHTML = '<option value="">Todos los vendedores</option>' + vendedores.map(v => `<option value="${_esc(v)}">${_esc(v)}</option>`).join('');
   selVendedor.value = prevVendedor;
 }
 
@@ -67,7 +67,7 @@ function setPeriodoHistorico(p) {
 // Ciudad es texto libre por cotización, Proyecto es el elegido de los registrados en el
 // cliente (ver el desplegable de Proyecto en Nueva Cotización, opcional hasta aceptar).
 function _ciudadProyectoTexto(cliente) {
-  const partes = [cliente?.ciudad, cliente?.proyecto].filter(Boolean);
+  const partes = [cliente?.ciudad, cliente?.proyecto].filter(Boolean).map(_esc);
   return partes.length ? partes.join(' · ') : '—';
 }
 
@@ -76,7 +76,7 @@ function _ciudadProyectoTexto(cliente) {
 // con lo ya impreso/enviado a clientes — se muestra entre paréntesis junto al nuevo. Las
 // cotizaciones nuevas no tienen numeroAnterior, así que esto no les agrega nada.
 function _numeroCotTexto(cot) {
-  return cot?.numeroAnterior ? `${cot.numero} (${cot.numeroAnterior})` : (cot?.numero || '');
+  return cot?.numeroAnterior ? `${_esc(cot.numero)} (${_esc(cot.numeroAnterior)})` : _esc(cot?.numero || '');
 }
 
 function renderHistorico() {
@@ -137,9 +137,9 @@ function renderHistorico() {
         ${tieneVersiones ? `<div style="margin-top:4px">${verBtn}</div>` : ''}
       </td>
       <td>${new Date(latest.fecha+'T12:00').toLocaleDateString('es-CO')}</td>
-      <td style="font-weight:600">${latest.cliente.nombre}</td>
+      <td style="font-weight:600">${_esc(latest.cliente.nombre)}</td>
       <td style="color:var(--gris-medio)">${_ciudadProyectoTexto(latest.cliente)}</td>
-      <td style="color:var(--gris-medio)">${latest.vendedor?.nombre||'—'}</td>
+      <td style="color:var(--gris-medio)">${_esc(latest.vendedor?.nombre)||'—'}</td>
       <td style="font-weight:700">$${(numOps > 1 ? menorVal : latest.totales.total).toLocaleString()}${numOps > 1 ? `<div style="font-size:10px;color:var(--gris-medio);font-weight:400">desde (menor opción)</div>` : ''}</td>
       <td><span class="badge badge-${latest.estado.toLowerCase()}">${latest.estado}</span></td>
       <td>
@@ -162,9 +162,9 @@ function renderHistorico() {
           </div>
         </td>
         <td style="color:var(--gris-medio);font-size:13px">${new Date(v.fecha+'T12:00').toLocaleDateString('es-CO')}</td>
-        <td style="color:var(--gris-medio);font-size:13px">${v.cliente.nombre}</td>
+        <td style="color:var(--gris-medio);font-size:13px">${_esc(v.cliente.nombre)}</td>
         <td style="color:var(--gris-medio);font-size:13px">${_ciudadProyectoTexto(v.cliente)}</td>
-        <td style="color:var(--gris-medio);font-size:13px">${v.vendedor?.nombre||'—'}</td>
+        <td style="color:var(--gris-medio);font-size:13px">${_esc(v.vendedor?.nombre)||'—'}</td>
         <td style="color:var(--gris-medio);font-size:13px">$${v.totales.total.toLocaleString()}</td>
         <td><span class="badge badge-${v.estado.toLowerCase()}" style="opacity:0.7">${v.estado}</span></td>
         <td>
@@ -321,9 +321,9 @@ function renderNotasSeguimiento() {
     <div style="background:#F8F9FB;border-left:3px solid var(--azul);border-radius:4px;padding:8px 12px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;gap:8px">
         <span style="font-size:11px;font-weight:700;color:var(--azul)">${new Date(n.fecha).toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-        <span style="font-size:10px;color:var(--gris-medio)">${USUARIOS_CRM[n.autor]?.nombre || n.autor || ''}</span>
+        <span style="font-size:10px;color:var(--gris-medio)">${_esc(USUARIOS_CRM[n.autor]?.nombre || n.autor)}</span>
       </div>
-      <div style="font-size:13px;white-space:pre-wrap">${n.texto}</div>
+      <div style="font-size:13px;white-space:pre-wrap">${_esc(n.texto)}</div>
     </div>`).join('');
 }
 
@@ -409,12 +409,12 @@ function renderClientes(lista) {
     const cotLabel = latestCots.length ? `📋 ${latestCots.length} cotización${latestCots.length>1?'es':''}` : '📋 Sin cotizaciones';
     return `
     <div class="cliente-card">
-      <div class="nombre">${c.nombre}</div>
-      ${c.nit ? `<div class="dato" style="font-size:11px;color:var(--gris-medio)">NIT: ${c.nit}</div>` : ''}
-      ${c.contacto ? `<div class="dato">👤 ${c.contacto}</div>` : ''}
-      ${c.cel ? `<div class="dato">📱 ${c.cel}</div>` : ''}
-      ${c.email ? `<div class="dato">✉️ ${c.email}</div>` : ''}
-      ${c.ciudad ? `<div class="dato">📍 ${c.ciudad}</div>` : ''}
+      <div class="nombre">${_esc(c.nombre)}</div>
+      ${c.nit ? `<div class="dato" style="font-size:11px;color:var(--gris-medio)">NIT: ${_esc(c.nit)}</div>` : ''}
+      ${c.contacto ? `<div class="dato">👤 ${_esc(c.contacto)}</div>` : ''}
+      ${c.cel ? `<div class="dato">📱 ${_esc(c.cel)}</div>` : ''}
+      ${c.email ? `<div class="dato">✉️ ${_esc(c.email)}</div>` : ''}
+      ${c.ciudad ? `<div class="dato">📍 ${_esc(c.ciudad)}</div>` : ''}
       <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">
         <button class="btn btn-primario btn-xs" onclick="usarCliente('${c.id}')">+ Cotizar</button>
         <button class="btn btn-secundario btn-xs" onclick="editarCliente('${c.id}')">✏️ Editar</button>
@@ -450,9 +450,9 @@ function renderProyectosCliente() {
       <tbody>
         ${_proyectosClienteActual.map((p, i) => `
           <tr>
-            <td><input type="text" value="${p.nombre || ''}" oninput="_proyectosClienteActual[${i}].nombre=this.value" placeholder="Ej: Torres del Parque"></td>
-            <td><input type="text" value="${p.contacto || ''}" oninput="_proyectosClienteActual[${i}].contacto=this.value" placeholder="Ing. ..."></td>
-            <td><input type="text" value="${p.telefono || ''}" oninput="_proyectosClienteActual[${i}].telefono=this.value"></td>
+            <td><input type="text" value="${_esc(p.nombre)}" oninput="_proyectosClienteActual[${i}].nombre=this.value" placeholder="Ej: Torres del Parque"></td>
+            <td><input type="text" value="${_esc(p.contacto)}" oninput="_proyectosClienteActual[${i}].contacto=this.value" placeholder="Ing. ..."></td>
+            <td><input type="text" value="${_esc(p.telefono)}" oninput="_proyectosClienteActual[${i}].telefono=this.value"></td>
             <td><button class="btn btn-rojo btn-xs" onclick="eliminarProyectoCliente(${i})">✕</button></td>
           </tr>`).join('')}
       </tbody>
@@ -634,8 +634,8 @@ function buscarClienteEnCot(q) {
   if (!res.length) { div.style.display = 'none'; return; }
   div.innerHTML = res.map(c => `
     <div class="buscador-item" onclick="seleccionarClienteCot(${c.id})">
-      <div class="nombre">${c.nombre}</div>
-      <div class="detalle">${c.contacto||''} ${c.cel ? '· ' + c.cel : ''}</div>
+      <div class="nombre">${_esc(c.nombre)}</div>
+      <div class="detalle">${_esc(c.contacto)||''} ${c.cel ? '· ' + _esc(c.cel) : ''}</div>
     </div>`).join('');
   div.style.display = 'block';
 }
@@ -681,7 +681,7 @@ function poblarFiltrosEstadisticas() {
   // Vendedores disponibles
   const vendedores = [...new Set(COTIZACIONES.map(c => c.vendedor?.nombre).filter(Boolean))].sort();
   const selVendedor = document.getElementById('filtro-vendedor');
-  selVendedor.innerHTML = '<option value="">Todos los vendedores</option>' + vendedores.map(v => `<option value="${v}">${v}</option>`).join('');
+  selVendedor.innerHTML = '<option value="">Todos los vendedores</option>' + vendedores.map(v => `<option value="${_esc(v)}">${_esc(v)}</option>`).join('');
 }
 
 function renderEstadisticas() {
@@ -793,7 +793,7 @@ function renderEstadisticas() {
   document.getElementById('top-clientes').innerHTML = top.length ? top.map(([n,v],i) => `
     <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gris-claro)">
       <span style="background:var(--azul);color:white;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">${i+1}</span>
-      <span style="flex:1;font-size:13px">${n}</span>
+      <span style="flex:1;font-size:13px">${_esc(n)}</span>
       <span style="font-weight:700;color:var(--azul)">$${(v/1000000).toFixed(2)}M</span>
     </div>`).join('') : '<div class="empty-state">Sin datos aún</div>';
 }
@@ -845,7 +845,7 @@ function renderPipeline() {
                ondragstart="onDragStart(event)"
                ondragend="onDragEnd(event)">
             <div class="kc-num">${_numeroCotTexto(c)} ${c.version||''}</div>
-            <div class="kc-cliente">${c.cliente.nombre}</div>
+            <div class="kc-cliente">${_esc(c.cliente.nombre)}</div>
             <div class="kc-proyecto">${_ciudadProyectoTexto(c.cliente)}</div>
             <div class="kc-total">$${c.totales.total.toLocaleString()}</div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
@@ -985,12 +985,12 @@ function renderPipelineProduccion() {
           <div class="kanban-card" draggable="true"
                style="border-left-color:${borde};background:${bgInv[inv.estado]}"
                data-os-id="${o.id}"
-               title="${inv.detalle.replace(/"/g,'&quot;')}"
+               title="${_esc(inv.detalle)}"
                ondragstart="onDragStartOS(event)"
                ondragend="onDragEndOS(event)">
-            <div class="kc-num">${iconoInv} ${o.numero}</div>
-            <div class="kc-cliente">${o.cliente}</div>
-            <div class="kc-proyecto" style="font-size:11px;color:var(--gris-medio);margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${o.descripcion}">${o.descripcion}</div>
+            <div class="kc-num">${iconoInv} ${_esc(o.numero)}</div>
+            <div class="kc-cliente">${_esc(o.cliente)}</div>
+            <div class="kc-proyecto" style="font-size:11px;color:var(--gris-medio);margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${_esc(o.descripcion)}">${_esc(o.descripcion)}</div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
               <div class="kc-fecha">${o.fechaEntrega ? new Date(o.fechaEntrega+'T12:00').toLocaleDateString('es-CO',{day:'2-digit',month:'short'}) : '—'}</div>
               <button class="btn btn-primario btn-xs" onclick="editarOrden('${o.id}')">✏️</button>

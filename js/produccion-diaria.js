@@ -37,11 +37,11 @@ function renderProduccionDiaria() {
   tbody.innerHTML = data.map(p => `
     <tr style="border-top:2px solid var(--azul-oscuro)">
       <td style="font-weight:600">${p.fecha ? new Date(p.fecha+'T12:00').toLocaleDateString('es-CO') : '—'}</td>
-      <td style="font-weight:600;color:var(--azul)">${p.producto || '—'}</td>
-      <td style="font-weight:700">${(Number(p.cantidad)||0).toLocaleString()} <span style="font-size:11px;color:var(--gris-medio);font-weight:400">${p.unidad||'ud'}</span></td>
-      <td>${p.orden ? `<span style="font-size:11px;background:#E3F2FD;color:#1565C0;padding:2px 6px;border-radius:3px;font-weight:600">${p.orden}</span>` : '—'}</td>
-      <td>${p.responsable || '—'}</td>
-      <td style="color:var(--gris-medio);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${p.observaciones||''}">${p.observaciones || '—'}</td>
+      <td style="font-weight:600;color:var(--azul)">${_esc(p.producto) || '—'}</td>
+      <td style="font-weight:700">${(Number(p.cantidad)||0).toLocaleString()} <span style="font-size:11px;color:var(--gris-medio);font-weight:400">${_esc(p.unidad) || 'ud'}</span></td>
+      <td>${p.orden ? `<span style="font-size:11px;background:#E3F2FD;color:#1565C0;padding:2px 6px;border-radius:3px;font-weight:600">${_esc(p.orden)}</span>` : '—'}</td>
+      <td>${_esc(p.responsable) || '—'}</td>
+      <td style="color:var(--gris-medio);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${_esc(p.observaciones)}">${_esc(p.observaciones) || '—'}</td>
       <td>
         <div class="flex-gap">
           <button class="btn btn-primario btn-xs" onclick="editarProduccion('${p.id}')">✏️ Editar</button>
@@ -59,9 +59,9 @@ function poblarSelectProductos() {
   PRODUCTOS.forEach(p => { (grupos[p.grupo] = grupos[p.grupo] || []).push(p); });
   let html = '<option value="">— Selecciona un producto —</option>';
   Object.keys(grupos).sort().forEach(g => {
-    html += `<optgroup label="${g}">`;
+    html += `<optgroup label="${_esc(g)}">`;
     grupos[g].forEach(p => {
-      html += `<option value="${p.nombre}" data-unidad="${p.unidad}">${p.nombre}</option>`;
+      html += `<option value="${_esc(p.nombre)}" data-unidad="${_esc(p.unidad)}">${_esc(p.nombre)}</option>`;
     });
     html += '</optgroup>';
   });
@@ -188,7 +188,7 @@ function poblarFiltroGrupoInv() {
   if (!sel) return;
   const actual = sel.value;
   const grupos = [...new Set(calcularInventario().map(r => r.grupo))].filter(Boolean).sort();
-  sel.innerHTML = '<option value="">Todos los grupos</option>' + grupos.map(g => `<option value="${g}">${g}</option>`).join('');
+  sel.innerHTML = '<option value="">Todos los grupos</option>' + grupos.map(g => `<option value="${_esc(g)}">${_esc(g)}</option>`).join('');
   sel.value = actual;
 }
 
@@ -224,9 +224,9 @@ function renderInventario() {
     const bajo = r.enInventario <= 0;
     return `
     <tr style="border-top:1px solid var(--gris-borde)">
-      <td style="font-weight:600;color:var(--azul)">${r.producto}</td>
-      <td style="color:var(--gris-medio)">${r.grupo}</td>
-      <td>${r.unidad}</td>
+      <td style="font-weight:600;color:var(--azul)">${_esc(r.producto)}</td>
+      <td style="color:var(--gris-medio)">${_esc(r.grupo)}</td>
+      <td>${_esc(r.unidad)}</td>
       <td style="text-align:right">${r.producido.toLocaleString()}</td>
       <td style="text-align:right;color:var(--gris-medio)">${r.despachado.toLocaleString()}</td>
       <td style="text-align:right;font-weight:800;color:${bajo?'#C62828':'#2E7D32'}">${r.enInventario.toLocaleString()}</td>

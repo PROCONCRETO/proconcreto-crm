@@ -77,6 +77,8 @@ async function mostrarApp() {
     document.getElementById('vendedor-nombre').value = perfil.nombre;
     document.getElementById('vendedor-cargo').value = perfil.cargo;
   }
+  const navCentroCostos = document.getElementById('nav-centro-costos');
+  if (navCentroCostos) navCentroCostos.style.display = _esUsuarioCentroCostos() ? '' : 'none';
   await cargarDatosSupabase();
   poblarGrupos();
   _resetFormularioCotizacion();

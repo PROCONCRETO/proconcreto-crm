@@ -283,7 +283,7 @@ function _chartVehiculos(viajesCumplidos) {
       const cap = CAPACIDAD_VEHICULO[veh];
       const esPropio = VEHICULO_ES_PROPIO[veh];
       const pctCap = viajesCount[i] ? Math.round((pesos[i] / (cap * viajesCount[i])) * 100) : 0;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:7px 0;border-top:1px solid var(--gris-borde)" title="${veh}">
+      return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:7px 0;border-top:1px solid var(--gris-borde)" title="${_esc(veh)}">
         <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${COLOR_VEHICULO_VIAJE[veh]};margin-right:6px"></span>${etiquetas[i]} <span style="color:var(--gris-medio)">(${esPropio ? 'propio' : 'tercerizado'})</span></span>
         <span style="color:var(--gris-medio)">${viajesCount[i]} viaje${viajesCount[i] === 1 ? '' : 's'} · ${pctCap}% de capacidad prom.</span>
       </div>`;
@@ -440,7 +440,7 @@ function _tablaCausas(causasReprogramacion, causasCancelacion) {
   cont.innerHTML = filas.map(f => `
     <div style="padding:9px 0;border-top:1px solid var(--gris-borde)">
       <div style="display:flex;justify-content:space-between;gap:10px;font-size:12.5px;margin-bottom:5px">
-        <span style="font-weight:600">${f.causa}</span>
+        <span style="font-weight:600">${_esc(f.causa)}</span>
         <span style="white-space:nowrap;color:var(--gris-medio)">${f.pct}% · ${f.casos} caso${f.casos === 1 ? '' : 's'}${f.repro ? ` · <span style="color:var(--naranja)">🔁 ${f.repro}</span>` : ''}${f.cancel ? ` · <span style="color:var(--rojo)">❌ ${f.cancel}</span>` : ''}</span>
       </div>
       <div style="background:#eee;border-radius:3px;height:6px;overflow:hidden">

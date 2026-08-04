@@ -105,8 +105,8 @@ function renderCosteoReferencia() {
     return `
     <tr>
       <td><span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap;background:${cat.bg};color:${cat.fg}">${cat.label}</span></td>
-      <td style="font-weight:600">${x.nombre}</td>
-      <td><span style="display:inline-block;background:var(--gris-claro);color:var(--gris-medio);font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">${x.unidad}</span></td>
+      <td style="font-weight:600">${_esc(x.nombre)}</td>
+      <td><span style="display:inline-block;background:var(--gris-claro);color:var(--gris-medio);font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">${_esc(x.unidad)}</span></td>
       <td style="text-align:right;color:var(--gris-medio)">${_fmtRef(x.costoSinIva)}</td>
       <td style="text-align:right;font-weight:700;color:var(--azul)">${_fmtRef(x.costoConIva)}</td>
       <td style="font-size:12px;color:var(--gris-medio)">${_fmtFechaRef(x.modificado)}</td>

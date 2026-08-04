@@ -14,6 +14,17 @@ Módulo nuevo (2026-07-26), construido a partir del Excel real "COSTOS MAESTRO 2
 - `sql/2026-07-30_lista_referencia_costos.sql` — DDL de la tabla `insumos_costos`. **Hay que correrlo una sola vez** en el SQL Editor de Supabase (elegir "Run without RLS") antes de que esta pantalla pueda guardar Materias Primas/Insumos.
 - `js/costeo-producto.js` — Costeo de Producto (combina Diseño de Mezcla + Maquinaria + Cuadrillas + Costos de Referencia en el costo por unidad de un producto terminado).
 - `sql/2026-08-02_costeo_producto.sql` — DDL de la tabla `costeo_productos`. **Hay que correrlo una sola vez** en el SQL Editor de Supabase (elegir "Run without RLS") antes de que esta pantalla pueda guardar costeos.
+- `sql/2026-08-04_rls_centro_costos.sql` — cierra el "Run without RLS" de arriba: activa RLS en las 6 tablas del módulo. **Hay que correrlo una sola vez** en Supabase — ver sección "Acceso restringido" más abajo.
+
+## Acceso restringido (2026-08-04)
+
+A pedido del usuario ("me preocupa que entren personas y nos puedan alterar la estructura"), Centro de Costos es el único módulo de la app con control de acceso. Solo 3 correos pueden entrar: Jose Pablo Escobar (Gerente Técnico), Ana María Mazuera (Coordinadora Técnica) y Jaime Eduardo Franco (Jefe de Producción) — el resto de cuentas del equipo (Comercial, Logística, Calidad) siguen usando el resto de la app sin verse afectadas.
+
+Dos capas:
+- **UI** (`_esUsuarioCentroCostos()`/`_EMAILS_CENTRO_COSTOS` en `js/config.js`): oculta el botón "💰 Centro de Costos" del nav y bloquea `activarModulo('costeo')` y `ir(pantalla)` para las 5 pantallas del módulo si el correo no está en la lista. Es solo conveniencia de interfaz, no seguridad real — se evade fácil desde la consola del navegador.
+- **RLS en Supabase** (`sql/2026-08-04_rls_centro_costos.sql`) — la protección real. Hasta este cambio, las 6 tablas del módulo se crearon con "Run without RLS" (ver DDLs arriba), lo que significa que cualquiera con la anon key pública (visible en el código fuente de la página) podía leer y **escribir** ahí directo vía la API REST de Supabase, sin siquiera iniciar sesión. Ahora: lectura abierta a cualquier autenticado (la necesitan otras pantallas, ej. Diseño de Mezcla lee `insumos_costos` para su selector de materiales), escritura (insert/update/delete) solo para los 3 correos, vía la función `es_usuario_centro_costos()`.
+
+Para agregar o quitar a alguien, hay que actualizar **ambos lados**: la lista `_EMAILS_CENTRO_COSTOS` en `js/config.js` y la función SQL `es_usuario_centro_costos()` (basta con correr de nuevo ese `CREATE OR REPLACE FUNCTION`, no hace falta repetir las políticas).
 
 ## Pantallas (`ir()` en `navegacion.js`, módulo `costeo`)
 
@@ -158,6 +169,10 @@ Igual que Costos de Referencia, este módulo **no duplica** nada de lo que ya ex
 8. **Maquinaria**: cada máquina se reparte según su **propia** `unidadUso` — `'ciclo'` ÷ Unidades/Ciclo (un ciclo de la línea completa produce esas unidades — Máquina Columbia, Mezcladora, Moldes, Anaqueles, Banda, Sistema de retorno todos comparten esta unidad porque están sincronizados al mismo ciclo de producción), `'dia'` ÷ Unidades/día (Montacargas, Minicargador, Puente Grúa).
 9. **Empaque** = Σ (cantidad × precio) de filas con `reparto:'estiba'` ÷ Unidades/estiba. **Consumos** = Σ (cantidad × precio) de filas con `reparto:'dia'` ÷ Unidades/día.
 10. **Total por unidad** = Materia Prima + Desperdicio + Mano de Obra + Herramienta Menor + Maquinaria + Empaque + Consumos.
+
+### % del costo total por insumo, en el detalle línea-por-línea (2026-08-04)
+
+Cada fila del detalle (`_filaDetalleCosteo()`, usado por `_seccionesDetalleCosteo()` en el formulario editable y en el consolidado ➕) tiene una columna extra a la derecha, "% Costo": `costo del insumo / k.totalUnidad` (`_pctCosteoProd()`). También aplica a las filas de recargo (Desperdicio, Herramienta Menor) y a cada Subtotal por sección — así se ve de un vistazo qué insumos o categorías pesan más en el costo del producto, sin tener que sacar la cuenta a mano. Si `totalUnidad` es 0 (costeo recién creado, sin datos todavía) muestra "—" en vez de dividir por cero.
 
 ### IVA descontable/no descontable en el precio de los insumos (2026-08-02)
 

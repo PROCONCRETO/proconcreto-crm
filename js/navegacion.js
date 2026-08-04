@@ -4,7 +4,14 @@ let itemsActuales = [];
 // ═══════════════════════════════
 // NAVEGACIÓN
 // ═══════════════════════════════
+// Pantallas que viven bajo el módulo Centro de Costos — restringidas a
+// _EMAILS_CENTRO_COSTOS (2026-08-04, ver js/config.js). Esto es solo la capa de UI: bloquea
+// el clic normal y una llamada directa desde la consola, pero la protección real está en las
+// políticas RLS de Supabase (sql/2026-08-04_rls_centro_costos.sql).
+const _PANTALLAS_CENTRO_COSTOS = ['productos', 'costeo-mo', 'costeo-maquinaria', 'costeo-referencia', 'costeo-producto'];
+
 function activarModulo(modulo) {
+  if (modulo === 'costeo' && !_esUsuarioCentroCostos()) { alert('No tienes acceso a Centro de Costos.'); return; }
   document.getElementById('vista-previa').style.display = 'none';
   document.querySelectorAll('.nav-modulo').forEach(b => b.classList.remove('activo'));
   event.currentTarget.classList.add('activo');
@@ -47,6 +54,7 @@ function activarModulo(modulo) {
 }
 
 function ir(pantalla) {
+  if (_PANTALLAS_CENTRO_COSTOS.includes(pantalla) && !_esUsuarioCentroCostos()) { alert('No tienes acceso a Centro de Costos.'); return; }
   document.getElementById('vista-previa').style.display = 'none';
   document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('activo'));

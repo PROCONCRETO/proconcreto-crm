@@ -70,7 +70,7 @@
   <button class="nav-modulo" onclick="activarModulo('produccion')">🏭 Producción</button>
   <button class="nav-modulo" onclick="activarModulo('logistica')">🚛 Logística</button>
   <button class="nav-modulo" onclick="activarModulo('calidad')">🔬 Calidad</button>
-  <button class="nav-modulo" onclick="activarModulo('costeo')">💰 Centro de Costos</button>
+  <button class="nav-modulo" id="nav-centro-costos" onclick="activarModulo('costeo')">💰 Centro de Costos</button>
   <div id="nav-usuario" style="margin-left:auto">
     <span id="rt-indicador" style="font-size:14px;font-weight:700;color:#999;white-space:nowrap;padding:4px 10px;border-radius:14px;background:rgba(255,255,255,0.12)" title="Estado de sincronización">⚪ Conectando…</span>
     <span id="usuario-email"></span>
@@ -2271,34 +2271,34 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260804a"></script>
-<script src="js/catalogo.js?v=20260804h"></script>
-<script src="js/navegacion.js?v=20260804a"></script>
-<script src="js/ordenes-produccion.js?v=20260804a"></script>
-<script src="js/produccion-diaria.js?v=20260804a"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20260804a"></script>
-<script src="js/costeo-mano-obra.js?v=20260804a"></script>
-<script src="js/costeo-maquinaria.js?v=20260804a"></script>
-<script src="js/costeo-referencia.js?v=20260804a"></script>
-<script src="js/costeo-producto.js?v=20260804f"></script>
-<script src="js/calidad-mezclas.js?v=20260804a"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.0" integrity="sha384-De+l/Df7qym5QBDVocD3+gW1S7IjR3epf+6KbRDjB3FCCzM/LqVTwqckT6FhFar8" crossorigin="anonymous"></script>
+<script src="js/config.js?v=20260804c"></script>
+<script src="js/catalogo.js?v=20260804i"></script>
+<script src="js/navegacion.js?v=20260804b"></script>
+<script src="js/ordenes-produccion.js?v=20260804b"></script>
+<script src="js/produccion-diaria.js?v=20260804b"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
+<script src="js/costeo-mano-obra.js?v=20260804b"></script>
+<script src="js/costeo-maquinaria.js?v=20260804b"></script>
+<script src="js/costeo-referencia.js?v=20260804b"></script>
+<script src="js/costeo-producto.js?v=20260804h"></script>
+<script src="js/calidad-mezclas.js?v=20260804c"></script>
 <script src="js/calidad-estadisticas.js?v=20260804a"></script>
 <script src="js/calidad-trazabilidad.js?v=20260804a"></script>
-<script src="js/logistica.js?v=20260804a"></script>
-<script src="js/estadisticas-logistica.js?v=20260804a"></script>
+<script src="js/logistica.js?v=20260804b"></script>
+<script src="js/estadisticas-logistica.js?v=20260804b"></script>
 <script src="js/auth.js?v=20260804a"></script>
-<script src="js/datos-realtime.js?v=20260804a"></script>
-<script src="js/cotizador.js?v=20260804a"></script>
-<script src="js/historico-clientes-stats.js?v=20260804a"></script>
+<script src="js/datos-realtime.js?v=20260804b"></script>
+<script src="js/cotizador.js?v=20260804b"></script>
+<script src="js/historico-clientes-stats.js?v=20260804b"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
 <script src="js/migracion-consecutivos.js?v=20260804a"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js" integrity="sha384-DhxhYObIMeMNGyAG7iK11OHzBIKyEIeRL0ad1iFPAOwZB8iirUlTT0O/WJJUk8+o" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <script src="js/pdf.js?v=20260804a"></script>
 <script src="js/rut-parser.js?v=20260804a"></script>

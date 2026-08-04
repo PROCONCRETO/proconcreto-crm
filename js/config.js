@@ -5,6 +5,16 @@ const _SB_URL = 'https://wyfjmgywyqluzoymxoyp.supabase.co';
 const _SB_KEY = 'sb_publishable_t1YO4FWYyljZaQXWc2xK0A_zcukxDa1';
 const sb = supabase.createClient(_SB_URL, _SB_KEY);
 
+// Escape genérico de HTML — para cualquier texto libre (nombre de cliente, causa, observaciones,
+// etc.) que se interpola dentro de un template literal asignado a innerHTML (2026-08-04,
+// auditoría de seguridad: clientes/cotizaciones no tenían RLS y ese texto se mostraba sin
+// escapar en Histórico/Cotizador — alguien podía insertar un cliente con HTML/JS malicioso en
+// el nombre y ejecutarlo en el navegador del primer empleado que lo viera). No hace falta
+// donde el destino es .value/.textContent/alert()/confirm() — esos nunca interpretan HTML.
+function _esc(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 const USUARIOS_CRM = {
   'jose.escobar@proconcreto.com.co':      { nombre: 'Jose Pablo Escobar Mejia',      cargo: 'Gerente Técnico',       cel: '+57 301 623 9733' },
   'maria.escobar@proconcreto.com.co':     { nombre: 'Maria Alejandra Escobar Mejia', cargo: 'Gerente Administrativa', cel: '+57 311 635 1086' },
@@ -18,6 +28,22 @@ const USUARIOS_CRM = {
 let COTIZACIONES = [];
 let CLIENTES = [];
 let USUARIO_ACTUAL = null;
+
+// Correos con acceso a Centro de Costos (2026-08-04, a pedido del usuario: "me preocupa que
+// entren personas y nos puedan alterar la estructura"). Esto es una capa de conveniencia en
+// la UI — oculta el módulo y bloquea la navegación para el resto de usuarios — pero la
+// protección real está en las políticas RLS de Supabase (sql/2026-08-04_rls_centro_costos.sql),
+// que exigen exactamente estos mismos correos para poder escribir en esas tablas. Si cambia
+// quién debe tener acceso, hay que actualizar ambos lados: esta lista y la función SQL
+// es_usuario_centro_costos() (correr de nuevo solo ese CREATE OR REPLACE FUNCTION).
+const _EMAILS_CENTRO_COSTOS = [
+  'jose.escobar@proconcreto.com.co',
+  'departamentotecnico@proconcreto.com.co',
+  'produccion@proconcreto.com.co',
+];
+function _esUsuarioCentroCostos() {
+  return !!USUARIO_ACTUAL && _EMAILS_CENTRO_COSTOS.includes(USUARIO_ACTUAL.email);
+}
 
 // Consecutivo de cotización — se asigna solo, nunca se escribe a mano (antes era manual y
 // causaba typos, saltos y duplicados). Arranca en 100001; los números de antes de esa fecha

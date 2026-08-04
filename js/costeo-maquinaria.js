@@ -87,7 +87,7 @@ function renderCosteoMaquinaria() {
       : `${m.vidaUtilAnos || 0} años`;
     return `
     <tr>
-      <td style="font-weight:600">${m.nombre}</td>
+      <td style="font-weight:600">${_esc(m.nombre)}</td>
       <td><span style="display:inline-block;background:var(--gris-claro);color:var(--gris-medio);font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">${_labelUnidadUso(m.unidadUso)}</span></td>
       <td style="font-size:12px;color:var(--gris-medio)">${vidaTexto}</td>
       <td style="text-align:right;font-weight:700;color:var(--azul)">${_fmtMaq(c.costoUnidad)}</td>
