@@ -50,20 +50,22 @@ function _defaultParametrosMO() {
     subsidioFamiliarPct: 4,
     // Dotación "sin respirador media máscara" — frecuencia convertida a veces/año:
     // bimensual=6, quincenal=24, mensual=12, cuatrimestral=3, anual=1.
+    // El precio de cada ítem YA NO vive aquí (ver _precioDotacionPorNombre) — solo el nombre
+    // (que debe apuntar a un ítem real de Costos de Referencia) y la cantidad/año.
     dotacion: [
-      { nombre: 'Gafas de Seguridad', valorUnitario: 4556, cantidadAnual: 6 },
-      { nombre: 'Tapaoidos de copa', valorUnitario: 17500, cantidadAnual: 1 },
-      { nombre: 'Tapaoidos de Inserción', valorUnitario: 1045, cantidadAnual: 6 },
-      { nombre: 'Tapabocas N95', valorUnitario: 1600, cantidadAnual: 24 },
-      { nombre: 'Guante anticorte', valorUnitario: 15903, cantidadAnual: 12 },
-      { nombre: 'Camibuso cuello redondo', valorUnitario: 26000, cantidadAnual: 3 },
-      { nombre: 'Pantalón de Jean', valorUnitario: 26500, cantidadAnual: 3 },
-      { nombre: 'Botas de seguridad', valorUnitario: 76000, cantidadAnual: 3 },
-      { nombre: 'Examen médico', valorUnitario: 55000, cantidadAnual: 1 },
+      { nombre: 'Gafas de Seguridad', cantidadAnual: 6 },
+      { nombre: 'Tapaoidos de copa', cantidadAnual: 1 },
+      { nombre: 'Tapaoidos de Inserción', cantidadAnual: 6 },
+      { nombre: 'Tapabocas N95', cantidadAnual: 24 },
+      { nombre: 'Guante anticorte', cantidadAnual: 12 },
+      { nombre: 'Camibuso cuello redondo', cantidadAnual: 3 },
+      { nombre: 'Pantalón de Jean', cantidadAnual: 3 },
+      { nombre: 'Botas de seguridad', cantidadAnual: 3 },
+      { nombre: 'Examen médico', cantidadAnual: 1 },
       // usarDiasLaborados: costos fijos que se pagan aunque el trabajador falte (el bus se
       // paga igual) — la cantidad/año se iguala a los días laborados al año SIN restar el
       // ajuste por ausentismo, a diferencia del resto de la dotación.
-      { nombre: 'Transporte especial para trabajadores', valorUnitario: 8000, usarDiasLaborados: true },
+      { nombre: 'Transporte especial para trabajadores', usarDiasLaborados: true },
     ],
   };
 }
@@ -75,8 +77,52 @@ function _cantidadAnualDotacion(d, p) {
   return d.usarDiasLaborados ? (p.diasLaboradosAno || 0) : (Number(d.cantidadAnual) || 0);
 }
 
+// El precio de un ítem de dotación se "arrastra" en vivo desde Costos de Referencia (2026-08-09,
+// a pedido del usuario — los ítems de dotación se movieron allá, aquí solo queda la Cantidad/año
+// editable) — null si el nombre no coincide con ningún ítem real ahí (dotación borrada/renombrada
+// en Costos de Referencia). Se usa el costo CON IVA (valorFinal): la dotación es un gasto
+// operativo de la empresa, no un insumo de un producto revendible con IVA descontable.
+function _precioDotacionPorNombre(nombre) {
+  const i = (INSUMOS_COSTOS || []).find(x => x.nombre === nombre);
+  return i ? calcularCostoInsumo(i).valorFinal : null;
+}
+
+function _opcionesDotacionHTML(seleccionado) {
+  const items = (INSUMOS_COSTOS || []).filter(i => i.categoria === 'insumo_cif');
+  const opciones = items.map(i => `<option value="${_escAttr(i.nombre)}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
+  if (!items.length) return '<option value="">— sin ítems de Insumo/CIF en Costos de Referencia —</option>';
+  return `<option value="">— Selecciona —</option>${opciones}`;
+}
+
+// Migración de una sola vez (2026-08-09): antes cada ítem de dotación traía su propio
+// `valorUnitario` guardado aquí mismo; ahora ese precio vive únicamente en Costos de Referencia
+// (mismo criterio que ya se usa para Cemento/Arena/Triturado/etc. en Diseño de Mezcla). Al
+// detectar un ítem viejo (todavía con `valorUnitario`), lo crea en insumos_costos con ese mismo
+// precio como punto de partida y le quita el campo aquí — así el precio real que ya se tenía
+// cargado no se pierde ni hay que volver a escribirlo a mano. Es idempotente: una vez migrado
+// un ítem ya no tiene `valorUnitario`, así que una segunda corrida no hace nada con él.
+function _migrarDotacionAReferenciaSiHaceFalta() {
+  const pendientes = (PARAMETROS_MO.dotacion || []).filter(d => d.valorUnitario !== undefined);
+  if (!pendientes.length) return false;
+  pendientes.forEach(d => {
+    if (!INSUMOS_COSTOS.find(x => x.nombre === d.nombre)) {
+      const nuevo = {
+        nombre: d.nombre, categoria: 'insumo_cif', rolDiseno: '', tamanoAgregado: '', unidad: 'un',
+        valorUnitario: Number(d.valorUnitario) || 0, aplicaIva: true, transporteIncluido: true, transporteAdicional: 0,
+      };
+      INSUMOS_COSTOS.push(nuevo);
+      sb.from('insumos_costos').upsert({ nombre: nuevo.nombre, datos: nuevo, modificado: new Date().toISOString() }, { onConflict: 'nombre' })
+        .then(({ error }) => { if (error) console.error(`Error migrando "${nuevo.nombre}" a Costos de Referencia:`, error.message); });
+    }
+    delete d.valorUnitario;
+  });
+  sb.from('parametros_mo').upsert({ id: 1, datos: PARAMETROS_MO, modificado: new Date().toISOString() }, { onConflict: 'id' })
+    .then(({ error }) => { if (error) console.error('Error guardando parámetros tras migrar dotación:', error.message); });
+  return true;
+}
+
 function _dotacionTotalAnual(p) {
-  return (p.dotacion || []).reduce((s, d) => s + (Number(d.valorUnitario) || 0) * _cantidadAnualDotacion(d, p), 0);
+  return (p.dotacion || []).reduce((s, d) => s + (_precioDotacionPorNombre(d.nombre) || 0) * _cantidadAnualDotacion(d, p), 0);
 }
 
 // Días laborados al año, netos de un ajuste por ausentismo (incapacidades, calamidades y
@@ -147,6 +193,9 @@ function _fmt(n) { return '$' + Math.round(n || 0).toLocaleString('es-CO'); }
 
 function renderCosteoManoObra() {
   if (!PARAMETROS_MO) PARAMETROS_MO = _defaultParametrosMO();
+  if (_migrarDotacionAReferenciaSiHaceFalta() && typeof mostrarToast === 'function') {
+    mostrarToast('📦 Los ítems de dotación ahora se gestionan desde Costos de Referencia');
+  }
   document.getElementById('pmo-smmlv').value = PARAMETROS_MO.smmlv;
   document.getElementById('pmo-subsidio-transporte').value = PARAMETROS_MO.subsidioTransporte;
   document.getElementById('pmo-dias-laborados-ano').value = PARAMETROS_MO.diasLaboradosAno || 220;
@@ -190,26 +239,29 @@ function renderDotacionMO() {
   const diasLaboradosActual = diasInput ? (parseFloat(diasInput.value) || 0) : (PARAMETROS_MO.diasLaboradosAno || 0);
   body.innerHTML = dotacion.map((d, i) => {
     const cantidad = d.usarDiasLaborados ? diasLaboradosActual : (Number(d.cantidadAnual) || 0);
+    const precio = _precioDotacionPorNombre(d.nombre);
     return `
     <tr>
-      <td style="font-size:12px;padding:5px 7px">${d.nombre || ''}</td>
-      <td><input type="number" min="0" step="1" value="${d.valorUnitario || 0}" oninput="PARAMETROS_MO.dotacion[${i}].valorUnitario=parseFloat(this.value)||0;renderDotacionMO()" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:12px"></td>
+      <td><select onchange="PARAMETROS_MO.dotacion[${i}].nombre=this.value;renderDotacionMO()" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:12px">${_opcionesDotacionHTML(d.nombre)}</select></td>
+      <td style="text-align:right;font-size:12px">${precio === null ? '<span style="color:var(--rojo)">no está en Costos de Referencia</span>' : _fmt(precio)}</td>
       <td>${d.usarDiasLaborados
         ? `<input type="number" value="${cantidad}" disabled title="Igual a Días laborados al año, sin restar el ajuste por ausentismo" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:12px;background:#F3F4F6;color:#666">`
         : `<input type="number" min="0" step="1" value="${d.cantidadAnual || 0}" oninput="PARAMETROS_MO.dotacion[${i}].cantidadAnual=parseFloat(this.value)||0;renderDotacionMO()" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:5px 7px;font-size:12px">`
       }</td>
-      <td style="text-align:right;font-size:12px">${_fmt((d.valorUnitario || 0) * cantidad)}</td>
+      <td style="text-align:right;font-size:12px">${_fmt((precio || 0) * cantidad)}</td>
+      <td><button class="btn btn-rojo btn-xs" onclick="eliminarDotacionMO(${i})">✕</button></td>
     </tr>`;
   }).join('');
 }
 
 function agregarDotacionMO() {
-  // El nombre ya no se edita en la tabla (columna fija), así que se pide una sola vez al
-  // agregar el ítem.
-  const nombre = (prompt('Nombre del nuevo ítem:') || '').trim();
-  if (!nombre) return;
   if (!PARAMETROS_MO.dotacion) PARAMETROS_MO.dotacion = [];
-  PARAMETROS_MO.dotacion.push({ nombre, valorUnitario: 0, cantidadAnual: 1 });
+  PARAMETROS_MO.dotacion.push({ nombre: '', cantidadAnual: 1 });
+  renderDotacionMO();
+}
+
+function eliminarDotacionMO(i) {
+  PARAMETROS_MO.dotacion.splice(i, 1);
   renderDotacionMO();
 }
 

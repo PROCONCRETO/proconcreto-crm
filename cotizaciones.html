@@ -848,7 +848,7 @@
       <button type="button" class="btn btn-secundario btn-xs" onclick="agregarDotacionMO()">+ Agregar ítem</button>
     </div>
     <table class="tabla-items" style="width:100%">
-      <thead><tr><th>Ítem</th><th style="width:150px">Valor unitario</th><th style="width:110px">Cantidad/año</th><th style="width:130px">Total/año</th></tr></thead>
+      <thead><tr><th>Ítem (Costos de Referencia)</th><th style="width:150px">Valor unitario</th><th style="width:110px">Cantidad/año</th><th style="width:130px">Total/año</th><th style="width:36px"></th></tr></thead>
       <tbody id="dotacion-mo-body"></tbody>
     </table>
   </div>
@@ -930,10 +930,10 @@
   <div class="acciones-row">
     <div class="flex-gap" style="gap:8px" id="referencia-filtros">
       <button id="chip-todos" onclick="_filtrarCategoriaReferencia('todos')" style="border:1px solid var(--azul);background:var(--azul);color:white;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">Todos <span id="chip-count-todos" style="background:rgba(255,255,255,0.25);color:white;padding:1px 7px;border-radius:10px;font-size:11px">0</span></button>
-      <button id="chip-mano_obra" onclick="_filtrarCategoriaReferencia('mano_obra')" style="border:1px solid var(--gris-borde);background:white;color:var(--gris-medio);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">👷 Mano de Obra <span id="chip-count-mano_obra" style="background:var(--gris-claro);color:var(--gris-medio);padding:1px 7px;border-radius:10px;font-size:11px">0</span></button>
-      <button id="chip-maquinaria" onclick="_filtrarCategoriaReferencia('maquinaria')" style="border:1px solid var(--gris-borde);background:white;color:var(--gris-medio);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">🔧 Maquinaria <span id="chip-count-maquinaria" style="background:var(--gris-claro);color:var(--gris-medio);padding:1px 7px;border-radius:10px;font-size:11px">0</span></button>
       <button id="chip-materia_prima" onclick="_filtrarCategoriaReferencia('materia_prima')" style="border:1px solid var(--gris-borde);background:white;color:var(--gris-medio);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">🧱 Materias Primas <span id="chip-count-materia_prima" style="background:var(--gris-claro);color:var(--gris-medio);padding:1px 7px;border-radius:10px;font-size:11px">0</span></button>
       <button id="chip-insumo_cif" onclick="_filtrarCategoriaReferencia('insumo_cif')" style="border:1px solid var(--gris-borde);background:white;color:var(--gris-medio);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">📦 Insumos y Otros CIF <span id="chip-count-insumo_cif" style="background:var(--gris-claro);color:var(--gris-medio);padding:1px 7px;border-radius:10px;font-size:11px">0</span></button>
+      <button id="chip-mano_obra" onclick="_filtrarCategoriaReferencia('mano_obra')" style="border:1px solid var(--gris-borde);background:white;color:var(--gris-medio);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">👷 Mano de Obra <span id="chip-count-mano_obra" style="background:var(--gris-claro);color:var(--gris-medio);padding:1px 7px;border-radius:10px;font-size:11px">0</span></button>
+      <button id="chip-maquinaria" onclick="_filtrarCategoriaReferencia('maquinaria')" style="border:1px solid var(--gris-borde);background:white;color:var(--gris-medio);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">🔧 Maquinaria <span id="chip-count-maquinaria" style="background:var(--gris-claro);color:var(--gris-medio);padding:1px 7px;border-radius:10px;font-size:11px">0</span></button>
     </div>
     <div class="flex-gap">
       <input class="buscador-input" id="referencia-buscador" placeholder="🔍 Buscar ítem..." oninput="_buscarReferencia(this.value)">
@@ -2316,9 +2316,9 @@
 <script src="js/ordenes-produccion.js?v=20260804b"></script>
 <script src="js/produccion-diaria.js?v=20260804b"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
-<script src="js/costeo-mano-obra.js?v=20260804b"></script>
+<script src="js/costeo-mano-obra.js?v=20260809a"></script>
 <script src="js/costeo-maquinaria.js?v=20260804b"></script>
-<script src="js/costeo-referencia.js?v=20260809b"></script>
+<script src="js/costeo-referencia.js?v=20260809c"></script>
 <script src="js/costeo-producto.js?v=20260804h"></script>
 <script src="js/calidad-mezclas.js?v=20260804c"></script>
 <script src="js/calidad-estadisticas.js?v=20260804a"></script>
