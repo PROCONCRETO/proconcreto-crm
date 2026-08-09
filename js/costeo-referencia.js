@@ -24,7 +24,7 @@ const CATEGORIAS_REFERENCIA = {
   materia_prima: { label: '🧱 Materia Prima',    bg: '#E8F5E9', fg: '#2E7D32' },
   insumo_cif:    { label: '📦 Insumo / CIF',     bg: '#F3E5F5', fg: '#6A1B9A' },
 };
-const _ORDEN_CATS_REFERENCIA = ['todos', 'mano_obra', 'maquinaria', 'materia_prima', 'insumo_cif'];
+const _ORDEN_CATS_REFERENCIA = ['todos', 'materia_prima', 'insumo_cif', 'mano_obra', 'maquinaria'];
 
 // Unidades tomadas de la hoja LIST.REF del Excel original, en símbolo internacional (SI)
 // correcto donde aplica — ver docs/modulos/costeo.md para el detalle de por qué GAL y kWh
@@ -65,6 +65,11 @@ function _listaUnificadaCostos() {
     const c = calcularCostoInsumo(i);
     lista.push({ categoria: i.categoria, nombre: i.nombre, unidad: _labelUnidadInsumo(i.unidad), costoSinIva: c.costoSinIva, costoConIva: c.valorFinal, soloLectura: false, modificado: i._modificado });
   });
+  // Orden fijo pedido por el usuario (2026-08-09), sin importar en qué orden se hayan creado:
+  // Materia Prima, Insumo/CIF, Mano de Obra, Maquinaria. Array.sort es estable en los motores
+  // modernos, así que dentro de cada categoría se conserva el orden con el que ya venía.
+  const ORDEN_LISTADO = { materia_prima: 0, insumo_cif: 1, mano_obra: 2, maquinaria: 3 };
+  lista.sort((a, b) => ORDEN_LISTADO[a.categoria] - ORDEN_LISTADO[b.categoria]);
   return lista;
 }
 
