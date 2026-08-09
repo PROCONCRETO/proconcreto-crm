@@ -235,6 +235,13 @@ function guardarInsumoCosto() {
   }
   i.nombre = nombre;
   const nombreAnterior = document.getElementById('m-insumo-nombre-anterior').value;
+
+  // Si esto es "Acero Figurado" y el precio/kg cambió, se ofrece actualizar también las
+  // varillas calculadas a partir de él (ver más abajo) — el precio ANTERIOR se captura antes
+  // de sobreescribir el array, para poder comparar después de guardar.
+  const itemAnterior = INSUMOS_COSTOS.find(x => x.nombre === (nombreAnterior || nombre));
+  const precioAnteriorAcero = (itemAnterior && _esNombreAceroFigurado(itemAnterior.nombre)) ? Number(itemAnterior.valorUnitario) || 0 : null;
+
   const guardarEnSupabase = () => {
     sb.from('insumos_costos').upsert({ nombre, datos: i, modificado: new Date().toISOString() }, { onConflict: 'nombre' })
       .then(({ error }) => { if (error) console.error('Error guardando ítem:', error.message); });
@@ -252,6 +259,10 @@ function guardarInsumoCosto() {
   cerrarModal('modal-insumo-costo');
   renderCosteoReferencia();
   _revisarImpactoPrecios(`Insumo "${nombre}" actualizado en Costos de Referencia`);
+
+  if (precioAnteriorAcero !== null && precioAnteriorAcero !== (Number(i.valorUnitario) || 0)) {
+    _ofrecerActualizarVarillasAcero(i);
+  }
 }
 
 function eliminarInsumoCosto(nombre) {
@@ -259,4 +270,75 @@ function eliminarInsumoCosto(nombre) {
   INSUMOS_COSTOS = INSUMOS_COSTOS.filter(x => x.nombre !== nombre);
   sb.from('insumos_costos').delete().eq('nombre', nombre).then(({ error }) => { if (error) console.error('Error eliminando ítem:', error.message); });
   renderCosteoReferencia();
+}
+
+// ═══════════════════════════════
+// VARILLAS DE ACERO CALCULADAS DESDE ACERO FIGURADO
+// ═══════════════════════════════
+// Cada vez que se guarda "Acero Figurado" con un precio/kg distinto al que tenía, se ofrece
+// actualizar de una vez las varillas N°2 a N°8 (Materia Prima, unidad "m") que se calculan a
+// partir de él: precio/kg × peso por metro de cada diámetro (tabla estándar de varillas
+// corrugadas). Quedan como ítems normales una vez creadas — se pueden editar igual que
+// cualquier otra desde aquí; esto solo les da/actualiza un valor calculado, no las deja
+// "amarradas" de forma invisible (cada actualización pasa por el mismo aviso de confirmación).
+const VARILLAS_ACERO = [
+  { designacion: 'N° 2', pulgadas: '1/4"', pesoKgM: 0.250 },
+  { designacion: 'N° 3', pulgadas: '3/8"', pesoKgM: 0.560 },
+  { designacion: 'N° 4', pulgadas: '1/2"', pesoKgM: 0.994 },
+  { designacion: 'N° 5', pulgadas: '5/8"', pesoKgM: 1.552 },
+  { designacion: 'N° 6', pulgadas: '3/4"', pesoKgM: 2.235 },
+  { designacion: 'N° 7', pulgadas: '7/8"', pesoKgM: 3.042 },
+  { designacion: 'N° 8', pulgadas: '1"',   pesoKgM: 3.973 },
+];
+
+function _esNombreAceroFigurado(nombre) {
+  return (nombre || '').trim().toLowerCase() === 'acero figurado';
+}
+
+function _ofrecerActualizarVarillasAcero(acero) {
+  const precioKg = Number(acero.valorUnitario) || 0;
+  if (precioKg <= 0) return;
+  const resumen = VARILLAS_ACERO.map(v => `• ${v.designacion} (${v.pulgadas}): ${_fmtRef(Math.round(precioKg * v.pesoKgM))}/m`).join('\n');
+  if (!confirm(`El precio de "${acero.nombre}" cambió a ${_fmtRef(precioKg)}/kg.\n\n¿Actualizar también las varillas N° 2 a N° 8 calculadas a partir de él?\n\n${resumen}`)) return;
+  _generarVarillasAcero(acero);
+}
+
+async function _generarVarillasAcero(acero) {
+  const precioKg = Number(acero.valorUnitario) || 0;
+  if (precioKg <= 0) return;
+
+  const nuevas = VARILLAS_ACERO.map(v => ({
+    nombre: `Varilla de Acero ${v.designacion} (${v.pulgadas})`,
+    categoria: acero.categoria,
+    rolDiseno: '',
+    tamanoAgregado: '',
+    unidad: 'm',
+    valorUnitario: Math.round(precioKg * v.pesoKgM),
+    aplicaIva: acero.aplicaIva !== false,
+    transporteIncluido: acero.transporteIncluido !== false,
+    transporteAdicional: acero.transporteAdicional || 0,
+  }));
+
+  // Se insertan con un "creado" justo después del de Acero Figurado, para que aparezcan
+  // inmediatamente debajo de él en la lista (que se ordena por fecha de creación, ver
+  // recargarInsumosCostosRT() en datos-realtime.js) sin importar qué tan vieja sea esa fila.
+  const { data: fila } = await sb.from('insumos_costos').select('creado').eq('nombre', acero.nombre).single();
+  const baseTs = fila?.creado ? new Date(fila.creado).getTime() : Date.now();
+  const idxAcero = INSUMOS_COSTOS.findIndex(x => x.nombre === acero.nombre);
+
+  let fallas = 0;
+  for (let idx = 0; idx < nuevas.length; idx++) {
+    const item = nuevas[idx];
+    const creado = new Date(baseTs + (idx + 1) * 50).toISOString();
+    const { error } = await sb.from('insumos_costos').upsert(
+      { nombre: item.nombre, datos: item, creado, modificado: new Date().toISOString() },
+      { onConflict: 'nombre' }
+    );
+    if (error) { console.error(`Error guardando ${item.nombre}:`, error.message); fallas++; continue; }
+    const idxExistente = INSUMOS_COSTOS.findIndex(x => x.nombre === item.nombre);
+    if (idxExistente >= 0) INSUMOS_COSTOS[idxExistente] = item;
+    else INSUMOS_COSTOS.splice((idxAcero >= 0 ? idxAcero : INSUMOS_COSTOS.length - 1) + 1 + idx, 0, item);
+  }
+  renderCosteoReferencia();
+  if (fallas) alert(`⚠️ Solo se pudieron actualizar ${nuevas.length - fallas} de ${nuevas.length} varillas — revisa la consola del navegador (probablemente por permisos: la escritura en Costos de Referencia está restringida al equipo de Centro de Costos).`);
 }
