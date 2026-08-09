@@ -30,6 +30,17 @@
 
 `.log-cal-grid` (`css/estilos.css`) usa `grid-template-columns: repeat(7, 1fr)` para que los 7 días de la semana midan lo mismo — pero un `1fr` en CSS Grid en realidad es `minmax(auto, 1fr)`, y ese `auto` toma como mínimo el ancho del contenido más largo de la celda. Con `.log-cal-viaje-texto` en `white-space: nowrap`, un destino largo sin cortar (ej. "Bajo tablazo Km 3 vía Mzales-Chinchiná...") estiraba SU columna más que las demás, aunque el `text-overflow: ellipsis` ya estuviera puesto — nunca llegaba a activarse porque la celda simplemente crecía en vez de truncar (bug real, reportado como "unifica el ancho de las columnas"). Arreglado (2026-07-30) agregando `min-width: 0` a `.log-cal-celda` (el ítem de grid) y a `.log-cal-viaje` (el ítem de flex que envuelve el texto) — con eso las celdas sí pueden encogerse por debajo del contenido, las 7 columnas quedan parejas de verdad, y el texto largo se trunca con "…" como estaba pensado.
 
+## Vista Listado (2026-08-04)
+
+Toggle "📅 Calendario" / "📋 Listado" junto a la navegación de mes — a pedido del usuario, para ver varios días seguidos sin la grilla, y que cada **entrega** (no cada viaje) se pueda leer sin tener que abrirla. `renderCalendarioLogistica()` sigue siendo el único punto de entrada (todos los `sb`/drag-drop que refrescan el calendario llaman esa función igual que antes); al final ahora también llama a `_renderListadoLogistica()`, que pinta `#log-listado` con la misma lógica de datos (mes/año, festivos, orden de `VIAJES` por día) pero en un layout distinto:
+
+- Un encabezado delgado por día (número, día de la semana, festivo si aplica, 🖨️ si hay viajes) — clic o soltar un viaje arrastrado programa/mueve a ese día, igual que una celda del calendario.
+- Debajo, **una fila completa por cada entrega** (aplanando todos los viajes del día, un viaje con 2 entregas da 2 filas) con cliente, destino específico, vehículo (color igual al del calendario), lista de productos, peso y estado (✅🔁❌⏳) — todo visible sin clic. El color del vehículo queda como borde izquierdo de cada fila para poder distinguir a qué viaje pertenece cada entrega sin repetir el dato en cada una.
+- Arrastrar cualquier fila de entrega mueve el VIAJE completo al que pertenece (no existe "mover solo una entrega" en la app) — mismo `iniciarArrastreViaje(v.id)` que ya usaba el calendario. Las flechas ▲▼ de reordenar (cuando hay más de un viaje el mismo día) se muestran una sola vez, en la primera entrega de cada viaje.
+- Clic en cualquier fila de entrega abre el viaje completo (`editarViaje`) — ahí se edita, igual que antes.
+
+`cambiarVistaLogistica(modo)` solo alterna qué contenedor se ve (`display`), no vuelve a calcular nada — las dos vistas siempre se recalculan juntas en cada render.
+
 ## Bloqueo de fechas pasadas
 
 `esFechaBloqueada(fecha)` — cualquier fecha anterior a hoy. Un viaje en fecha bloqueada se abre en modo solo-lectura (banner + campos deshabilitados + sin botón Guardar/Eliminar). No se puede crear un viaje nuevo en una fecha pasada. Marcar cumplidos SÍ sigue permitido sobre fechas pasadas — es la vía para registrar qué pasó realmente.
@@ -59,6 +70,14 @@ Tarjetas KPI con el componente `.stat-card` (mismo que Cotizaciones→Estadísti
 - Ranking de destinos más frecuentes — cuenta la **Ciudad de Destino del viaje**, no el destino específico/proyecto de la entrega.
 - Ranking de **causas de reprogramación** (ámbar) y **causas de cancelación** (rojo) más frecuentes — un conteo por cada vez que se eligió esa causa (`_chartCausas()`, mismo patrón que Destinos; las etiquetas largas se truncan en el eje, el texto completo queda en el tooltip). Vacío hasta que haya reprogramaciones/cancelaciones con causa registrada (el campo se agregó el 2026-07-17; lo de antes no tiene causa y no aparece en el ranking).
 - Debajo, un **cuadro "Motivos más frecuentes"** (`_tablaCausas()`, tabla en HTML, no una gráfica) que junta reprogramación y cancelación en un solo ranking por **porcentaje del total de incidencias** — para ver de un vistazo cuál es la causa raíz más recurrente sin importar en cuál de las dos terminó (una causa puede sumar reprogramaciones Y cancelaciones a la vez; cada fila muestra el desglose 🔁/❌).
+
+### Solo cuentan los cambios avisados tarde (2026-08-04)
+
+A pedido del usuario ("anterior a estos días no es tan grave la reprogramación y se mueven mucho de acuerdo a la disponibilidad de recepción de los clientes"): la tarjeta **"Entregas reprogramadas"** y los rankings de **causas de reprogramación/cancelación** solo cuentan un cambio si se avisó con poca anticipación — el mismo día o el día anterior a la fecha que YA estaba comprometida en ese momento (`_esCambioTardio()`, compara `fechaConfirmacion` del cambio contra esa fecha). Una reprogramación hecha con varios días de anticipación ya no suma en ninguna de las dos.
+
+Ojo con el detalle si una entrega se reprogramó más de una vez: `fechaOriginal` se fija una sola vez y nunca cambia, así que para la reprogramación #2 (o #3...) "la fecha que estaba comprometida en ese momento" NO es `fechaOriginal` sino la fecha que dejó la reprogramación anterior — por eso `_reprogramacionesTardias(e)` recorre el historial comparando cada entrada contra la anterior, no todas contra `fechaOriginal`. Una cancelación usa el mismo criterio contra la última fecha vigente (la última reprogramación si hubo alguna, si no `fechaOriginal`).
+
+Lo que **no cambió**: el badge "🔁×N" que se ve en Cumplidos/tarjetas (`_countReprogramaciones()`, en `js/logistica.js`) sigue contando TODAS las reprogramaciones sin filtrar por anticipación — es solo un dato factual ("cuántas veces cambió"), no una estadística de desempeño, así que no aplica el mismo criterio.
 
 ## Qué hace
 

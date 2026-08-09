@@ -373,6 +373,108 @@ function soltarViajeSobreViaje(event, targetId) {
   renderCalendarioLogistica();
 }
 
+// Vista de Programación de Viajes: 'calendario' (grilla mensual, la de siempre) o 'listado'
+// (una fila por día, de arriba hacia abajo — más fácil de leer varios días seguidos sin tener
+// que entrecerrar los ojos en una celda chiquita) (2026-08-04, a pedido del usuario). Las dos
+// vistas se pintan siempre juntas en cada render — cambiar de vista solo alterna cuál se ve,
+// no vuelve a calcular nada.
+let _logVista = 'calendario';
+
+function cambiarVistaLogistica(modo) {
+  _logVista = modo;
+  const cal = document.getElementById('log-calendario');
+  const lst = document.getElementById('log-listado');
+  if (cal) cal.style.display = modo === 'calendario' ? '' : 'none';
+  if (lst) lst.style.display = modo === 'listado' ? '' : 'none';
+  const btnCal = document.getElementById('log-vista-btn-calendario');
+  const btnLst = document.getElementById('log-vista-btn-listado');
+  if (btnCal) { btnCal.style.background = modo === 'calendario' ? 'var(--azul)' : 'white'; btnCal.style.color = modo === 'calendario' ? 'white' : 'var(--gris-medio)'; }
+  if (btnLst) { btnLst.style.background = modo === 'listado' ? 'var(--azul)' : 'white'; btnLst.style.color = modo === 'listado' ? 'white' : 'var(--gris-medio)'; }
+}
+
+// Misma lógica de datos que renderCalendarioLogistica() (mismo mes/año, mismos festivos, mismo
+// filtro/orden de VIAJES por día) — solo cambia el layout: un encabezado delgado por día y,
+// debajo, una fila COMPLETA por cada entrega (no por viaje) — a pedido del usuario, para poder
+// ver de qué se trata cada entrega (cliente, destino, productos, estado) sin tener que abrir
+// cada una. Reutiliza los mismos handlers de arrastrar/soltar y de clic que la grilla —
+// arrastrar cualquier fila de entrega mueve el VIAJE completo al que pertenece (no existe un
+// concepto de "mover solo una entrega" en la app), igual que ya pasaba con los chips del
+// calendario.
+function _renderListadoLogistica(festivosMap, hoyStr, primerDia, diasEnMes) {
+  const cont = document.getElementById('log-listado');
+  if (!cont) return;
+
+  let html = '';
+  for (let dia = 1; dia <= diasEnMes; dia++) {
+    const fechaObj = new Date(_logAnio, _logMes, dia);
+    const fechaStr = _fmtISO(fechaObj);
+    const dow = fechaObj.getDay();
+    const festivoNombre = festivosMap[fechaStr];
+    const esHoy = fechaStr === hoyStr;
+    const viajesDia = VIAJES.filter(v => v.fecha === fechaStr).sort((a, b) => _claveOrdenViaje(a) - _claveOrdenViaje(b));
+    const diaBloqueado = esFechaBloqueada(fechaStr);
+
+    let clasesDia = 'log-lst-dia';
+    if (festivoNombre) clasesDia += ' log-lst-festivo';
+    else if (dow === 0 || dow === 6) clasesDia += ' log-lst-finde';
+    if (esHoy) clasesDia += ' log-lst-hoy';
+
+    html += `
+      <div class="${clasesDia}" onclick="abrirModalViaje('${fechaStr}')" ondragover="permitirSoltarViaje(event)" ondragleave="quitarResaltadoSoltar(event)" ondrop="soltarViajeEnDia(event,'${fechaStr}')">
+        <span class="log-lst-fecha-num">${dia}</span>
+        <span class="log-lst-fecha-dow">${DIAS_SEMANA_ES[dow]}</span>
+        ${esHoy ? '<span class="log-cal-hoy-badge">HOY</span>' : ''}
+        ${festivoNombre ? `<span class="log-lst-festivo-nombre" title="${_esc(festivoNombre)}">🎉 ${_esc(festivoNombre)}</span>` : ''}
+        <span style="flex:1"></span>
+        ${viajesDia.length ? `<span onclick="event.stopPropagation();imprimirProgramacionDia('${fechaStr}')" title="Imprimir programación del día" style="cursor:pointer">🖨️</span>` : ''}
+      </div>`;
+
+    if (!viajesDia.length) {
+      html += `<div class="log-lst-sin-viajes" onclick="abrirModalViaje('${fechaStr}')">Sin viajes — clic para programar uno</div>`;
+      continue;
+    }
+
+    viajesDia.forEach((v, idxViaje) => {
+      const colorViaje = COLOR_VEHICULO_VIAJE[v.vehiculo] || '#607D8B';
+      const flechas = viajesDia.length > 1 ? `
+        <span class="log-cal-viaje-flechas">
+          ${idxViaje > 0 ? `<span onclick="event.stopPropagation();moverViajeOrden('${v.id}',-1)" title="Subir prioridad">▲</span>` : ''}
+          ${idxViaje < viajesDia.length - 1 ? `<span onclick="event.stopPropagation();moverViajeOrden('${v.id}',1)" title="Bajar prioridad">▼</span>` : ''}
+        </span>` : '';
+      const entregasViaje = _entregasDeViaje(v);
+      const dragAttrs = `draggable="${!diaBloqueado}" ondragstart="iniciarArrastreViaje(event,'${v.id}')" ondragend="terminarArrastreViaje(event)" ondragover="permitirSoltarViaje(event)" ondrop="soltarViajeSobreViaje(event,'${v.id}')"`;
+
+      if (!entregasViaje.length) {
+        html += `
+        <div class="log-lst-entrega" ${dragAttrs} onclick="editarViaje('${v.id}')" style="border-left-color:${colorViaje}" title="${diaBloqueado ? '' : 'Arrastra para mover o reordenar el viaje'}">
+          <span class="log-lst-entrega-vehiculo" style="background:${colorViaje}">${_esc(v.vehiculo) || 'Sin vehículo'}</span>
+          <span class="log-lst-entrega-vacia">Viaje sin entregas cargadas todavía</span>
+          ${flechas}
+        </div>`;
+        return;
+      }
+
+      entregasViaje.forEach((e, idxEntrega) => {
+        const c = _cumplidoDeEntrega(e);
+        const etiqueta = _ETIQUETA_CUMPLIDO[c.estado] || _ETIQUETA_CUMPLIDO.pendiente;
+        const pesoEntrega = (e.productos || []).reduce((s, p) => s + (Number(p.peso) || 0), 0);
+        const productosTxt = (e.productos || []).filter(p => p.producto).map(p => `${p.producto}${p.cantidad ? ' (' + p.cantidad + ')' : ''}`).join(', ') || 'Sin productos cargados';
+        html += `
+        <div class="log-lst-entrega${c.estado === 'cancelada' ? ' log-lst-entrega-cancelada' : ''}" ${dragAttrs} onclick="editarViaje('${v.id}')" style="border-left-color:${colorViaje}" title="${diaBloqueado ? '' : 'Arrastra para mover o reordenar el viaje'}">
+          <span class="log-lst-entrega-vehiculo" style="background:${colorViaje}">${_esc(v.vehiculo) || '—'}</span>
+          <span class="log-lst-entrega-cliente">${_esc(e.cliente) || 'Sin cliente'}${e.destino ? `<span class="log-lst-entrega-destino"> — ${_esc(e.destino)}</span>` : ''}</span>
+          <span class="log-lst-entrega-productos" title="${_esc(productosTxt)}">${_esc(productosTxt)}</span>
+          <span class="log-lst-entrega-peso">${pesoEntrega.toFixed(2)} ton</span>
+          <span class="log-lst-entrega-estado">${etiqueta}</span>
+          ${idxEntrega === 0 ? flechas : ''}
+        </div>`;
+      });
+    });
+  }
+
+  cont.innerHTML = html;
+}
+
 function renderCalendarioLogistica() {
   const cont = document.getElementById('log-calendario');
   if (!cont) return;
@@ -440,6 +542,8 @@ function renderCalendarioLogistica() {
     <div class="log-cal-grid">${DIAS_SEMANA_ES.map(d => `<div class="log-cal-dia-nombre">${d}</div>`).join('')}</div>
     <div class="log-cal-grid">${celdas}</div>`;
 
+  _renderListadoLogistica(festivosMap, hoyStr, primerDia, diasEnMes);
+  cambiarVistaLogistica(_logVista);
   actualizarBadgeCumplidos();
 }
 
@@ -1064,36 +1168,84 @@ function imprimirProgramacionDia(fechaStr) {
   _progDiaFechaActual = fechaStr;
 
   const fechaLegible = new Date(fechaStr + 'T12:00').toLocaleDateString('es-CO', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-  const fechaHoy = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+  const fechaHoy = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' });
   // Mismo orden de prioridad que el calendario (viaje.orden, flechas ▲▼ o arrastre) — el
   // impreso es lo único que ve el área de despachos sin acceso al aplicativo, así que tiene
   // que reflejar el orden real de despacho, no un orden alfabético por vehículo.
   viajesDia.sort((a, b) => _claveOrdenViaje(a) - _claveOrdenViaje(b));
 
+  // Resumen del día — lo primero que se lee, antes de entrar al detalle de cada viaje
+  // (2026-08-04, rediseño a pedido del usuario: "los conductores y programadores se me están
+  // quejando que no entienden bien").
+  let totalEntregas = 0, totalPeso = 0, vehiculosAlLimite = 0;
+  viajesDia.forEach(v => {
+    totalEntregas += _entregasDeViaje(v).length;
+    totalPeso += Number(v.pesoTotal) || 0;
+    const capacidad = CAPACIDAD_VEHICULO[v.vehiculo];
+    if (capacidad && (Number(v.pesoTotal) || 0) > capacidad) vehiculosAlLimite++;
+  });
+
   const bloques = viajesDia.map((v, idxViaje) => {
     const capacidad = CAPACIDAD_VEHICULO[v.vehiculo];
     const peso = Number(v.pesoTotal) || 0;
     const excedido = capacidad && peso > capacidad;
-    const entregasHTML = _entregasDeViaje(v).map(e => `
-      <div style="margin:8px 0;padding:8px;border:1px solid #eee;border-radius:5px">
-        <div style="font-size:12px;font-weight:700">${_esc(e.cliente) || '—'}${e.destino ? ' — ' + _esc(e.destino) : ''}</div>
-        <div style="font-size:10.5px;color:#555;margin-bottom:4px">Contacto en obra: ${e.contactoObraNombre ? _esc(e.contactoObraNombre) + (e.contactoObraTelefono ? ' — ' + _esc(e.contactoObraTelefono) : '') : '—'}</div>
-        <table style="width:100%;border-collapse:collapse;font-size:10.5px">
-          ${(e.productos || []).map(p => `<tr><td style="padding:2px 0">• ${_esc(p.producto) || ''}</td><td style="padding:2px 0;text-align:center;width:70px">${p.cantidad || 0}</td><td style="padding:2px 0;text-align:right;width:80px">${(Number(p.peso) || 0).toFixed(2)} ton</td></tr>`).join('')}
+    const pctBarra = capacidad ? Math.min(Math.round((peso / capacidad) * 100), 100) : 100;
+    // Los vehículos propios se guardan como "PLACA / Conductor" (ver leyenda del calendario);
+    // los tercerizados son solo un tipo de camión, sin conductor fijo que mostrar aparte.
+    const [placa, conductor] = (v.vehiculo || '—').split(' / ');
+    const entregasViaje = _entregasDeViaje(v);
+
+    const entregasHTML = entregasViaje.map(e => {
+      const contactoHTML = e.contactoObraNombre
+        ? `<div class="pv-contacto"><b>👤 Recibe: ${_esc(e.contactoObraNombre)}</b>${e.contactoObraTelefono ? `<span class="tel">📞 ${_esc(e.contactoObraTelefono)}</span>` : ''}</div>`
+        : `<div class="pv-contacto sin-datos">Sin contacto registrado en obra — confirmar con el cliente antes de salir</div>`;
+      const productosHTML = (e.productos || []).filter(p => p.producto).map(p =>
+        `<tr><td>${_esc(p.producto)}</td><td class="num">${p.cantidad || 0}</td><td class="num">${(Number(p.peso) || 0).toFixed(2)} ton</td></tr>`
+      ).join('');
+      const pesoEntrega = (e.productos || []).reduce((s, p) => s + (Number(p.peso) || 0), 0);
+      return `
+      <div class="pv-entrega">
+        <div class="pv-entrega-top">
+          <div class="pv-check"></div>
+          <div class="pv-entrega-quien">
+            <div class="cliente">${_esc(e.cliente) || 'Sin cliente'}</div>
+            ${e.destino ? `<div class="sitio">${_esc(e.destino)}</div>` : ''}
+          </div>
+          ${e.ordenNumero ? `<div class="pv-entrega-orden">Orden ${_esc(e.ordenNumero)}</div>` : ''}
+        </div>
+        ${contactoHTML}
+        <table class="pv-productos">
+          <thead><tr><th>Producto</th><th class="num">Cant.</th><th class="num">Peso</th></tr></thead>
+          <tbody>${productosHTML || '<tr><td colspan="3" style="color:#999;font-style:italic">Sin productos cargados</td></tr>'}</tbody>
+          <tfoot><tr><td>Total</td><td></td><td class="num">${pesoEntrega.toFixed(2)} ton</td></tr></tfoot>
         </table>
-      </div>`).join('');
+        <div class="pv-firma">
+          <div class="pv-firma-campo">Firma de quien recibe</div>
+          <div class="pv-firma-campo hora">Hora de entrega</div>
+        </div>
+      </div>`;
+    }).join('') || `<div class="pv-entrega"><span style="color:#999;font-style:italic;font-size:12px">Viaje sin entregas cargadas todavía</span></div>`;
+
     return `
-      <div style="margin-bottom:16px">
-        <div style="background:#003F7F;color:white;padding:6px 10px;border-radius:5px 5px 0 0;display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12px;font-weight:700">
-          <span style="background:#1D9E75;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">${idxViaje + 1}</span>
-          <span>🚛 ${_esc(v.vehiculo) || '—'}</span>
-          <span>Destino: ${_esc(v.destino) || '—'}</span>
-          <span style="margin-left:auto;color:${excedido ? '#FFCDD2' : 'white'}">${peso.toFixed(2)}${capacidad ? ' / ' + capacidad : ''} ton${excedido ? ' ⚠' : ''}</span>
+      <div class="pv-viaje">
+        <div class="pv-viaje-head">
+          <div class="pv-viaje-num">${idxViaje + 1}</div>
+          <div class="pv-viaje-vehiculo">
+            <div class="placa">${_esc(placa)}</div>
+            ${conductor ? `<div class="conductor">${_esc(conductor)}</div>` : ''}
+          </div>
+          <div class="pv-viaje-destino">
+            <div class="ciudad">${_esc(v.destino) || '—'}</div>
+            <div class="n-entregas">${entregasViaje.length} entrega${entregasViaje.length === 1 ? '' : 's'}</div>
+          </div>
         </div>
-        <div style="border:1px solid #ddd;border-top:none;padding:6px 10px 10px">
-          ${entregasHTML}
-          ${v.observaciones ? `<div style="font-size:10px;color:#777;margin-top:4px"><b>Obs:</b> ${_esc(v.observaciones)}</div>` : ''}
+        <div class="pv-viaje-carga${excedido ? ' excedido' : ''}">
+          <span class="num">${peso.toFixed(2)} <span class="max">${capacidad ? '/ ' + capacidad + ' ton' : 'ton'}</span></span>
+          <div class="barra"><i style="width:${pctBarra}%"></i></div>
+          ${excedido ? `<span class="flag">⚠ Sobre capacidad</span>` : `<span class="num">${capacidad ? pctBarra + '%' : ''}</span>`}
         </div>
+        ${entregasHTML}
+        ${v.observaciones ? `<div class="pv-obs"><b>Obs:</b> ${_esc(v.observaciones)}</div>` : ''}
       </div>`;
   }).join('');
 
@@ -1112,7 +1264,13 @@ function imprimirProgramacionDia(fechaStr) {
         <div style="text-align:center;margin-bottom:12px">
           <div style="font-size:13px;font-weight:700;color:#003F7F;letter-spacing:0.03em">PROGRAMACIÓN DE VIAJES</div>
           <div style="font-size:11.5px;color:#333;text-transform:capitalize">${fechaLegible}</div>
-          <div style="font-size:10px;color:#777">${viajesDia.length} viaje${viajesDia.length === 1 ? '' : 's'} · Generado el ${fechaHoy}</div>
+          <div style="font-size:10px;color:#777">Generado el ${fechaHoy}</div>
+        </div>
+        <div class="pv-resumen">
+          <div class="celda"><div class="n">${viajesDia.length}</div><div class="l">Viaje${viajesDia.length === 1 ? '' : 's'}</div></div>
+          <div class="celda"><div class="n">${totalEntregas}</div><div class="l">Entrega${totalEntregas === 1 ? '' : 's'}</div></div>
+          <div class="celda"><div class="n">${totalPeso.toFixed(1)}</div><div class="l">Ton. programadas</div></div>
+          <div class="celda"><div class="n${vehiculosAlLimite ? ' alerta' : ''}">${vehiculosAlLimite}</div><div class="l">Vehículo${vehiculosAlLimite === 1 ? '' : 's'} al límite</div></div>
         </div>
         ${bloques}
       </div>

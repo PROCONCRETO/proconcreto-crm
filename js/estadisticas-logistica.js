@@ -26,18 +26,52 @@ const _COLOR_CUMPLIDO_VIAJE = {
   pendiente:    { color: '#b0aea6', icono: '⏳', etiqueta: 'Pendiente' },
 };
 
-// "¿Esta entrega se reprogramó alguna vez?" — es un hecho histórico, independiente del estado
-// ACTUAL (una entrega se puede haber reprogramado y de todas formas terminar "hecha": reprogramar
-// ya no bloquea la entrega, ver marcarCumplidoEntrega() en logistica.js). Cubre tres señales:
-// `_countReprogramaciones(e)` (mecanismo nuevo, con historial y causa; no bloquea nada),
-// `cumplido.estado === 'reprogramada'` (marcas de antes de este cambio, donde sí quedaba fija
-// como estado final) y `fechaOriginal` distinta a la fecha actual del viaje (se arrastró en el
-// calendario sin pasar por Cumplidos).
+// "¿Se avisó este cambio (reprogramación o cancelación) con poca anticipación?" — a pedido
+// del usuario: una reprogramación con varios días de anticipación es normal (los clientes
+// mueven la fecha según su propia disponibilidad de recepción, y eso no es un problema de
+// servicio) y no debería pesar en las estadísticas como si lo fuera. Lo que sí importa es
+// cuando se avisa el mismo día o el día anterior a la fecha que YA estaba comprometida en ese
+// momento — ahí sí hay un impacto real de logística (2026-08-04).
+function _esCambioTardio(fechaProgramada, fechaConfirmacionISO) {
+  if (!fechaProgramada || !fechaConfirmacionISO) return false;
+  const fechaConfirmacion = fechaConfirmacionISO.slice(0, 10); // ISO datetime -> solo la fecha
+  const dProgramada = new Date(fechaProgramada + 'T12:00');
+  const dConfirmacion = new Date(fechaConfirmacion + 'T12:00');
+  const diasAntes = Math.round((dProgramada - dConfirmacion) / 86400000);
+  return diasAntes <= 1; // mismo día (0), el día anterior (1), o incluso después (negativo) — todos cuentan como tardíos
+}
+
+// Del historial de reprogramaciones de una entrega, solo las que se avisaron tarde (ver
+// _esCambioTardio). Para cada reprogramación, "la fecha que estaba comprometida en ese
+// momento" es la fecha vigente justo ANTES de ese cambio en particular — la original si es la
+// primera vez que se reprograma, o la fecha que dejó la reprogramación anterior si ya se
+// había movido antes (fechaOriginal nunca cambia, así que no sirve para las reprogramaciones
+// #2, #3... de una misma entrega).
+function _reprogramacionesTardias(e) {
+  const historial = e.reprogramaciones || [];
+  return historial.filter((r, i) => {
+    const fechaVigenteAntes = i === 0 ? e.fechaOriginal : historial[i - 1].fecha;
+    return _esCambioTardio(fechaVigenteAntes, r.fechaConfirmacion);
+  });
+}
+
+// "¿Esta entrega se reprogramó alguna vez [de forma que cuenta para las estadísticas]?" — es
+// un hecho histórico, independiente del estado ACTUAL (una entrega se puede haber reprogramado
+// y de todas formas terminar "hecha": reprogramar ya no bloquea la entrega, ver
+// marcarCumplidoEntrega() en logistica.js). Cubre: reprogramaciones tardías del historial
+// nuevo (con fecha/hora, se puede evaluar si fueron tardías), `cumplido.estado ===
+// 'reprogramada'` (marcas de antes de este mecanismo, sin esa info — se cuentan igual porque
+// no hay forma de saber si fueron tardías) y `fechaOriginal` distinta a la fecha actual del
+// viaje sin historial (se arrastró en el calendario sin pasar por Cumplidos — mismo caso, sin
+// fecha de confirmación que evaluar, se cuenta igual).
 function _fueReprogramada(e, viajeFecha) {
-  if (_countReprogramaciones(e)) return true;
+  if (_reprogramacionesTardias(e).length) return true;
   if (_cumplidoDeEntrega(e).estado === 'reprogramada') return true;
-  const fechaOriginal = e.fechaOriginal || viajeFecha;
-  return fechaOriginal !== viajeFecha;
+  if (!(e.reprogramaciones || []).length) {
+    const fechaOriginal = e.fechaOriginal || viajeFecha;
+    if (fechaOriginal !== viajeFecha) return true;
+  }
+  return false;
 }
 
 function _categoriaCumplidoViaje(v) {
@@ -79,11 +113,17 @@ function _datosEstadisticasLogistica(periodoDias) {
         reprogramada: _fueReprogramada(e, v.fecha),
         pesoEntrega,
       });
-      // Causas: un registro por CADA VEZ que se reprogramó (una entrega puede reprogramarse más
-      // de una vez, con causas distintas cada vez), y uno por cada cancelación con causa.
-      (e.reprogramaciones || []).forEach(r => { if (r.causa) causasReprogramacion.push(r.causa); });
+      // Causas: un registro por cada reprogramación TARDÍA (ver _reprogramacionesTardias — una
+      // entrega puede reprogramarse más de una vez, con causas distintas cada vez, y una
+      // reprogramada con anticipación no cuenta acá), y uno por cada cancelación con causa que
+      // también se haya avisado tarde (mismo criterio, sobre la fecha vigente al cancelar: la
+      // última reprogramación si hubo alguna, si no la original).
+      _reprogramacionesTardias(e).forEach(r => { if (r.causa) causasReprogramacion.push(r.causa); });
       const c = _cumplidoDeEntrega(e);
-      if (c.estado === 'cancelada' && c.causa) causasCancelacion.push(c.causa);
+      if (c.estado === 'cancelada' && c.causa) {
+        const fechaVigente = (e.reprogramaciones && e.reprogramaciones.length) ? e.reprogramaciones[e.reprogramaciones.length - 1].fecha : fechaOriginal;
+        if (_esCambioTardio(fechaVigente, c.fechaConfirmacion)) causasCancelacion.push(c.causa);
+      }
       if (!viajesVistos.has(v.id)) { viajesVistos.add(v.id); viajesEnPeriodo.push(v); }
     });
   });
