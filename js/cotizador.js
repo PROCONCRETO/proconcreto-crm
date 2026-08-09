@@ -201,6 +201,7 @@ function recalcular() {
   document.getElementById('tot-transporte').textContent = '$' + transporte.toLocaleString();
   document.getElementById('tot-logistica').textContent = '$' + logistica.toLocaleString();
   document.getElementById('tot-total').textContent = '$' + total.toLocaleString();
+  if (typeof _renderResumenRetenciones === 'function') _renderResumenRetenciones();
 }
 
 function actualizarTransporte() { recalcular(); }
@@ -677,6 +678,7 @@ function guardarCotizacion() {
       cargo: document.getElementById('vendedor-cargo').value,
     },
     totales: { subtotal, iva, transporte, logistica, total: subtotal + iva + transporte + logistica },
+    retenciones: typeof recogerRetenciones === 'function' ? recogerRetenciones() : { aplica: false },
     opcionesExtra: recogerOpcionesExtra(),
     opcionAceptada: existente ? existente.opcionAceptada : null,
     estado: existente ? existente.estado : 'Borrador',
@@ -753,6 +755,7 @@ function cargarCotizacion(id) {
   renderItems();
   actualizarCargue();
   cargarOpcionesExtraDesde(cot);
+  if (typeof cargarRetenciones === 'function') cargarRetenciones(cot.retenciones);
   document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
   document.getElementById('pantalla-nueva-cotizacion').classList.add('activa');
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('activo'));
@@ -789,6 +792,7 @@ function _resetFormularioCotizacion() {
   document.getElementById('desc-descargue').value = 0;
   opcionesExtra = [];
   renderOpcionesExtra();
+  if (typeof cargarRetenciones === 'function') cargarRetenciones(null);
   document.getElementById('fecha-cot').value = new Date().toISOString().split('T')[0];
   const perfil = USUARIOS_CRM[USUARIO_ACTUAL?.email];
   if (perfil) {
@@ -838,6 +842,7 @@ function previsualizarCotizacionById(id) {
   itemsActuales = JSON.parse(JSON.stringify(cot.items));
   renderItems();
   cargarOpcionesExtraDesde(cot);
+  if (typeof cargarRetenciones === 'function') cargarRetenciones(cot.retenciones);
   previsualizarCotizacion();
   // La vista previa ya quedó armada (es un string de HTML ya inyectado, no vuelve a leer
   // estos campos) — así que el formulario de Nueva Cotización se puede dejar en blanco de
@@ -947,6 +952,7 @@ function previsualizarCotizacion() {
         </div>
         ${resumenOpciones}
         ${tablasHTML}
+        ${typeof _bloqueRetencionesHTML === 'function' ? _bloqueRetencionesHTML(multiOp) : ''}
         <div class="preview-aclaraciones">
           <h4>ACLARACIONES IMPORTANTES SOBRE LA PROPUESTA</h4>
           <ul>

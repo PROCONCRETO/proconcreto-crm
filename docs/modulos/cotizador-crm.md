@@ -6,6 +6,7 @@
 - `js/historico-clientes-stats.js` (946 líneas) — pipeline de cotizaciones, histórico por cliente, estadísticas, modal de Cliente (`abrirModalCliente()`/`editarCliente()`/`guardarCliente()`)
 - `js/pdf.js` — exporta la cotización a PDF (jsPDF + html2canvas)
 - `js/rut-parser.js` — lee el RUT (PDF) de un cliente en el navegador para autocompletar el modal de Cliente
+- `js/retenciones.js` — calcula y discrimina Retefuente de renta, ReteIVA y ReteICA en el documento de la cotización (ver "Retenciones tributarias" más abajo)
 - `js/migracion-consecutivos.js` — **temporal**, borrar tras usarla una vez (ver "Migración de las cotizaciones anteriores al 2026-07-22" más abajo)
 
 ## Datos
@@ -78,6 +79,31 @@ Hasta el 2026-07-22 el Número se escribía a mano (con solo una sugerencia de "
 Los números viejos (escritos a mano, sin un formato fijo) no se pierden: `js/migracion-consecutivos.js` es una **herramienta de un solo uso** (no parte permanente del aplicativo — se debe borrar, junto con su `<script>` en `cotizaciones.html`, después de usarla una vez) que agrupa las cotizaciones existentes por número (una cotización con varias versiones V1/V2/V3... comparte un solo consecutivo nuevo), las ordena por fecha y les asigna `C100001`, `C100002`... en ese orden, guardando el número viejo en un campo nuevo `cot.numeroAnterior`. Donde se muestra el número a una persona (histórico, kanban del Pipeline, PDF de la cotización, referencia en la Orden de Producción) se usa `_numeroCotTexto(cot)` (`js/historico-clientes-stats.js`), que arma `"C100001 (C4562)"` si hay `numeroAnterior`, o solo `cot.numero` si no lo hay (las cotizaciones nuevas nunca tienen `numeroAnterior`). También reamarra las Órdenes de Servicio que ya apuntaban al número viejo (`orden.cotizacion`), para no romper el enlace cotización → orden.
 
 Se corre a mano desde la consola del navegador, ya logueado en la app: `migrarConsecutivosCotizaciones()` solo muestra el plan (no escribe nada); `migrarConsecutivosCotizaciones(true)` lo ejecuta de verdad. Es idempotente (una cotización con `numeroAnterior` ya asignado se salta sola en una segunda corrida) y se niega a correr si detecta alguna cotización ya creada con el consecutivo nuevo antes de migrar las viejas — por eso **debe correrse antes de crear cualquier cotización nueva** después de este cambio, para que la numeración no se cruce.
+
+## Retenciones tributarias (2026-08-09)
+
+En Nueva Cotización, tarjeta **"🧾 Retenciones tributarias"** (debajo de Totales, antes de Opciones adicionales): casilla **"Aplicar retenciones en el documento"** que, al activarse, discrimina Retefuente de renta, ReteIVA y ReteICA en la vista previa (y por tanto en el PDF, que se genera capturando esa misma vista previa) y muestra el neto que Proconcreto realmente recibiría. Toda la lógica vive en `js/retenciones.js`.
+
+**Quién retiene qué depende del cliente, no de Proconcreto.** Proconcreto es persona jurídica, régimen ordinario y responsable de IVA — no autorretenedor de renta (según su RUT vigente al construir esta función) — así que quien decide si hay retención y de cuánto es el cliente que paga, no Proconcreto. El único dato tributario que ya se registra del cliente es su campo `regimen` (modal de Cliente, ver más arriba — normalmente se lee del RUT del cliente): uno de `05. Régimen Ordinario`, `13. Gran contribuyente` o `47. Régimen Simple (SIMPLE)`. A partir de ahí, `_inferenciaRetencionPorRegimen()` sugiere de mejor esfuerzo:
+
+- **13 (Gran contribuyente):** retiene renta y retiene IVA (está en la lista del Art. 437-2 E.T.).
+- **05 (Régimen Ordinario):** retiene renta (es persona jurídica), no retiene IVA.
+- **47 (Régimen Simple):** no retiene ni renta ni IVA (un cliente bajo RST no actúa como agente retenedor sobre sus compras, Art. 911 E.T.).
+- **Sin régimen definido, o cliente no encontrado en la ficha:** no se marca nada automáticamente — se muestra un aviso en naranja pidiendo completar la ficha del cliente o ajustar las casillas a mano.
+
+Esta sugerencia solo se recalcula al activar la casilla o al cambiar de cliente (`seleccionarClienteCot()`/`usarCliente()` en `js/historico-clientes-stats.js`, si el panel ya está abierto) — nunca en cada tecla, para no pisarle a alguien un ajuste manual que ya hizo a propósito. Las casillas de Retefuente renta y ReteIVA quedan siempre editables encima de la sugerencia.
+
+**ReteICA nunca se auto-detecta** — es una designación que hace cada municipio sobre un cliente en particular, no algo que aparezca en el RUT ni en ningún dato que ya tengamos. Por eso la casilla siempre arranca apagada; al marcarla aparece un campo para escribir la tarifa "por mil" a mano (ej. `0.772`).
+
+**Concepto de la venta:** selector con las 3 categorías de la guía de referencia (Compra de bienes/materiales 2,5% con base mínima 10 UVT, Servicio general 4% con base mínima 2 UVT, Contrato de obra/construcción de inmueble 2% sin mínimo). Por defecto queda en "Compra de bienes/materiales", porque es lo que vende Proconcreto (prefabricados de concreto) — coincide con su actividad económica secundaria registrada (4663, comercio al por mayor de materiales de construcción). Las tarifas usadas son siempre las de "declarante" (2,5%/4%/2%) porque Proconcreto, al ser persona jurídica, siempre es declarante de renta — no hay escenario de "no declarante" del lado de quien recibe el pago.
+
+**Cálculo** (`_calcularRetenciones()`): la base de Retefuente renta y de ReteICA es `subtotal + transporte + logística` (sin IVA) de la Opción 1 del formulario (recalculado con `calcOpcion()`, la misma función que usan los totales en vivo — no se duplica esa lógica). ReteIVA es el 15% del IVA ya cobrado (`op.iva`), y solo aplica si efectivamente se cobró IVA. UVT 2026 = $52.374 (`UVT_2026`), bases y tarifas tomadas de la guía de referencia que trajo el usuario (vigentes a julio de 2026 — ver el aviso permanente en el panel y en el documento: estas cifras cambiaron 3 veces en poco más de un año por decreto y fallos judiciales, así que hay que confirmar con el contador antes de facturar en firme, sobre todo en facturas de valor alto).
+
+- `netoARecibir = totalFactura − retefuenteRenta − reteIVA − reteICA`, donde `totalFactura` ya incluye el IVA.
+- Si el concepto elegido no supera su base mínima, Retefuente renta queda en `$0` con una nota "no supera la base mínima, no aplica" — la casilla se puede dejar marcada sin que afecte el cálculo.
+- En cotizaciones con varias Opciones (`agregarOpcionExtra()`), el cálculo siempre es sobre la Opción 1 — el bloque del documento avisa "Calculado sobre el valor de la Opción 1" cuando hay más de una.
+
+**Persistencia:** `recogerRetenciones()` guarda el desglose completo dentro de `cot.retenciones` al hacer `guardarCotizacion()` (o `{ aplica: false }` si la casilla estaba apagada). `cargarRetenciones(cot.retenciones)` lo restaura tanto al editar una cotización (`cargarCotizacion()`, crea nueva versión) como al reimprimirla (`previsualizarCotizacionById()`) — así una cotización vieja siempre reabre con las mismas retenciones (y el mismo régimen detectado en su momento) con que se guardó, sin depender de que el régimen del cliente no haya cambiado desde entonces.
 
 ## Qué hace
 

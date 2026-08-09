@@ -621,6 +621,7 @@ function usarCliente(id) {
   document.getElementById('cliente-cel').value = c.cel || '';
   document.getElementById('cliente-ciudad').value = c.ciudad || '';
   poblarSelectProyectosDeCliente('cliente-proyecto', c.nombre);
+  if (typeof _actualizarClienteRetenciones === 'function') _actualizarClienteRetenciones();
   document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
   document.getElementById('pantalla-nueva-cotizacion').classList.add('activa');
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('activo'));
@@ -648,6 +649,7 @@ function seleccionarClienteCot(id) {
   document.getElementById('cliente-cel').value = c.cel || '';
   document.getElementById('cliente-ciudad').value = c.ciudad || '';
   poblarSelectProyectosDeCliente('cliente-proyecto', c.nombre);
+  if (typeof _actualizarClienteRetenciones === 'function') _actualizarClienteRetenciones();
   document.getElementById('lista-clientes-cot').style.display = 'none';
   document.getElementById('buscar-cliente-cot').value = '';
   document.getElementById('cliente-ciudad').focus();

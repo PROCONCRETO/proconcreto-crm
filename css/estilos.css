@@ -84,6 +84,16 @@
   .totales-box .fila-total { border-top: 2px solid var(--azul); margin-top: 6px; padding-top: 8px; font-weight: 700; font-size: 16px; color: var(--azul); }
   .totales-bottom { display: flex; justify-content: flex-end; margin-top: 12px; }
 
+  /* ── RETENCIONES (formulario) ── */
+  /* Misma presentación que el botón "¿Quieres agregar otra opción a esta cotización?": borde
+     punteado azul, fondo celeste suave, texto azul en negrilla — cuando está activo se rellena
+     en sólido para que sea obvio que la cotización actual SÍ tiene retenciones aplicadas. */
+  .ret-toggle-btn { border: 1.5px dashed var(--azul); color: var(--azul); background: #F8FBFF; font-weight: 600; font-size: 19.5px; justify-content: center; }
+  .ret-toggle-btn.activo { border: 1.5px solid var(--azul); background: var(--azul); color: #fff; }
+  .ret-resumen-box { background: var(--azul-suave); border: 1px solid #90CAF9; border-radius: var(--radio); padding: 10px 14px; }
+  .ret-resumen-box .fila { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12.5px; }
+  .ret-resumen-box .fila-total { border-top: 2px solid var(--azul); margin-top: 6px; padding-top: 8px; font-weight: 700; font-size: 15px; color: var(--azul); }
+
   /* ── BUSCADOR PRODUCTO ── */
   .buscador-container { position: relative; }
   .buscador-resultado { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--gris-borde); border-radius: var(--radio); box-shadow: var(--sombra-md); z-index: 100; max-height: 280px; overflow-y: auto; }
@@ -186,6 +196,16 @@
   .preview-aclaraciones li { margin-left: 16px; margin-bottom: 4px; }
   .preview-firma { margin-top: 28px; margin-bottom: 24px; }
 
+  /* ── RETENCIONES (documento) ── */
+  .preview-retenciones { border: 1px solid #90CAF9; background: #F8FBFF; border-radius: var(--radio); padding: 12px 14px; margin-bottom: 16px; }
+  .preview-retenciones-titulo { font-weight: 700; color: var(--azul); font-size: 13px; margin-bottom: 8px; }
+  .preview-retenciones-nota-opcion { font-size: 11px; color: var(--naranja); margin-bottom: 8px; }
+  .preview-retenciones-tabla { width: 100%; font-size: 12px; border-collapse: collapse; }
+  .preview-retenciones-tabla td { padding: 3px 0; }
+  .preview-retenciones-tabla td:last-child { text-align: right; white-space: nowrap; }
+  .preview-retenciones-tabla tr.total td { border-top: 2px solid var(--azul); font-weight: 700; color: var(--azul-claro); padding-top: 6px; }
+  .preview-retenciones-aviso { font-size: 10px; color: #666; margin-top: 8px; line-height: 1.5; }
+
   .preview-membrete-footer {
     width: 100%;
     margin-top: 24px;
@@ -222,6 +242,64 @@
   }
   .preview-membrete-footer .pf-col:last-child { border-right: none; }
   .preview-membrete-footer .pf-icon { font-size: 14px; flex-shrink: 0; color: #003F7F; }
+
+  /* ── Imprimible de Programación de Viajes (2026-08-04) — rediseñado a pedido del usuario:
+     "los conductores y programadores se me están quejando que no entienden bien". Resumen del
+     día arriba, tipografía grande en lo que se necesita ver rápido, contacto en obra destacado,
+     barra de capacidad con alerta de sobrecarga, casilla+firma por entrega para dejar soporte
+     físico de la entrega. ── */
+  .pv-resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--gris-borde); border: 1px solid var(--gris-borde); border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+  .pv-resumen .celda { background: #fff; padding: 9px 10px; text-align: center; }
+  .pv-resumen .celda .n { font-size: 20px; font-weight: 800; color: #003F7F; line-height: 1; }
+  .pv-resumen .celda .n.alerta { color: #C62828; }
+  .pv-resumen .celda .l { font-size: 9px; font-weight: 700; color: var(--gris-medio); text-transform: uppercase; letter-spacing: .05em; margin-top: 4px; }
+
+  .pv-viaje { margin-bottom: 18px; page-break-inside: avoid; break-inside: avoid; }
+  .pv-viaje-head { display: flex; align-items: center; gap: 10px; background: #003F7F; color: #fff; border-radius: 7px 7px 0 0; padding: 8px 12px; }
+  .pv-viaje-num { width: 26px; height: 26px; border-radius: 50%; background: #1D9E75; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; flex-shrink: 0; }
+  .pv-viaje-vehiculo { flex: 1; min-width: 0; }
+  .pv-viaje-vehiculo .placa { font-size: 15px; font-weight: 800; letter-spacing: .02em; }
+  .pv-viaje-vehiculo .conductor { font-size: 10px; color: #CFE0F5; margin-top: 1px; }
+  .pv-viaje-destino { text-align: right; }
+  .pv-viaje-destino .ciudad { font-size: 13.5px; font-weight: 800; }
+  .pv-viaje-destino .n-entregas { font-size: 9.5px; color: #CFE0F5; }
+  .pv-viaje-carga { display: flex; align-items: center; gap: 9px; border: 1px solid var(--gris-borde); border-top: none; background: var(--gris-claro); padding: 7px 12px; }
+  .pv-viaje-carga .barra { flex: 1; height: 7px; border-radius: 4px; background: #E2E7EB; overflow: hidden; }
+  .pv-viaje-carga .barra i { display: block; height: 100%; background: #1D9E75; border-radius: 4px; }
+  .pv-viaje-carga.excedido .barra i { background: #C62828; }
+  .pv-viaje-carga .num { font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .pv-viaje-carga .num .max { color: var(--gris-medio); font-weight: 600; }
+  .pv-viaje-carga .flag { font-size: 10px; font-weight: 800; color: #C62828; white-space: nowrap; }
+
+  .pv-entrega { border: 1px solid var(--gris-borde); border-top: none; padding: 10px 12px; }
+  .pv-entrega:last-of-type { border-radius: 0 0 7px 7px; }
+  .pv-entrega + .pv-entrega { border-top: 1px dashed var(--gris-borde); }
+  .pv-entrega-top { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 7px; }
+  .pv-check { width: 18px; height: 18px; border: 2px solid var(--gris-oscuro); border-radius: 4px; flex-shrink: 0; margin-top: 2px; }
+  .pv-entrega-quien { flex: 1; min-width: 0; }
+  .pv-entrega-quien .cliente { font-size: 14px; font-weight: 800; line-height: 1.25; }
+  .pv-entrega-quien .sitio { font-size: 11px; color: var(--gris-medio); margin-top: 1px; }
+  .pv-entrega-orden { text-align: right; font-size: 9.5px; color: var(--gris-medio); white-space: nowrap; }
+
+  .pv-contacto { display: flex; align-items: center; gap: 7px; background: #FFF9E8; border: 1px solid #F0DFA0; border-radius: 6px; padding: 5px 9px; margin-bottom: 9px; font-size: 11px; }
+  .pv-contacto b { font-weight: 800; }
+  .pv-contacto .tel { margin-left: auto; font-weight: 800; color: #B8860B; white-space: nowrap; }
+  .pv-contacto.sin-datos { background: var(--gris-claro); border-color: var(--gris-borde); color: var(--gris-medio); font-style: italic; }
+
+  .pv-productos { width: 100%; border-collapse: collapse; margin-bottom: 9px; }
+  .pv-productos th { text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: var(--gris-medio); border-bottom: 1.5px solid var(--gris-oscuro); padding: 0 4px 4px; font-weight: 700; }
+  .pv-productos th.num { text-align: right; }
+  .pv-productos td { font-size: 12px; padding: 5px 4px; border-bottom: 1px solid var(--gris-borde); }
+  .pv-productos td.num { text-align: right; font-weight: 700; white-space: nowrap; }
+  .pv-productos tr:last-child td { border-bottom: none; }
+  .pv-productos tfoot td { border-top: 1.5px solid var(--gris-oscuro); border-bottom: none; font-weight: 800; padding-top: 5px; }
+
+  .pv-firma { display: flex; align-items: flex-end; gap: 14px; margin-top: 3px; }
+  .pv-firma-campo { flex: 1; border-top: 1px solid var(--gris-oscuro); padding-top: 3px; font-size: 9px; color: var(--gris-medio); }
+  .pv-firma-campo.hora { flex: 0 0 80px; }
+
+  .pv-obs { border: 1px solid var(--gris-borde); border-top: none; background: var(--gris-claro); padding: 7px 12px; font-size: 10.5px; color: var(--gris-oscuro); border-radius: 0 0 7px 7px; }
+  .pv-obs b { color: #003F7F; }
 
   @media print {
     .preview-doc { box-shadow: none; margin: 0; max-width: 100%; }
@@ -281,6 +359,30 @@
   .log-cal-viaje-flechas { display: flex; flex-direction: column; flex-shrink: 0; line-height: 6px; font-size: 7px; }
   .log-cal-viaje-flechas span { cursor: pointer; opacity: 0.75; }
   .log-cal-viaje-flechas span:hover { opacity: 1; }
+
+  /* Programación de Viajes — vista Listado (encabezado de día + una fila completa por entrega) */
+  .log-lst-dia { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--gris-claro); border-top: 1px solid var(--gris-borde); cursor: pointer; }
+  .log-lst-dia:hover { background: var(--azul-suave); }
+  .log-lst-dia.log-lst-finde { background: #EFEFEF; }
+  .log-lst-dia.log-lst-festivo { background: #FBE9E7; }
+  .log-lst-dia.log-lst-hoy { box-shadow: inset 3px 0 0 var(--azul-claro); }
+  .log-lst-fecha-num { font-size: 12.5px; font-weight: 700; color: var(--gris-oscuro); }
+  .log-lst-fecha-dow { font-size: 10px; color: var(--gris-medio); text-transform: uppercase; letter-spacing: .03em; }
+  .log-lst-festivo-nombre { font-size: 10px; color: #C62828; font-weight: 600; }
+  .log-lst-sin-viajes { padding: 7px 12px 7px 34px; font-size: 11.5px; color: var(--gris-medio); font-style: italic; cursor: pointer; border-bottom: 1px solid var(--gris-claro); }
+  .log-lst-sin-viajes:hover { background: var(--azul-suave); }
+  .log-lst-entrega { display: flex; align-items: center; gap: 10px; padding: 7px 12px 7px 10px; margin-left: 24px; border-left: 3px solid; border-bottom: 1px solid var(--gris-claro); cursor: pointer; transition: background .15s; }
+  .log-lst-entrega:hover { background: var(--azul-suave); }
+  .log-lst-entrega[draggable="true"] { cursor: grab; }
+  .log-lst-entrega-cancelada { opacity: .55; }
+  .log-lst-entrega-cancelada .log-lst-entrega-cliente { text-decoration: line-through; }
+  .log-lst-entrega-vehiculo { flex-shrink: 0; width: 108px; color: white; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+  .log-lst-entrega-cliente { flex: 1 1 220px; min-width: 0; font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log-lst-entrega-destino { font-weight: 400; color: var(--gris-medio); }
+  .log-lst-entrega-productos { flex: 2 1 260px; min-width: 0; font-size: 11.5px; color: var(--gris-medio); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log-lst-entrega-vacia { flex: 1; font-size: 11.5px; color: var(--gris-medio); font-style: italic; }
+  .log-lst-entrega-peso { flex-shrink: 0; width: 64px; text-align: right; font-size: 11.5px; font-weight: 600; color: var(--gris-oscuro); }
+  .log-lst-entrega-estado { flex-shrink: 0; width: 100px; text-align: right; font-size: 11px; font-weight: 600; }
   #usuario-email { font-size: 12px; color: rgba(255,255,255,0.65); }
 
   /* ── COSTEO DE PRODUCTO: formulario único por secciones ── */

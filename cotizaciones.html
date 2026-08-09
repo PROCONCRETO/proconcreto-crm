@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260804a">
+<link rel="stylesheet" href="css/estilos.css?v=20260809d">
 </head>
 <body>
 
@@ -337,10 +337,43 @@
   <!-- Opciones adicionales (alternativas para el cliente) -->
   <div id="opciones-extra-container"></div>
   <div style="text-align:center;margin-top:14px">
-    <button class="btn btn-secundario" onclick="agregarOpcionExtra()" style="border:1.5px dashed var(--azul);color:var(--azul);background:#F8FBFF;font-weight:600">
+    <button class="btn btn-secundario" onclick="agregarOpcionExtra()" style="border:1.5px dashed var(--azul);color:var(--azul);background:#F8FBFF;font-weight:600;font-size:19.5px">
       ➕ ¿Quieres agregar otra opción a esta cotización?
     </button>
     <div style="font-size:11px;color:var(--gris-medio);margin-top:6px">Permite presentar al cliente hasta 4 alternativas (Opción 1 + 3 adicionales) en un mismo documento.</div>
+  </div>
+
+  <!-- Retenciones tributarias -->
+  <div id="retenciones-card" style="text-align:center;margin-top:14px">
+    <input type="checkbox" id="ret-aplicar" style="display:none">
+    <button type="button" id="ret-aplicar-btn" class="btn btn-secundario ret-toggle-btn" onclick="_clickAplicarRetenciones()">
+      <span id="ret-toggle-texto">🧾 ¿Quieres aplicar retenciones a esta cotización?</span>
+    </button>
+    <div style="font-size:11px;color:var(--gris-medio);margin-top:6px">Discrimina Retefuente de renta, ReteIVA y ReteICA, y calcula el neto a recibir en el documento.</div>
+    <div id="ret-detalle" class="card" style="display:none;margin-top:14px;text-align:left">
+      <div id="ret-regimen-info" style="font-size:12px;margin-bottom:10px;padding:8px 10px;border-radius:var(--radio)"></div>
+      <div class="form-grid" style="margin-bottom:10px">
+        <div class="form-grupo">
+          <label>Concepto de la venta</label>
+          <select id="ret-concepto" onchange="_renderResumenRetenciones()">
+            <option value="bienes">Compra de bienes / materiales (2,5% · base 10 UVT)</option>
+            <option value="servicios">Servicio general (4% · base 2 UVT)</option>
+            <option value="obra">Contrato de obra / construcción de inmueble (2% · sin mínimo)</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px;font-size:12.5px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ret-renta" onchange="_renderResumenRetenciones()"> Retefuente de renta</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ret-iva" onchange="_renderResumenRetenciones()"> ReteIVA (15% del IVA)</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ret-ica" onchange="_toggleIcaInput()"> ReteICA</label>
+      </div>
+      <div class="form-grupo" id="ret-ica-wrap" style="display:none;margin-bottom:10px;max-width:220px">
+        <label>Tarifa ReteICA (por mil)</label>
+        <input type="number" id="ret-ica-tarifa" step="0.001" min="0" placeholder="ej. 0.772" oninput="_renderResumenRetenciones()">
+      </div>
+      <div id="ret-resumen" class="ret-resumen-box"></div>
+      <div style="font-size:10.5px;color:var(--gris-medio);margin-top:8px">Cálculo de referencia según normativa vigente a julio de 2026 (UVT = $52.374) — confirma con el contador antes de facturar en firme, sobre todo el ReteICA (depende de si el municipio designó a este cliente como agente retenedor).</div>
+    </div>
   </div>
 
   <!-- Vendedor -->
@@ -661,12 +694,17 @@
       <div id="log-mes-titulo" style="font-weight:700;min-width:150px;text-align:center;text-transform:capitalize"></div>
       <button class="btn btn-secundario btn-sm" onclick="cambiarMesLogistica(1)">▶</button>
       <button class="btn btn-secundario btn-sm" onclick="irHoyLogistica()">Hoy</button>
+      <div style="display:flex;border:1px solid var(--gris-borde);border-radius:var(--radio);overflow:hidden">
+        <button id="log-vista-btn-calendario" onclick="cambiarVistaLogistica('calendario')" style="padding:7px 12px;border:none;background:var(--azul);color:white;font-size:12px;font-weight:600;cursor:pointer">📅 Calendario</button>
+        <button id="log-vista-btn-listado" onclick="cambiarVistaLogistica('listado')" style="padding:7px 12px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">📋 Listado</button>
+      </div>
       <button class="btn btn-secundario" onclick="abrirModalCumplidos()"><span id="btn-cumplidos-texto">✅ Cumplidos</span></button>
       <button class="btn btn-primario" onclick="abrirModalViaje()">+ Nuevo Viaje</button>
     </div>
   </div>
   <div class="card" style="padding:0;overflow:hidden">
     <div id="log-calendario"></div>
+    <div id="log-listado" style="display:none"></div>
   </div>
   <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--gris-medio)">
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#FFF3F0;border:1px solid #FFCDD2;margin-right:4px"></span>Festivo</span>
@@ -2285,12 +2323,13 @@
 <script src="js/calidad-mezclas.js?v=20260804c"></script>
 <script src="js/calidad-estadisticas.js?v=20260804a"></script>
 <script src="js/calidad-trazabilidad.js?v=20260804a"></script>
-<script src="js/logistica.js?v=20260804b"></script>
-<script src="js/estadisticas-logistica.js?v=20260804b"></script>
+<script src="js/logistica.js?v=20260804e"></script>
+<script src="js/estadisticas-logistica.js?v=20260804c"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20260804b"></script>
-<script src="js/cotizador.js?v=20260804b"></script>
-<script src="js/historico-clientes-stats.js?v=20260804b"></script>
+<script src="js/cotizador.js?v=20260809a"></script>
+<script src="js/historico-clientes-stats.js?v=20260809a"></script>
+<script src="js/retenciones.js?v=20260809c"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
 <script src="js/migracion-consecutivos.js?v=20260804a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js" integrity="sha384-DhxhYObIMeMNGyAG7iK11OHzBIKyEIeRL0ad1iFPAOwZB8iirUlTT0O/WJJUk8+o" crossorigin="anonymous"></script>
