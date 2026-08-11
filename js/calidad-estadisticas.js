@@ -160,7 +160,7 @@ function renderAnalisisEstadistico() {
     const ctx = _contextoEnsayo(e);
     if (proyectoF && !ctx.proyectos.includes(proyectoF)) return;
     if (productoF && !ctx.productos.includes(productoF)) return;
-    muestras.push({ fecha: r.fecha || e.fecha, fechaFundida: e.fecha, resistencia: Number(r.resistencia), numero: e.numero, edad: Number(r.edad) });
+    muestras.push({ fecha: r.fecha || e.fecha, fechaFundida: e.fecha, resistencia: Number(r.resistencia), numero: e.numero, cilindroNo: e.cilindroNo, edad: Number(r.edad) });
   });
   muestras.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
 
@@ -300,6 +300,11 @@ function renderAnalisisEstadistico() {
         legend: { position: 'bottom', labels: { boxWidth: 14, font: { size: 11 } } },
         tooltip: {
           callbacks: {
+            title: (items) => {
+              if (!items.length) return '';
+              const m = muestras[items[0].dataIndex];
+              return m?.cilindroNo ? `${items[0].label} — Cilindro ${m.cilindroNo}` : items[0].label;
+            },
             afterLabel: (item) => {
               if (item.datasetIndex !== 0 || !revisionesDiseno.length) return '';
               const seg = segmentos[item.dataIndex];
