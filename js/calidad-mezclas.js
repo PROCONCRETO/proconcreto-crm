@@ -499,7 +499,11 @@ function _ensayosFiltrados() {
   if (fCliente) data = data.filter(e => _clientesProyectosEnsayo(e).clientes.includes(fCliente));
   if (fProyecto) data = data.filter(e => _clientesProyectosEnsayo(e).proyectos.includes(fProyecto));
   if (fResistencia) data = data.filter(e => e.disenoCodigo === fResistencia);
-  data.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  // Por consecutivo de cilindro (más reciente primero), no por fecha del ensayo — la fecha es
+  // cuándo se rompió el cilindro, no cuándo se fundió, así que dos cilindros fundidos seguidos
+  // pueden romperse en fechas muy distintas según la edad de ensayo (3/7/28 días) y quedaban
+  // desordenados en la lista (a pedido del usuario, 2026-08-11).
+  data.sort((a, b) => (parseInt(b.cilindroNo) || 0) - (parseInt(a.cilindroNo) || 0));
   return data;
 }
 
