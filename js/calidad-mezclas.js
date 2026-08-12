@@ -486,42 +486,71 @@ function poblarFiltrosEnsayosLista() {
   if (prevResistencia) selResistencia.value = prevResistencia;
 }
 
-// Cilindros con Ajuste Diario (fundidos) que todavía no tienen ningún Ensayo de Calidad
-// registrado — no "en curado sin resultados" (eso ya lo cubre el estado del ensayo), sino que
-// a nadie se le ha creado el ensayo todavía. Se cruza por cilindroNo, orden descendente
-// (consecutivo más reciente primero), a pedido del usuario (2026-08-12).
-function _cilindrosSinEnsayo() {
-  const conEnsayo = new Set(ENSAYOS_CALIDAD.map(e => String(e.cilindroNo)).filter(Boolean));
-  return AJUSTES_MEZCLA
-    .filter(a => a.cilindroNo && !conEnsayo.has(String(a.cilindroNo)))
-    .sort((a, b) => (parseInt(b.cilindroNo) || 0) - (parseInt(a.cilindroNo) || 0));
+function _diasDesdeFecha(fecha) {
+  if (!fecha) return 0;
+  const hoy = new Date(); hoy.setHours(12, 0, 0, 0);
+  const d = new Date(fecha + 'T12:00');
+  return Math.floor((hoy - d) / 86400000);
 }
 
-// Filtro "⚠️ Cilindros sin ensayo" de la tarjeta-resumen — mismo patrón que los filtros
-// clickeables de Centro de Costos › Productos (clic filtra en la misma tabla, sin ventanas
-// aparte; clic de nuevo, o usar cualquier otro filtro, lo quita). Como estos "cilindros sin
-// ensayo" no son ensayos reales (no existen en ENSAYOS_CALIDAD), se arman filas de solo
-// lectura a partir de su Ajuste Diario, con la única acción disponible siendo crear el ensayo.
-let _soloSinEnsayo = false;
+// Vista unificada de Control de Ensayos: un registro por cada cilindro fundido (Ajuste Diario),
+// con su Ensayo de Calidad si ya se creó. Antes la pantalla solo mostraba ENSAYOS_CALIDAD, así
+// que un cilindro recién fundido sin ensayo creado todavía no aparecía en ningún lado, y "En
+// curado" solo contaba ensayos YA CREADOS sin resultado final — podía marcar 0 aunque hubiera
+// cilindros fundidos ayer. Un cilindro es "En curado" mientras tenga menos de 28 días de edad
+// real (fecha fundida) y no tenga un resultado a esa edad o más — normal, todavía no le toca
+// romperse. Pasados los 28 días reales sin un resultado de esa edad, cuenta como "Sin ensayo" —
+// tenga o no un Ensayo de Calidad ya creado: resultados a edad temprana (3/7 días) sirven para
+// ver la evolución del producto, pero no son el ensayo que libera el producto, así que un
+// ensayo creado que solo trae resultados tempranos y ya superó los 28 días reales sin subir el
+// de 28+ cuenta igual como "Sin ensayo" (a pedido del usuario, 2026-08-13) — la diferencia con
+// un cilindro sin ensayo creado es que aquí la fila NO es virtual (`_virtual: false`), así que
+// la acción sigue siendo "✏️ Editar" (para subirle el resultado que falta), no "Crear ensayo".
+function _cilindrosConEstado() {
+  const porCilindro = new Map();
+  ENSAYOS_CALIDAD.forEach(e => { if (e.cilindroNo) porCilindro.set(String(e.cilindroNo), e); });
 
-function _filtroEnsayosSinEnsayo() {
-  _soloSinEnsayo = !_soloSinEnsayo;
-  if (_soloSinEnsayo) {
-    document.getElementById('buscar-ensayo').value = '';
-    document.getElementById('filtro-estado-ensayo').value = '';
-    document.getElementById('ensayos-filtro-cliente').value = '';
-    document.getElementById('ensayos-filtro-proyecto').value = '';
-    document.getElementById('ensayos-filtro-resistencia').value = '';
-  }
+  const data = AJUSTES_MEZCLA.filter(a => a.cilindroNo).map(a => {
+    const ensayo = porCilindro.get(String(a.cilindroNo));
+    const edadCilindro = _diasDesdeFecha(a.fecha);
+    if (ensayo) {
+      const finales = (ensayo.resultados || []).filter(r => Number(r.edad) >= 28 && Number(r.resistencia) > 0);
+      let estado;
+      if (finales.length) {
+        const cumpleTodos = finales.every(r => Number(r.resistencia) >= Number(ensayo.resistenciaObjetivo || 0));
+        estado = cumpleTodos ? 'Cumple' : 'No cumple';
+      } else {
+        estado = edadCilindro < 28 ? 'En curado' : 'Sin ensayo';
+      }
+      return { ...ensayo, _estado: estado, _virtual: false };
+    }
+    return {
+      cilindroNo: a.cilindroNo, fecha: a.fecha, disenoCodigo: a.disenoCodigo,
+      elemento: a.productoNombre, resistenciaObjetivo: a.resistenciaDiseno,
+      resultados: [], creadoPor: a.creadoPor, pdfPath: '', id: null,
+      _estado: edadCilindro < 28 ? 'En curado' : 'Sin ensayo', _virtual: true,
+    };
+  });
+  data.sort((a, b) => (parseInt(b.cilindroNo) || 0) - (parseInt(a.cilindroNo) || 0));
+  return data;
+}
+
+// Tarjetas del resumen como filtros clickeables sobre el <select> de Estado — mismo patrón que
+// Centro de Costos › Productos: clic selecciona ese estado (o lo quita si ya estaba activo).
+// "Sin ensayo" es un valor de estado más, igual que los otros — ya no necesita su propio modo
+// aparte. "Totalidad cilindros" limpia todos los filtros para ver la lista completa.
+function _filtroEnsayosEstado(estado) {
+  const sel = document.getElementById('filtro-estado-ensayo');
+  sel.value = (sel.value === estado) ? '' : estado;
   renderEnsayosCalidad();
 }
 
-// Las otras 3 tarjetas (En curado/Cumple/No cumple) son el mismo filtro clickeable, apoyado en
-// el <select> de Estado que ya existía — clic selecciona ese estado, clic de nuevo lo quita.
-function _filtroEnsayosEstado(estado) {
-  _soloSinEnsayo = false;
-  const sel = document.getElementById('filtro-estado-ensayo');
-  sel.value = (sel.value === estado) ? '' : estado;
+function _filtroEnsayosTodos() {
+  document.getElementById('buscar-ensayo').value = '';
+  document.getElementById('filtro-estado-ensayo').value = '';
+  document.getElementById('ensayos-filtro-cliente').value = '';
+  document.getElementById('ensayos-filtro-proyecto').value = '';
+  document.getElementById('ensayos-filtro-resistencia').value = '';
   renderEnsayosCalidad();
 }
 
@@ -536,7 +565,9 @@ function crearEnsayoDesdeCilindro(cilindroNo) {
   cargarDesdeAjusteMezcla();
 }
 
-// Aplica los filtros de la pantalla de Control de Ensayos (búsqueda, estado, cliente, proyecto, resistencia).
+// Aplica los filtros de la pantalla de Control de Ensayos (búsqueda, estado, cliente, proyecto,
+// resistencia) sobre la vista unificada de cilindros (_cilindrosConEstado — ver más arriba),
+// no solo sobre ENSAYOS_CALIDAD, para que los cilindros sin ensayo también se puedan filtrar.
 function _ensayosFiltrados() {
   const q = (document.getElementById('buscar-ensayo')?.value || '').toLowerCase();
   const fEstado = document.getElementById('filtro-estado-ensayo')?.value || '';
@@ -544,31 +575,12 @@ function _ensayosFiltrados() {
   const fProyecto = document.getElementById('ensayos-filtro-proyecto')?.value || '';
   const fResistencia = document.getElementById('ensayos-filtro-resistencia')?.value || '';
 
-  if (_soloSinEnsayo) {
-    // Cualquier otro filtro real gana sobre este — usarlos implica que el usuario ya se salió
-    // de "ver solo los faltantes" y quiere buscar/filtrar de la forma normal.
-    if (q || fEstado || fCliente || fProyecto || fResistencia) { _soloSinEnsayo = false; }
-    else {
-      return _cilindrosSinEnsayo().map(a => ({
-        cilindroNo: a.cilindroNo, fecha: a.fecha, disenoCodigo: a.disenoCodigo,
-        elemento: a.productoNombre, resistenciaObjetivo: a.resistenciaDiseno,
-        resultados: [], creadoPor: a.creadoPor, pdfPath: '', id: null,
-        _estado: 'Sin ensayo', _virtual: true,
-      }));
-    }
-  }
-
-  let data = ENSAYOS_CALIDAD.map(e => ({ ...e, _estado: calcularEstadoEnsayo(e) }));
-  if (q) data = data.filter(e => (e.numero + ' ' + String(e.cilindroNo || '') + ' ' + (e.elemento || '') + ' ' + (e.disenoCodigo || '')).toLowerCase().includes(q));
+  let data = _cilindrosConEstado();
+  if (q) data = data.filter(e => ((e.numero || '') + ' ' + String(e.cilindroNo || '') + ' ' + (e.elemento || '') + ' ' + (e.disenoCodigo || '')).toLowerCase().includes(q));
   if (fEstado) data = data.filter(e => e._estado === fEstado);
   if (fCliente) data = data.filter(e => _clientesProyectosEnsayo(e).clientes.includes(fCliente));
   if (fProyecto) data = data.filter(e => _clientesProyectosEnsayo(e).proyectos.includes(fProyecto));
   if (fResistencia) data = data.filter(e => e.disenoCodigo === fResistencia);
-  // Por consecutivo de cilindro (más reciente primero), no por fecha del ensayo — la fecha es
-  // cuándo se rompió el cilindro, no cuándo se fundió, así que dos cilindros fundidos seguidos
-  // pueden romperse en fechas muy distintas según la edad de ensayo (3/7/28 días) y quedaban
-  // desordenados en la lista (a pedido del usuario, 2026-08-11).
-  data.sort((a, b) => (parseInt(b.cilindroNo) || 0) - (parseInt(a.cilindroNo) || 0));
   return data;
 }
 
@@ -580,25 +592,29 @@ function renderEnsayosCalidad() {
   const data = _ensayosFiltrados();
 
   if (resumen) {
-    const enCurado = ENSAYOS_CALIDAD.filter(e => calcularEstadoEnsayo(e) === 'En curado').length;
-    const cumple = ENSAYOS_CALIDAD.filter(e => calcularEstadoEnsayo(e) === 'Cumple').length;
-    const noCumple = ENSAYOS_CALIDAD.filter(e => calcularEstadoEnsayo(e) === 'No cumple').length;
-    const sinEnsayo = _cilindrosSinEnsayo().length;
-    const estadoActivo = _soloSinEnsayo ? '' : (document.getElementById('filtro-estado-ensayo')?.value || '');
+    const todos = _cilindrosConEstado();
+    const enCurado = todos.filter(c => c._estado === 'En curado').length;
+    const cumple = todos.filter(c => c._estado === 'Cumple').length;
+    const noCumple = todos.filter(c => c._estado === 'No cumple').length;
+    const sinEnsayo = todos.filter(c => c._estado === 'Sin ensayo').length;
+    const estadoActivo = document.getElementById('filtro-estado-ensayo')?.value || '';
     const tarjeta = (estado, count, color, label) => {
       const activa = estadoActivo === estado;
-      return `<div onclick="_filtroEnsayosEstado('${estado}')" style="background:${activa ? color : 'white'};border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid ${color};min-width:130px;cursor:pointer" title="Clic para filtrar por este estado — clic de nuevo para quitar el filtro"><div style="font-size:10px;font-weight:700;color:${activa ? 'white' : color};text-transform:uppercase">${label}</div><div style="font-size:18px;font-weight:800;color:${activa ? 'white' : 'inherit'}">${count}</div></div>`;
+      return `<div onclick="_filtroEnsayosEstado('${estado}')" style="background:${activa ? color : 'white'};border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid ${color};min-width:150px;cursor:pointer" title="Clic para filtrar por este estado — clic de nuevo para quitar el filtro"><div style="font-size:10px;font-weight:700;color:${activa ? 'white' : color};text-transform:uppercase">${label}</div><div style="font-size:18px;font-weight:800;color:${activa ? 'white' : 'inherit'}">${count}</div></div>`;
     };
     resumen.innerHTML =
-      tarjeta('En curado', enCurado, '#1565C0', 'En curado') +
+      tarjeta('En curado', enCurado, '#1565C0', 'En curado (< 28 días)') +
       tarjeta('Cumple', cumple, 'var(--verde)', 'Cumple') +
       tarjeta('No cumple', noCumple, '#C62828', 'No cumple') +
-      `<div onclick="_filtroEnsayosSinEnsayo()" style="background:${_soloSinEnsayo ? 'var(--naranja)' : 'white'};border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--naranja);min-width:180px;cursor:pointer" title="Clic para filtrar solo los cilindros sin ensayo — clic de nuevo para quitar el filtro"><div style="font-size:10px;font-weight:700;color:${_soloSinEnsayo ? 'white' : 'var(--naranja)'};text-transform:uppercase">⚠️ Cilindros sin ensayo</div><div style="font-size:18px;font-weight:800;color:${_soloSinEnsayo ? 'white' : 'inherit'}">${sinEnsayo}</div></div>`;
+      tarjeta('Sin ensayo', sinEnsayo, 'var(--naranja)', '⚠️ Cilindros sin ensayo') +
+      `<div onclick="_filtroEnsayosTodos()" style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--azul);min-width:150px;cursor:pointer" title="Clic para ver todos los cilindros, sin filtros"><div style="font-size:10px;font-weight:700;color:var(--azul);text-transform:uppercase">Totalidad cilindros</div><div style="font-size:18px;font-weight:800">${todos.length}</div></div>`;
   }
 
   if (!data.length) {
-    const hayFiltros = _soloSinEnsayo || document.getElementById('buscar-ensayo')?.value || document.getElementById('filtro-estado-ensayo')?.value || document.getElementById('ensayos-filtro-cliente')?.value || document.getElementById('ensayos-filtro-proyecto')?.value || document.getElementById('ensayos-filtro-resistencia')?.value;
-    tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">${_soloSinEnsayo ? '✅' : '📐'}</div><div>${_soloSinEnsayo ? 'Todos los cilindros fundidos ya tienen un ensayo registrado.' : hayFiltros ? 'No hay ensayos que coincidan con los filtros seleccionados.' : 'No hay ensayos registrados.'}</div></td></tr>`;
+    const fEstadoActual = document.getElementById('filtro-estado-ensayo')?.value || '';
+    const hayFiltros = document.getElementById('buscar-ensayo')?.value || fEstadoActual || document.getElementById('ensayos-filtro-cliente')?.value || document.getElementById('ensayos-filtro-proyecto')?.value || document.getElementById('ensayos-filtro-resistencia')?.value;
+    const esVacioSinEnsayo = fEstadoActual === 'Sin ensayo';
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">${esVacioSinEnsayo ? '✅' : '📐'}</div><div>${esVacioSinEnsayo ? 'Todos los cilindros fundidos ya tienen ensayo o siguen en curado.' : hayFiltros ? 'No hay cilindros que coincidan con los filtros seleccionados.' : 'No hay cilindros fundidos registrados.'}</div></td></tr>`;
     return;
   }
   const colorEstado = { 'En curado': '#1565C0', 'Cumple': '#2E7D32', 'No cumple': '#C62828', 'Sin ensayo': '#E65100' };
