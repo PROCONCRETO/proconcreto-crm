@@ -486,6 +486,56 @@ function poblarFiltrosEnsayosLista() {
   if (prevResistencia) selResistencia.value = prevResistencia;
 }
 
+// Cilindros con Ajuste Diario (fundidos) que todavía no tienen ningún Ensayo de Calidad
+// registrado — no "en curado sin resultados" (eso ya lo cubre el estado del ensayo), sino que
+// a nadie se le ha creado el ensayo todavía. Se cruza por cilindroNo, orden descendente
+// (consecutivo más reciente primero), a pedido del usuario (2026-08-12).
+function _cilindrosSinEnsayo() {
+  const conEnsayo = new Set(ENSAYOS_CALIDAD.map(e => String(e.cilindroNo)).filter(Boolean));
+  return AJUSTES_MEZCLA
+    .filter(a => a.cilindroNo && !conEnsayo.has(String(a.cilindroNo)))
+    .sort((a, b) => (parseInt(b.cilindroNo) || 0) - (parseInt(a.cilindroNo) || 0));
+}
+
+// Filtro "⚠️ Cilindros sin ensayo" de la tarjeta-resumen — mismo patrón que los filtros
+// clickeables de Centro de Costos › Productos (clic filtra en la misma tabla, sin ventanas
+// aparte; clic de nuevo, o usar cualquier otro filtro, lo quita). Como estos "cilindros sin
+// ensayo" no son ensayos reales (no existen en ENSAYOS_CALIDAD), se arman filas de solo
+// lectura a partir de su Ajuste Diario, con la única acción disponible siendo crear el ensayo.
+let _soloSinEnsayo = false;
+
+function _filtroEnsayosSinEnsayo() {
+  _soloSinEnsayo = !_soloSinEnsayo;
+  if (_soloSinEnsayo) {
+    document.getElementById('buscar-ensayo').value = '';
+    document.getElementById('filtro-estado-ensayo').value = '';
+    document.getElementById('ensayos-filtro-cliente').value = '';
+    document.getElementById('ensayos-filtro-proyecto').value = '';
+    document.getElementById('ensayos-filtro-resistencia').value = '';
+  }
+  renderEnsayosCalidad();
+}
+
+// Las otras 3 tarjetas (En curado/Cumple/No cumple) son el mismo filtro clickeable, apoyado en
+// el <select> de Estado que ya existía — clic selecciona ese estado, clic de nuevo lo quita.
+function _filtroEnsayosEstado(estado) {
+  _soloSinEnsayo = false;
+  const sel = document.getElementById('filtro-estado-ensayo');
+  sel.value = (sel.value === estado) ? '' : estado;
+  renderEnsayosCalidad();
+}
+
+// Atajo desde una fila "Sin ensayo": abre "Nuevo Ensayo" ya con el cilindro elegido y sus datos
+// (producto/cliente/proyecto/diseño) arrastrados del Ajuste Diario, igual que si se hubiera
+// buscado el cilindro a mano en el formulario.
+function crearEnsayoDesdeCilindro(cilindroNo) {
+  const a = AJUSTES_MEZCLA.find(x => String(x.cilindroNo) === String(cilindroNo));
+  if (!a) return;
+  abrirModalEnsayo();
+  document.getElementById('m-ensayo-cilindro').value = _textoCilindroEnsayo(a);
+  cargarDesdeAjusteMezcla();
+}
+
 // Aplica los filtros de la pantalla de Control de Ensayos (búsqueda, estado, cliente, proyecto, resistencia).
 function _ensayosFiltrados() {
   const q = (document.getElementById('buscar-ensayo')?.value || '').toLowerCase();
@@ -493,6 +543,21 @@ function _ensayosFiltrados() {
   const fCliente = document.getElementById('ensayos-filtro-cliente')?.value || '';
   const fProyecto = document.getElementById('ensayos-filtro-proyecto')?.value || '';
   const fResistencia = document.getElementById('ensayos-filtro-resistencia')?.value || '';
+
+  if (_soloSinEnsayo) {
+    // Cualquier otro filtro real gana sobre este — usarlos implica que el usuario ya se salió
+    // de "ver solo los faltantes" y quiere buscar/filtrar de la forma normal.
+    if (q || fEstado || fCliente || fProyecto || fResistencia) { _soloSinEnsayo = false; }
+    else {
+      return _cilindrosSinEnsayo().map(a => ({
+        cilindroNo: a.cilindroNo, fecha: a.fecha, disenoCodigo: a.disenoCodigo,
+        elemento: a.productoNombre, resistenciaObjetivo: a.resistenciaDiseno,
+        resultados: [], creadoPor: a.creadoPor, pdfPath: '', id: null,
+        _estado: 'Sin ensayo', _virtual: true,
+      }));
+    }
+  }
+
   let data = ENSAYOS_CALIDAD.map(e => ({ ...e, _estado: calcularEstadoEnsayo(e) }));
   if (q) data = data.filter(e => (e.numero + ' ' + String(e.cilindroNo || '') + ' ' + (e.elemento || '') + ' ' + (e.disenoCodigo || '')).toLowerCase().includes(q));
   if (fEstado) data = data.filter(e => e._estado === fEstado);
@@ -518,22 +583,29 @@ function renderEnsayosCalidad() {
     const enCurado = ENSAYOS_CALIDAD.filter(e => calcularEstadoEnsayo(e) === 'En curado').length;
     const cumple = ENSAYOS_CALIDAD.filter(e => calcularEstadoEnsayo(e) === 'Cumple').length;
     const noCumple = ENSAYOS_CALIDAD.filter(e => calcularEstadoEnsayo(e) === 'No cumple').length;
-    resumen.innerHTML = `
-      <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid #1565C0;min-width:130px"><div style="font-size:10px;font-weight:700;color:#1565C0;text-transform:uppercase">En curado</div><div style="font-size:18px;font-weight:800">${enCurado}</div></div>
-      <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--verde);min-width:130px"><div style="font-size:10px;font-weight:700;color:var(--verde);text-transform:uppercase">Cumple</div><div style="font-size:18px;font-weight:800">${cumple}</div></div>
-      <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid #C62828;min-width:130px"><div style="font-size:10px;font-weight:700;color:#C62828;text-transform:uppercase">No cumple</div><div style="font-size:18px;font-weight:800">${noCumple}</div></div>`;
+    const sinEnsayo = _cilindrosSinEnsayo().length;
+    const estadoActivo = _soloSinEnsayo ? '' : (document.getElementById('filtro-estado-ensayo')?.value || '');
+    const tarjeta = (estado, count, color, label) => {
+      const activa = estadoActivo === estado;
+      return `<div onclick="_filtroEnsayosEstado('${estado}')" style="background:${activa ? color : 'white'};border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid ${color};min-width:130px;cursor:pointer" title="Clic para filtrar por este estado — clic de nuevo para quitar el filtro"><div style="font-size:10px;font-weight:700;color:${activa ? 'white' : color};text-transform:uppercase">${label}</div><div style="font-size:18px;font-weight:800;color:${activa ? 'white' : 'inherit'}">${count}</div></div>`;
+    };
+    resumen.innerHTML =
+      tarjeta('En curado', enCurado, '#1565C0', 'En curado') +
+      tarjeta('Cumple', cumple, 'var(--verde)', 'Cumple') +
+      tarjeta('No cumple', noCumple, '#C62828', 'No cumple') +
+      `<div onclick="_filtroEnsayosSinEnsayo()" style="background:${_soloSinEnsayo ? 'var(--naranja)' : 'white'};border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--naranja);min-width:180px;cursor:pointer" title="Clic para filtrar solo los cilindros sin ensayo — clic de nuevo para quitar el filtro"><div style="font-size:10px;font-weight:700;color:${_soloSinEnsayo ? 'white' : 'var(--naranja)'};text-transform:uppercase">⚠️ Cilindros sin ensayo</div><div style="font-size:18px;font-weight:800;color:${_soloSinEnsayo ? 'white' : 'inherit'}">${sinEnsayo}</div></div>`;
   }
 
   if (!data.length) {
-    const hayFiltros = document.getElementById('buscar-ensayo')?.value || document.getElementById('filtro-estado-ensayo')?.value || document.getElementById('ensayos-filtro-cliente')?.value || document.getElementById('ensayos-filtro-proyecto')?.value || document.getElementById('ensayos-filtro-resistencia')?.value;
-    tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">📐</div><div>${hayFiltros ? 'No hay ensayos que coincidan con los filtros seleccionados.' : 'No hay ensayos registrados.'}</div></td></tr>`;
+    const hayFiltros = _soloSinEnsayo || document.getElementById('buscar-ensayo')?.value || document.getElementById('filtro-estado-ensayo')?.value || document.getElementById('ensayos-filtro-cliente')?.value || document.getElementById('ensayos-filtro-proyecto')?.value || document.getElementById('ensayos-filtro-resistencia')?.value;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">${_soloSinEnsayo ? '✅' : '📐'}</div><div>${_soloSinEnsayo ? 'Todos los cilindros fundidos ya tienen un ensayo registrado.' : hayFiltros ? 'No hay ensayos que coincidan con los filtros seleccionados.' : 'No hay ensayos registrados.'}</div></td></tr>`;
     return;
   }
-  const colorEstado = { 'En curado': '#1565C0', 'Cumple': '#2E7D32', 'No cumple': '#C62828' };
-  const bgEstado = { 'En curado': '#E3F2FD', 'Cumple': '#E8F5E9', 'No cumple': '#FFEBEE' };
+  const colorEstado = { 'En curado': '#1565C0', 'Cumple': '#2E7D32', 'No cumple': '#C62828', 'Sin ensayo': '#E65100' };
+  const bgEstado = { 'En curado': '#E3F2FD', 'Cumple': '#E8F5E9', 'No cumple': '#FFEBEE', 'Sin ensayo': '#FFF3E0' };
   tbody.innerHTML = data.map(e => {
     const ultimaResistencia = (e.resultados || []).length ? e.resultados[e.resultados.length - 1] : null;
-    return `<tr style="border-top:2px solid var(--azul-oscuro)">
+    return `<tr style="border-top:2px solid var(--azul-oscuro)${e._virtual ? ';opacity:.85' : ''}">
       <td style="font-weight:700;color:var(--azul)">${_esc(e.cilindroNo) || '—'}</td>
       <td>${e.fecha ? new Date(e.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
       <td>${e.disenoCodigo ? `<span style="font-size:11px;background:var(--gris-borde);color:#333;padding:2px 6px;border-radius:3px;font-weight:600">${_esc(e.disenoCodigo)}</span>` : '—'}</td>
@@ -544,9 +616,11 @@ function renderEnsayosCalidad() {
       <td>${_esc(USUARIOS_CRM[e.creadoPor]?.nombre || e.creadoPor) || '—'}</td>
       <td>
         <div class="flex-gap">
-          ${e.pdfPath ? `<button class="btn btn-secundario btn-xs" onclick="verPdfEnsayo('${e.id}')">📄 Ver PDF</button>` : ''}
+          ${e._virtual
+            ? `<button class="btn btn-primario btn-xs" onclick="crearEnsayoDesdeCilindro('${_escNombreOnclick(String(e.cilindroNo))}')">✏️ Crear ensayo</button>`
+            : `${e.pdfPath ? `<button class="btn btn-secundario btn-xs" onclick="verPdfEnsayo('${e.id}')">📄 Ver PDF</button>` : ''}
           <button class="btn btn-primario btn-xs" onclick="editarEnsayo('${e.id}')">✏️ Editar</button>
-          <button class="btn btn-rojo btn-xs" onclick="eliminarEnsayo('${e.id}')">🗑️</button>
+          <button class="btn btn-rojo btn-xs" onclick="eliminarEnsayo('${e.id}')">🗑️</button>`}
         </div>
       </td>
     </tr>`;
