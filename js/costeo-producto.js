@@ -149,16 +149,17 @@ const _INSUMOS_DEFECTO_VIBROCOMPACTADO = [
 ];
 
 // La estructura completa del cuestionario (Diseño de Mezcla, Rendimiento, Máquinas...) depende
-// del tipo elegido aquí — un Vibrocompactado se arma distinto a un Pretensado (ver BD MEZCLA
+// del tipo elegido aquí — un Vibrocompactado se arma distinto a un Reforzado (ver BD MEZCLA
 // VIBROCOMPACTADOS del Excel, la fuente real de esa estructura) — por eso las secciones 2-8
-// quedan ocultas hasta que se elige un tipo (2026-08-02, a pedido del usuario). Hoy solo
-// Vibrocompactado tiene su cuestionario construido; los demás muestran un aviso.
+// quedan ocultas hasta que se elige un tipo (2026-08-02, a pedido del usuario). Hoy Vibrocompactado
+// y Reforzado tienen su cuestionario construido; Pretensado y Pretensado Moldeado siguen pendientes.
 function _elegirTipoEstructuraCosteo(tipo) {
   document.getElementById('m-costeo-tipo').value = tipo;
   document.querySelectorAll('#costeo-tipo-chips .tipo-chip').forEach(el => {
     el.classList.toggle('activo', el.dataset.tipo === tipo);
   });
-  const disponible = tipo === 'vibrocompactado';
+  const disponible = tipo === 'vibrocompactado' || tipo === 'reforzado';
+  const esReforzado = tipo === 'reforzado';
   const wrapper = document.getElementById('costeo-secciones-tipo');
   const placeholder = document.getElementById('costeo-tipo-placeholder');
   if (wrapper) wrapper.style.display = disponible ? '' : 'none';
@@ -166,16 +167,36 @@ function _elegirTipoEstructuraCosteo(tipo) {
     placeholder.style.display = disponible ? 'none' : '';
     if (!disponible) {
       placeholder.innerHTML = tipo
-        ? `El cuestionario de <b>${(TIPOS_ESTRUCTURA_COSTEO[tipo] || {}).label || tipo}</b> todavía no está construido — por ahora solo está disponible Vibrocompactado.`
-        : 'Elige un tipo de estructura arriba para continuar — cada tipo tiene su propio cuestionario (la receta y las máquinas de un Vibrocompactado no son las de un Pretensado).';
+        ? `El cuestionario de <b>${(TIPOS_ESTRUCTURA_COSTEO[tipo] || {}).label || tipo}</b> todavía no está construido — por ahora solo están disponibles Vibrocompactado y Reforzado.`
+        : 'Elige un tipo de estructura arriba para continuar — cada tipo tiene su propio cuestionario (la receta y las máquinas de un Vibrocompactado no son las de un Reforzado).';
     }
   }
+  // Sección 3 (Rendimiento): qué campos se muestran depende del tipo — Vibrocompactado reparte
+  // por Ciclos/Unidades-Ciclo/Unidades-Bache; Reforzado usa un rendimiento directo de cuadrilla
+  // (Unidades/día) y trae su propio bloque de Refuerzo (Acero/Alambre). "display:contents" en
+  // los dos bloques de la fila superior para que sus campos sigan siendo celdas del mismo
+  // form-grid-3, no un bloque aparte que rompa la cuadrícula.
+  const camposVibro = document.getElementById('rendimiento-campos-vibrocompactado');
+  const camposReforzado = document.getElementById('rendimiento-campos-reforzado');
+  const bacheVibro = document.getElementById('rendimiento-bache-vibrocompactado');
+  const refuerzoReforzado = document.getElementById('rendimiento-refuerzo-reforzado');
+  const hintRendimiento = document.getElementById('costeo-hint-rendimiento');
+  if (camposVibro) camposVibro.style.display = esReforzado ? 'none' : 'contents';
+  if (camposReforzado) camposReforzado.style.display = esReforzado ? 'contents' : 'none';
+  if (bacheVibro) bacheVibro.style.display = esReforzado ? 'none' : '';
+  if (refuerzoReforzado) refuerzoReforzado.style.display = esReforzado ? '' : 'none';
+  if (hintRendimiento) hintRendimiento.textContent = esReforzado
+    ? 'El Volumen de concreto por unidad es un dato real de la pieza (viene de su diseño/geometría) — se digita directo. El peso equivalente se muestra abajo, derivado con una densidad de 2450 kg/m³, solo de referencia.'
+    : 'Unidades / Bache es un dato real de planta (cuántas unidades rinde una mezclada completa de la mezcladora) — no se calcula desde el peso, se digita directo. La Materia Prima se reparte con este número, no con Peso/unidad.';
+  // A diferencia de Vibrocompactado, Reforzado no trae máquinas/insumos por defecto — no hay
+  // una lista real confirmada (los defaults de Vibrocompactado los armó el usuario a mano en
+  // una sesión anterior); se elige de lo que ya esté registrado en Maquinaria y Costos de Referencia.
   if (disponible) {
-    if (!_maquinasCosteoActual.length) {
+    if (!esReforzado && !_maquinasCosteoActual.length) {
       _maquinasCosteoActual = _MAQUINAS_DEFECTO_VIBROCOMPACTADO.map(nombre => ({ nombre }));
       renderMaquinasCosteo();
     }
-    if (!_insumosCosteoActual.length) {
+    if (!esReforzado && !_insumosCosteoActual.length) {
       _insumosCosteoActual = JSON.parse(JSON.stringify(_INSUMOS_DEFECTO_VIBROCOMPACTADO));
       renderInsumosCosteo();
     }
@@ -329,10 +350,7 @@ function renderInsumosCosteo() {
       <td><select onchange="_insumosCosteoActual[${i}].nombre=this.value;renderInsumosCosteo();_actualizarResumenCosteo()">${_opcionesInsumoCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio);white-space:nowrap">${precio}</td>
       <td><input type="number" value="${row.cantidad}" min="0" step="0.001" oninput="_insumosCosteoActual[${i}].cantidad=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>
-      <td><select onchange="_insumosCosteoActual[${i}].reparto=this.value;_actualizarResumenCosteo()">
-        <option value="estiba" ${row.reparto === 'estiba' ? 'selected' : ''}>Por estiba</option>
-        <option value="dia" ${row.reparto === 'dia' ? 'selected' : ''}>Por día</option>
-      </select></td>
+      <td><select onchange="_insumosCosteoActual[${i}].reparto=this.value;_actualizarResumenCosteo()">${_opcionesRepartoInsumoCosteo(row.reparto)}</select></td>
       <td><button class="btn btn-rojo btn-xs" onclick="_insumosCosteoActual.splice(${i},1);renderInsumosCosteo();_actualizarResumenCosteo()">✕</button></td>
     </tr>`;
   }).join('');
@@ -342,6 +360,14 @@ function _opcionesInsumoCosteo(seleccionado) {
   return '<option value="">— Selecciona —</option>' + INSUMOS_COSTOS.map(i => `<option value="${_escAttr(i.nombre)}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
 }
 function agregarInsumoCosteo() { _insumosCosteoActual.push({ nombre: '', cantidad: 0, reparto: 'estiba' }); renderInsumosCosteo(); }
+function _opcionesRepartoInsumoCosteo(seleccionado) {
+  const opciones = [
+    ['estiba', 'Por estiba'],
+    ['dia', 'Por día'],
+    ['directo', 'Directo (ya es cantidad/unidad)'],
+  ];
+  return opciones.map(([v, label]) => `<option value="${v}" ${v === seleccionado ? 'selected' : ''}>${label}</option>`).join('');
+}
 
 // ── Cálculo del costeo completo ──
 function _leerFormularioCosteo() {
@@ -360,6 +386,11 @@ function _leerFormularioCosteo() {
       unidadesCiclo: parseFloat(document.getElementById('m-costeo-unidades-ciclo').value) || 0,
       unidadesBache: parseFloat(document.getElementById('m-costeo-unidades-bache').value) || 0,
       unidadesEstiba: parseFloat(document.getElementById('m-costeo-unidades-estiba').value) || 0,
+      // Propios de Reforzado — inofensivos para Vibrocompactado (quedan en 0/sin uso ahí).
+      volumenUnidadM3: parseFloat(document.getElementById('m-costeo-volumen-unidad').value) || 0,
+      unidadesDia: parseFloat(document.getElementById('m-costeo-unidades-dia-reforzado').value) || 0,
+      aceroKgUnidad: parseFloat(document.getElementById('m-costeo-acero-kg').value) || 0,
+      pctAlambre: document.getElementById('m-costeo-pct-alambre').value === '' ? 2 : (parseFloat(document.getElementById('m-costeo-pct-alambre').value) || 0),
     },
     maquinas: JSON.parse(JSON.stringify(_maquinasCosteoActual)).filter(x => x.nombre),
     manoObra: JSON.parse(JSON.stringify(_manoObraCosteoActual)).filter(x => x.nombre),
@@ -381,7 +412,19 @@ function _capacidadCochadaDeLinea(c) {
   return 0;
 }
 
+// Precio de venta sugerido a partir del costo y un % de margen — reutilizado por Vibrocompactado
+// y Reforzado. "% Margen" es margen sobre el PRECIO DE VENTA (utilidad / precio), no recargo
+// sobre el costo — así se maneja históricamente en Pro Concreto (verificado contra COSTEO Y
+// LISTA DE PRECIOS.xlsx: costo $1.718 + margen 30% -> precio $2.450, y (2450-1718)/2450 = 30%
+// exacto; con recargo sobre costo hubiera dado 42,6%, no 30%). Fórmula: precio = costo / (1 -
+// margen/100).
+function _precioPorMargenSobreVenta(costo, margenPct) {
+  const factor = 1 - (margenPct || 0) / 100;
+  return factor > 0 ? costo / factor : costo;
+}
+
 function calcularCosteoProducto(c) {
+  if (c.tipoEstructura === 'reforzado') return _calcularCosteoReforzado(c);
   const diseno = DISENOS_MEZCLA.find(d => d.codigo === c.disenoMezclaCodigo);
   const r = c.rendimiento || {};
   const capacidadCochadaM3 = _capacidadCochadaDeLinea(c);
@@ -494,18 +537,7 @@ function calcularCosteoProducto(c) {
 
   // Precio de venta sugerido, configurable por producto (2026-08-02, a pedido del usuario)
   // — informativo hasta que se presione "Aplicar al catálogo"; nunca se escribe solo en
-  // `productos` (ver _aplicarPreciosCatalogo()).
-  // "% Margen" aquí es margen sobre el PRECIO DE VENTA (utilidad / precio), no recargo
-  // sobre el costo — así se maneja históricamente en Pro Concreto (verificado contra
-  // COSTEO Y LISTA DE PRECIOS.xlsx: costo $1.718 + margen 30% -> precio $2.450, y
-  // (2450-1718)/2450 = 30% exacto; con recargo sobre costo hubiera dado 42,6%, no 30%).
-  // Fórmula: precio = costo / (1 - margen/100). Corregido 2026-08-03 — antes se calculaba
-  // como recargo sobre costo (costo * (1 + margen/100)), lo que entregaba un margen real
-  // por debajo del % configurado.
-  const _precioPorMargenSobreVenta = (costo, margenPct) => {
-    const factor = 1 - (margenPct || 0) / 100;
-    return factor > 0 ? costo / factor : costo;
-  };
+  // `productos` (ver _aplicarPreciosCatalogo()). Ver _precioPorMargenSobreVenta() más arriba.
   const precioSugeridoLista = _precioPorMargenSobreVenta(totalUnidad, c.margenLista);
   const precioSugeridoMinimo = _precioPorMargenSobreVenta(totalUnidad, c.margenMinimo);
 
@@ -514,6 +546,159 @@ function calcularCosteoProducto(c) {
     materiaPrima, desperdicio, manoObra, herramientaMenor, maquinaria, empaque, consumos, totalUnidad,
     precioSugeridoLista, precioSugeridoMinimo,
     materiaPrimaDetalle, manoObraDetalle, maquinariaDetalle, empaqueDetalle, consumosDetalle,
+    // Refuerzo/Otros son propios de Reforzado — en 0/vacío aquí para que el resto de la
+    // pantalla (resumen, detalle, consolidado) pueda leerlos sin distinguir el tipo.
+    refuerzo: 0, refuerzoDetalle: [], otros: 0, otrosDetalle: [],
+  };
+}
+
+// ── Reforzado ──
+// Cimentaciones, prelosas y demás piezas reforzadas: no hay "ciclos de máquina" (una pieza no
+// sale en golpes de una máquina vibrocompactadora) — el rendimiento de producción es directo,
+// unidades/día de la cuadrilla asignada. El volumen de concreto de cada pieza se deriva del
+// Peso/unidad asumiendo una densidad estándar (no se pide un campo aparte), y la Materia Prima
+// sale directo de la receta del Diseño de Mezcla × ese volumen — más simple que Vibrocompactado
+// porque no depende de la capacidad de la mezcladora ni de "unidades/bache" (cada pieza se
+// dosifica según lo que necesita, no según cuántas caben en una mezclada completa).
+// Grounding real: Excel de costeo de producto "C3" (cimentación reforzada) que aportó el
+// usuario 2026-08-14, y las respuestas de esa misma conversación sobre cómo tratar Acero/
+// Alambre/Desmoldante/maquinaria por m³ — ver docs/modulos/costeo.md.
+const DENSIDAD_CONCRETO_KG_M3 = 2450;
+
+function _calcularCosteoReforzado(c) {
+  const diseno = DISENOS_MEZCLA.find(d => d.codigo === c.disenoMezclaCodigo);
+  const r = c.rendimiento || {};
+  // Volumen es el dato real que se conoce de la pieza (viene de su diseño/geometría) — se
+  // digita directo. El peso es el derivado (solo de referencia, no participa en ningún
+  // cálculo), asumiendo la densidad estándar del concreto.
+  const volumenUnidadM3 = r.volumenUnidadM3 || 0;
+  const pesoEstimadoKg = volumenUnidadM3 * DENSIDAD_CONCRETO_KG_M3;
+  const unidadesDia = r.unidadesDia || 0;
+
+  const productoCosteo = CATALOGO.find(p => p.codigo === c.productoCodigo);
+  const productoGeneraIva = productoCosteo?.iva === 'SI';
+
+  // Materia Prima — cantidad por unidad = cantidad por m³ del Diseño × volumen real de la pieza.
+  let materiaPrima = 0;
+  const materiaPrimaDetalle = [];
+  const m = diseno?.materiales || {};
+  if (volumenUnidadM3 > 0) {
+    _MATERIALES_COSTEO_PESO.forEach(k => {
+      if (!((m[k] || 0) > 0)) return;
+      const cantidad = (m[k] || 0) * volumenUnidadM3;
+      const precio = _precioInsumoPorNombre(m[`${k}Producto`], productoGeneraIva, _UNIDAD_RECETA_MATERIAL[k]);
+      const costo = cantidad * precio;
+      materiaPrima += costo;
+      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo });
+    });
+    (m.agregados || []).forEach(a => {
+      if (!((Number(a.volumen) || 0) > 0)) return;
+      const cantidad = (Number(a.volumen) || 0) * volumenUnidadM3;
+      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
+      const costo = cantidad * precio;
+      materiaPrima += costo;
+      materiaPrimaDetalle.push({ nombre: a.producto || _LABEL_ROL_AGREGADO_COSTEO[a.rolBase] || a.rolBase, unidad: 'm³', cantidad, precio, costo });
+    });
+    (m.adiciones || []).forEach(a => {
+      if (!((Number(a.cantidad) || 0) > 0)) return;
+      const cantidad = (Number(a.cantidad) || 0) * volumenUnidadM3;
+      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
+      const costo = cantidad * precio;
+      materiaPrima += costo;
+      materiaPrimaDetalle.push({ nombre: a.producto || 'Adición', unidad: 'kg', cantidad, precio, costo });
+    });
+    (m.aditivos || []).forEach(a => {
+      if (!((Number(a.dosis) || 0) > 0)) return;
+      const cantidad = (Number(a.dosis) || 0) * volumenUnidadM3;
+      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
+      const costo = cantidad * precio;
+      materiaPrima += costo;
+      materiaPrimaDetalle.push({ nombre: a.producto || a.tipo, unidad: 'kg', cantidad, precio, costo });
+    });
+  }
+  const desperdicio = materiaPrima * ((c.pctDesperdicio || 0) / 100);
+
+  // Refuerzo — Acero Figurado es una cantidad manual (depende de la geometría/complejidad real
+  // de cada pieza, no se puede derivar de una fórmula genérica). Alambre Dulce sí se deriva: un
+  // % del peso del Acero (editable, 2% por defecto) — a pedido del usuario, 2026-08-14. Los
+  // precios salen del mismo "Acero Figurado"/"Alambre Dulce" de Costos de Referencia que ya
+  // alimenta las varillas de acero calculadas (js/costeo-referencia.js); si el ítem no existe
+  // ahí, el precio sale en 0 (mismo comportamiento que _precioInsumoPorNombre en cualquier otro
+  // insumo no encontrado, sin alerta nueva).
+  const cantidadAcero = r.aceroKgUnidad || 0;
+  const precioAcero = _precioInsumoPorNombre('Acero Figurado', productoGeneraIva);
+  const costoAcero = cantidadAcero * precioAcero;
+  const pctAlambre = r.pctAlambre ?? 2;
+  const cantidadAlambre = cantidadAcero * (pctAlambre / 100);
+  const precioAlambre = _precioInsumoPorNombre('Alambre Dulce', productoGeneraIva);
+  const costoAlambre = cantidadAlambre * precioAlambre;
+  const refuerzo = costoAcero + costoAlambre;
+  const refuerzoDetalle = [
+    { nombre: 'Acero Figurado', unidad: 'kg', cantidad: cantidadAcero, precio: precioAcero, costo: costoAcero },
+    { nombre: `Alambre Dulce (${pctAlambre}% del Acero)`, unidad: 'kg', cantidad: cantidadAlambre, precio: precioAlambre, costo: costoAlambre },
+  ];
+
+  // Mano de Obra — mismo patrón que Vibrocompactado: costo/día de cada cuadrilla ÷ unidades/día.
+  let manoObra = 0;
+  const manoObraDetalle = [];
+  (c.manoObra || []).forEach(row => {
+    const cu = CUADRILLAS_PRODUCTIVAS.find(x => x.nombre === row.nombre);
+    const costoDia = cu ? _totalCuadrilla(cu).diario : 0;
+    const costo = (cu && unidadesDia > 0) ? costoDia / unidadesDia : 0;
+    manoObra += costo;
+    manoObraDetalle.push({ nombre: row.nombre, costoDia, costo, noEncontrado: !cu });
+  });
+  const herramientaMenor = manoObra * ((c.pctHerramientaMenor || 0) / 100);
+
+  // Maquinaria — cada máquina según su PROPIA unidad de uso: "día" ÷ unidades/día (grúa,
+  // montacargas, minicargador — igual criterio que Vibrocompactado); "m³" × volumen de la pieza
+  // (mezcladora, vibrador de aguja — máquinas que se cobran por m³ de concreto, no por día ni
+  // por ciclo); "ciclo" directo, sin dividir (moldes: 1 uso del molde = 1 pieza producida —
+  // Reforzado no tiene "unidades/ciclo" como Vibrocompactado).
+  let maquinaria = 0;
+  const maquinariaDetalle = [];
+  (c.maquinas || []).forEach(row => {
+    const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
+    if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
+    const costoUnidad = calcularCostoMaquina(maq).costoUnidad;
+    let costo = 0;
+    if (maq.unidadUso === 'dia' && unidadesDia > 0) costo = costoUnidad / unidadesDia;
+    else if (maq.unidadUso === 'm3' && volumenUnidadM3 > 0) costo = costoUnidad * volumenUnidadM3;
+    else if (maq.unidadUso === 'ciclo') costo = costoUnidad;
+    maquinaria += costo;
+    maquinariaDetalle.push({ nombre: row.nombre, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad, costo });
+  });
+
+  // Insumos — "por día" (consumos: ensayos, combustible...) o "directo" (Desmoldante y
+  // similares: la cantidad ya es por unidad, no se reparte) — acumulados en "Otros insumos",
+  // separado de Empaque/Consumos porque no encaja en ninguna de esas dos categorías.
+  let empaque = 0, consumos = 0, otros = 0;
+  const empaqueDetalle = [], consumosDetalle = [], otrosDetalle = [];
+  (c.insumos || []).forEach(row => {
+    const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
+    if (!ins) return;
+    const costoIns = calcularCostoInsumo(ins);
+    const precio = productoGeneraIva ? costoIns.costoSinIva : costoIns.valorFinal;
+    if (row.reparto === 'dia') {
+      if (unidadesDia > 0) { const costo = (row.cantidad * precio) / unidadesDia; consumos += costo; consumosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, precio, costo }); }
+    } else if (row.reparto === 'directo') {
+      const costo = row.cantidad * precio;
+      otros += costo;
+      otrosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, precio, costo });
+    } else {
+      if (r.unidadesEstiba > 0) { const costo = (row.cantidad * precio) / r.unidadesEstiba; empaque += costo; empaqueDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, precio, costo }); }
+    }
+  });
+
+  const totalUnidad = materiaPrima + desperdicio + refuerzo + manoObra + herramientaMenor + maquinaria + empaque + consumos + otros;
+  const precioSugeridoLista = _precioPorMargenSobreVenta(totalUnidad, c.margenLista);
+  const precioSugeridoMinimo = _precioPorMargenSobreVenta(totalUnidad, c.margenMinimo);
+
+  return {
+    volumenUnidadM3, pesoEstimadoKg, unidadesDia,
+    materiaPrima, desperdicio, refuerzo, manoObra, herramientaMenor, maquinaria, empaque, consumos, otros, totalUnidad,
+    precioSugeridoLista, precioSugeridoMinimo,
+    materiaPrimaDetalle, refuerzoDetalle, manoObraDetalle, maquinariaDetalle, empaqueDetalle, consumosDetalle, otrosDetalle,
   };
 }
 
@@ -524,9 +709,13 @@ function _actualizarResumenCosteo() {
   const c = _leerFormularioCosteo();
   const k = calcularCosteoProducto(c);
   const producto = _productoDesdeTextoCosteo(document.getElementById('m-costeo-producto').value);
-  document.getElementById('costeo-calculo-vivo').innerHTML = `
-    <div class="fila"><span>Capacidad de bache (de la mezcladora de la línea)</span><span>${k.capacidadCochadaM3.toLocaleString('es-CO')} m³</span></div>
-    <div class="fila"><span>Unidades / día (ciclos/día × unidades/ciclo)</span><span>${k.unidadesDia.toLocaleString('es-CO')} unidades</span></div>`;
+  const esReforzado = c.tipoEstructura === 'reforzado';
+  document.getElementById('costeo-calculo-vivo').innerHTML = esReforzado
+    ? `<div class="fila"><span>Volumen de concreto por unidad</span><span>${(k.volumenUnidadM3 || 0).toLocaleString('es-CO', { maximumFractionDigits: 4 })} m³</span></div>
+       <div class="fila sub"><span>≈ Peso equivalente (× 2450 kg/m³, solo de referencia)</span><span>${(k.pesoEstimadoKg || 0).toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg</span></div>
+       <div class="fila"><span>Unidades / día</span><span>${k.unidadesDia.toLocaleString('es-CO')} unidades</span></div>`
+    : `<div class="fila"><span>Capacidad de bache (de la mezcladora de la línea)</span><span>${k.capacidadCochadaM3.toLocaleString('es-CO')} m³</span></div>
+       <div class="fila"><span>Unidades / día (ciclos/día × unidades/ciclo)</span><span>${k.unidadesDia.toLocaleString('es-CO')} unidades</span></div>`;
   // El régimen de IVA del PRODUCTO (ya definido en el catálogo) decide si los insumos se
   // costean con o sin IVA — ver calcularCosteoProducto()/_precioInsumoPorNombre(). Se muestra
   // aquí explícito para que no sea una regla invisible.
@@ -539,11 +728,13 @@ function _actualizarResumenCosteo() {
     <div style="font-size:11px;color:var(--gris-medio);margin-bottom:8px">${notaIva}</div>
     <div class="fila"><span>🧱 Materia Prima</span><span>${_fmtCosteoProd(k.materiaPrima)}</span></div>
     <div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_fmtCosteoProd(k.desperdicio)}</span></div>
+    ${esReforzado ? `<div class="fila"><span>🔩 Refuerzo (Acero + Alambre)</span><span>${_fmtCosteoProd(k.refuerzo)}</span></div>` : ''}
     <div class="fila"><span>👷 Mano de Obra</span><span>${_fmtCosteoProd(k.manoObra)}</span></div>
     <div class="fila sub"><span>+ Herramienta Menor (${c.pctHerramientaMenor}%)</span><span>${_fmtCosteoProd(k.herramientaMenor)}</span></div>
     <div class="fila"><span>🔧 Maquinaria</span><span>${_fmtCosteoProd(k.maquinaria)}</span></div>
     <div class="fila"><span>📦 Insumos de empaque</span><span>${_fmtCosteoProd(k.empaque)}</span></div>
     <div class="fila"><span>⚡ Consumos (energía/agua/combustible)</span><span>${_fmtCosteoProd(k.consumos)}</span></div>
+    ${k.otros > 0 ? `<div class="fila"><span>📎 Otros insumos</span><span>${_fmtCosteoProd(k.otros)}</span></div>` : ''}
     <div class="fila fila-total"><span>Costo total por unidad</span><span>${_fmtCosteoProd(k.totalUnidad)}</span></div>`;
   // Desglose línea-por-línea (cada material, cada máquina, cada cuadrilla, cada insumo) —
   // mismo bloque que el consolidado (➕), pero aquí en vivo mientras se arma el costeo, para
@@ -699,6 +890,10 @@ function abrirModalCosteoProducto() {
   document.getElementById('m-costeo-unidades-ciclo').value = '';
   document.getElementById('m-costeo-unidades-bache').value = '';
   document.getElementById('m-costeo-unidades-estiba').value = '';
+  document.getElementById('m-costeo-volumen-unidad').value = '';
+  document.getElementById('m-costeo-unidades-dia-reforzado').value = '';
+  document.getElementById('m-costeo-acero-kg').value = '';
+  document.getElementById('m-costeo-pct-alambre').value = 2;
   document.getElementById('m-costeo-pct-desperdicio').value = 4;
   document.getElementById('m-costeo-pct-herramienta').value = 2;
   document.getElementById('m-costeo-margen-lista').value = 30;
@@ -730,6 +925,10 @@ function editarCosteoProducto(codigo) {
   document.getElementById('m-costeo-unidades-ciclo').value = r.unidadesCiclo || '';
   document.getElementById('m-costeo-unidades-bache').value = r.unidadesBache || '';
   document.getElementById('m-costeo-unidades-estiba').value = r.unidadesEstiba || '';
+  document.getElementById('m-costeo-volumen-unidad').value = r.volumenUnidadM3 || '';
+  document.getElementById('m-costeo-unidades-dia-reforzado').value = r.unidadesDia || '';
+  document.getElementById('m-costeo-acero-kg').value = r.aceroKgUnidad || '';
+  document.getElementById('m-costeo-pct-alambre').value = r.pctAlambre ?? 2;
   document.getElementById('m-costeo-pct-desperdicio').value = c.pctDesperdicio || 0;
   document.getElementById('m-costeo-pct-herramienta').value = c.pctHerramientaMenor || 0;
   document.getElementById('m-costeo-margen-lista').value = c.margenLista ?? 30;
@@ -747,7 +946,8 @@ function editarCosteoProducto(codigo) {
 function guardarCosteoProducto() {
   const producto = _productoDesdeTextoCosteo(document.getElementById('m-costeo-producto').value);
   if (!producto) { alert('Selecciona un producto válido del catálogo (busca por código o nombre).'); return; }
-  if (document.getElementById('m-costeo-tipo').value !== 'vibrocompactado') { alert('Elige el tipo de estructura (por ahora solo Vibrocompactado está disponible).'); return; }
+  const tipoElegido = document.getElementById('m-costeo-tipo').value;
+  if (tipoElegido !== 'vibrocompactado' && tipoElegido !== 'reforzado') { alert('Elige el tipo de estructura (por ahora solo Vibrocompactado y Reforzado están disponibles).'); return; }
   if (!document.getElementById('m-costeo-diseno').value) { alert('Selecciona un Diseño de Mezcla.'); return; }
   const c = _leerFormularioCosteo();
   c.productoCodigo = producto.codigo;
@@ -833,6 +1033,14 @@ function _seccionesDetalleCosteo(c, k) {
        <tr style="font-weight:700"><td colspan="3" style="text-align:right">Subtotal Materia Prima</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.materiaPrima + k.desperdicio)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.materiaPrima + k.desperdicio, k.totalUnidad)}</td></tr>`;
   const seccionMP = `<div style="font-size:11px;color:var(--gris-medio);margin:14px 0 -8px">${notaIvaDetalle}</div>` + _seccionDetalleCosteo('🧱 Materia Prima <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(por unidad de producto)</span>', filasMP, 'Sin Diseño de Mezcla o sin materiales con cantidad.');
 
+  // Refuerzo — solo Reforzado (Vibrocompactado siempre trae refuerzoDetalle vacío).
+  const seccionRef = k.refuerzoDetalle.length
+    ? _seccionDetalleCosteo('🔩 Refuerzo <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(Acero Figurado + Alambre Dulce)</span>',
+        k.refuerzoDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, f.unidad, f.precio, f.costo, false, k.totalUnidad)).join('')
+        + `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Refuerzo</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.refuerzo)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.refuerzo, k.totalUnidad)}</td></tr>`,
+        'Sin refuerzo agregado.')
+    : '';
+
   const filasMO = k.manoObraDetalle.map(f => _filaDetalleCosteo(f.nombre, null, null, f.costoDia ? f.costoDia : null, f.costo, f.noEncontrado, k.totalUnidad)).join('')
     + (k.manoObraDetalle.length ? `<tr style="border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right;color:var(--gris-medio)">+ Herramienta Menor (${c.pctHerramientaMenor}%)</td><td style="text-align:right;font-weight:700">${_fmtCosteoProd(k.herramientaMenor)}</td><td style="text-align:right;color:var(--gris-medio);font-size:12px">${_pctCosteoProd(k.herramientaMenor, k.totalUnidad)}</td></tr>
        <tr style="font-weight:700"><td colspan="3" style="text-align:right">Subtotal Mano de Obra</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.manoObra + k.herramientaMenor)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.manoObra + k.herramientaMenor, k.totalUnidad)}</td></tr>` : '');
@@ -850,7 +1058,15 @@ function _seccionesDetalleCosteo(c, k) {
     + (k.consumosDetalle.length ? `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Consumos</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.consumos)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.consumos, k.totalUnidad)}</td></tr>` : '');
   const seccionCons = _seccionDetalleCosteo('⚡ Consumos <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(energía/agua/combustible)</span>', filasCons, 'Sin consumos agregados.');
 
-  return seccionMP + seccionMO + seccionMaq + seccionEmp + seccionCons;
+  // Otros insumos — reparto "directo" (Desmoldante y similares); solo aparece si hay filas.
+  const seccionOtros = k.otrosDetalle.length
+    ? _seccionDetalleCosteo('📎 Otros insumos <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(cantidad directa por unidad)</span>',
+        k.otrosDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, null, f.precio, f.costo, false, k.totalUnidad)).join('')
+        + `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Otros insumos</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.otros)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.otros, k.totalUnidad)}</td></tr>`,
+        '')
+    : '';
+
+  return seccionMP + seccionRef + seccionMO + seccionMaq + seccionEmp + seccionCons + seccionOtros;
 }
 
 // Consolidado de solo lectura (➕) — muestra CADA input que compone el costo (cada material,
@@ -864,21 +1080,33 @@ function abrirDetalleCosteoProducto(codigo) {
   const diseno = DISENOS_MEZCLA.find(d => d.codigo === c.disenoMezclaCodigo);
   const r = c.rendimiento || {};
 
+  const esReforzado = c.tipoEstructura === 'reforzado';
+
   document.getElementById('modal-detalle-costeo-titulo').textContent = `Consolidado — ${c.productoNombre}`;
-  document.getElementById('detalle-costeo-resumen').innerHTML = `
-    <span>${tipo.label}</span>
-    <span><strong>Diseño:</strong> ${diseno ? `${_esc(diseno.codigo)} — ${_esc(diseno.nombre)}` : (_esc(c.disenoMezclaCodigo) || '—')}</span>
-    <span><strong>Unidades/Bache:</strong> ${(r.unidadesBache || 0).toLocaleString('es-CO')}</span>
-    <span><strong>Unidades/día:</strong> ${k.unidadesDia.toLocaleString('es-CO')}</span>`;
+  document.getElementById('detalle-costeo-resumen').innerHTML = esReforzado
+    ? `<span>${tipo.label}</span>
+       <span><strong>Diseño:</strong> ${diseno ? `${_esc(diseno.codigo)} — ${_esc(diseno.nombre)}` : (_esc(c.disenoMezclaCodigo) || '—')}</span>
+       <span><strong>Volumen/unidad:</strong> ${(k.volumenUnidadM3 || 0).toLocaleString('es-CO', { maximumFractionDigits: 4 })} m³</span>
+       <span><strong>Unidades/día:</strong> ${k.unidadesDia.toLocaleString('es-CO')}</span>`
+    : `<span>${tipo.label}</span>
+       <span><strong>Diseño:</strong> ${diseno ? `${_esc(diseno.codigo)} — ${_esc(diseno.nombre)}` : (_esc(c.disenoMezclaCodigo) || '—')}</span>
+       <span><strong>Unidades/Bache:</strong> ${(r.unidadesBache || 0).toLocaleString('es-CO')}</span>
+       <span><strong>Unidades/día:</strong> ${k.unidadesDia.toLocaleString('es-CO')}</span>`;
 
   const seccionRendimiento = `
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo">Rendimiento de producción</div>
       <div class="caja-costeo">
+        ${esReforzado ? `
+        <div class="fila"><span>Volumen de concreto / unidad <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(del diseño de la pieza)</span></span><span>${(r.volumenUnidadM3 || 0).toLocaleString('es-CO', { maximumFractionDigits: 4 })} m³</span></div>
+        <div class="fila sub"><span>≈ Peso equivalente (× 2450 kg/m³, solo de referencia)</span><span>${(k.pesoEstimadoKg || 0).toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg</span></div>
+        <div class="fila"><span>Unidades / día</span><span>${(r.unidadesDia || 0).toLocaleString('es-CO')}</span></div>
+        <div class="fila"><span>Acero Figurado / unidad</span><span>${(r.aceroKgUnidad || 0).toLocaleString('es-CO')} kg</span></div>
+        <div class="fila"><span>% Alambre Dulce</span><span>${(r.pctAlambre ?? 2).toLocaleString('es-CO')}%</span></div>` : `
         <div class="fila"><span>Peso / unidad <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(informativo)</span></span><span>${(r.pesoUnidadKg || 0).toLocaleString('es-CO')} kg</span></div>
         <div class="fila"><span>Ciclos / día</span><span>${(r.ciclosDia || 0).toLocaleString('es-CO')}</span></div>
         <div class="fila"><span>Unidades / Ciclo</span><span>${(r.unidadesCiclo || 0).toLocaleString('es-CO')}</span></div>
-        <div class="fila"><span>Unidades / Bache</span><span>${(r.unidadesBache || 0).toLocaleString('es-CO')}</span></div>
+        <div class="fila"><span>Unidades / Bache</span><span>${(r.unidadesBache || 0).toLocaleString('es-CO')}</span></div>`}
         <div class="fila"><span>Unidades / estiba</span><span>${(r.unidadesEstiba || 0).toLocaleString('es-CO')}</span></div>
       </div>
     </div>`;
@@ -889,11 +1117,13 @@ function abrirDetalleCosteoProducto(codigo) {
       <div class="caja-costeo caja-costeo-resumen">
         <div class="fila"><span>🧱 Materia Prima</span><span>${_fmtCosteoProd(k.materiaPrima)}</span></div>
         <div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_fmtCosteoProd(k.desperdicio)}</span></div>
+        ${esReforzado ? `<div class="fila"><span>🔩 Refuerzo</span><span>${_fmtCosteoProd(k.refuerzo)}</span></div>` : ''}
         <div class="fila"><span>👷 Mano de Obra</span><span>${_fmtCosteoProd(k.manoObra)}</span></div>
         <div class="fila sub"><span>+ Herramienta Menor (${c.pctHerramientaMenor}%)</span><span>${_fmtCosteoProd(k.herramientaMenor)}</span></div>
         <div class="fila"><span>🔧 Maquinaria</span><span>${_fmtCosteoProd(k.maquinaria)}</span></div>
         <div class="fila"><span>📦 Insumos de empaque</span><span>${_fmtCosteoProd(k.empaque)}</span></div>
         <div class="fila"><span>⚡ Consumos</span><span>${_fmtCosteoProd(k.consumos)}</span></div>
+        ${k.otros > 0 ? `<div class="fila"><span>📎 Otros insumos</span><span>${_fmtCosteoProd(k.otros)}</span></div>` : ''}
         <div class="fila fila-total"><span>Costo total por unidad</span><span>${_fmtCosteoProd(k.totalUnidad)}</span></div>
       </div>
     </div>`;
