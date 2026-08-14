@@ -1785,14 +1785,21 @@
   <div class="modal" style="width:1080px;max-width:95vw">
     <div class="modal-titulo" id="modal-ajuste-titulo">🌡️ Nuevo Ajuste Diario de Mezcla</div>
     <input type="hidden" id="m-ajuste-id">
-    <div class="form-grid-3" style="margin-bottom:10px">
+    <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Cilindro N° *</label><input type="number" id="m-ajuste-cilindro" min="1"></div>
       <div class="form-grupo"><label>Fecha *</label><input type="date" id="m-ajuste-fecha"></div>
-      <div class="form-grupo"><label>Producto a fabricar *</label>
-        <input type="text" id="m-ajuste-producto" list="datalist-productos-ajuste" onchange="cargarDesdeProducto()" placeholder="Busca por código o nombre..." style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
-        <datalist id="datalist-productos-ajuste"></datalist>
-      </div>
     </div>
+    <table class="tabla-items" style="width:100%;margin-bottom:10px">
+      <thead><tr><th>Producto a fabricar *</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <input type="text" id="m-ajuste-producto" list="datalist-productos-ajuste" onchange="cargarDesdeProducto()" placeholder="Busca por código o nombre...">
+            <datalist id="datalist-productos-ajuste"></datalist>
+          </td>
+        </tr>
+      </tbody>
+    </table>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:2px 0 8px">
       <span style="font-size:11px;color:var(--gris-medio)">¿Se aprovecha esta misma mezcla para fabricar otro(s) producto(s) al tiempo (mismo diseño, molde distinto)?</span>
       <button class="btn btn-secundario btn-xs" onclick="agregarProductoAdicionalAjuste()">+ Agregar producto</button>
