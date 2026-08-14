@@ -26,6 +26,23 @@ Implementación (2026-07-30): el "peso a cobrar" (`pesoCobro`) se decide antes d
 
 En el PDF (`construirTablaCotizacion()`), la fila de transporte se ve distinto según el modo — "por viaje" no tendría sentido mostrarla como `kg reales × tarifa/kg` porque esa cuenta no cuadraría con el total cobrado (el peso real no es el que se está facturando), así que en ese modo la fila se muestra como `1 viaje × $(tarifa/kg × 11.000)` en vez de `peso real × tarifa/kg`, con el mismo total resultante.
 
+### "Por viaje completo": número de viajes real, no fijo en 1 (2026-08-14)
+
+Dos bugs reales reportados seguidos, los dos en el modo **"Por viaje completo (no se consolida)"**, corregidos juntos con `_transportePorViaje(destino, tarifaManual, pesoTotal)` (`js/cotizador.js`, usado en los mismos 4 lugares que el resto del cálculo de transporte: `recalcular()`, `calcOpcion()`, `construirTablaCotizacion()`, `guardarCotizacion()`):
+
+1. **Destino "Otro" (manual): la tarifa manual se seguía leyendo como $/kg.** `tarifaKgDe('Otro', tarifaManual)` devuelve la tarifa manual tal cual, y se multiplicaba por `PESO_VIAJE_COMPLETO` (11.000) — si el usuario escribía ahí un precio pensado como "valor plano del viaje" (ej. $800.000), el cálculo lo trataba como $800.000/kg × 11.000 kg, disparando el total por miles.
+2. **Cualquier destino: siempre se cobraba exactamente "1 viaje", sin importar el peso.** Un pedido de 45.560 kg a un destino ya tarifado no cabe en un solo camión de 11.000 kg — hacían falta varios viajes, pero el cálculo original solo multiplicaba la tarifa/kg del destino por los 11.000 kg de un camión una sola vez, cobrando muy por debajo de lo real.
+
+`_transportePorViaje()` resuelve los dos a la vez:
+
+- **Número de viajes, siempre**: `Math.ceil(pesoTotal / capacidadCamion)` — redondeado hacia arriba (un viaje empezado se cobra completo). `capacidadCamion` es `PESO_VIAJE_OTRO` (**10.000** kg) para destino "Otro", o `PESO_VIAJE_COMPLETO` (**11.000** kg) para un destino ya tarifado — distintos a propósito, a pedido explícito del usuario: un destino manual suele ser una vía/acceso que todavía no se conoce bien, así que se asume más conservador (camión más liviano).
+- **Precio por viaje**: para "Otro", la tarifa manual tal cual (deja de leerse como $/kg — el label del campo cambia solo a "Tarifa manual ($/viaje)" cuando aplica este combo, `label-tarifa-manual` en `cotizaciones.html`). Para un destino ya tarifado, `capacidadCamion × tarifa/kg del destino` — igual cuenta que antes para un solo viaje, ahora multiplicada por cuántos viajes hacen falta.
+- `transporte = precioPorViaje × numeroViajes × (1 − descuento/100)`.
+- En el PDF, la fila de transporte muestra el número real de viajes (ya no fijo en "1") — para "Otro" además detalla la cuenta: `(peso total kg ÷ 10.000 kg/viaje)`.
+- La nota bajo el selector (`#nota-viaje-completo`) también se recalcula en vivo con el número de viajes real de cada combo.
+
+El modo "Por peso" (consolidado, sin importar el destino) no cambió.
+
 ## Pantallas (`ir()` en `navegacion.js`)
 
 `pipeline`, `historico`, `clientes`, `estadisticas`
