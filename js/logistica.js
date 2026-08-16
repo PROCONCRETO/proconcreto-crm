@@ -136,6 +136,17 @@ function irHoyLogistica() {
   _logAnio = hoy.getFullYear();
   _logMes = hoy.getMonth();
   renderCalendarioLogistica();
+  if (_logVista === 'listado') _scrollListadoAHoy();
+}
+
+// La vista Listado renderiza TODOS los días del mes de una vez (1 al último) — sin esto, entrar
+// a Listado siempre arrancaba mostrando el día 1, obligando a bajar manualmente hasta hoy (a
+// pedido del usuario, 2026-08-17: "me sale el listado por defecto desde el primer día... para
+// no tener que bajar tanto"). Solo se llama al cambiar A la vista Listado o al pulsar "Hoy" —
+// nunca en cada refresco por datos (realtime, drag&drop...), que sí re-renderiza el listado
+// completo muy seguido y le pisaría el scroll a quien esté revisando otro día a propósito.
+function _scrollListadoAHoy() {
+  document.getElementById('log-lst-hoy-anchor')?.scrollIntoView({ block: 'start' });
 }
 
 // ── Entregas / cumplidos: helpers compartidos ──
@@ -390,6 +401,7 @@ function cambiarVistaLogistica(modo) {
   const btnLst = document.getElementById('log-vista-btn-listado');
   if (btnCal) { btnCal.style.background = modo === 'calendario' ? 'var(--azul)' : 'white'; btnCal.style.color = modo === 'calendario' ? 'white' : 'var(--gris-medio)'; }
   if (btnLst) { btnLst.style.background = modo === 'listado' ? 'var(--azul)' : 'white'; btnLst.style.color = modo === 'listado' ? 'white' : 'var(--gris-medio)'; }
+  if (modo === 'listado') _scrollListadoAHoy();
 }
 
 // Misma lógica de datos que renderCalendarioLogistica() (mismo mes/año, mismos festivos, mismo
@@ -420,7 +432,7 @@ function _renderListadoLogistica(festivosMap, hoyStr, primerDia, diasEnMes) {
     if (esHoy) clasesDia += ' log-lst-hoy';
 
     html += `
-      <div class="${clasesDia}" onclick="abrirModalViaje('${fechaStr}')" ondragover="permitirSoltarViaje(event)" ondragleave="quitarResaltadoSoltar(event)" ondrop="soltarViajeEnDia(event,'${fechaStr}')">
+      <div class="${clasesDia}"${esHoy ? ' id="log-lst-hoy-anchor"' : ''} onclick="abrirModalViaje('${fechaStr}')" ondragover="permitirSoltarViaje(event)" ondragleave="quitarResaltadoSoltar(event)" ondrop="soltarViajeEnDia(event,'${fechaStr}')">
         <span class="log-lst-fecha-num">${dia}</span>
         <span class="log-lst-fecha-dow">${DIAS_SEMANA_ES[dow]}</span>
         ${esHoy ? '<span class="log-cal-hoy-badge">HOY</span>' : ''}

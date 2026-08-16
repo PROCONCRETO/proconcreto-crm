@@ -104,9 +104,6 @@
   <button class="nav-btn" onclick="ir('control-ensayos')">📐 Control de Ensayos</button>
   <button class="nav-btn" onclick="ir('analisis-estadistico')">📊 Análisis Estadístico</button>
   <button class="nav-btn" onclick="ir('materia-prima')">🧱 Materia Prima</button>
-  <button class="nav-btn" onclick="ir('trazabilidad')">🔗 Trazabilidad</button>
-  <button class="nav-btn" onclick="ir('no-conformidades')">⚠️ No Conformidades</button>
-  <button class="nav-btn" onclick="ir('certificados-calidad')">📜 Certificados</button>
   <button class="nav-btn" onclick="ir('diseno-mezcla')" style="margin-left:auto">🧪 Diseño de Mezcla</button>
 </nav>
 
@@ -1146,72 +1143,6 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════
-     PANTALLA: TRAZABILIDAD
-═══════════════════════════════════════ -->
-<div id="pantalla-trazabilidad" class="pantalla">
-  <div class="acciones-row">
-    <div style="font-size:18px;font-weight:700;color:var(--azul)">Trazabilidad de Calidad</div>
-    <div class="flex-gap">
-      <input type="text" id="buscar-trazabilidad" class="buscador-input" style="width:320px" placeholder="🔍 N° Ensayo, N° Orden o Código de Diseño..." oninput="buscarTrazabilidad()">
-    </div>
-  </div>
-  <div id="trazabilidad-resultado">
-    <div class="empty-state"><div class="icono">🔗</div><div>Busca por N° de Orden de Producción, N° de Ensayo o Código de Diseño.</div></div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════
-     PANTALLA: NO CONFORMIDADES
-═══════════════════════════════════════ -->
-<div id="pantalla-no-conformidades" class="pantalla">
-  <div class="acciones-row">
-    <div style="font-size:18px;font-weight:700;color:var(--azul)">No Conformidades de Calidad</div>
-    <div class="flex-gap">
-      <select id="filtro-estado-nc" class="buscador-input" style="width:auto" onchange="renderNoConformidades()">
-        <option value="">Todos los estados</option>
-        <option value="Abierta">Abierta</option>
-        <option value="Cerrada">Cerrada</option>
-      </select>
-      <input type="text" id="buscar-nc" class="buscador-input" placeholder="🔍 Buscar..." oninput="renderNoConformidades()">
-      <button class="btn btn-primario" onclick="abrirModalNC()">+ Nueva No Conformidad</button>
-    </div>
-  </div>
-  <div id="nc-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
-  <div class="card" style="padding:0;overflow:hidden">
-    <table class="tabla-cots" id="tabla-no-conformidades">
-      <thead><tr>
-        <th>N°</th><th>FECHA</th><th>TIPO</th><th>DESCRIPCIÓN</th><th>DISPOSICIÓN</th><th>RESPONSABLE</th><th>ESTADO</th><th style="min-width:150px">ACCIONES</th>
-      </tr></thead>
-      <tbody id="no-conformidades-body">
-        <tr><td colspan="8" class="empty-state"><div class="icono">⚠️</div><div>No hay no conformidades registradas.</div></td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════
-     PANTALLA: CERTIFICADOS DE CALIDAD
-═══════════════════════════════════════ -->
-<div id="pantalla-certificados-calidad" class="pantalla">
-  <div class="acciones-row">
-    <div style="font-size:18px;font-weight:700;color:var(--azul)">Certificados de Calidad</div>
-    <div class="flex-gap">
-      <input type="text" id="buscar-certificado" class="buscador-input" placeholder="🔍 Buscar ensayo..." oninput="renderCertificadosCalidad()">
-    </div>
-  </div>
-  <div class="card" style="padding:0;overflow:hidden">
-    <table class="tabla-cots" id="tabla-certificados">
-      <thead><tr>
-        <th>N° ENSAYO</th><th>FECHA</th><th>ELEMENTO</th><th style="text-align:center">RESISTENCIA</th><th>RESULTADO</th><th style="min-width:150px">ACCIONES</th>
-      </tr></thead>
-      <tbody id="certificados-body">
-        <tr><td colspan="6" class="empty-state"><div class="icono">📜</div><div>No hay ensayos con resultados finales para certificar aún.</div></td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
 <div class="modal-overlay" id="modal-diseno">
   <div class="modal" style="width:900px;max-width:95vw">
     <div class="modal-titulo" id="modal-diseno-titulo">🧪 Nuevo Diseño de Mezcla</div>
@@ -1580,6 +1511,12 @@
           <div class="form-grupo"><label>Volumen de concreto / unidad (m³) <span class="hint">(del diseño de la pieza)</span></label><input type="number" id="m-costeo-volumen-unidad" min="0" step="0.0001" oninput="_actualizarResumenCosteo()"></div>
           <div class="form-grupo"><label>Unidades / día <span class="hint">(rendimiento directo de la cuadrilla)</span></label><input type="number" id="m-costeo-unidades-dia-reforzado" min="0" step="0.01" oninput="_actualizarResumenCosteo()"></div>
         </div>
+        <div id="rendimiento-campos-pretensado" style="display:none">
+          <div class="form-grupo"><label>Volumen de concreto / ml (m³) <span class="hint">(del diseño de la pieza)</span></label><input type="number" id="m-costeo-volumen-unidad-pretensado" min="0" step="0.0001" oninput="_actualizarResumenCosteo()"></div>
+          <div class="form-grupo"><label>Metros lineales / banco <span class="hint">(largo real de la colada)</span></label><input type="number" id="m-costeo-metros-banco" min="0" step="1" oninput="_actualizarResumenCosteo()"></div>
+          <div class="form-grupo"><label>Hilos de pretensado / banco</label><input type="number" id="m-costeo-hilos-banco" min="0" step="1" oninput="_actualizarResumenCosteo()"></div>
+          <div class="form-grupo"><label>Longitud bruta del hilo (m) <span class="hint">(incluye colas del banco)</span></label><input type="number" id="m-costeo-longitud-hilo" min="0" step="0.1" oninput="_actualizarResumenCosteo()"></div>
+        </div>
       </div>
       <div id="rendimiento-bache-vibrocompactado" class="form-grid" style="margin-top:10px">
         <div class="form-grupo"><label>Unidades / Bache <span class="hint">(rendimiento real de una mezclada completa)</span></label><input type="number" id="m-costeo-unidades-bache" min="0" step="1" oninput="_actualizarResumenCosteo()"></div>
@@ -1589,6 +1526,9 @@
         <div class="form-grupo"><label>Acero Figurado (kg / unidad) <span class="hint">(según diseño de refuerzo de esta pieza)</span></label><input type="number" id="m-costeo-acero-kg" min="0" step="0.01" oninput="_actualizarResumenCosteo()"></div>
         <div class="form-grupo"><label>% Alambre Dulce <span class="hint">(sobre el peso del Acero)</span></label><input type="number" id="m-costeo-pct-alambre" min="0" step="0.1" value="2" oninput="_actualizarResumenCosteo()"></div>
       </div>
+      <div id="rendimiento-banco-pretensado" class="form-grid" style="margin-top:10px;display:none">
+        <div class="form-grupo"><label>Bancos / día <span class="hint">(rendimiento por defecto de la línea — cada cuadrilla o máquina lo puede anular)</span></label><input type="number" id="m-costeo-bancos-dia" min="0" step="0.01" oninput="_actualizarResumenCosteo()"></div>
+      </div>
       <div id="costeo-calculo-vivo" class="caja-costeo"></div>
       <div id="costeo-hint-rendimiento" style="font-size:11px;color:var(--gris-medio);margin-top:6px">Unidades / Bache es un dato real de planta (cuántas unidades rinde una mezclada completa de la mezcladora) — no se calcula desde el peso, se digita directo. La Materia Prima se reparte con este número, no con Peso/unidad.</div>
     </div>
@@ -1597,7 +1537,7 @@
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo"><span class="num">4</span> Máquinas involucradas</div>
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Máquina</th><th style="width:140px">Costo</th><th style="width:36px"></th></tr></thead>
+        <thead><tr><th>Máquina</th><th style="width:140px">Costo</th><th id="costeo-maq-th-banco" style="width:110px;display:none">Bancos/día</th><th id="costeo-maq-th-hilo" style="width:80px;display:none">× hilo</th><th style="width:36px"></th></tr></thead>
         <tbody id="costeo-maquinas-body"></tbody>
       </table>
       <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarMaquinaCosteo()">+ Agregar máquina</button>
@@ -1607,7 +1547,7 @@
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo"><span class="num">5</span> Mano de obra involucrada</div>
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Cuadrilla</th><th style="width:140px">Costo</th><th style="width:36px"></th></tr></thead>
+        <thead><tr><th>Cuadrilla</th><th style="width:140px">Costo</th><th id="costeo-mo-th-banco" style="width:110px;display:none">Bancos/día</th><th style="width:36px"></th></tr></thead>
         <tbody id="costeo-mano-obra-body"></tbody>
       </table>
       <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarManoObraCosteo()">+ Agregar cuadrilla</button>
@@ -1976,53 +1916,6 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-nc">
-  <div class="modal" style="width:600px;max-width:95vw">
-    <div class="modal-titulo" id="modal-nc-titulo">⚠️ Nueva No Conformidad</div>
-    <input type="hidden" id="m-nc-id">
-    <div class="form-grid" style="margin-bottom:10px">
-      <div class="form-grupo"><label>N° *</label><input type="text" id="m-nc-numero" placeholder="NC-0001"></div>
-      <div class="form-grupo"><label>Fecha *</label><input type="date" id="m-nc-fecha"></div>
-    </div>
-    <div class="form-grid" style="margin-bottom:10px">
-      <div class="form-grupo"><label>Tipo</label>
-        <select id="m-nc-tipo" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
-          <option value="Ensayo fallido">Ensayo fallido</option>
-          <option value="Materia prima rechazada">Materia prima rechazada</option>
-          <option value="Otro">Otro</option>
-        </select>
-      </div>
-      <div class="form-grupo"><label>Referencia</label><input type="text" id="m-nc-referencia" placeholder="N° de ensayo o lote afectado"></div>
-    </div>
-    <div class="form-grupo" style="margin-bottom:10px"><label>Descripción *</label><textarea id="m-nc-descripcion" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical"></textarea></div>
-    <div class="form-grupo" style="margin-bottom:10px"><label>Acción correctiva</label><textarea id="m-nc-accion" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical"></textarea></div>
-    <div class="form-grid" style="margin-bottom:10px">
-      <div class="form-grupo"><label>Responsable</label><input type="text" id="m-nc-responsable"></div>
-      <div class="form-grupo"><label>Disposición</label>
-        <select id="m-nc-disposicion" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
-          <option value="Retenido">Retenido</option>
-          <option value="Liberado con concesión">Liberado con concesión</option>
-          <option value="Rechazado">Rechazado</option>
-          <option value="Reprocesado">Reprocesado</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-grid" style="margin-bottom:16px">
-      <div class="form-grupo"><label>Estado</label>
-        <select id="m-nc-estado" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
-          <option value="Abierta">Abierta</option>
-          <option value="Cerrada">Cerrada</option>
-        </select>
-      </div>
-      <div class="form-grupo"><label>Fecha de cierre</label><input type="date" id="m-nc-fecha-cierre"></div>
-    </div>
-    <div class="modal-acciones">
-      <button class="btn btn-secundario" onclick="cerrarModal('modal-nc')">Cancelar</button>
-      <button class="btn btn-primario" onclick="guardarNC()">Guardar</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-overlay" id="modal-producto">
   <div class="modal" style="width:560px;max-width:95vw">
     <div class="modal-titulo" id="modal-producto-titulo">📦 Nuevo producto</div>
@@ -2337,11 +2230,11 @@
 <script src="js/costeo-mano-obra.js?v=20260809a"></script>
 <script src="js/costeo-maquinaria.js?v=20260804b"></script>
 <script src="js/costeo-referencia.js?v=20260809c"></script>
-<script src="js/costeo-producto.js?v=20260814b"></script>
+<script src="js/costeo-producto.js?v=20260816a"></script>
 <script src="js/calidad-mezclas.js?v=20260813b"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
-<script src="js/calidad-trazabilidad.js?v=20260804a"></script>
-<script src="js/logistica.js?v=20260804e"></script>
+<script src="js/calidad-materia-prima.js?v=20260817a"></script>
+<script src="js/logistica.js?v=20260817a"></script>
 <script src="js/estadisticas-logistica.js?v=20260804c"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20260804b"></script>

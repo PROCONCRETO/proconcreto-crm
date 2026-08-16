@@ -41,6 +41,8 @@ Toggle "📅 Calendario" / "📋 Listado" junto a la navegación de mes — a pe
 
 `cambiarVistaLogistica(modo)` solo alterna qué contenedor se ve (`display`), no vuelve a calcular nada — las dos vistas siempre se recalculan juntas en cada render.
 
+**Auto-scroll al día de hoy (2026-08-17)**: la Vista Listado pinta TODOS los días del mes de una vez (del 1 al último) — sin esto, entrar a Listado siempre arrancaba mostrando el día 1, obligando a bajar manualmente hasta hoy (a pedido del usuario: "me sale el listado por defecto desde el primer día... para no tener que bajar tanto"). `_scrollListadoAHoy()` hace `scrollIntoView` sobre el día de hoy (`id="log-lst-hoy-anchor"`, agregado condicionalmente a la fila del día en `_renderListadoLogistica()` cuando `esHoy`). Se llama solo al cambiar A la vista Listado (`cambiarVistaLogistica('listado')`) y al pulsar "Hoy" (`irHoyLogistica()`) — nunca en cada refresco por datos (realtime, drag&drop, etc.), que sí re-renderiza el listado completo muy seguido y le pisaría el scroll a quien esté revisando otro día a propósito.
+
 ## Bloqueo de fechas pasadas
 
 `esFechaBloqueada(fecha)` — cualquier fecha anterior a hoy. Un viaje en fecha bloqueada se abre en modo solo-lectura (banner + campos deshabilitados + sin botón Guardar/Eliminar). No se puede crear un viaje nuevo en una fecha pasada. Marcar cumplidos SÍ sigue permitido sobre fechas pasadas — es la vía para registrar qué pasó realmente.

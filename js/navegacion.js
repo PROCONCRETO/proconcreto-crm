@@ -79,9 +79,6 @@ function ir(pantalla) {
   if (pantalla === 'control-ensayos') renderEnsayosCalidad();
   if (pantalla === 'analisis-estadistico') renderAnalisisEstadistico();
   if (pantalla === 'materia-prima') renderMateriaPrima();
-  if (pantalla === 'trazabilidad') { const inp = document.getElementById('buscar-trazabilidad'); if (inp) inp.value = ''; buscarTrazabilidad(); }
-  if (pantalla === 'no-conformidades') renderNoConformidades();
-  if (pantalla === 'certificados-calidad') renderCertificadosCalidad();
   if (pantalla === 'logistica') renderCalendarioLogistica();
   if (pantalla === 'logistica-estadisticas') renderEstadisticasLogistica();
   if (pantalla === 'productos') renderProductosAdmin();

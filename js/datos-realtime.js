@@ -1,5 +1,5 @@
 async function cargarDatosSupabase() {
-  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }, { data: prods, error: e4 }, { data: disenos, error: e5 }, { data: ensayos, error: e6 }, { data: mprima, error: e7 }, { data: nconf, error: e8 }, { data: ajustes, error: e9 }, { data: entregas, error: e10 }, { data: pmo, error: e11 }, { data: clasesMo, error: e12 }, { data: cuadrillas, error: e13 }, { data: maquinas, error: e14 }, { data: insumos, error: e15 }, { data: costeoProd, error: e16 }] = await Promise.all([
+  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }, { data: prods, error: e4 }, { data: disenos, error: e5 }, { data: ensayos, error: e6 }, { data: mprima, error: e7 }, { data: ajustes, error: e9 }, { data: entregas, error: e10 }, { data: pmo, error: e11 }, { data: clasesMo, error: e12 }, { data: cuadrillas, error: e13 }, { data: maquinas, error: e14 }, { data: insumos, error: e15 }, { data: costeoProd, error: e16 }] = await Promise.all([
     sb.from('cotizaciones').select('datos, estado').order('creado', { ascending: true }),
     sb.from('clientes').select('datos').order('creado', { ascending: true }),
     sb.from('ordenes_servicio').select('datos').order('creado', { ascending: false }),
@@ -7,7 +7,6 @@ async function cargarDatosSupabase() {
     sb.from('disenos_mezcla').select('datos').order('creado', { ascending: false }),
     sb.from('ensayos_calidad').select('datos').order('creado', { ascending: false }),
     sb.from('materia_prima').select('datos').order('creado', { ascending: false }),
-    sb.from('no_conformidades').select('datos').order('creado', { ascending: false }),
     sb.from('ajustes_mezcla').select('datos').order('creado', { ascending: false }),
     sb.from('entregas_programadas').select('datos').order('creado', { ascending: false }),
     sb.from('parametros_mo').select('datos').eq('id', 1).maybeSingle(),
@@ -22,7 +21,6 @@ async function cargarDatosSupabase() {
   if (e5) console.warn('Tabla disenos_mezcla no disponible aún.');
   if (e6) console.warn('Tabla ensayos_calidad no disponible aún.');
   if (e7) console.warn('Tabla materia_prima no disponible aún.');
-  if (e8) console.warn('Tabla no_conformidades no disponible aún.');
   if (e9) console.warn('Tabla ajustes_mezcla no disponible aún.');
   if (e10) console.warn('Tabla entregas_programadas no disponible aún.');
   if (e11) console.warn('Tabla parametros_mo no disponible aún — corre sql/2026-07-26_costeo_mano_obra.sql en Supabase.');
@@ -36,7 +34,6 @@ async function cargarDatosSupabase() {
   DISENOS_MEZCLA = (disenos || []).filter(r => r.datos).map(r => _normalizarDiseno(r.datos));
   ENSAYOS_CALIDAD = (ensayos || []).filter(r => r.datos).map(r => r.datos);
   MATERIA_PRIMA = (mprima || []).filter(r => r.datos).map(r => r.datos);
-  NO_CONFORMIDADES = (nconf || []).filter(r => r.datos).map(r => r.datos);
   AJUSTES_MEZCLA = (ajustes || []).filter(r => r.datos).map(r => _normalizarAjuste(r.datos));
   VIAJES = (entregas || []).filter(r => r.datos).map(r => r.datos);
   PARAMETROS_MO = pmo?.datos || _defaultParametrosMO();
@@ -119,9 +116,6 @@ function rerenderPantallaActiva() {
     case 'pantalla-control-ensayos': renderEnsayosCalidad(); break;
     case 'pantalla-analisis-estadistico': renderAnalisisEstadistico(); break;
     case 'pantalla-materia-prima': renderMateriaPrima(); break;
-    case 'pantalla-no-conformidades': renderNoConformidades(); break;
-    case 'pantalla-certificados-calidad': renderCertificadosCalidad(); break;
-    case 'pantalla-trazabilidad': buscarTrazabilidad(); break;
     case 'pantalla-logistica': renderCalendarioLogistica(); break;
     case 'pantalla-logistica-estadisticas': renderEstadisticasLogistica(); break;
     case 'pantalla-costeo-mo': renderCosteoManoObra(); break;
@@ -173,11 +167,6 @@ async function recargarEnsayosRT() {
 async function recargarMateriaPrimaRT() {
   const { data } = await sb.from('materia_prima').select('datos').order('creado', { ascending: false });
   MATERIA_PRIMA = (data || []).filter(r => r.datos).map(r => r.datos);
-  rerenderPantallaActiva();
-}
-async function recargarNCRT() {
-  const { data } = await sb.from('no_conformidades').select('datos').order('creado', { ascending: false });
-  NO_CONFORMIDADES = (data || []).filter(r => r.datos).map(r => r.datos);
   rerenderPantallaActiva();
 }
 async function recargarAjustesRT() {
@@ -232,7 +221,6 @@ function suscribirRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'disenos_mezcla' },      () => _rtDebounce('disenos', recargarDisenosRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ensayos_calidad' },     () => _rtDebounce('ensayos', recargarEnsayosRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'materia_prima' },       () => _rtDebounce('materiaprima', recargarMateriaPrimaRT))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'no_conformidades' },    () => _rtDebounce('noconformidades', recargarNCRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ajustes_mezcla' },      () => _rtDebounce('ajustes', recargarAjustesRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'entregas_programadas' }, () => _rtDebounce('viajes', recargarViajesRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'parametros_mo' },        () => _rtDebounce('parametrosmo', recargarParametrosMoRT))

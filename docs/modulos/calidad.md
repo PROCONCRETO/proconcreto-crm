@@ -7,18 +7,19 @@ El más grande de la aplicación — control técnico de las mezclas de concreto
 - `js/calidad-mezclas.js` (732 líneas) — diseño de mezclas y control de ensayos
 - `js/calidad-ajuste-mezcla.js` (674 líneas) — ajustes de mezcla
 - `js/calidad-estadisticas.js` (462 líneas) — análisis estadístico
-- `js/calidad-trazabilidad.js` (433 líneas) — materia prima, trazabilidad y no conformidades
+- `js/calidad-materia-prima.js` — materia prima (única pantalla que quedó de las 4 que vivían en `js/calidad-trazabilidad.js`, ver nota de 2026-08-17 más abajo)
 - `js/compresor-pdf.js` — comprime PDFs pesados (informes de laboratorio) en el navegador antes de subirlos
 - `js/lector-informes.js` — lee el informe de laboratorio (PDF) en el navegador para autocompletar el modal de Ensayo
 
 ## Datos
 
-- Tablas Supabase: `disenos_mezcla`, `ensayos_calidad`, `materia_prima`, `no_conformidades`, `ajustes_mezcla`
+- Tablas Supabase: `disenos_mezcla`, `ensayos_calidad`, `materia_prima`, `ajustes_mezcla`
+- La tabla `no_conformidades` sigue existiendo en Supabase con sus datos intactos, pero la app ya no la consulta ni la muestra (ver nota de 2026-08-17 más abajo).
 - Bucket de Supabase Storage: `laboratorio-pdf` (privado) — informes de laboratorio en PDF adjuntos a un Ensayo (ver más abajo)
 
 ## Pantallas
 
-`diseno-mezcla`, `ajuste-mezcla`, `control-ensayos`, `analisis-estadistico`, `materia-prima`, `trazabilidad`, `no-conformidades`, `certificados-calidad`
+`diseno-mezcla`, `ajuste-mezcla`, `control-ensayos`, `analisis-estadistico`, `materia-prima`
 
 ## Diseño de Mezcla ↔ Costos de Referencia (2026-07-30)
 
@@ -86,13 +87,22 @@ Cada día se ajusta la mezcla por humedad (Ajuste Diario) y a ese ajuste se le a
 
 **`_cilindrosConEstado()` es la fuente única de la pantalla** (resumen y tabla) — antes se basaba solo en `ENSAYOS_CALIDAD`, así que un cilindro recién fundido sin ensayo creado todavía no aparecía en ningún lado. Ahora recorre `AJUSTES_MEZCLA` (todo lo que se fundió, la fuente real de qué cilindros existen) y para cada uno:
 
-- Si ya tiene un Ensayo de Calidad creado (cruce por `cilindroNo`), su estado sale de `calcularEstadoEnsayo()` de siempre (En curado/Cumple/No cumple) — esa función no se tocó, la sigue usando también Trazabilidad.
+- Si ya tiene un Ensayo de Calidad creado (cruce por `cilindroNo`), su estado sale de `calcularEstadoEnsayo()` de siempre (En curado/Cumple/No cumple) — esa función no se tocó.
 - Si **no** tiene ensayo creado, es una fila "virtual" (`_virtual: true`) armada a partir de su Ajuste Diario, y su estado depende de la **edad real** del cilindro (`_diasDesdeFecha(a.fecha)`, hoy − fecha fundida): **menos de 28 días → "En curado"** (normal, todavía no le toca romperse a los 28 días — antes esto contaba 0 porque "En curado" solo miraba ensayos ya creados sin resultado); **28 días o más → "Sin ensayo"** (a esa edad ya debería tener mínimo un ensayo creado, a pedido del usuario 2026-08-13).
 
 **5 tarjetas del resumen, todas filtros clickeables** (mismo patrón que Centro de Costos › Productos, `js/catalogo.js`) sobre el mismo `<select id="filtro-estado-ensayo">` que ya existía (ahora con una 4ta opción, "Sin ensayo"): **En curado**, **Cumple**, **No cumple**, **⚠️ Cilindros sin ensayo** y **Totalidad cilindros** (`_filtroEnsayosTodos()`, limpia todos los filtros para ver la lista completa sin restricciones). Un clic en una tarjeta de estado (`_filtroEnsayosEstado(estado)`) selecciona ese valor en el `<select>` (o lo quita si ya estaba seleccionado); se pinta en su color sólido mientras está activa. Como "Sin ensayo" es ahora un valor de estado más, no necesita un modo aparte — se filtra exactamente igual que los otros tres.
 
 Las filas virtuales comparten las mismas columnas de la tabla (cilindro, fecha, diseño, elemento, objetivo), con opacidad reducida para diferenciarlas a simple vista, y como única acción un botón **"✏️ Crear ensayo"** (en vez de Ver PDF/Editar/Eliminar, que no aplican sin un ensayo real) — `crearEnsayoDesdeCilindro()` abre "Nuevo Ensayo" con ese cilindro ya elegido y sus datos arrastrados del Ajuste Diario, igual que si se hubiera buscado el cilindro a mano en el formulario. Esto aplica tanto a cilindros "En curado" (por si se quiere registrar una rotura temprana, ej. 7 días, antes de los 28) como a los "Sin ensayo".
 
+## Materia Prima, Trazabilidad, No Conformidades y Certificados eran una sola pantalla activa (2026-08-17)
+
+Las 4 pantallas del subnav de Calidad (🧱 Materia Prima, 🔗 Trazabilidad, ⚠️ No Conformidades, 📋 Certificados) vivían todas en un único archivo, `js/calidad-trazabilidad.js`, aunque solo **Materia Prima** estaba realmente en uso — a pedido del usuario ("eliminemos estas ventanas de la ventana de calidad, que no están siendo utilizadas... conservemos la ventana de materia prima") se eliminaron las otras 3 y se dejó solo Materia Prima.
+
+- **Se quitó de la app**: las pantallas `pantalla-trazabilidad`, `pantalla-no-conformidades` y `pantalla-certificados-calidad`, sus botones del subnav, el modal `modal-nc`, y todo su código (`buscarTrazabilidad()`, `renderNoConformidades()`/`abrirModalNC()`/`editarNC()`/`guardarNC()`/`eliminarNC()`/`siguienteNumeroNC()`, `renderCertificadosCalidad()`/`verCertificadoCalidad()`/`descargarCertificadoCalidad()`) — recuperable solo desde el historial de git si hiciera falta en el futuro.
+- **Materia Prima se movió a su propio archivo**, `js/calidad-materia-prima.js`, sin ningún cambio de lógica (mismo CRUD contra la tabla `materia_prima`).
+- **La tabla Supabase `no_conformidades` y sus datos NO se tocaron** — a propósito, siguiendo el criterio de no borrar datos sin confirmación explícita del usuario. Solo se quitó el código que la leía/mostraba (`recargarNCRT()`, la suscripción realtime, la carga en `cargarDatosSupabase()`). Si algún día se necesita recuperar esos datos, siguen intactos en Supabase.
+- Trazabilidad y Certificados no tenían tabla propia — solo leían `ENSAYOS_CALIDAD`/`DISENOS_MEZCLA`/`ORDENES`/`AJUSTES_MEZCLA`, así que no queda ningún dato huérfano por su eliminación.
+
 ## Qué hace
 
-Gestiona el diseño técnico de cada mezcla de concreto, sus ajustes, los ensayos de calidad (resistencia, etc.), la trazabilidad de materia prima usada, el registro de no conformidades y la emisión de certificados de calidad para el cliente.
+Gestiona el diseño técnico de cada mezcla de concreto, sus ajustes, los ensayos de calidad (resistencia, etc.) y el registro de materia prima recibida.

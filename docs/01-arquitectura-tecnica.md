@@ -25,8 +25,8 @@ Tablas identificadas en el código (`js/datos-realtime.js` es el punto central q
 | `productos` | `catalogo.js` |
 | `disenos_mezcla` | `calidad-mezclas.js` |
 | `ensayos_calidad` | `calidad-mezclas.js` |
-| `materia_prima` | `calidad-trazabilidad.js` |
-| `no_conformidades` | `calidad-trazabilidad.js` |
+| `materia_prima` | `calidad-materia-prima.js` |
+| `no_conformidades` | (ninguno — tabla y datos se conservan en Supabase, pero la app ya no la consulta desde 2026-08-17, ver `docs/modulos/calidad.md`) |
 | `ajustes_mezcla` | `calidad-ajuste-mezcla.js` |
 | `entregas_programadas` | `logistica.js` |
 | `parametros_mo`, `clases_salariales`, `cuadrillas_productivas` | `costeo-mano-obra.js` — módulo Costeo, ver `docs/modulos/costeo.md`. Tablas nuevas (2026-07-26), hay que correr `sql/2026-07-26_costeo_mano_obra.sql` en Supabase antes de usarlas. |
