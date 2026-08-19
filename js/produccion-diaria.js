@@ -31,7 +31,7 @@ function renderProduccionDiaria() {
     </div>`;
 
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">📅</div><div>No hay producciones registradas${fFecha||q?' para este filtro':''}.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">📅</div><div>No hay producciones registradas${fFecha||q?' para este filtro':''}.</div></td></tr>`;
     return;
   }
   tbody.innerHTML = data.map(p => `
@@ -39,6 +39,7 @@ function renderProduccionDiaria() {
       <td style="font-weight:600">${p.fecha ? new Date(p.fecha+'T12:00').toLocaleDateString('es-CO') : '—'}</td>
       <td style="font-weight:600;color:var(--azul)">${_esc(p.producto) || '—'}</td>
       <td style="font-weight:700">${(Number(p.cantidad)||0).toLocaleString()} <span style="font-size:11px;color:var(--gris-medio);font-weight:400">${_esc(p.unidad) || 'ud'}</span></td>
+      ${_celdaCementoProduccion(p)}
       <td>${p.orden ? `<span style="font-size:11px;background:#E3F2FD;color:#1565C0;padding:2px 6px;border-radius:3px;font-weight:600">${_esc(p.orden)}</span>` : '—'}</td>
       <td>${_esc(p.responsable) || '—'}</td>
       <td style="color:var(--gris-medio);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${_esc(p.observaciones)}">${_esc(p.observaciones) || '—'}</td>
@@ -49,6 +50,32 @@ function renderProduccionDiaria() {
         </div>
       </td>
     </tr>`).join('');
+}
+
+// Consumo de cemento por producto: real registrado vs. teórico (kg/unidad del Costeo de
+// Producto guardado × cantidad producida, ver _cementoTeoricoPorUnidad() en
+// js/costeo-producto.js) — verde si está cerca del teórico, ámbar/rojo si se aleja, para
+// detectar sobreconsumo de un vistazo (2026-08-19, a pedido del usuario). Sin Costeo de
+// Producto guardado para ese producto, se muestra solo el real, sin comparación.
+function _celdaCementoProduccion(p) {
+  const real = Number(p.consumoCemento) || 0;
+  if (!(real > 0)) return '<td style="color:var(--gris-medio)">—</td>';
+  const bodegaLabel = p.bodegaCemento ? (_BODEGAS_CEMENTO[p.bodegaCemento] || p.bodegaCemento) : '';
+  const teoricoUnidad = typeof _cementoTeoricoPorUnidad === 'function' ? _cementoTeoricoPorUnidad(p.producto) : null;
+  const cantidad = Number(p.cantidad) || 0;
+  const teorico = (teoricoUnidad !== null && cantidad > 0) ? teoricoUnidad * cantidad : null;
+  let badge = '';
+  if (teorico > 0) {
+    const pct = ((real - teorico) / teorico) * 100;
+    const abs = Math.abs(pct);
+    const color = abs <= 10 ? '#2E7D32' : (abs <= 25 ? '#E65100' : '#C62828');
+    badge = `<div style="font-size:10px;font-weight:700;color:${color}">${pct >= 0 ? '+' : ''}${pct.toLocaleString('es-CO', { maximumFractionDigits: 1 })}% vs teórico</div>`;
+  }
+  return `<td>
+    <div style="font-weight:600">${real.toLocaleString('es-CO')} kg</div>
+    ${bodegaLabel ? `<div style="font-size:10px;color:var(--gris-medio)">${_esc(bodegaLabel)}</div>` : ''}
+    ${badge}
+  </td>`;
 }
 
 function poblarSelectProductos() {
@@ -89,6 +116,8 @@ function abrirModalProduccion() {
   const perfil = USUARIOS_CRM[USUARIO_ACTUAL?.email];
   document.getElementById('m-prod-responsable').value = perfil?.nombre || '';
   document.getElementById('m-prod-obs').value = '';
+  document.getElementById('m-prod-consumo-cemento').value = '';
+  document.getElementById('m-prod-bodega-cemento').value = '';
   document.getElementById('modal-produccion').classList.add('abierto');
 }
 
@@ -109,6 +138,8 @@ function editarProduccion(id) {
   document.getElementById('m-prod-orden').value = p.orden || '';
   document.getElementById('m-prod-responsable').value = p.responsable || '';
   document.getElementById('m-prod-obs').value = p.observaciones || '';
+  document.getElementById('m-prod-consumo-cemento').value = p.consumoCemento || '';
+  document.getElementById('m-prod-bodega-cemento').value = p.bodegaCemento || '';
   document.getElementById('modal-produccion').classList.add('abierto');
 }
 
@@ -129,6 +160,8 @@ function guardarProduccion() {
     orden: document.getElementById('m-prod-orden').value,
     responsable: document.getElementById('m-prod-responsable').value.trim(),
     observaciones: document.getElementById('m-prod-obs').value.trim(),
+    consumoCemento: parseFloat(document.getElementById('m-prod-consumo-cemento').value) || 0,
+    bodegaCemento: document.getElementById('m-prod-bodega-cemento').value || '',
     creadoPor: USUARIO_ACTUAL?.email,
     creadoEn: editId ? (PRODUCCIONES.find(x => String(x.id) === String(editId))?.creadoEn || new Date().toISOString()) : new Date().toISOString(),
   };

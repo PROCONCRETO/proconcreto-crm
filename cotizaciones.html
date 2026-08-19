@@ -92,6 +92,7 @@
   <button class="nav-btn activo" onclick="ir('ordenes-servicio')">📝 Órdenes de Producción</button>
   <button class="nav-btn" onclick="ir('produccion-diaria')">📅 Producción Diaria</button>
   <button class="nav-btn" onclick="ir('inventario')">📦 Inventario</button>
+  <button class="nav-btn" onclick="ir('materia-prima')">🧱 Materia Prima</button>
 </nav>
 
 <nav class="nav" id="subnav-logistica" style="display:none">
@@ -103,7 +104,6 @@
   <button class="nav-btn activo" onclick="ir('ajuste-mezcla')">🌡️ Ajuste Diario</button>
   <button class="nav-btn" onclick="ir('control-ensayos')">📐 Control de Ensayos</button>
   <button class="nav-btn" onclick="ir('analisis-estadistico')">📊 Análisis Estadístico</button>
-  <button class="nav-btn" onclick="ir('materia-prima')">🧱 Materia Prima</button>
   <button class="nav-btn" onclick="ir('diseno-mezcla')" style="margin-left:auto">🧪 Diseño de Mezcla</button>
 </nav>
 
@@ -603,6 +603,7 @@
           <th>FECHA</th>
           <th>PRODUCTO</th>
           <th>CANTIDAD</th>
+          <th>CEMENTO</th>
           <th>ORDEN PROD.</th>
           <th>RESPONSABLE</th>
           <th>OBSERVACIONES</th>
@@ -610,7 +611,7 @@
         </tr>
       </thead>
       <tbody id="produccion-body">
-        <tr><td colspan="7" class="empty-state"><div class="icono">📅</div><div>No hay producciones registradas.</div></td></tr>
+        <tr><td colspan="8" class="empty-state"><div class="icono">📅</div><div>No hay producciones registradas.</div></td></tr>
       </tbody>
     </table>
   </div>
@@ -645,6 +646,40 @@
       </thead>
       <tbody id="inventario-body">
         <tr><td colspan="7" class="empty-state"><div class="icono">📦</div><div>Sin existencias registradas. Registra producciones diarias para alimentar el inventario.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: MATERIA PRIMA
+═══════════════════════════════════════ -->
+<div id="pantalla-materia-prima" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Control de Materia Prima</div>
+    <div class="flex-gap">
+      <select id="filtro-tipo-mp" class="buscador-input" style="width:auto" onchange="renderMateriaPrima()">
+        <option value="">Todos los tipos</option>
+        <option value="Cemento">Cemento</option>
+        <option value="Arena">Arena</option>
+        <option value="Grava">Grava</option>
+        <option value="Agua">Agua</option>
+        <option value="Aditivo">Aditivo</option>
+        <option value="Otro">Otro</option>
+      </select>
+      <input type="text" id="buscar-materia-prima" class="buscador-input" placeholder="🔍 Buscar proveedor o lote..." oninput="renderMateriaPrima()">
+      <button class="btn btn-primario" onclick="abrirModalMateriaPrima()">+ Registrar Materia Prima</button>
+    </div>
+  </div>
+  <div style="font-size:13px;font-weight:700;color:var(--gris-medio);margin-bottom:8px">🧱 Inventario de Cemento por Bodega</div>
+  <div id="inventario-cemento-cards" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" id="tabla-materia-prima">
+      <thead><tr>
+        <th>TIPO</th><th>PROVEEDOR</th><th>LOTE</th><th>RECEPCIÓN</th><th>VENCIMIENTO</th><th style="text-align:right">CANTIDAD</th><th>ESTADO</th><th style="min-width:150px">ACCIONES</th>
+      </tr></thead>
+      <tbody id="materia-prima-body">
+        <tr><td colspan="8" class="empty-state"><div class="icono">🧱</div><div>No hay materia prima registrada.</div></td></tr>
       </tbody>
     </table>
   </div>
@@ -1109,38 +1144,6 @@
   </div>
   <div id="est-contenido"></div>
   <div id="est-acciones" style="display:flex;justify-content:flex-end;margin-top:14px"></div>
-</div>
-
-<!-- ═══════════════════════════════════════
-     PANTALLA: MATERIA PRIMA
-═══════════════════════════════════════ -->
-<div id="pantalla-materia-prima" class="pantalla">
-  <div class="acciones-row">
-    <div style="font-size:18px;font-weight:700;color:var(--azul)">Control de Materia Prima</div>
-    <div class="flex-gap">
-      <select id="filtro-tipo-mp" class="buscador-input" style="width:auto" onchange="renderMateriaPrima()">
-        <option value="">Todos los tipos</option>
-        <option value="Cemento">Cemento</option>
-        <option value="Arena">Arena</option>
-        <option value="Grava">Grava</option>
-        <option value="Agua">Agua</option>
-        <option value="Aditivo">Aditivo</option>
-        <option value="Otro">Otro</option>
-      </select>
-      <input type="text" id="buscar-materia-prima" class="buscador-input" placeholder="🔍 Buscar proveedor o lote..." oninput="renderMateriaPrima()">
-      <button class="btn btn-primario" onclick="abrirModalMateriaPrima()">+ Registrar Materia Prima</button>
-    </div>
-  </div>
-  <div class="card" style="padding:0;overflow:hidden">
-    <table class="tabla-cots" id="tabla-materia-prima">
-      <thead><tr>
-        <th>TIPO</th><th>PROVEEDOR</th><th>LOTE</th><th>RECEPCIÓN</th><th>VENCIMIENTO</th><th style="text-align:right">CANTIDAD</th><th>ESTADO</th><th style="min-width:150px">ACCIONES</th>
-      </tr></thead>
-      <tbody id="materia-prima-body">
-        <tr><td colspan="8" class="empty-state"><div class="icono">🧱</div><div>No hay materia prima registrada.</div></td></tr>
-      </tbody>
-    </table>
-  </div>
 </div>
 
 <div class="modal-overlay" id="modal-diseno">
@@ -1873,7 +1876,7 @@
     <input type="hidden" id="m-mp-id">
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Tipo *</label>
-        <select id="m-mp-tipo" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <select id="m-mp-tipo" onchange="_alCambiarTipoMateriaPrima()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
           <option value="Cemento">Cemento</option>
           <option value="Arena">Arena</option>
           <option value="Grava">Grava</option>
@@ -1882,9 +1885,26 @@
           <option value="Otro">Otro</option>
         </select>
       </div>
-      <div class="form-grupo"><label>Proveedor *</label><input type="text" id="m-mp-proveedor"></div>
+      <div class="form-grupo">
+        <label>Proveedor *</label>
+        <input type="text" id="m-mp-proveedor">
+        <select id="m-mp-proveedor-cemento" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;display:none">
+          <option value="">— Selecciona —</option>
+          <option value="ALION">ALION</option>
+          <option value="ARGOS">ARGOS</option>
+        </select>
+      </div>
     </div>
-    <div class="form-grupo" style="margin-bottom:10px"><label>Lote *</label><input type="text" id="m-mp-lote" placeholder="N° de lote o remisión"></div>
+    <div class="form-grupo" id="bloque-bodega-cemento-mp" style="margin-bottom:10px">
+      <label>Bodega *</label>
+      <select id="m-mp-bodega-cemento" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <option value="">— Selecciona —</option>
+        <option value="silo1">Silo 1 — Pretensados</option>
+        <option value="silo2">Silo 2 — Vibrocompactados</option>
+        <option value="bolsa">Cemento en bolsa</option>
+      </select>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px"><label>Lote</label><input type="text" id="m-mp-lote" placeholder="N° de lote o remisión (opcional)"></div>
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Fecha de recepción</label><input type="date" id="m-mp-fecha-recepcion"></div>
       <div class="form-grupo"><label>Fecha de vencimiento</label><input type="date" id="m-mp-fecha-vencimiento"></div>
@@ -2017,6 +2037,21 @@
     <div class="form-grupo" style="margin-bottom:10px">
       <label>Responsable / Turno</label>
       <input type="text" id="m-prod-responsable" placeholder="Nombre del responsable">
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo">
+        <label>Consumo total de cemento (kg)</label>
+        <input type="number" id="m-prod-consumo-cemento" placeholder="0" min="0" step="0.1">
+      </div>
+      <div class="form-grupo">
+        <label>Bodega</label>
+        <select id="m-prod-bodega-cemento" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="">— Selecciona —</option>
+          <option value="silo1">Silo 1 — Pretensados</option>
+          <option value="silo2">Silo 2 — Vibrocompactados</option>
+          <option value="bolsa">Cemento en bolsa</option>
+        </select>
+      </div>
     </div>
     <div class="form-grupo" style="margin-bottom:16px">
       <label>Observaciones</label>
@@ -2225,15 +2260,15 @@
 <script src="js/catalogo.js?v=20260804i"></script>
 <script src="js/navegacion.js?v=20260804b"></script>
 <script src="js/ordenes-produccion.js?v=20260804b"></script>
-<script src="js/produccion-diaria.js?v=20260804b"></script>
+<script src="js/produccion-diaria.js?v=20260819b"></script>
+<script src="js/produccion-materia-prima.js?v=20260819a"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
 <script src="js/costeo-mano-obra.js?v=20260809a"></script>
 <script src="js/costeo-maquinaria.js?v=20260804b"></script>
 <script src="js/costeo-referencia.js?v=20260809c"></script>
-<script src="js/costeo-producto.js?v=20260816a"></script>
+<script src="js/costeo-producto.js?v=20260819a"></script>
 <script src="js/calidad-mezclas.js?v=20260813b"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
-<script src="js/calidad-materia-prima.js?v=20260817a"></script>
 <script src="js/logistica.js?v=20260817a"></script>
 <script src="js/estadisticas-logistica.js?v=20260804c"></script>
 <script src="js/auth.js?v=20260804a"></script>

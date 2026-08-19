@@ -504,7 +504,7 @@ function calcularCosteoProducto(c) {
       const precio = _precioInsumoPorNombre(m[`${k}Producto`], productoGeneraIva, _UNIDAD_RECETA_MATERIAL[k]);
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo });
+      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo, esCemento: k === 'cemento' });
     });
     (m.agregados || []).forEach(a => {
       if (!((Number(a.volumen) || 0) > 0)) return;
@@ -632,7 +632,7 @@ function _calcularCosteoReforzado(c) {
       const precio = _precioInsumoPorNombre(m[`${k}Producto`], productoGeneraIva, _UNIDAD_RECETA_MATERIAL[k]);
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo });
+      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo, esCemento: k === 'cemento' });
     });
     (m.agregados || []).forEach(a => {
       if (!((Number(a.volumen) || 0) > 0)) return;
@@ -780,7 +780,7 @@ function _calcularCosteoPretensado(c) {
       const precio = _precioInsumoPorNombre(m[`${k}Producto`], productoGeneraIva, _UNIDAD_RECETA_MATERIAL[k]);
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo });
+      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo, esCemento: k === 'cemento' });
     });
     (m.agregados || []).forEach(a => {
       if (!((Number(a.volumen) || 0) > 0)) return;
@@ -1361,4 +1361,18 @@ function abrirDetalleCosteoProducto(codigo) {
   _pintarPrecioSugerido('detalle-costeo-precio', c, k, producto);
   document.getElementById('detalle-costeo-btn-aplicar').onclick = () => aplicarPreciosCatalogoDesdeDetalle(codigo);
   document.getElementById('modal-detalle-costeo').classList.add('abierto');
+}
+
+// Cemento teórico (kg) por unidad de un producto, según su Costeo de Producto guardado —
+// usado por Producción Diaria para comparar el consumo real de cemento contra este teórico
+// (control de consumo por producto, 2026-08-19). `null` si el producto no existe o no tiene
+// Costeo de Producto guardado — no es un error, simplemente no hay con qué comparar todavía.
+function _cementoTeoricoPorUnidad(productoNombre) {
+  const prod = CATALOGO.find(p => p.nombre === productoNombre);
+  if (!prod) return null;
+  const costeo = COSTEO_PRODUCTOS.find(c => c.productoCodigo === prod.codigo);
+  if (!costeo) return null;
+  const k = calcularCosteoProducto(costeo);
+  const filaCemento = k.materiaPrimaDetalle.find(f => f.esCemento);
+  return filaCemento ? filaCemento.cantidad : null;
 }

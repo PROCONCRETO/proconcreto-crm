@@ -7,19 +7,18 @@ El más grande de la aplicación — control técnico de las mezclas de concreto
 - `js/calidad-mezclas.js` (732 líneas) — diseño de mezclas y control de ensayos
 - `js/calidad-ajuste-mezcla.js` (674 líneas) — ajustes de mezcla
 - `js/calidad-estadisticas.js` (462 líneas) — análisis estadístico
-- `js/calidad-materia-prima.js` — materia prima (única pantalla que quedó de las 4 que vivían en `js/calidad-trazabilidad.js`, ver nota de 2026-08-17 más abajo)
 - `js/compresor-pdf.js` — comprime PDFs pesados (informes de laboratorio) en el navegador antes de subirlos
 - `js/lector-informes.js` — lee el informe de laboratorio (PDF) en el navegador para autocompletar el modal de Ensayo
 
 ## Datos
 
-- Tablas Supabase: `disenos_mezcla`, `ensayos_calidad`, `materia_prima`, `ajustes_mezcla`
+- Tablas Supabase: `disenos_mezcla`, `ensayos_calidad`, `ajustes_mezcla`
 - La tabla `no_conformidades` sigue existiendo en Supabase con sus datos intactos, pero la app ya no la consulta ni la muestra (ver nota de 2026-08-17 más abajo).
 - Bucket de Supabase Storage: `laboratorio-pdf` (privado) — informes de laboratorio en PDF adjuntos a un Ensayo (ver más abajo)
 
 ## Pantallas
 
-`diseno-mezcla`, `ajuste-mezcla`, `control-ensayos`, `analisis-estadistico`, `materia-prima`
+`diseno-mezcla`, `ajuste-mezcla`, `control-ensayos`, `analisis-estadistico`
 
 ## Diseño de Mezcla ↔ Costos de Referencia (2026-07-30)
 
@@ -99,10 +98,10 @@ Las filas virtuales comparten las mismas columnas de la tabla (cilindro, fecha, 
 Las 4 pantallas del subnav de Calidad (🧱 Materia Prima, 🔗 Trazabilidad, ⚠️ No Conformidades, 📋 Certificados) vivían todas en un único archivo, `js/calidad-trazabilidad.js`, aunque solo **Materia Prima** estaba realmente en uso — a pedido del usuario ("eliminemos estas ventanas de la ventana de calidad, que no están siendo utilizadas... conservemos la ventana de materia prima") se eliminaron las otras 3 y se dejó solo Materia Prima.
 
 - **Se quitó de la app**: las pantallas `pantalla-trazabilidad`, `pantalla-no-conformidades` y `pantalla-certificados-calidad`, sus botones del subnav, el modal `modal-nc`, y todo su código (`buscarTrazabilidad()`, `renderNoConformidades()`/`abrirModalNC()`/`editarNC()`/`guardarNC()`/`eliminarNC()`/`siguienteNumeroNC()`, `renderCertificadosCalidad()`/`verCertificadoCalidad()`/`descargarCertificadoCalidad()`) — recuperable solo desde el historial de git si hiciera falta en el futuro.
-- **Materia Prima se movió a su propio archivo**, `js/calidad-materia-prima.js`, sin ningún cambio de lógica (mismo CRUD contra la tabla `materia_prima`).
+- **Materia Prima se movió a su propio archivo**, `js/calidad-materia-prima.js`, sin ningún cambio de lógica (mismo CRUD contra la tabla `materia_prima`). **Nota (2026-08-19): la pantalla Materia Prima en sí se movió de Calidad a Producción** (`js/produccion-materia-prima.js`), ver `docs/modulos/produccion.md` — esta sección queda como registro histórico de por qué el archivo se llamó así.
 - **La tabla Supabase `no_conformidades` y sus datos NO se tocaron** — a propósito, siguiendo el criterio de no borrar datos sin confirmación explícita del usuario. Solo se quitó el código que la leía/mostraba (`recargarNCRT()`, la suscripción realtime, la carga en `cargarDatosSupabase()`). Si algún día se necesita recuperar esos datos, siguen intactos en Supabase.
 - Trazabilidad y Certificados no tenían tabla propia — solo leían `ENSAYOS_CALIDAD`/`DISENOS_MEZCLA`/`ORDENES`/`AJUSTES_MEZCLA`, así que no queda ningún dato huérfano por su eliminación.
 
 ## Qué hace
 
-Gestiona el diseño técnico de cada mezcla de concreto, sus ajustes, los ensayos de calidad (resistencia, etc.) y el registro de materia prima recibida.
+Gestiona el diseño técnico de cada mezcla de concreto, sus ajustes y los ensayos de calidad (resistencia, etc.). El registro de materia prima recibida vive ahora en Producción — ver `docs/modulos/produccion.md`.
