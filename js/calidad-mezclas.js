@@ -378,7 +378,7 @@ function guardarDiseno() {
     .then(({ error }) => { if (error) console.error('Error guardando diseño:', error.message); });
   cerrarModal('modal-diseno');
   renderDisenosMezcla();
-  _revisarImpactoPrecios(`Diseño de Mezcla "${codigo}" actualizado en Calidad`);
+  _revisarImpactoPrecios(`Diseño de Mezcla "${codigo}" actualizado en Calidad`, c => c.disenoMezclaCodigo === codigo);
 }
 
 function eliminarDiseno(id) {

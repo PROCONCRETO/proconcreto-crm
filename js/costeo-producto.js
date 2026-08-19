@@ -1004,8 +1004,15 @@ function aplicarPreciosCatalogoDesdeDetalle(codigo) {
 // precio de catálogo que verán las cotizaciones NUEVAS de aquí en adelante.
 let _impactoPreciosActual = [];
 
-function _costeosAfectadosPorCambio() {
-  return COSTEO_PRODUCTOS.map(c => {
+// `filtro(c)` acota a los costeos que de verdad dependen de lo que se acaba de guardar — sin
+// esto, cualquier costeo que ya estuviera desincronizado del catálogo por OTRO motivo (ej. un
+// precio de catálogo cargado a mano en la semilla, distinto del costo real) aparecía como si lo
+// hubiera causado el cambio actual, aunque no tuviera ninguna relación (bug real, reportado
+// 2026-08-19: guardar un Diseño de Mezcla nuevo, sin usar todavía en ningún producto, mostraba
+// "2 productos cambian de precio" de otros productos sin relación). Si no se pasa `filtro`, se
+// revisan todos — usarlo siempre que se sepa qué costeos pueden verse afectados de verdad.
+function _costeosAfectadosPorCambio(filtro) {
+  return COSTEO_PRODUCTOS.filter(c => !filtro || filtro(c)).map(c => {
     const producto = CATALOGO.find(p => p.codigo === c.productoCodigo);
     if (!producto) return null;
     const k = calcularCosteoProducto(c);
@@ -1016,10 +1023,30 @@ function _costeosAfectadosPorCambio() {
   }).filter(Boolean);
 }
 
+// Un costeo "usa" un insumo si aparece directo en su tabla de Insumos, o indirecto vía el
+// Diseño de Mezcla que tiene asignado (Cemento/Agua/Agregados/Adiciones/Aditivos), o vía los
+// insumos hardcodeados de Refuerzo (Acero Figurado/Alambre Dulce en Reforzado, Acero 5mm
+// Pretensionamiento en Pretensado — ver _calcularCosteoReforzado()/_calcularCosteoPretensado()).
+// `nombres` es un arreglo porque un insumo renombrado hay que buscarlo por el nombre nuevo Y el
+// anterior (los costeos ya guardados todavía referencian el nombre viejo hasta que alguien los
+// vuelva a guardar).
+function _costeoUsaInsumo(c, nombres) {
+  if ((c.insumos || []).some(r => nombres.includes(r.nombre))) return true;
+  const diseno = DISENOS_MEZCLA.find(d => d.codigo === c.disenoMezclaCodigo);
+  const m = diseno?.materiales || {};
+  if (nombres.includes(m.cementoProducto) || nombres.includes(m.aguaProducto)) return true;
+  if ((m.agregados || []).some(a => nombres.includes(a.producto))) return true;
+  if ((m.adiciones || []).some(a => nombres.includes(a.producto))) return true;
+  if ((m.aditivos || []).some(a => nombres.includes(a.producto))) return true;
+  if (c.tipoEstructura === 'reforzado' && (nombres.includes('Acero Figurado') || nombres.includes('Alambre Dulce'))) return true;
+  if (c.tipoEstructura === 'pretensado' && nombres.includes('Acero 5mm Pretensionamiento')) return true;
+  return false;
+}
+
 // Se llama al final de cada guardarX() que pueda mover un costo (insumo, máquina, cuadrilla,
 // nivel salarial, diseño de mezcla) — si ningún costeo cambió de precio no muestra nada.
-function _revisarImpactoPrecios(origenLabel) {
-  const afectados = _costeosAfectadosPorCambio();
+function _revisarImpactoPrecios(origenLabel, filtro) {
+  const afectados = _costeosAfectadosPorCambio(filtro);
   if (!afectados.length) return;
   _impactoPreciosActual = afectados;
   document.getElementById('impacto-precios-origen').textContent = origenLabel;

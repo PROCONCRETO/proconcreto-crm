@@ -263,7 +263,8 @@ function guardarInsumoCosto() {
   }
   cerrarModal('modal-insumo-costo');
   renderCosteoReferencia();
-  _revisarImpactoPrecios(`Insumo "${nombre}" actualizado en Costos de Referencia`);
+  const _nombresInsumo = [nombre, nombreAnterior].filter(Boolean);
+  _revisarImpactoPrecios(`Insumo "${nombre}" actualizado en Costos de Referencia`, c => _costeoUsaInsumo(c, _nombresInsumo));
 
   if (precioAnteriorAcero !== null && precioAnteriorAcero !== (Number(i.valorUnitario) || 0)) {
     _ofrecerActualizarVarillasAcero(i);

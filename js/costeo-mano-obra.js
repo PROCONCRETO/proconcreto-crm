@@ -416,7 +416,12 @@ function guardarClaseSalarial() {
   cerrarModal('modal-clase-salarial');
   renderClasesSalariales();
   renderCuadrillas();
-  _revisarImpactoPrecios(`Nivel salarial "${nombre}" actualizado en Costo de Mano de Obra`);
+  // Un nivel salarial no se referencia directo desde el costeo — hay que pasar primero por las
+  // cuadrillas que usan esta clase en alguno de sus roles (mismo criterio que ya usa
+  // eliminarClaseSalarial() para avisar si la clase está en uso).
+  const _nombresClase = [nombre, nombreAnterior].filter(Boolean);
+  const _cuadrillasAfectadas = CUADRILLAS_PRODUCTIVAS.filter(cu => (cu.roles || []).some(r => _nombresClase.includes(r.clase))).map(cu => cu.nombre);
+  _revisarImpactoPrecios(`Nivel salarial "${nombre}" actualizado en Costo de Mano de Obra`, c => (c.manoObra || []).some(m => _cuadrillasAfectadas.includes(m.nombre)));
 }
 
 function eliminarClaseSalarial(nombre) {
@@ -588,7 +593,8 @@ function guardarCuadrilla() {
   }
   cerrarModal('modal-cuadrilla');
   renderCuadrillas();
-  _revisarImpactoPrecios(`Cuadrilla "${nombre}" actualizada en Costo de Mano de Obra`);
+  const _nombresCuadrilla = [nombre, nombreAnterior].filter(Boolean);
+  _revisarImpactoPrecios(`Cuadrilla "${nombre}" actualizada en Costo de Mano de Obra`, c => (c.manoObra || []).some(m => _nombresCuadrilla.includes(m.nombre)));
 }
 
 function eliminarCuadrilla(nombre) {

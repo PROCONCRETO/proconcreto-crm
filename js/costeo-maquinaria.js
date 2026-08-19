@@ -231,7 +231,8 @@ function guardarMaquina() {
   }
   cerrarModal('modal-maquina');
   renderCosteoMaquinaria();
-  _revisarImpactoPrecios(`Máquina "${nombre}" actualizada en Maquinaria y Equipos`);
+  const _nombresMaquina = [nombre, nombreAnterior].filter(Boolean);
+  _revisarImpactoPrecios(`Máquina "${nombre}" actualizada en Maquinaria y Equipos`, c => (c.maquinas || []).some(m => _nombresMaquina.includes(m.nombre)));
 }
 
 function eliminarMaquina(nombre) {
