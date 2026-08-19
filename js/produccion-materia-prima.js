@@ -165,8 +165,16 @@ function eliminarMateriaPrima(id) {
 // pedir cemento — por eso el foco es stock actual + días de cobertura estimados, sin pedir un
 // umbral configurable.
 const _DIAS_VENTANA_CONSUMO_CEMENTO = 30;
-const _DIAS_COBERTURA_ALERTA_ROJA = 3;
-const _DIAS_COBERTURA_ALERTA_AMBAR = 7;
+// Escala de color por stock actual (kg), a pedido del usuario (2026-08-19) — más directa que
+// los días de cobertura para detectar una bodega baja: una bodega con poco consumo reciente
+// puede salir con muchos "días de cobertura" aunque el stock en kg ya sea crítico.
+const _KG_STOCK_ROJO = 15000;
+const _KG_STOCK_AMBAR = 30000;
+function _colorStockCemento(stock) {
+  if (stock <= _KG_STOCK_ROJO) return { bg: '#FFEBEE', fg: '#C62828' };
+  if (stock <= _KG_STOCK_AMBAR) return { bg: '#FFF3E0', fg: '#E65100' };
+  return { bg: '#E8F5E9', fg: '#2E7D32' };
+}
 
 function calcularInventarioCemento() {
   const inicioVentana = new Date();
@@ -195,17 +203,13 @@ function renderInventarioCemento() {
   const div = document.getElementById('inventario-cemento-cards');
   if (!div) return;
   div.innerHTML = calcularInventarioCemento().map(r => {
-    let color = 'var(--azul)';
-    if (r.diasCobertura !== null) {
-      if (r.diasCobertura <= _DIAS_COBERTURA_ALERTA_ROJA) color = '#C62828';
-      else if (r.diasCobertura <= _DIAS_COBERTURA_ALERTA_AMBAR) color = '#E65100';
-    }
+    const { bg, fg } = _colorStockCemento(r.stock);
     return `
-    <div style="background:white;border-radius:6px;padding:10px 14px;box-shadow:var(--sombra);border-top:3px solid ${color};min-width:190px">
-      <div style="font-size:11px;font-weight:700;color:${color};text-transform:uppercase">${_esc(r.label)}</div>
+    <div style="background:${bg};border-radius:6px;padding:10px 14px;box-shadow:var(--sombra);border-top:3px solid ${fg};min-width:190px">
+      <div style="font-size:11px;font-weight:700;color:${fg};text-transform:uppercase">${_esc(r.label)}</div>
       <div style="font-size:19px;font-weight:800;color:var(--gris-oscuro)">${r.stock.toLocaleString('es-CO', { maximumFractionDigits: 0 })} kg</div>
       <div style="font-size:11px;color:var(--gris-medio)">Consumo prom.: ${r.consumoPromedioDia.toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg/día (últimos ${_DIAS_VENTANA_CONSUMO_CEMENTO}d)</div>
-      <div style="font-size:11px;font-weight:700;color:${color}">${r.diasCobertura === null ? 'Sin consumo reciente' : `≈ ${r.diasCobertura.toLocaleString('es-CO', { maximumFractionDigits: 1 })} días de cobertura`}</div>
+      <div style="font-size:11px;font-weight:700;color:${fg}">${r.diasCobertura === null ? 'Sin consumo reciente' : `≈ ${r.diasCobertura.toLocaleString('es-CO', { maximumFractionDigits: 1 })} días de cobertura`}</div>
     </div>`;
   }).join('');
 }
