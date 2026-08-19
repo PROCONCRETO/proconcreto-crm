@@ -39,6 +39,8 @@ Dos niveles: `activarModulo(modulo)` cambia de módulo (Cotizaciones/Producción
 
 **Invariante importante**: cada rama de `activarModulo()` tiene que dejar activada la pantalla por defecto de ESE módulo (quitando `activa` de todas las `.pantalla` primero) — si un módulo nuevo no lo hace, al entrar desde otro módulo queda visible la pantalla del módulo anterior en vez de la propia (bug real, corregido 2026-07-17: al módulo Cotizaciones le faltaba este bloque, así que entrar desde Calidad/Logística/Producción dejaba la pantalla anterior en pantalla en vez de "Nueva Cotización").
 
+**Barras de navegación fijas al hacer scroll** (2026-08-19, a pedido del usuario): `.nav-top` (módulos) y `.nav` (subnav del módulo activo) usan `position: sticky` en `css/estilos.css` — `.nav-top` ancla en `top: 0`, `.nav` justo debajo en `top: 50px` (la altura fija de `.nav-top`), así ambas quedan siempre visibles sin taparse entre sí mientras se baja por una pantalla larga.
+
 ## Autenticación
 
 Supabase Auth con email/contraseña (`js/auth.js`): login, recuperación de contraseña por email, cambio de contraseña. Los usuarios del equipo y su rol/cargo (solo informativo, no de permisos) están hardcodeados en `USUARIOS_CRM` dentro de `js/config.js`. No hay control de acceso diferenciado por rol para la mayoría de módulos — cualquier cuenta autenticada los ve todos.
