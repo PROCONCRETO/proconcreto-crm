@@ -33,7 +33,7 @@ function renderMateriaPrima() {
   if (q) data = data.filter(m => ((m.proveedor || '') + ' ' + (m.lote || '')).toLowerCase().includes(q));
   data.sort((a, b) => (b.fechaRecepcion || '').localeCompare(a.fechaRecepcion || ''));
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">🧱</div><div>No hay materia prima registrada.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">🧱</div><div>No hay materia prima registrada.</div></td></tr>`;
     return;
   }
   const colorEstado = { 'Aprobado': '#2E7D32', 'Rechazado': '#C62828', 'Pendiente': '#E65100' };
@@ -45,6 +45,7 @@ function renderMateriaPrima() {
       <td style="font-family:monospace;font-size:12px">${m.lote || '—'}</td>
       <td>${m.fechaRecepcion ? new Date(m.fechaRecepcion + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
       <td>${m.fechaVencimiento ? new Date(m.fechaVencimiento + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
+      <td style="color:var(--gris-medio)">${m.bodegaCemento ? _esc(_BODEGAS_CEMENTO[m.bodegaCemento] || m.bodegaCemento) : '—'}</td>
       <td style="text-align:right">${(m.cantidad || 0).toLocaleString()} ${m.unidad || ''}</td>
       <td><span class="badge" style="background:${bgEstado[m.estado] || '#eee'};color:${colorEstado[m.estado] || '#333'}">${m.estado || 'Pendiente'}</span></td>
       <td>

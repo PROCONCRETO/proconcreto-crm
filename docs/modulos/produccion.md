@@ -31,6 +31,7 @@ La pantalla Materia Prima (recepciones de cemento, arena, grava, agua, aditivos.
 Junto con la mudanza, el usuario pidió 3 ajustes al formulario de registro:
 
 - **Lote ya no es obligatorio** — antes bloqueaba guardar junto con Proveedor; ahora solo Proveedor es obligatorio (`guardarMateriaPrima()`).
+- **Columna Bodega en la tabla general** (2026-08-20, a pedido del usuario): la tabla de Materia Prima (`renderMateriaPrima()`) muestra la Bodega de cada registro de Cemento (`_BODEGAS_CEMENTO[m.bodegaCemento]`) — "—" para el resto de tipos, que no tienen bodega.
 - **Proveedor de Cemento es un desplegable fijo** (`ALION`/`ARGOS`, `_PROVEEDORES_CEMENTO`) en vez de texto libre — solo cuando Tipo = Cemento (`_alCambiarTipoMateriaPrima()` alterna entre el `<select id="m-mp-proveedor-cemento">` y el `<input id="m-mp-proveedor">` de texto libre que se sigue usando para el resto de tipos, ya que no hay una lista fija confirmada para Arena/Grava/Aditivo). `guardarMateriaPrima()` lee del campo que esté visible según el tipo.
 - **Bodega** (`bodegaCemento`, antes llamada "Fuente/Silo" en la primera versión de este control — renombrada a pedido del usuario): mismo campo condicional que ya existía, solo cambió el nombre visible y el de la variable.
 
