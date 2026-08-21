@@ -247,9 +247,16 @@ function renderInventario() {
   const resumen = document.getElementById('inv-resumen');
   const q = (document.getElementById('buscar-inventario')?.value || '').toLowerCase();
   const grupo = document.getElementById('filtro-grupo-inv')?.value || '';
+  const fDesde = document.getElementById('filtro-fecha-desde-inv')?.value || '';
+  const fHasta = document.getElementById('filtro-fecha-hasta-inv')?.value || '';
 
   let data = calcularInventario();
   if (grupo) data = data.filter(r => r.grupo === grupo);
+  // Filtra por fecha de ÚLTIMA producción (no hay "fecha" propia en una fila de inventario —
+  // es un total acumulado, no un movimiento puntual) — sirve para ver qué referencias se
+  // produjeron (o no) por última vez dentro de una ventana, sin alterar el stock real mostrado.
+  if (fDesde) data = data.filter(r => (r.ultima || '') >= fDesde);
+  if (fHasta) data = data.filter(r => (r.ultima || '') <= fHasta);
   if (q) data = data.filter(r => r.producto.toLowerCase().includes(q));
   data.sort((a, b) => a.grupo.localeCompare(b.grupo) || a.producto.localeCompare(b.producto));
 
@@ -266,7 +273,7 @@ function renderInventario() {
     </div>`;
 
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">📦</div><div>Sin existencias${grupo||q?' para este filtro':''}. Registra producciones diarias para alimentar el inventario.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">📦</div><div>Sin existencias${grupo||q||fDesde||fHasta?' para este filtro':''}. Registra producciones diarias para alimentar el inventario.</div></td></tr>`;
     return;
   }
   tbody.innerHTML = data.map(r => {

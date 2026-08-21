@@ -28,12 +28,16 @@ function renderMateriaPrima() {
   if (!tbody) return;
   const q = (document.getElementById('buscar-materia-prima')?.value || '').toLowerCase();
   const fTipo = document.getElementById('filtro-tipo-mp')?.value || '';
+  const fDesde = document.getElementById('filtro-fecha-desde-mp')?.value || '';
+  const fHasta = document.getElementById('filtro-fecha-hasta-mp')?.value || '';
   let data = [...MATERIA_PRIMA];
   if (fTipo) data = data.filter(m => m.tipo === fTipo);
+  if (fDesde) data = data.filter(m => (m.fechaRecepcion || '') >= fDesde);
+  if (fHasta) data = data.filter(m => (m.fechaRecepcion || '') <= fHasta);
   if (q) data = data.filter(m => ((m.proveedor || '') + ' ' + (m.lote || '')).toLowerCase().includes(q));
   data.sort((a, b) => (b.fechaRecepcion || '').localeCompare(a.fechaRecepcion || ''));
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">🧱</div><div>No hay materia prima registrada.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">🧱</div><div>No hay materia prima registrada${fTipo||fDesde||fHasta||q ? ' para este filtro' : ''}.</div></td></tr>`;
     return;
   }
   const colorEstado = { 'Aprobado': '#2E7D32', 'Rechazado': '#C62828', 'Pendiente': '#E65100' };

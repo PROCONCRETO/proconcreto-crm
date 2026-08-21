@@ -559,7 +559,12 @@
   <div class="acciones-row">
     <div style="font-size:18px;font-weight:700;color:var(--azul)">Órdenes de Producción</div>
     <div class="flex-gap">
-      <input type="text" class="buscador-input" placeholder="🔍 Buscar orden..." oninput="filtrarOrdenes(this.value)">
+      <input type="date" id="filtro-fecha-desde-ordenes" class="buscador-input" style="width:auto" onchange="renderOrdenes()" title="Desde (fecha entrega)">
+      <input type="date" id="filtro-fecha-hasta-ordenes" class="buscador-input" style="width:auto" onchange="renderOrdenes()" title="Hasta (fecha entrega)">
+      <select id="filtro-grupo-ordenes" class="buscador-input" style="width:auto" onchange="renderOrdenes()">
+        <option value="">Todos los tipos de producto</option>
+      </select>
+      <input type="text" id="buscar-ordenes" class="buscador-input" placeholder="🔍 Buscar orden..." oninput="renderOrdenes()">
       <button class="btn btn-primario" onclick="abrirModalOrden()">+ Nueva Orden</button>
     </div>
   </div>
@@ -628,6 +633,8 @@
   <div class="acciones-row">
     <div style="font-size:18px;font-weight:700;color:var(--azul)">Inventario de Producto Terminado</div>
     <div class="flex-gap">
+      <input type="date" id="filtro-fecha-desde-inv" class="buscador-input" style="width:auto" onchange="renderInventario()" title="Desde (última producción)">
+      <input type="date" id="filtro-fecha-hasta-inv" class="buscador-input" style="width:auto" onchange="renderInventario()" title="Hasta (última producción)">
       <select id="filtro-grupo-inv" class="buscador-input" style="width:auto" onchange="renderInventario()">
         <option value="">Todos los grupos</option>
       </select>
@@ -662,6 +669,8 @@
   <div class="acciones-row">
     <div style="font-size:18px;font-weight:700;color:var(--azul)">Control de Materia Prima</div>
     <div class="flex-gap">
+      <input type="date" id="filtro-fecha-desde-mp" class="buscador-input" style="width:auto" onchange="renderMateriaPrima()" title="Desde (recepción)">
+      <input type="date" id="filtro-fecha-hasta-mp" class="buscador-input" style="width:auto" onchange="renderMateriaPrima()" title="Hasta (recepción)">
       <select id="filtro-tipo-mp" class="buscador-input" style="width:auto" onchange="renderMateriaPrima()">
         <option value="">Todos los tipos</option>
         <option value="Cemento">Cemento</option>
@@ -2263,9 +2272,9 @@
 <script src="js/config.js?v=20260804c"></script>
 <script src="js/catalogo.js?v=20260804i"></script>
 <script src="js/navegacion.js?v=20260804b"></script>
-<script src="js/ordenes-produccion.js?v=20260804b"></script>
-<script src="js/produccion-diaria.js?v=20260821a"></script>
-<script src="js/produccion-materia-prima.js?v=20260820a"></script>
+<script src="js/ordenes-produccion.js?v=20260821a"></script>
+<script src="js/produccion-diaria.js?v=20260821b"></script>
+<script src="js/produccion-materia-prima.js?v=20260821a"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
 <script src="js/costeo-mano-obra.js?v=20260819a"></script>
 <script src="js/costeo-maquinaria.js?v=20260819a"></script>

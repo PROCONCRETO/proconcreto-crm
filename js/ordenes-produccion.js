@@ -9,11 +9,46 @@ async function cargarOrdenes() {
   ORDENES = (data || []).filter(r => r.datos).map(r => r.datos);
 }
 
-function renderOrdenes(lista) {
-  const data = lista !== undefined ? lista : ORDENES;
+// Deriva los grupos (tipo de producto) de todas las órdenes registradas, cruzando cada renglón
+// (`_itemsDeOrden()`, en logistica.js — unifica el desglose por producto de una orden creada
+// desde cotización con la cantidad genérica de una orden creada a mano) contra el catálogo.
+function poblarFiltroGrupoOrdenes() {
+  const sel = document.getElementById('filtro-grupo-ordenes');
+  if (!sel) return;
+  const actual = sel.value;
+  const grupos = new Set();
+  ORDENES.forEach(o => {
+    (typeof _itemsDeOrden === 'function' ? _itemsDeOrden(o) : []).forEach(it => {
+      const grupo = PRODUCTOS.find(p => p.nombre === it.nombre)?.grupo;
+      if (grupo) grupos.add(grupo);
+    });
+  });
+  const lista = [...grupos].sort();
+  sel.innerHTML = '<option value="">Todos los tipos de producto</option>' + lista.map(g => `<option value="${_esc(g)}">${_esc(g)}</option>`).join('');
+  sel.value = actual;
+}
+
+function renderOrdenes() {
+  poblarFiltroGrupoOrdenes();
   const tbody = document.getElementById('ordenes-body');
+  const q = (document.getElementById('buscar-ordenes')?.value || '').toLowerCase();
+  const fDesde = document.getElementById('filtro-fecha-desde-ordenes')?.value || '';
+  const fHasta = document.getElementById('filtro-fecha-hasta-ordenes')?.value || '';
+  const fGrupo = document.getElementById('filtro-grupo-ordenes')?.value || '';
+
+  let data = [...ORDENES];
+  if (fDesde) data = data.filter(o => (o.fechaEntrega || '') >= fDesde);
+  if (fHasta) data = data.filter(o => (o.fechaEntrega || '') <= fHasta);
+  if (fGrupo) data = data.filter(o => (typeof _itemsDeOrden === 'function' ? _itemsDeOrden(o) : []).some(it => PRODUCTOS.find(p => p.nombre === it.nombre)?.grupo === fGrupo));
+  if (q) data = data.filter(o =>
+    (o.numero || '').toLowerCase().includes(q) ||
+    (o.cliente || '').toLowerCase().includes(q) ||
+    (o.descripcion || '').toLowerCase().includes(q)
+  );
+  const hayFiltro = fDesde || fHasta || fGrupo || q;
+
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">📝</div><div>No hay órdenes de servicio registradas.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">📝</div><div>No hay órdenes de servicio registradas${hayFiltro ? ' para este filtro' : ''}.</div></td></tr>`;
     return;
   }
   const colorOS = { 'Pendiente':'#E65100', 'En producción':'#1565C0', 'Listo':'#2E7D32', 'Despachado':'#00695C', 'Cancelado':'#C62828' };
@@ -45,15 +80,6 @@ function renderOrdenes(lista) {
         </div>
       </td>
     </tr>`).join('');
-}
-
-function filtrarOrdenes(q) {
-  const res = ORDENES.filter(o =>
-    o.numero?.toLowerCase().includes(q.toLowerCase()) ||
-    o.cliente?.toLowerCase().includes(q.toLowerCase()) ||
-    o.descripcion?.toLowerCase().includes(q.toLowerCase())
-  );
-  renderOrdenes(res);
 }
 
 function abrirModalOrden() {
