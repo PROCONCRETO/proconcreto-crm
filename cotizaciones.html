@@ -558,15 +558,15 @@
 <div id="pantalla-ordenes-servicio" class="pantalla">
   <div class="acciones-row">
     <div style="font-size:18px;font-weight:700;color:var(--azul)">Órdenes de Producción</div>
-    <div class="flex-gap">
-      <input type="date" id="filtro-fecha-desde-ordenes" class="buscador-input" style="width:auto" onchange="renderOrdenes()" title="Desde (fecha entrega)">
-      <input type="date" id="filtro-fecha-hasta-ordenes" class="buscador-input" style="width:auto" onchange="renderOrdenes()" title="Hasta (fecha entrega)">
-      <select id="filtro-grupo-ordenes" class="buscador-input" style="width:auto" onchange="renderOrdenes()">
-        <option value="">Todos los tipos de producto</option>
-      </select>
-      <input type="text" id="buscar-ordenes" class="buscador-input" placeholder="🔍 Buscar orden..." oninput="renderOrdenes()">
-      <button class="btn btn-primario" onclick="abrirModalOrden()">+ Nueva Orden</button>
-    </div>
+    <button class="btn btn-primario" onclick="abrirModalOrden()">+ Nueva Orden</button>
+  </div>
+  <div class="flex-gap" style="margin-bottom:16px">
+    <input type="date" id="filtro-fecha-desde-ordenes" class="buscador-input" style="width:auto" onchange="renderOrdenes()" title="Desde (fecha entrega)">
+    <input type="date" id="filtro-fecha-hasta-ordenes" class="buscador-input" style="width:auto" onchange="renderOrdenes()" title="Hasta (fecha entrega)">
+    <select id="filtro-grupo-ordenes" class="buscador-input" style="width:auto" onchange="renderOrdenes()">
+      <option value="">Todos los tipos de producto</option>
+    </select>
+    <input type="text" id="buscar-ordenes" class="buscador-input" placeholder="🔍 Buscar orden..." oninput="renderOrdenes()">
   </div>
   <div class="card" style="padding:0;overflow:hidden">
     <table class="tabla-cots" id="tabla-ordenes">
@@ -594,15 +594,15 @@
 <div id="pantalla-produccion-diaria" class="pantalla">
   <div class="acciones-row">
     <div style="font-size:18px;font-weight:700;color:var(--azul)">Registro de Producción Diaria</div>
-    <div class="flex-gap">
-      <input type="date" id="filtro-fecha-desde-prod" class="buscador-input" style="width:auto" onchange="renderProduccionDiaria()" title="Desde">
-      <input type="date" id="filtro-fecha-hasta-prod" class="buscador-input" style="width:auto" onchange="renderProduccionDiaria()" title="Hasta">
-      <select id="filtro-grupo-prod" class="buscador-input" style="width:auto" onchange="renderProduccionDiaria()">
-        <option value="">Todos los tipos de producto</option>
-      </select>
-      <input type="text" id="buscar-produccion" class="buscador-input" placeholder="🔍 Buscar producto o responsable..." oninput="renderProduccionDiaria()">
-      <button class="btn btn-primario" onclick="abrirModalProduccion()">+ Registrar Producción</button>
-    </div>
+    <button class="btn btn-primario" onclick="abrirModalProduccion()">+ Registrar Producción</button>
+  </div>
+  <div class="flex-gap" style="margin-bottom:16px">
+    <input type="date" id="filtro-fecha-desde-prod" class="buscador-input" style="width:auto" onchange="renderProduccionDiaria()" title="Desde">
+    <input type="date" id="filtro-fecha-hasta-prod" class="buscador-input" style="width:auto" onchange="renderProduccionDiaria()" title="Hasta">
+    <select id="filtro-grupo-prod" class="buscador-input" style="width:auto" onchange="renderProduccionDiaria()">
+      <option value="">Todos los tipos de producto</option>
+    </select>
+    <input type="text" id="buscar-produccion" class="buscador-input" placeholder="🔍 Buscar producto o responsable..." oninput="renderProduccionDiaria()">
   </div>
   <div id="prod-diaria-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
   <div class="card" style="padding:0;overflow:hidden">
@@ -632,14 +632,14 @@
 <div id="pantalla-inventario" class="pantalla">
   <div class="acciones-row">
     <div style="font-size:18px;font-weight:700;color:var(--azul)">Inventario de Producto Terminado</div>
-    <div class="flex-gap">
-      <input type="date" id="filtro-fecha-desde-inv" class="buscador-input" style="width:auto" onchange="renderInventario()" title="Desde (última producción)">
-      <input type="date" id="filtro-fecha-hasta-inv" class="buscador-input" style="width:auto" onchange="renderInventario()" title="Hasta (última producción)">
-      <select id="filtro-grupo-inv" class="buscador-input" style="width:auto" onchange="renderInventario()">
-        <option value="">Todos los grupos</option>
-      </select>
-      <input type="text" id="buscar-inventario" class="buscador-input" placeholder="🔍 Buscar producto..." oninput="renderInventario()">
-    </div>
+  </div>
+  <div class="flex-gap" style="margin-bottom:16px">
+    <input type="date" id="filtro-fecha-desde-inv" class="buscador-input" style="width:auto" onchange="renderInventario()" title="Desde (última producción)">
+    <input type="date" id="filtro-fecha-hasta-inv" class="buscador-input" style="width:auto" onchange="renderInventario()" title="Hasta (última producción)">
+    <select id="filtro-grupo-inv" class="buscador-input" style="width:auto" onchange="renderInventario()">
+      <option value="">Todos los grupos</option>
+    </select>
+    <input type="text" id="buscar-inventario" class="buscador-input" placeholder="🔍 Buscar producto..." oninput="renderInventario()">
   </div>
   <div id="inv-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
   <div class="card" style="padding:0;overflow:hidden">
@@ -668,21 +668,21 @@
 <div id="pantalla-materia-prima" class="pantalla">
   <div class="acciones-row">
     <div style="font-size:18px;font-weight:700;color:var(--azul)">Control de Materia Prima</div>
-    <div class="flex-gap">
-      <input type="date" id="filtro-fecha-desde-mp" class="buscador-input" style="width:auto" onchange="renderMateriaPrima()" title="Desde (recepción)">
-      <input type="date" id="filtro-fecha-hasta-mp" class="buscador-input" style="width:auto" onchange="renderMateriaPrima()" title="Hasta (recepción)">
-      <select id="filtro-tipo-mp" class="buscador-input" style="width:auto" onchange="renderMateriaPrima()">
-        <option value="">Todos los tipos</option>
-        <option value="Cemento">Cemento</option>
-        <option value="Arena">Arena</option>
-        <option value="Grava">Grava</option>
-        <option value="Agua">Agua</option>
-        <option value="Aditivo">Aditivo</option>
-        <option value="Otro">Otro</option>
-      </select>
-      <input type="text" id="buscar-materia-prima" class="buscador-input" placeholder="🔍 Buscar proveedor o lote..." oninput="renderMateriaPrima()">
-      <button class="btn btn-primario" onclick="abrirModalMateriaPrima()">+ Registrar Materia Prima</button>
-    </div>
+    <button class="btn btn-primario" onclick="abrirModalMateriaPrima()">+ Registrar Materia Prima</button>
+  </div>
+  <div class="flex-gap" style="margin-bottom:16px">
+    <input type="date" id="filtro-fecha-desde-mp" class="buscador-input" style="width:auto" onchange="renderMateriaPrima()" title="Desde (recepción)">
+    <input type="date" id="filtro-fecha-hasta-mp" class="buscador-input" style="width:auto" onchange="renderMateriaPrima()" title="Hasta (recepción)">
+    <select id="filtro-tipo-mp" class="buscador-input" style="width:auto" onchange="renderMateriaPrima()">
+      <option value="">Todos los tipos</option>
+      <option value="Cemento">Cemento</option>
+      <option value="Arena">Arena</option>
+      <option value="Grava">Grava</option>
+      <option value="Agua">Agua</option>
+      <option value="Aditivo">Aditivo</option>
+      <option value="Otro">Otro</option>
+    </select>
+    <input type="text" id="buscar-materia-prima" class="buscador-input" placeholder="🔍 Buscar proveedor o lote..." oninput="renderMateriaPrima()">
   </div>
   <div style="font-size:13px;font-weight:700;color:var(--gris-medio);margin-bottom:8px">🧱 Inventario de Cemento por Bodega</div>
   <div id="inventario-cemento-cards" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
