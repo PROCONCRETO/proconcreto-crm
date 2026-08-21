@@ -3,17 +3,33 @@
 // ═══════════════════════════════
 let PRODUCCIONES = [];
 
+function poblarFiltroGrupoProd() {
+  const sel = document.getElementById('filtro-grupo-prod');
+  if (!sel) return;
+  const actual = sel.value;
+  const grupos = [...new Set(PRODUCCIONES.map(p => p.grupo))].filter(Boolean).sort();
+  sel.innerHTML = '<option value="">Todos los tipos de producto</option>' + grupos.map(g => `<option value="${_esc(g)}">${_esc(g)}</option>`).join('');
+  sel.value = actual;
+}
+
 function renderProduccionDiaria() {
+  poblarFiltroGrupoProd();
   const tbody = document.getElementById('produccion-body');
   const resumen = document.getElementById('prod-diaria-resumen');
   const q = (document.getElementById('buscar-produccion')?.value || '').toLowerCase();
-  const fFecha = document.getElementById('filtro-fecha-prod')?.value || '';
+  const fDesde = document.getElementById('filtro-fecha-desde-prod')?.value || '';
+  const fHasta = document.getElementById('filtro-fecha-hasta-prod')?.value || '';
+  const fGrupo = document.getElementById('filtro-grupo-prod')?.value || '';
 
   let data = [...PRODUCCIONES];
-  if (fFecha) data = data.filter(p => p.fecha === fFecha);
+  if (fDesde) data = data.filter(p => (p.fecha || '') >= fDesde);
+  if (fHasta) data = data.filter(p => (p.fecha || '') <= fHasta);
+  if (fGrupo) data = data.filter(p => p.grupo === fGrupo);
   if (q) data = data.filter(p => (p.producto || '').toLowerCase().includes(q) || (p.responsable || '').toLowerCase().includes(q));
   // Orden: más reciente primero
   data.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.creadoEn || '').localeCompare(a.creadoEn || ''));
+
+  const hayFiltro = fDesde || fHasta || fGrupo || q;
 
   // Resumen
   const hoy = new Date().toISOString().split('T')[0];
@@ -25,13 +41,13 @@ function renderProduccionDiaria() {
       <div style="font-size:18px;font-weight:800;color:var(--gris-oscuro)">${totalHoy.toLocaleString()} ud</div>
     </div>
     <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--azul);min-width:140px">
-      <div style="font-size:10px;font-weight:700;color:var(--azul);text-transform:uppercase">${fFecha || q ? 'Filtrado' : 'Total registros'}</div>
+      <div style="font-size:10px;font-weight:700;color:var(--azul);text-transform:uppercase">${hayFiltro ? 'Filtrado' : 'Total registros'}</div>
       <div style="font-size:18px;font-weight:800;color:var(--gris-oscuro)">${totalMostrado.toLocaleString()} ud</div>
       <div style="font-size:11px;color:var(--gris-medio)">${data.length} registro${data.length===1?'':'s'}</div>
     </div>`;
 
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">📅</div><div>No hay producciones registradas${fFecha||q?' para este filtro':''}.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">📅</div><div>No hay producciones registradas${hayFiltro ? ' para este filtro' : ''}.</div></td></tr>`;
     return;
   }
   tbody.innerHTML = data.map(p => `

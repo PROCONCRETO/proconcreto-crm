@@ -50,3 +50,12 @@ El usuario pidió llevar control del cemento como insumo, con dos objetivos: (1)
 
 - **Real vs. teórico**: la tabla de Producción Diaria muestra, en la columna "Cemento", el consumo real registrado y — si ese producto tiene un Costeo de Producto guardado — el % de variación contra el teórico (`_celdaCementoProduccion()`, usa `_cementoTeoricoPorUnidad(producto)` de `js/costeo-producto.js`, que recalcula el Costeo guardado de ese producto y lee la cantidad de la fila de Materia Prima marcada `esCemento: true`, kg por unidad × cantidad producida = teórico total). Verde si la variación es ≤10%, ámbar ≤25%, rojo por encima — para detectar sobreconsumo de un vistazo. Sin Costeo de Producto guardado para ese producto, se muestra solo el real, sin badge de comparación (no bloquea nada — hoy solo una parte del catálogo tiene Costeo guardado).
 - `_cementoTeoricoPorUnidad()` funciona para los 3 tipos de estructura de Costeo (Vibrocompactado/Reforzado/Pretensado) porque el flag `esCemento` se agregó en los 3 `_MATERIALES_COSTEO_PESO.forEach()` que arman `materiaPrimaDetalle` — cambio puramente aditivo, no afecta ningún cálculo existente.
+
+## Filtros de Producción Diaria (2026-08-21)
+
+A pedido del usuario, la pantalla ganó filtros para revisar el histórico sin tener que scrollear todo `PRODUCCIONES`:
+
+- **Rango de fechas** (`filtro-fecha-desde-prod`/`filtro-fecha-hasta-prod`, ambos opcionales) — reemplaza al filtro de un solo día que había antes (`filtro-fecha-prod`). Sugerido como mejora natural sobre lo pedido: un registro de producción se suele revisar por semana/mes, no día por día.
+- **Tipo de producto** (`filtro-grupo-prod`, dropdown) — filtra por `p.grupo` (el mismo campo `grupo` del catálogo que ya trae cada registro, ver `guardarProduccion()`). Poblado dinámicamente (`poblarFiltroGrupoProd()`) solo con los grupos que de verdad aparecen en `PRODUCCIONES` — mismo patrón que `poblarFiltroGrupoInv()` (Inventario de Producto Terminado, mismo archivo).
+- **Producto/Responsable** (`buscar-produccion`, texto libre) — ya existía, sin cambios de comportamiento (busca coincidencia parcial en `producto` o `responsable`); solo se ajustó el placeholder para que diga explícitamente que también busca por responsable.
+- Los 4 filtros son acumulables (se aplican todos los que tengan valor a la vez) y siguen alimentando el mismo resumen "Filtrado" / "Total registros" de arriba de la tabla.

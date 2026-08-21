@@ -590,8 +590,12 @@
   <div class="acciones-row">
     <div style="font-size:18px;font-weight:700;color:var(--azul)">Registro de Producción Diaria</div>
     <div class="flex-gap">
-      <input type="date" id="filtro-fecha-prod" class="buscador-input" style="width:auto" onchange="renderProduccionDiaria()" title="Filtrar por fecha">
-      <input type="text" id="buscar-produccion" class="buscador-input" placeholder="🔍 Buscar producto..." oninput="renderProduccionDiaria()">
+      <input type="date" id="filtro-fecha-desde-prod" class="buscador-input" style="width:auto" onchange="renderProduccionDiaria()" title="Desde">
+      <input type="date" id="filtro-fecha-hasta-prod" class="buscador-input" style="width:auto" onchange="renderProduccionDiaria()" title="Hasta">
+      <select id="filtro-grupo-prod" class="buscador-input" style="width:auto" onchange="renderProduccionDiaria()">
+        <option value="">Todos los tipos de producto</option>
+      </select>
+      <input type="text" id="buscar-produccion" class="buscador-input" placeholder="🔍 Buscar producto o responsable..." oninput="renderProduccionDiaria()">
       <button class="btn btn-primario" onclick="abrirModalProduccion()">+ Registrar Producción</button>
     </div>
   </div>
@@ -2260,7 +2264,7 @@
 <script src="js/catalogo.js?v=20260804i"></script>
 <script src="js/navegacion.js?v=20260804b"></script>
 <script src="js/ordenes-produccion.js?v=20260804b"></script>
-<script src="js/produccion-diaria.js?v=20260819b"></script>
+<script src="js/produccion-diaria.js?v=20260821a"></script>
 <script src="js/produccion-materia-prima.js?v=20260820a"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
 <script src="js/costeo-mano-obra.js?v=20260819a"></script>
