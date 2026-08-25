@@ -77,28 +77,65 @@ function renderCosteoMaquinaria() {
   const body = document.getElementById('maquinaria-body');
   if (!body) return;
   if (!MAQUINARIA_EQUIPOS.length) {
-    body.innerHTML = `<tr><td colspan="5" class="empty-state"><div class="icono">🔧</div><div>No hay máquinas ni equipos registrados.</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="icono">🔧</div><div>No hay máquinas ni equipos registrados.</div></td></tr>`;
     return;
   }
+  // MAQUINARIA_EQUIPOS ya llega ordenado por `orden` (_normalizarOrdenLista(), ver
+  // js/datos-realtime.js) — el handle de arrastre reordena el arreglo real, no una copia local.
   body.innerHTML = MAQUINARIA_EQUIPOS.map(m => {
     const c = calcularCostoMaquina(m);
     const vidaTexto = m.baseVidaUtil === 'usos'
       ? `${(Number(m.usosTotal) || 0).toLocaleString('es-CO')} usos`
       : `${m.vidaUtilAnos || 0} años`;
+    const nombreEsc = _escNombreOnclick(m.nombre);
     return `
-    <tr>
+    <tr ondragover="permitirSoltarMaquina(event)" ondragleave="quitarResaltadoSoltarMaquina(event)" ondrop="soltarMaquinaSobreMaquina(event,'${nombreEsc}')">
+      <td style="text-align:center"><span class="drag-handle" draggable="true" ondragstart="iniciarArrastreMaquina(event,'${nombreEsc}')" ondragend="terminarArrastreMaquina(event)" title="Arrastra para reordenar">☰</span></td>
       <td style="font-weight:600">${_esc(m.nombre)}</td>
       <td><span style="display:inline-block;background:var(--gris-claro);color:var(--gris-medio);font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">${_labelUnidadUso(m.unidadUso)}</span></td>
       <td style="font-size:12px;color:var(--gris-medio)">${vidaTexto}</td>
       <td style="text-align:right;font-weight:700;color:var(--azul)">${_fmtMaq(c.costoUnidad)}</td>
       <td>
         <div class="flex-gap">
-          <button class="btn btn-primario btn-xs" onclick="editarMaquina('${_escNombreOnclick(m.nombre)}')">✏️</button>
-          <button class="btn btn-rojo btn-xs" onclick="eliminarMaquina('${_escNombreOnclick(m.nombre)}')">🗑️</button>
+          <button class="btn btn-primario btn-xs" onclick="editarMaquina('${nombreEsc}')">✏️</button>
+          <button class="btn btn-rojo btn-xs" onclick="eliminarMaquina('${nombreEsc}')">🗑️</button>
         </div>
       </td>
     </tr>`;
   }).join('');
+}
+
+// ── Reordenar por arrastre (mismo patrón que Logística, ver js/config.js) ──
+let _maquinaArrastradaNombre = null;
+function iniciarArrastreMaquina(event, nombre) {
+  _maquinaArrastradaNombre = nombre;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', nombre);
+  event.currentTarget.closest('tr')?.classList.add('fila-arrastrando');
+}
+function terminarArrastreMaquina(event) {
+  event.currentTarget.closest('tr')?.classList.remove('fila-arrastrando');
+  _maquinaArrastradaNombre = null;
+}
+function permitirSoltarMaquina(event) {
+  if (!_maquinaArrastradaNombre) return;
+  event.preventDefault();
+  event.currentTarget.classList.add('fila-dragover');
+}
+function quitarResaltadoSoltarMaquina(event) {
+  event.currentTarget.classList.remove('fila-dragover');
+}
+function soltarMaquinaSobreMaquina(event, nombreDestino) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('fila-dragover');
+  if (!_maquinaArrastradaNombre) return;
+  const origen = _maquinaArrastradaNombre;
+  _maquinaArrastradaNombre = null;
+  const resultado = _reordenarPorArrastre(MAQUINARIA_EQUIPOS, origen, nombreDestino, x => x.nombre,
+    m => sb.from('maquinaria_equipos').upsert({ nombre: m.nombre, datos: m, modificado: new Date().toISOString() }, { onConflict: 'nombre' })
+      .then(({ error }) => { if (error) console.error('Error guardando orden de máquina:', error.message); }));
+  renderCosteoMaquinaria();
+  return resultado;
 }
 
 function _elegirBaseVidaUtilMaquina(base) {

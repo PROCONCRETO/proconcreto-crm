@@ -15,6 +15,39 @@ function _esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// ── Reordenamiento manual (arrastrar y soltar) ──
+// Mismo patrón que `viaje.orden`/`soltarViajeSobreViaje()` en js/logistica.js, generalizado
+// para reutilizar en Costos de Referencia, Maquinaria y Equipos, y Costeo de Producto
+// (2026-08-21, a pedido del usuario: poder ordenar estas listas manualmente con un handle de
+// arrastre, "de acuerdo al avance" de su trabajo, en vez del orden alfabético/de creación).
+
+// Rellena `orden` en los ítems que no lo tengan todavía (con su posición de llegada, mismo
+// criterio que Logística usa con el id/timestamp como respaldo) y ordena la lista por ese
+// campo — se llama cada vez que se cargan/recargan estas listas (cargarDatosSupabase() y cada
+// recargarXRT() en js/datos-realtime.js), igual que _normalizarDiseno()/_normalizarAjuste().
+function _normalizarOrdenLista(lista) {
+  lista.forEach((x, i) => { if (x.orden === undefined || x.orden === null) x.orden = i; });
+  lista.sort((a, b) => a.orden - b.orden);
+  return lista;
+}
+
+// Mueve el ítem `claveArrastrada` a la posición de `claveDestino` DENTRO de `lista` (el
+// arreglo completo, no una vista filtrada — así el resultado es consistente aunque haya un
+// buscador/filtro activo en ese momento) y renumera `orden` de todo el arreglo (0..n-1), igual
+// que soltarViajeSobreViaje() en js/logistica.js. `claveFn` obtiene la clave única de una fila;
+// `guardarFila` persiste una fila en Supabase (debe devolver una Promise).
+function _reordenarPorArrastre(lista, claveArrastrada, claveDestino, claveFn, guardarFila) {
+  if (claveArrastrada === claveDestino) return;
+  const idxA = lista.findIndex(x => claveFn(x) === claveArrastrada);
+  if (idxA < 0) return;
+  const [item] = lista.splice(idxA, 1);
+  const idxB = lista.findIndex(x => claveFn(x) === claveDestino);
+  if (idxB < 0) { lista.splice(idxA, 0, item); return; } // destino no encontrado, revertir
+  lista.splice(idxB, 0, item);
+  lista.forEach((x, i) => { x.orden = i; });
+  return Promise.all(lista.map(guardarFila));
+}
+
 const USUARIOS_CRM = {
   'jose.escobar@proconcreto.com.co':      { nombre: 'Jose Pablo Escobar Mejia',      cargo: 'Gerente Técnico',       cel: '+57 301 623 9733' },
   'maria.escobar@proconcreto.com.co':     { nombre: 'Maria Alejandra Escobar Mejia', cargo: 'Gerente Administrativa', cel: '+57 311 635 1086' },

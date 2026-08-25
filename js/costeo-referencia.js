@@ -63,13 +63,22 @@ function _listaUnificadaCostos() {
   });
   (INSUMOS_COSTOS || []).forEach(i => {
     const c = calcularCostoInsumo(i);
-    lista.push({ categoria: i.categoria, nombre: i.nombre, unidad: _labelUnidadInsumo(i.unidad), costoSinIva: c.costoSinIva, costoConIva: c.valorFinal, soloLectura: false, modificado: i._modificado });
+    lista.push({ categoria: i.categoria, nombre: i.nombre, unidad: _labelUnidadInsumo(i.unidad), costoSinIva: c.costoSinIva, costoConIva: c.valorFinal, soloLectura: false, modificado: i._modificado, orden: i.orden });
   });
   // Orden fijo pedido por el usuario (2026-08-09), sin importar en qué orden se hayan creado:
-  // Materia Prima, Insumo/CIF, Mano de Obra, Maquinaria. Array.sort es estable en los motores
-  // modernos, así que dentro de cada categoría se conserva el orden con el que ya venía.
+  // Materia Prima, Insumo/CIF, Mano de Obra, Maquinaria — esta parte no se toca. DENTRO de
+  // Materia Prima/Insumo-CIF sí se puede reordenar a mano (2026-08-21, arrastre con handle
+  // ☰ en la tabla, ver renderCosteoReferencia()) — por eso, solo esas 2 categorías usan
+  // `orden` como desempate; Mano de Obra/Maquinaria (soloLectura aquí, se editan en sus propias
+  // pantallas) mantienen su orden de origen tal cual, gracias a que Array.sort es estable.
   const ORDEN_LISTADO = { materia_prima: 0, insumo_cif: 1, mano_obra: 2, maquinaria: 3 };
-  lista.sort((a, b) => ORDEN_LISTADO[a.categoria] - ORDEN_LISTADO[b.categoria]);
+  const _CATS_CON_ORDEN_MANUAL = new Set(['materia_prima', 'insumo_cif']);
+  lista.sort((a, b) => {
+    const catDiff = ORDEN_LISTADO[a.categoria] - ORDEN_LISTADO[b.categoria];
+    if (catDiff !== 0) return catDiff;
+    if (_CATS_CON_ORDEN_MANUAL.has(a.categoria)) return (a.orden ?? 0) - (b.orden ?? 0);
+    return 0;
+  });
   return lista;
 }
 
@@ -91,7 +100,7 @@ function renderCosteoReferencia() {
   const body = document.getElementById('referencia-costos-body');
   if (!body) return;
   if (!filtradas.length) {
-    body.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">📑</div><div>No hay ítems para este filtro.</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">📑</div><div>No hay ítems para este filtro.</div></td></tr>`;
     return;
   }
   body.innerHTML = filtradas.map(x => {
@@ -107,8 +116,13 @@ function renderCosteoReferencia() {
           <button class="btn btn-primario btn-xs" onclick="editarInsumoCosto('${nombreEsc}')">✏️</button>
           <button class="btn btn-rojo btn-xs" onclick="eliminarInsumoCosto('${nombreEsc}')">🗑️</button>
         </div>`;
+    // El handle de arrastre solo aparece en Materia Prima/Insumo-CIF (las filas que de verdad
+    // viven en INSUMOS_COSTOS) — Mano de Obra/Maquinaria son un espejo de solo lectura de otras
+    // pantallas, su orden se controla desde allá (ver _listaUnificadaCostos() más arriba).
+    const handle = x.soloLectura ? '' : `<span class="drag-handle" draggable="true" ondragstart="iniciarArrastreInsumo(event,'${nombreEsc}')" ondragend="terminarArrastreInsumo(event)" title="Arrastra para reordenar">☰</span>`;
     return `
-    <tr>
+    <tr ondragover="permitirSoltarInsumo(event)" ondragleave="quitarResaltadoSoltarInsumo(event)" ondrop="soltarInsumoSobreInsumo(event,'${nombreEsc}')">
+      <td style="text-align:center">${handle}</td>
       <td><span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap;background:${cat.bg};color:${cat.fg}">${cat.label}</span></td>
       <td style="font-weight:600">${_esc(x.nombre)}</td>
       <td><span style="display:inline-block;background:var(--gris-claro);color:var(--gris-medio);font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">${_esc(x.unidad)}</span></td>
@@ -118,6 +132,42 @@ function renderCosteoReferencia() {
       <td>${acciones}</td>
     </tr>`;
   }).join('');
+}
+
+// ── Reordenar por arrastre (mismo patrón que Logística, ver js/config.js) — solo aplica a
+// filas editables de esta pantalla (Materia Prima/Insumo-CIF, backadas por INSUMOS_COSTOS). ──
+let _insumoArrastradoNombre = null;
+function iniciarArrastreInsumo(event, nombre) {
+  _insumoArrastradoNombre = nombre;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', nombre);
+  event.currentTarget.closest('tr')?.classList.add('fila-arrastrando');
+}
+function terminarArrastreInsumo(event) {
+  event.currentTarget.closest('tr')?.classList.remove('fila-arrastrando');
+  _insumoArrastradoNombre = null;
+}
+function permitirSoltarInsumo(event) {
+  if (!_insumoArrastradoNombre) return;
+  event.preventDefault();
+  event.currentTarget.classList.add('fila-dragover');
+}
+function quitarResaltadoSoltarInsumo(event) {
+  event.currentTarget.classList.remove('fila-dragover');
+}
+function soltarInsumoSobreInsumo(event, nombreDestino) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('fila-dragover');
+  if (!_insumoArrastradoNombre) return;
+  const origen = _insumoArrastradoNombre;
+  _insumoArrastradoNombre = null;
+  // Si el destino es una fila de solo lectura (Mano de Obra/Maquinaria), no existe en
+  // INSUMOS_COSTOS — _reordenarPorArrastre() no encuentra el destino y no hace nada.
+  const resultado = _reordenarPorArrastre(INSUMOS_COSTOS, origen, nombreDestino, x => x.nombre,
+    i => sb.from('insumos_costos').upsert({ nombre: i.nombre, datos: i, modificado: new Date().toISOString() }, { onConflict: 'nombre' })
+      .then(({ error }) => { if (error) console.error('Error guardando orden de insumo:', error.message); }));
+  renderCosteoReferencia();
+  return resultado;
 }
 
 function _filtrarCategoriaReferencia(cat) {

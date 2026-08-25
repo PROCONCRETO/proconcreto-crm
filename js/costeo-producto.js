@@ -1085,16 +1085,22 @@ function renderCosteoProductos() {
   let data = [...COSTEO_PRODUCTOS];
   if (q) data = data.filter(c => (c.productoCodigo + ' ' + c.productoNombre).toLowerCase().includes(q));
   if (fTipo) data = data.filter(c => c.tipoEstructura === fTipo);
-  data.sort((a, b) => a.productoNombre.localeCompare(b.productoNombre));
+  // Orden manual (2026-08-21, a pedido del usuario, reemplaza el alfabético de antes) — se
+  // aplica DESPUÉS del filtro de búsqueda/tipo, así que buscar/filtrar sigue funcionando igual.
+  // COSTEO_PRODUCTOS ya llega ordenado por `orden` (_normalizarOrdenLista(), ver
+  // js/datos-realtime.js) — Productos (js/catalogo.js, _ordenCosteo) hereda este mismo orden
+  // porque lee directo del arreglo global, sin volver a ordenar por su cuenta.
+  data.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="icono">🏗️</div><div>No hay costeos de producto registrados.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">🏗️</div><div>No hay costeos de producto registrados.</div></td></tr>`;
     return;
   }
   tbody.innerHTML = data.map(c => {
     const k = calcularCosteoProducto(c);
     const tipo = TIPOS_ESTRUCTURA_COSTEO[c.tipoEstructura] || TIPOS_ESTRUCTURA_COSTEO.vibrocompactado;
     const nombreEsc = _escNombreOnclick(c.productoCodigo);
-    return `<tr>
+    return `<tr ondragover="permitirSoltarCosteoProducto(event)" ondragleave="quitarResaltadoSoltarCosteoProducto(event)" ondrop="soltarCosteoProductoSobreCosteoProducto(event,'${nombreEsc}')">
+      <td style="text-align:center"><span class="drag-handle" draggable="true" ondragstart="iniciarArrastreCosteoProducto(event,'${nombreEsc}')" ondragend="terminarArrastreCosteoProducto(event)" title="Arrastra para reordenar">☰</span></td>
       <td style="font-weight:600">${_esc(c.productoNombre)}</td>
       <td><span class="badge-tipo" style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:600;background:${tipo.bg};color:${tipo.fg}">${tipo.label}</span></td>
       <td style="text-align:right;font-weight:700;color:var(--azul)">${_fmtCosteoProd(k.totalUnidad)}</td>
@@ -1112,6 +1118,41 @@ function renderCosteoProductos() {
 }
 
 function _filtrarCosteoProductos() { renderCosteoProductos(); }
+
+// ── Reordenar por arrastre (mismo patrón que Logística, ver js/config.js) — opera sobre
+// COSTEO_PRODUCTOS completo, no la vista filtrada `data`, así que sigue siendo consistente
+// aunque haya un buscador/filtro de tipo activo en ese momento. ──
+let _costeoProductoArrastradoCodigo = null;
+function iniciarArrastreCosteoProducto(event, codigo) {
+  _costeoProductoArrastradoCodigo = codigo;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', codigo);
+  event.currentTarget.closest('tr')?.classList.add('fila-arrastrando');
+}
+function terminarArrastreCosteoProducto(event) {
+  event.currentTarget.closest('tr')?.classList.remove('fila-arrastrando');
+  _costeoProductoArrastradoCodigo = null;
+}
+function permitirSoltarCosteoProducto(event) {
+  if (!_costeoProductoArrastradoCodigo) return;
+  event.preventDefault();
+  event.currentTarget.classList.add('fila-dragover');
+}
+function quitarResaltadoSoltarCosteoProducto(event) {
+  event.currentTarget.classList.remove('fila-dragover');
+}
+function soltarCosteoProductoSobreCosteoProducto(event, codigoDestino) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('fila-dragover');
+  if (!_costeoProductoArrastradoCodigo) return;
+  const origen = _costeoProductoArrastradoCodigo;
+  _costeoProductoArrastradoCodigo = null;
+  const resultado = _reordenarPorArrastre(COSTEO_PRODUCTOS, origen, codigoDestino, x => x.productoCodigo,
+    c => sb.from('costeo_productos').upsert({ producto_codigo: c.productoCodigo, datos: c, modificado: new Date().toISOString() }, { onConflict: 'producto_codigo' })
+      .then(({ error }) => { if (error) console.error('Error guardando orden de costeo de producto:', error.message); }));
+  renderCosteoProductos();
+  return resultado;
+}
 
 function abrirModalCosteoProducto() {
   document.getElementById('m-costeo-producto-codigo-anterior').value = '';

@@ -39,9 +39,9 @@ async function cargarDatosSupabase() {
   PARAMETROS_MO = pmo?.datos || _defaultParametrosMO();
   CLASES_SALARIALES = (clasesMo || []).filter(r => r.datos).map(r => r.datos);
   CUADRILLAS_PRODUCTIVAS = (cuadrillas || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
-  MAQUINARIA_EQUIPOS = (maquinas || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
-  INSUMOS_COSTOS = (insumos || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
-  COSTEO_PRODUCTOS = (costeoProd || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
+  MAQUINARIA_EQUIPOS = _normalizarOrdenLista((maquinas || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado })));
+  INSUMOS_COSTOS = _normalizarOrdenLista((insumos || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado })));
+  COSTEO_PRODUCTOS = _normalizarOrdenLista((costeoProd || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado })));
 
   // Catálogo de productos desde Supabase (con auto-siembra la primera vez)
   await cargarCatalogo();
@@ -196,17 +196,17 @@ async function recargarCuadrillasRT() {
 }
 async function recargarMaquinariaRT() {
   const { data } = await sb.from('maquinaria_equipos').select('datos, modificado').order('creado', { ascending: true });
-  MAQUINARIA_EQUIPOS = (data || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
+  MAQUINARIA_EQUIPOS = _normalizarOrdenLista((data || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado })));
   rerenderPantallaActiva();
 }
 async function recargarInsumosCostosRT() {
   const { data } = await sb.from('insumos_costos').select('datos, modificado').order('creado', { ascending: true });
-  INSUMOS_COSTOS = (data || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
+  INSUMOS_COSTOS = _normalizarOrdenLista((data || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado })));
   rerenderPantallaActiva();
 }
 async function recargarCosteoProductosRT() {
   const { data } = await sb.from('costeo_productos').select('datos, modificado').order('creado', { ascending: true });
-  COSTEO_PRODUCTOS = (data || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
+  COSTEO_PRODUCTOS = _normalizarOrdenLista((data || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado })));
   rerenderPantallaActiva();
 }
 

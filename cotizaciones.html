@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260819a">
+<link rel="stylesheet" href="css/estilos.css?v=20260821a">
 </head>
 <body>
 
@@ -946,14 +946,15 @@
   <div class="card" style="padding:0;overflow:hidden">
     <table class="tabla-cots" id="tabla-maquinaria" style="table-layout:fixed">
       <thead><tr>
-        <th style="width:34%">MÁQUINA / EQUIPO</th>
+        <th style="width:4%"></th>
+        <th style="width:30%">MÁQUINA / EQUIPO</th>
         <th style="width:14%">UNIDAD DE USO</th>
         <th style="width:16%">VIDA ÚTIL</th>
         <th style="width:16%;text-align:right">COSTO/UNIDAD</th>
         <th style="width:20%">ACCIONES</th>
       </tr></thead>
       <tbody id="maquinaria-body">
-        <tr><td colspan="5" class="empty-state"><div class="icono">🔧</div><div>No hay máquinas ni equipos registrados.</div></td></tr>
+        <tr><td colspan="6" class="empty-state"><div class="icono">🔧</div><div>No hay máquinas ni equipos registrados.</div></td></tr>
       </tbody>
     </table>
   </div>
@@ -989,8 +990,9 @@
   <div class="card" style="padding:0;overflow:hidden">
     <table class="tabla-cots" style="table-layout:fixed">
       <thead><tr>
+        <th style="width:4%"></th>
         <th style="width:14%">CATEGORÍA</th>
-        <th style="width:21%">ÍTEM</th>
+        <th style="width:17%">ÍTEM</th>
         <th style="width:7%">UNIDAD</th>
         <th style="width:12%;text-align:right">COSTO SIN IVA</th>
         <th style="width:12%;text-align:right">COSTO CON IVA</th>
@@ -998,7 +1000,7 @@
         <th style="width:21%">ORIGEN / ACCIONES</th>
       </tr></thead>
       <tbody id="referencia-costos-body">
-        <tr><td colspan="7" class="empty-state"><div class="icono">📑</div><div>No hay ítems para este filtro.</div></td></tr>
+        <tr><td colspan="8" class="empty-state"><div class="icono">📑</div><div>No hay ítems para este filtro.</div></td></tr>
       </tbody>
     </table>
   </div>
@@ -1029,7 +1031,8 @@
   <div class="card" style="padding:0;overflow:hidden">
     <table class="tabla-cots" style="table-layout:fixed">
       <thead><tr>
-        <th style="width:34%">PRODUCTO</th>
+        <th style="width:4%"></th>
+        <th style="width:30%">PRODUCTO</th>
         <th style="width:14%">TIPO</th>
         <th style="width:12%;text-align:right">COSTO/UNIDAD</th>
         <th style="width:14%">DISEÑO DE MEZCLA</th>
@@ -1037,7 +1040,7 @@
         <th style="width:14%">ACCIONES</th>
       </tr></thead>
       <tbody id="costeo-producto-body">
-        <tr><td colspan="6" class="empty-state"><div class="icono">🏗️</div><div>No hay costeos de producto registrados.</div></td></tr>
+        <tr><td colspan="7" class="empty-state"><div class="icono">🏗️</div><div>No hay costeos de producto registrados.</div></td></tr>
       </tbody>
     </table>
   </div>
@@ -2269,7 +2272,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.0" integrity="sha384-De+l/Df7qym5QBDVocD3+gW1S7IjR3epf+6KbRDjB3FCCzM/LqVTwqckT6FhFar8" crossorigin="anonymous"></script>
-<script src="js/config.js?v=20260804c"></script>
+<script src="js/config.js?v=20260821a"></script>
 <script src="js/catalogo.js?v=20260804i"></script>
 <script src="js/navegacion.js?v=20260804b"></script>
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
@@ -2277,15 +2280,15 @@
 <script src="js/produccion-materia-prima.js?v=20260821a"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
 <script src="js/costeo-mano-obra.js?v=20260819a"></script>
-<script src="js/costeo-maquinaria.js?v=20260819a"></script>
-<script src="js/costeo-referencia.js?v=20260819a"></script>
-<script src="js/costeo-producto.js?v=20260819b"></script>
+<script src="js/costeo-maquinaria.js?v=20260821a"></script>
+<script src="js/costeo-referencia.js?v=20260821a"></script>
+<script src="js/costeo-producto.js?v=20260821a"></script>
 <script src="js/calidad-mezclas.js?v=20260819a"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
 <script src="js/logistica.js?v=20260817a"></script>
 <script src="js/estadisticas-logistica.js?v=20260804c"></script>
 <script src="js/auth.js?v=20260804a"></script>
-<script src="js/datos-realtime.js?v=20260804b"></script>
+<script src="js/datos-realtime.js?v=20260821a"></script>
 <script src="js/cotizador.js?v=20260814c"></script>
 <script src="js/historico-clientes-stats.js?v=20260809a"></script>
 <script src="js/retenciones.js?v=20260809c"></script>

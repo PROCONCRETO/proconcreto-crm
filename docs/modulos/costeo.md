@@ -259,6 +259,54 @@ Guardar un insumo, una máquina, una cuadrilla, un nivel salarial o un Diseño d
   - **Nivel salarial** (`js/costeo-mano-obra.js`): no se referencia directo desde el costeo — primero se buscan las cuadrillas que usan esa clase en algún rol (`CUADRILLAS_PRODUCTIVAS`, mismo criterio que ya usa `eliminarClaseSalarial()` para avisar si está en uso), y de ahí los costeos que usan esas cuadrillas.
   - **Insumo** (`js/costeo-referencia.js`): `_costeoUsaInsumo(c, nombres)` (`js/costeo-producto.js`) — cubre uso directo (tabla de Insumos del costeo) e indirecto vía el Diseño de Mezcla asignado (Cemento/Agua/Agregados/Adiciones/Aditivos) y vía los insumos hardcodeados de Refuerzo ("Acero Figurado"/"Alambre Dulce" en Reforzado, "Acero 5mm Pretensionamiento" en Pretensado).
 
+## Reordenamiento manual — Costos de Referencia, Maquinaria, Costeo de Producto (2026-08-21)
+
+A pedido del usuario ("darle un orden de acuerdo al avance"), estas 3 pantallas ganaron un
+handle de arrastre (☰) para reordenar sus filas a mano, reemplazando/complementando el orden
+que traían antes. Mismo patrón de drag-and-drop HTML5 nativo (sin librerías) que ya usa
+Logística (`viaje.orden`/`soltarViajeSobreViaje()` en `js/logistica.js`), generalizado en dos
+funciones compartidas en `js/config.js`:
+
+- **`_normalizarOrdenLista(lista)`**: rellena `orden` en los ítems que no lo tengan todavía (con
+  su posición de llegada, mismo respaldo que usa Logística con el id/timestamp) y ordena la
+  lista por ese campo. Se llama en `js/datos-realtime.js` cada vez que se cargan/recargan
+  `MAQUINARIA_EQUIPOS`, `INSUMOS_COSTOS` y `COSTEO_PRODUCTOS` (`cargarDatosSupabase()` y cada
+  `recargarXRT()` correspondiente) — mismo criterio que `_normalizarDiseno()`/
+  `_normalizarAjuste()`.
+- **`_reordenarPorArrastre(lista, claveArrastrada, claveDestino, claveFn, guardarFila)`**: mueve
+  un ítem a la posición de otro DENTRO del arreglo completo (nunca de una vista filtrada — el
+  resultado es consistente aunque haya un buscador/filtro activo) y renumera `orden` de todo el
+  arreglo (0..n-1), igual que `soltarViajeSobreViaje()`. Cada pantalla trae sus propias 5
+  funciones de arrastre (`iniciarArrastreX`/`terminarArrastreX`/`permitirSoltarX`/
+  `quitarResaltadoSoltarX`/`soltarXSobreX`) que solo arman el `guardarFila` (un upsert de esa
+  fila) y llaman a esta función compartida.
+- `orden` vive dentro de `datos` (JSONB) de cada fila, igual que `viaje.orden` — sin migración
+  de base de datos.
+- **Amortización de Maquinaria y Equipos**: reordena `MAQUINARIA_EQUIPOS` directo — antes no
+  ordenaba nada (orden de llegada de Supabase).
+- **Costos de Referencia**: el orden **fijo por categoría** (Materia Prima → Insumo/CIF → Mano
+  de Obra → Maquinaria, decisión 2026-08-09, sin tocar) sigue siendo la clave primaria del sort
+  en `_listaUnificadaCostos()` — el arrastre solo decide la posición DENTRO de Materia
+  Prima/Insumo-CIF (las únicas categorías con `orden` propio, backadas por `INSUMOS_COSTOS`). El
+  handle **no aparece** en las filas de Mano de Obra/Maquinaria (`soloLectura:true` en esta
+  pantalla — son un espejo de otras pantallas) — su orden se controla desde donde de verdad
+  viven (Maquinaria y Equipos con este mismo cambio; Cuadrillas Productivas no fue pedido, sigue
+  con su orden de llegada).
+- **Costeo de Producto**: `renderCosteoProductos()` pasó de ordenar alfabético por nombre a
+  ordenar por `orden` — se aplica después del filtro de búsqueda/tipo existente, así que
+  buscar/filtrar sigue funcionando igual.
+- **Productos hereda el orden de Costeo de Producto, sin tocar `js/catalogo.js`**: esa pantalla
+  ya priorizaba "tiene Costeo de Producto" primero (`_ordenCosteo`, un `Map` armado directo
+  desde el arreglo global `COSTEO_PRODUCTOS`, tal como llega) — como `COSTEO_PRODUCTOS` ahora
+  siempre queda físicamente ordenado por `orden` (tanto al cargar como después de cada
+  arrastre, que muta el arreglo en el sitio), esa herencia ya existente empieza a reflejar el
+  orden manual solo, sin ningún cambio en `catalogo.js`.
+- **Fuera de alcance, a propósito**: sin flechas ▲▼ como mecanismo alternativo (Logística sí las
+  tiene) — el usuario describió específicamente el handle de arrastre. Sin reordenar Mano de
+  Obra/Maquinaria desde Costos de Referencia (son de solo lectura ahí). Sin renumeración masiva
+  en Supabase — el backfill de `orden` es perezoso (en memoria, al cargar) y el primer arrastre
+  real de cada pantalla es lo que persiste valores limpios por primera vez.
+
 ### Pendiente (no bloquea el uso de Vibrocompactados, Reforzados ni Pretensados)
 
 - Pretensados Moldeados — ni empezado. Requiere revisar `BD MEZCLA AMOBLAMIENTO` en el Excel (probablemente otra estructura distinta a la de banco de pretensado).
