@@ -197,12 +197,17 @@ function _elegirTipoEstructuraCosteo(tipo) {
   const mpExtraWrap = document.getElementById('costeo-mp-extra-wrap');
   if (mpExtraWrap) mpExtraWrap.style.display = esPretensado ? '' : 'none';
   // Columnas "Bancos/día" (Máquinas y Mano de Obra) y "× hilo" (Máquinas) solo tienen sentido
-  // para Pretensado — el resto de tipos reparte con un único "unidades/día" de línea, sin
-  // rendimiento por fila.
+  // para Pretensado, que reparte por banco. Vibrocompactado/Reforzado tienen su propia columna
+  // por fila equivalente en Mano de Obra, "Unidades/día" (2026-08-25, a pedido del usuario: "hay
+  // mano de obra que se pone adicional para procesos complementarios que debemos darles un
+  // rendimiento diario [propio]" — antes TODA la mano de obra de la línea repartía contra el
+  // mismo "unidades/día" de línea, sin poder anularlo fila por fila, ver más abajo).
   ['costeo-maq-th-banco', 'costeo-maq-th-hilo', 'costeo-mo-th-banco'].forEach(id => {
     const th = document.getElementById(id);
     if (th) th.style.display = esPretensado ? '' : 'none';
   });
+  const thUnidadesDia = document.getElementById('costeo-mo-th-unidades-dia');
+  if (thUnidadesDia) thUnidadesDia.style.display = esPretensado ? 'none' : '';
   if (hintRendimiento) hintRendimiento.textContent = esPretensado
     ? 'Metros lineales/banco, Hilos/banco y Longitud bruta del hilo son datos reales de la colada — con ellos se calcula solo el Acero de Pretensionamiento. Bancos/día es el rendimiento por defecto de toda la línea; cada cuadrilla o máquina lo puede anular más abajo si tiene un ritmo real distinto.'
     : esReforzado
@@ -223,6 +228,12 @@ function _elegirTipoEstructuraCosteo(tipo) {
     }
     renderMaquinasCosteo();
     renderManoObraCosteo();
+    // Sin condición, a diferencia del bloque de arriba — el aviso de "Por estiba no aplica a
+    // este tipo" (ver renderInsumosCosteo()) depende de `m-costeo-tipo`, así que tiene que
+    // volver a pintarse cada vez que cambia el tipo (incluida la primera vez que se abre un
+    // costeo existente para editar, antes de esto `m-costeo-tipo` todavía no tenía el valor
+    // correcto cuando editarCosteoProducto() llamó a renderInsumosCosteo() por su cuenta).
+    renderInsumosCosteo();
     _actualizarResumenCosteo();
   }
 }
@@ -395,7 +406,7 @@ function renderManoObraCosteo() {
   if (!tbody) return;
   const esPretensado = document.getElementById('m-costeo-tipo')?.value === 'pretensado';
   if (!_manoObraCosteoActual.length) {
-    tbody.innerHTML = `<tr><td colspan="${esPretensado ? 5 : 4}" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las cuadrillas de la línea de producción</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las cuadrillas de la línea de producción</td></tr>`;
     return;
   }
   tbody.innerHTML = _manoObraCosteoActual.map((row, i) => {
@@ -405,11 +416,19 @@ function renderManoObraCosteo() {
     // Grúa, oficial+ayudantes) tiene su propio ritmo de producción; vacío = usa el de la línea.
     const celdaPretensado = esPretensado
       ? `<td><input type="number" min="0" step="0.01" value="${row.bancosDiaFila || ''}" placeholder="de línea" style="width:90px" oninput="_manoObraCosteoActual[${i}].bancosDiaFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
+    // "Unidades/día" por fila — Vibrocompactado/Reforzado (2026-08-25, a pedido del usuario):
+    // antes toda la mano de obra de la línea repartía siempre contra el mismo Unidades/día de
+    // línea (Sección 3); mano de obra adicional para un proceso complementario (con su propio
+    // ritmo real, distinto al de la línea) no tenía forma de anularlo. Vacío = hereda el de la
+    // línea, mismo criterio que "de línea" en Pretensado/Maquinaria.
+    const celdaUnidadesDia = !esPretensado
+      ? `<td><input type="number" min="0" step="0.01" value="${row.unidadesDiaFila || ''}" placeholder="de línea" style="width:90px" oninput="_manoObraCosteoActual[${i}].unidadesDiaFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
     return `<tr>
       <td><select onchange="_manoObraCosteoActual[${i}].nombre=this.value;_actualizarResumenCosteo()">${_opcionesCuadrillaCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio)">${info}</td>
       <td><input type="text" value="${_escAttr(row.nota || '')}" placeholder="ej: armado de molde, vaciado..." style="width:100%" oninput="_manoObraCosteoActual[${i}].nota=this.value;_actualizarResumenCosteo()"></td>
       ${celdaPretensado}
+      ${celdaUnidadesDia}
       <td><button class="btn btn-rojo btn-xs" onclick="_manoObraCosteoActual.splice(${i},1);renderManoObraCosteo();_actualizarResumenCosteo()">✕</button></td>
     </tr>`;
   }).join('');
@@ -432,6 +451,14 @@ function renderInsumosCosteo() {
     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega insumos de empaque (estiba, zuncho...) o consumos (energía, agua, ACPM...)</td></tr>`;
     return;
   }
+  // "Por estiba" reparte ÷ Unidades/estiba (sección 3, Rendimiento) — ese campo solo existe en
+  // el cuestionario de Vibrocompactado (ver rendimiento-bache-vibrocompactado en
+  // cotizaciones.html); Reforzado y Pretensado no tienen dónde diligenciarlo, así que una fila
+  // dejada en "Por estiba" en esos dos tipos no tiene ÷ 0 con qué repartir y su costo no suma
+  // NADA al total (bug de coherencia real, no solo de rótulo — 2026-08-25, a pedido del
+  // usuario). Se avisa en el propio desplegable y con un aviso en la fila.
+  const tipo = document.getElementById('m-costeo-tipo')?.value;
+  const estibaAplica = tipo === 'vibrocompactado' || !tipo;
   tbody.innerHTML = _insumosCosteoActual.map((row, i) => {
     const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
     const precio = ins ? _fmtRef(calcularCostoInsumo(ins).valorFinal) + '/' + _labelUnidadInsumo(ins.unidad) : '—';
@@ -439,7 +466,10 @@ function renderInsumosCosteo() {
       <td><select onchange="_insumosCosteoActual[${i}].nombre=this.value;renderInsumosCosteo();_actualizarResumenCosteo()">${_opcionesInsumoCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio);white-space:nowrap">${precio}</td>
       <td><input type="number" value="${row.cantidad}" min="0" step="0.001" oninput="_insumosCosteoActual[${i}].cantidad=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>
-      <td><select onchange="_insumosCosteoActual[${i}].reparto=this.value;_actualizarResumenCosteo()">${_opcionesRepartoInsumoCosteo(row.reparto)}</select></td>
+      <td>
+        <select onchange="_insumosCosteoActual[${i}].reparto=this.value;renderInsumosCosteo();_actualizarResumenCosteo()">${_opcionesRepartoInsumoCosteo(row.reparto, estibaAplica)}</select>
+        ${(!estibaAplica && row.reparto === 'estiba') ? '<div style="color:var(--rojo);font-size:10px;margin-top:2px">⚠️ No aplica a este tipo — no suma costo</div>' : ''}
+      </td>
       <td><button class="btn btn-rojo btn-xs" onclick="_insumosCosteoActual.splice(${i},1);renderInsumosCosteo();_actualizarResumenCosteo()">✕</button></td>
     </tr>`;
   }).join('');
@@ -448,10 +478,20 @@ function _opcionesInsumoCosteo(seleccionado) {
   if (!INSUMOS_COSTOS.length) return '<option value="">Sin insumos registrados</option>';
   return '<option value="">— Selecciona —</option>' + INSUMOS_COSTOS.map(i => `<option value="${_escAttr(i.nombre)}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
 }
-function agregarInsumoCosteo() { _insumosCosteoActual.push({ nombre: '', cantidad: 0, reparto: 'estiba' }); renderInsumosCosteo(); }
-function _opcionesRepartoInsumoCosteo(seleccionado) {
+// El reparto por defecto de una fila nueva depende del tipo: Vibrocompactado sí tiene
+// "Unidades/estiba" diligenciable (empaque real, se vende por estiba); Reforzado y Pretensado
+// no tienen ese campo en su cuestionario (se venden por unidad/ml, no por estiba) — dejarlas en
+// "Por estiba" por defecto ahí es exactamente el bug de coherencia que reportó el usuario (fila
+// que no suma costo sin ningún aviso). "Por día" es el reparto que sí tienen los tres tipos.
+function agregarInsumoCosteo() {
+  const tipo = document.getElementById('m-costeo-tipo')?.value;
+  const repartoDefecto = (tipo === 'reforzado' || tipo === 'pretensado') ? 'dia' : 'estiba';
+  _insumosCosteoActual.push({ nombre: '', cantidad: 0, reparto: repartoDefecto });
+  renderInsumosCosteo();
+}
+function _opcionesRepartoInsumoCosteo(seleccionado, estibaAplica) {
   const opciones = [
-    ['estiba', 'Por estiba'],
+    ['estiba', estibaAplica === false ? 'Por estiba (no aplica a este tipo)' : 'Por estiba'],
     ['dia', 'Por día'],
     ['directo', 'Directo (ya es cantidad/unidad)'],
   ];
@@ -590,13 +630,17 @@ function calcularCosteoProducto(c) {
   }
   const desperdicio = materiaPrima * ((c.pctDesperdicio || 0) / 100);
 
-  // Mano de Obra — costo/día de cada cuadrilla de la línea, repartido entre unidades/día.
+  // Mano de Obra — costo/día de cada cuadrilla, repartido entre unidades/día. Por defecto, la
+  // de línea (arriba); "Unidades/día" por fila (2026-08-25, a pedido del usuario) la anula
+  // cuando esa cuadrilla es un proceso complementario con su propio ritmo real (ej. una mano de
+  // obra adicional que no avanza al ritmo de la línea principal) — vacío = hereda la de línea.
   let manoObra = 0;
   const manoObraDetalle = [];
   (c.manoObra || []).forEach(row => {
     const cu = CUADRILLAS_PRODUCTIVAS.find(x => x.nombre === row.nombre);
     const costoDia = cu ? _totalCuadrilla(cu).diario : 0;
-    const costo = (cu && unidadesDia > 0) ? costoDia / unidadesDia : 0;
+    const unidadesDiaFila = row.unidadesDiaFila || unidadesDia;
+    const costo = (cu && unidadesDiaFila > 0) ? costoDia / unidadesDiaFila : 0;
     manoObra += costo;
     manoObraDetalle.push({ nombre: row.nota ? `${row.nombre} — ${row.nota}` : row.nombre, costoDia, costo, noEncontrado: !cu });
   });
@@ -738,13 +782,16 @@ function _calcularCosteoReforzado(c) {
     { nombre: `Alambre Dulce (${pctAlambre}% del Acero)`, unidad: 'kg', cantidad: cantidadAlambre, precio: precioAlambre, costo: costoAlambre },
   ];
 
-  // Mano de Obra — mismo patrón que Vibrocompactado: costo/día de cada cuadrilla ÷ unidades/día.
+  // Mano de Obra — mismo patrón que Vibrocompactado: costo/día de cada cuadrilla ÷ unidades/día,
+  // anulable fila por fila con "Unidades/día" (2026-08-25, a pedido del usuario) para mano de
+  // obra de un proceso complementario con ritmo propio, distinto al de la línea.
   let manoObra = 0;
   const manoObraDetalle = [];
   (c.manoObra || []).forEach(row => {
     const cu = CUADRILLAS_PRODUCTIVAS.find(x => x.nombre === row.nombre);
     const costoDia = cu ? _totalCuadrilla(cu).diario : 0;
-    const costo = (cu && unidadesDia > 0) ? costoDia / unidadesDia : 0;
+    const unidadesDiaFila = row.unidadesDiaFila || unidadesDia;
+    const costo = (cu && unidadesDiaFila > 0) ? costoDia / unidadesDiaFila : 0;
     manoObra += costo;
     manoObraDetalle.push({ nombre: row.nota ? `${row.nombre} — ${row.nota}` : row.nombre, costoDia, costo, noEncontrado: !cu });
   });
