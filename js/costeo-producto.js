@@ -192,6 +192,10 @@ function _elegirTipoEstructuraCosteo(tipo) {
   if (refuerzoReforzado) refuerzoReforzado.style.display = esReforzado ? '' : 'none';
   const bancoPretensado = document.getElementById('rendimiento-banco-pretensado');
   if (bancoPretensado) bancoPretensado.style.display = esPretensado ? '' : 'none';
+  // Otras materias primas (fuera del Diseño de Mezcla) — solo tiene sentido en Pretensado, a
+  // pedido del usuario (2026-08-25); los demás tipos no la muestran.
+  const mpExtraWrap = document.getElementById('costeo-mp-extra-wrap');
+  if (mpExtraWrap) mpExtraWrap.style.display = esPretensado ? '' : 'none';
   // Columnas "Bancos/día" (Máquinas y Mano de Obra) y "× hilo" (Máquinas) solo tienen sentido
   // para Pretensado — el resto de tipos reparte con un único "unidades/día" de línea, sin
   // rendimiento por fila.
@@ -300,6 +304,36 @@ function _actualizarPreviewDiseno() {
   div.innerHTML = filas.join('');
 }
 
+// ── Otras materias primas, fuera del Diseño de Mezcla (solo Pretensado) ──
+// Una pieza de Pretensado a veces lleva materiales reales que no son parte de la receta de
+// concreto (ej. insertos, placas de anclaje, espuma de vacíos) y por eso no tienen cómo entrar
+// por el Diseño de Mezcla — a pedido del usuario (2026-08-25), esta lista deja agregarlas
+// igual que cualquier otra materia prima del desglose (mismo catálogo de precio, Costos de
+// Referencia, misma sección "🧱 Materia Prima" en el resumen), sin forzarlas dentro de la
+// receta ni mezclarlas con la sección de Insumos/Consumos (que es de empaque y consumibles,
+// no de materia prima). "Cantidad" ya es la cantidad por unidad de producto (mismo criterio
+// que el reparto "Directo" de Insumos), porque no hay una fórmula que la derive.
+let _materiaPrimaExtraCosteoActual = [];
+function renderMateriaPrimaExtraCosteo() {
+  const tbody = document.getElementById('costeo-mp-extra-body');
+  if (!tbody) return;
+  if (!_materiaPrimaExtraCosteoActual.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Sin materias primas adicionales</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = _materiaPrimaExtraCosteoActual.map((row, i) => {
+    const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
+    const precio = ins ? `${_fmtRef(calcularCostoInsumo(ins).valorFinal)}/${_labelUnidadInsumo(ins.unidad)}` : '—';
+    return `<tr>
+      <td><select onchange="_materiaPrimaExtraCosteoActual[${i}].nombre=this.value;renderMateriaPrimaExtraCosteo();_actualizarResumenCosteo()">${_opcionesInsumoCosteo(row.nombre)}</select></td>
+      <td style="color:var(--gris-medio);white-space:nowrap">${precio}</td>
+      <td><input type="number" value="${row.cantidad}" min="0" step="0.001" oninput="_materiaPrimaExtraCosteoActual[${i}].cantidad=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>
+      <td><button class="btn btn-rojo btn-xs" onclick="_materiaPrimaExtraCosteoActual.splice(${i},1);renderMateriaPrimaExtraCosteo();_actualizarResumenCosteo()">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+function agregarMateriaPrimaExtraCosteo() { _materiaPrimaExtraCosteoActual.push({ nombre: '', cantidad: 0 }); renderMateriaPrimaExtraCosteo(); }
+
 // ── Máquinas involucradas (filas dinámicas) ──
 let _maquinasCosteoActual = [];
 function renderMaquinasCosteo() {
@@ -307,7 +341,7 @@ function renderMaquinasCosteo() {
   if (!tbody) return;
   const esPretensado = document.getElementById('m-costeo-tipo')?.value === 'pretensado';
   if (!_maquinasCosteoActual.length) {
-    tbody.innerHTML = `<tr><td colspan="${esPretensado ? 5 : 3}" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las máquinas de la línea de producción</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${esPretensado ? 6 : 4}" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las máquinas de la línea de producción</td></tr>`;
     return;
   }
   tbody.innerHTML = _maquinasCosteoActual.map((row, i) => {
@@ -323,9 +357,30 @@ function renderMaquinasCosteo() {
       <td><select onchange="_maquinasCosteoActual[${i}].nombre=this.value;_actualizarResumenCosteo()">${_opcionesMaquinariaCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio)">${info}</td>
       ${celdasPretensado}
+      <td><button class="btn btn-secundario btn-xs" title="Asignar operario en Mano de Obra" onclick="_asignarOperarioMaquina(${i})">👷</button></td>
       <td><button class="btn btn-rojo btn-xs" onclick="_maquinasCosteoActual.splice(${i},1);renderMaquinasCosteo();_actualizarResumenCosteo()">✕</button></td>
     </tr>`;
   }).join('');
+}
+// Botón "👷" por fila de máquina — agrega de una vez, en Mano de Obra, la cuadrilla
+// "Operario de maquinaria" (a pedido del usuario: cada máquina real la opera alguien, y hoy
+// tocaba acordarse de agregarla a mano en la sección de abajo). Solo Pretensado tiene una
+// cantidad "por fila" que copiar (Bancos/día, misma columna en Máquinas y Mano de Obra — ver
+// docs/modulos/costeo.md, "su ritmo real coincide con el de su operario"), y solo tiene sentido
+// copiarla cuando la unidad de uso de la máquina es 'dia' (rendimiento propio por fila); las
+// demás unidades ('m3'/'banco'/'ciclo'/'m2') no tienen ritmo por fila, así que el campo queda
+// en blanco para asignarlo a mano. Vibrocompactado y Reforzado no tienen columna de cantidad
+// por fila en ninguna de las dos secciones, así que ahí el botón solo agrega el rol.
+function _asignarOperarioMaquina(i) {
+  const row = _maquinasCosteoActual[i];
+  if (!row) return;
+  const esPretensado = document.getElementById('m-costeo-tipo')?.value === 'pretensado';
+  const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
+  const nuevaFila = { nombre: 'Operario de maquinaria', nota: row.nombre ? `Operario de ${row.nombre}` : '' };
+  if (esPretensado && maq && maq.unidadUso === 'dia') nuevaFila.bancosDiaFila = row.bancosDiaFila;
+  _manoObraCosteoActual.push(nuevaFila);
+  renderManoObraCosteo();
+  _actualizarResumenCosteo();
 }
 function _opcionesMaquinariaCosteo(seleccionado) {
   if (!MAQUINARIA_EQUIPOS.length) return '<option value="">Sin máquinas registradas</option>';
@@ -438,6 +493,7 @@ function _leerFormularioCosteo() {
     maquinas: JSON.parse(JSON.stringify(_maquinasCosteoActual)).filter(x => x.nombre),
     manoObra: JSON.parse(JSON.stringify(_manoObraCosteoActual)).filter(x => x.nombre),
     insumos: JSON.parse(JSON.stringify(_insumosCosteoActual)).filter(x => x.nombre),
+    materiaPrimaExtra: JSON.parse(JSON.stringify(_materiaPrimaExtraCosteoActual)).filter(x => x.nombre),
     pctDesperdicio: parseFloat(document.getElementById('m-costeo-pct-desperdicio').value) || 0,
     pctHerramientaMenor: parseFloat(document.getElementById('m-costeo-pct-herramienta').value) || 0,
     margenLista: parseFloat(document.getElementById('m-costeo-margen-lista').value) || 0,
@@ -810,20 +866,39 @@ function _calcularCosteoPretensado(c) {
   }
   const desperdicio = materiaPrima * ((c.pctDesperdicio || 0) / 100);
 
-  // Refuerzo — Acero de Pretensionamiento: única cantidad que SÍ se puede derivar de una fórmula
-  // exacta (a diferencia del Acero Figurado de Reforzado, que depende del diseño de cada pieza y
-  // no se puede calcular solo). Cantidad = hilos tensados en el banco × longitud bruta de cada
-  // hilo (incluye colas), repartido entre los metros lineales que rinde ese banco — confirmado
-  // exacto contra el Excel real (vigueta H11 2H: 27 × 101 ÷ 840 = 3,246428571). El resto del
-  // refuerzo (Resorte Loza, Alambre Dulce) no tiene fórmula — se cargan como Insumos normales
-  // con reparto "Directo" (ver sección 6), igual que Reforzado hace con su Desmoldante.
+  // Acero de Pretensionamiento: única cantidad de refuerzo que SÍ se puede derivar de una
+  // fórmula exacta (a diferencia del Acero Figurado de Reforzado, que depende del diseño de
+  // cada pieza y no se puede calcular solo). Cantidad = hilos tensados en el banco × longitud
+  // bruta de cada hilo (incluye colas), repartido entre los metros lineales que rinde ese banco
+  // — confirmado exacto contra el Excel real (vigueta H11 2H: 27 × 101 ÷ 840 = 3,246428571). Se
+  // suma a Materia Prima, no a Refuerzo aparte (a pedido del usuario, 2026-08-25: "el acero de
+  // pretensionamiento también es una materia prima, que no se discrimine en el desglose") — a
+  // diferencia de Reforzado, donde el Acero Figurado sí queda en su propia sección de Refuerzo
+  // porque es una cantidad manual, no derivada de esta fórmula. Se suma DESPUÉS de calcular
+  // `desperdicio` a propósito, para no aplicarle el % de desperdicio de la mezcla (es acero, no
+  // material de la mezcla). El resto del refuerzo real de Pretensado (Resorte Loza, Alambre
+  // Dulce) no tiene fórmula — se carga como Insumo normal con reparto "Directo" (sección 6),
+  // igual que Reforzado hace con su Desmoldante.
   const cantidadAcero = metrosLinealesBanco > 0 ? (hilosBanco * longitudBrutaHilo) / metrosLinealesBanco : 0;
   const precioAcero = _precioInsumoPorNombre('Acero 5mm Pretensionamiento', productoGeneraIva);
   const costoAcero = cantidadAcero * precioAcero;
-  const refuerzo = costoAcero;
-  const refuerzoDetalle = cantidadAcero > 0
-    ? [{ nombre: 'Acero de Pretensionamiento', unidad: 'm', cantidad: cantidadAcero, precio: precioAcero, costo: costoAcero }]
-    : [];
+  if (cantidadAcero > 0) {
+    materiaPrima += costoAcero;
+    materiaPrimaDetalle.push({ nombre: 'Acero de Pretensionamiento', unidad: 'm', cantidad: cantidadAcero, precio: precioAcero, costo: costoAcero });
+  }
+  const refuerzo = 0;
+  const refuerzoDetalle = [];
+
+  // Otras materias primas fuera del Diseño de Mezcla (insertos, placas de anclaje, espuma de
+  // vacíos...) — mismo criterio que el Acero de Pretensionamiento arriba: se suman a Materia
+  // Prima DESPUÉS de `desperdicio`, para no aplicarles el % de desperdicio de la mezcla.
+  (c.materiaPrimaExtra || []).forEach(row => {
+    const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
+    const precio = _precioInsumoPorNombre(row.nombre, productoGeneraIva);
+    const costo = (row.cantidad || 0) * precio;
+    materiaPrima += costo;
+    materiaPrimaDetalle.push({ nombre: row.nombre, unidad: ins ? _labelUnidadInsumo(ins.unidad) : '', cantidad: row.cantidad, precio, costo, noEncontrado: !ins });
+  });
 
   // Mano de Obra — cada cuadrilla real tiene su propio ritmo (Bobcat, Montacargas, Puente Grúa y
   // las cuadrillas de oficial+ayudantes NO avanzan igual de rápido; confirmado contra el Excel
@@ -1182,9 +1257,11 @@ function abrirModalCosteoProducto() {
   _maquinasCosteoActual = [];
   _manoObraCosteoActual = [];
   _insumosCosteoActual = [];
+  _materiaPrimaExtraCosteoActual = [];
   renderMaquinasCosteo();
   renderManoObraCosteo();
   renderInsumosCosteo();
+  renderMateriaPrimaExtraCosteo();
   document.getElementById('costeo-producto-sugerencias').style.display = 'none';
   _elegirTipoEstructuraCosteo(''); // sin tipo elegido todavía — oculta las secciones 2-8
   document.getElementById('modal-costeo-producto').classList.add('abierto');
@@ -1222,9 +1299,11 @@ function editarCosteoProducto(codigo) {
   _maquinasCosteoActual = JSON.parse(JSON.stringify(c.maquinas || []));
   _manoObraCosteoActual = JSON.parse(JSON.stringify(c.manoObra || []));
   _insumosCosteoActual = JSON.parse(JSON.stringify(c.insumos || []));
+  _materiaPrimaExtraCosteoActual = JSON.parse(JSON.stringify(c.materiaPrimaExtra || []));
   renderMaquinasCosteo();
   renderManoObraCosteo();
   renderInsumosCosteo();
+  renderMateriaPrimaExtraCosteo();
   _elegirTipoEstructuraCosteo(c.tipoEstructura || 'vibrocompactado');
   document.getElementById('modal-costeo-producto').classList.add('abierto');
 }
@@ -1336,7 +1415,7 @@ function _seccionesDetalleCosteo(c, k) {
       ? '🧾 Producto <b>genera IVA</b> → insumos costeados <b>SIN IVA</b> (descontable)'
       : '🧾 Producto <b>excluido de IVA</b> → insumos costeados <b>CON IVA</b> (no descontable)')
     : '';
-  const filasMP = k.materiaPrimaDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, f.unidad, f.precio, f.costo, false, k.totalUnidad)).join('')
+  const filasMP = k.materiaPrimaDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, f.unidad, f.precio, f.costo, f.noEncontrado, k.totalUnidad)).join('')
     + `<tr style="border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right;color:var(--gris-medio)">+ Desperdicio (${c.pctDesperdicio}%)</td><td style="text-align:right;font-weight:700">${_fmtCosteoProd(k.desperdicio)}</td><td style="text-align:right;color:var(--gris-medio);font-size:12px">${_pctCosteoProd(k.desperdicio, k.totalUnidad)}</td></tr>
        <tr style="font-weight:700"><td colspan="3" style="text-align:right">Subtotal Materia Prima</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.materiaPrima + k.desperdicio)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.materiaPrima + k.desperdicio, k.totalUnidad)}</td></tr>`;
   const seccionMP = `<div style="font-size:11px;color:var(--gris-medio);margin:14px 0 -8px">${notaIvaDetalle}</div>` + _seccionDetalleCosteo('🧱 Materia Prima <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(por unidad de producto)</span>', filasMP, 'Sin Diseño de Mezcla o sin materiales con cantidad.');

@@ -646,7 +646,7 @@ function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCarg
 // ═══════════════════════════════
 // GUARDAR / CARGAR COTIZACIÓN
 // ═══════════════════════════════
-function guardarCotizacion() {
+async function guardarCotizacion() {
   // El número ya no se escribe a mano (causaba typos/saltos/duplicados) — se asigna solo.
   // Si el número que se ve en pantalla todavía no le pertenece a ninguna cotización guardada,
   // es apenas el "próximo consecutivo" que se mostró al abrir el formulario, y puede haberse
@@ -656,7 +656,13 @@ function guardarCotizacion() {
   // cotización existente, es porque se está guardando una nueva versión de ella, y conserva
   // su propio número.
   let num = document.getElementById('num-cot').value.trim().toUpperCase();
-  if (!COTIZACIONES.some(c => c.numero === num)) num = siguienteNum();
+  // esNumeroNuevo: no hay TODAVÍA ninguna cotización guardada con este número (de ninguna
+  // versión) — es el caso donde el número lo acabamos de calcular con siguienteNum() y por
+  // tanto es el único caso realmente expuesto al choque de dos personas cotizando a la vez
+  // (ver insert()+reintento más abajo). Guardar una nueva VERSIÓN de una cotización que ya
+  // existe no pasa por acá, porque ahí el número no se recalcula, se hereda.
+  const esNumeroNuevo = !COTIZACIONES.some(c => c.numero === num);
+  if (esNumeroNuevo) num = siguienteNum();
   document.getElementById('num-cot').value = num;
   document.getElementById('display-num-cot').textContent = num;
   if (!document.getElementById('cliente-nombre').value.trim()) {
@@ -743,10 +749,6 @@ function guardarCotizacion() {
     creado: existente ? existente.creado : new Date().toISOString()
   };
 
-  const idx = COTIZACIONES.findIndex(c => c.numero === num && c.version === version);
-  if (idx >= 0) COTIZACIONES[idx] = cot;
-  else COTIZACIONES.push(cot);
-
   // Registrar o actualizar cliente en la tabla clientes
   if (!CLIENTES.find(c => c.nombre === cot.cliente.nombre)) {
     const nuevoCliente = { id: Date.now(), nombre: cot.cliente.nombre, contacto: cot.cliente.contacto || '', cel: cot.cliente.cel || '', email: '', ciudad: cot.cliente.ciudad || '', nit: '' };
@@ -755,8 +757,7 @@ function guardarCotizacion() {
       .then(({ error }) => { if (error) console.warn('Cliente no guardado:', error.message); });
   }
 
-  // Guardar en Supabase
-  sb.from('cotizaciones').upsert({
+  const payloadCotizacion = () => ({
     numero: cot.numero,
     version: cot.version,
     estado: cot.estado,
@@ -765,10 +766,38 @@ function guardarCotizacion() {
     condiciones: cot.condiciones,
     datos: cot,
     modificado: new Date().toISOString()
-  }, { onConflict: 'numero,version' }).then(({ error }) => {
-    if (error) alert(`✅ Cotización ${num} ${cot.version} guardada.\n⚠️ Error al sincronizar: ${error.message}`);
-    else alert(`✅ Cotización ${num} ${cot.version} guardada y sincronizada.`);
   });
+
+  if (esNumeroNuevo) {
+    // insert() en vez de upsert(): si otro usuario alcanzó a tomar este mismo número justo
+    // antes de que "en vivo" nos avisara (el bug que causó el choque real en la cotización
+    // 109, incidente del 2026-08 anterior a la corrección de REPLICA IDENTITY), Postgres
+    // rechaza el insert por la restricción única (numero,version) — código 23505 — en vez de
+    // sobrescribir en silencio la cotización de la otra persona. En ese caso se toma el
+    // siguiente número y se reintenta, de forma invisible para quien está guardando.
+    let choque = false;
+    for (let intentos = 0; ; intentos++) {
+      const { error } = await sb.from('cotizaciones').insert(payloadCotizacion());
+      if (!error) break;
+      if (error.code === '23505' && intentos < 20) {
+        choque = true;
+        cot.numero = 'C' + (parseInt(cot.numero.replace(/\D/g, '')) + 1);
+        continue;
+      }
+      alert(`⚠️ No se pudo guardar la cotización: ${error.message}`);
+      return;
+    }
+    COTIZACIONES.push(cot);
+    if (choque) alert(`⚠️ El número ${num} ya lo había tomado otra persona justo antes que tú. Se reasignó automáticamente a ${cot.numero}.\n✅ Cotización ${cot.numero} ${cot.version} guardada y sincronizada.`);
+    else alert(`✅ Cotización ${cot.numero} ${cot.version} guardada y sincronizada.`);
+  } else {
+    const idx = COTIZACIONES.findIndex(c => c.numero === num && c.version === version);
+    if (idx >= 0) COTIZACIONES[idx] = cot;
+    else COTIZACIONES.push(cot);
+    const { error } = await sb.from('cotizaciones').upsert(payloadCotizacion(), { onConflict: 'numero,version' });
+    if (error) alert(`✅ Cotización ${cot.numero} ${cot.version} guardada.\n⚠️ Error al sincronizar: ${error.message}`);
+    else alert(`✅ Cotización ${cot.numero} ${cot.version} guardada y sincronizada.`);
+  }
 
   _resetFormularioCotizacion();
 }
