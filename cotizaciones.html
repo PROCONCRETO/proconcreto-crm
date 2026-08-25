@@ -710,6 +710,8 @@
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="ver-ocultos-prod" onchange="renderProductosAdmin()"> Ver ocultos</label>
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="solo-ocultos-prod" onchange="renderProductosAdmin()"> Solo ocultos</label>
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="ver-duplicados-prod" onchange="renderProductosAdmin()"> Solo duplicados</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="solo-costeados-prod" onchange="if(this.checked)document.getElementById('solo-sin-costear-prod').checked=false;renderProductosAdmin()"> Solo costeados</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="solo-sin-costear-prod" onchange="if(this.checked)document.getElementById('solo-costeados-prod').checked=false;renderProductosAdmin()"> Solo sin costear</label>
       <button class="btn btn-secundario" onclick="abrirModalResolverDuplicados()">🔗 Resolver duplicados</button>
       <button class="btn btn-secundario" onclick="exportarCatalogoExcel()">⬇️ Exportar Excel</button>
       <button class="btn btn-secundario" onclick="abrirModalImportar()">⬆️ Importar Excel</button>
@@ -1566,7 +1568,7 @@
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo"><span class="num">5</span> Mano de obra involucrada</div>
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Cuadrilla</th><th style="width:140px">Costo</th><th id="costeo-mo-th-banco" style="width:110px;display:none">Bancos/día</th><th style="width:36px"></th></tr></thead>
+        <thead><tr><th>Cuadrilla</th><th style="width:140px">Costo</th><th>Función específica</th><th id="costeo-mo-th-banco" style="width:110px;display:none">Bancos/día</th><th style="width:36px"></th></tr></thead>
         <tbody id="costeo-mano-obra-body"></tbody>
       </table>
       <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarManoObraCosteo()">+ Agregar cuadrilla</button>
@@ -2273,7 +2275,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.0" integrity="sha384-De+l/Df7qym5QBDVocD3+gW1S7IjR3epf+6KbRDjB3FCCzM/LqVTwqckT6FhFar8" crossorigin="anonymous"></script>
 <script src="js/config.js?v=20260821a"></script>
-<script src="js/catalogo.js?v=20260804i"></script>
+<script src="js/catalogo.js?v=20260821a"></script>
 <script src="js/navegacion.js?v=20260804b"></script>
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
 <script src="js/produccion-diaria.js?v=20260821b"></script>
@@ -2282,7 +2284,7 @@
 <script src="js/costeo-mano-obra.js?v=20260819a"></script>
 <script src="js/costeo-maquinaria.js?v=20260821a"></script>
 <script src="js/costeo-referencia.js?v=20260821a"></script>
-<script src="js/costeo-producto.js?v=20260821a"></script>
+<script src="js/costeo-producto.js?v=20260821d"></script>
 <script src="js/calidad-mezclas.js?v=20260819a"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
 <script src="js/logistica.js?v=20260817a"></script>

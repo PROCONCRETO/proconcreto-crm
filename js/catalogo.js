@@ -407,16 +407,38 @@ function _filtroProdAdmActivos() {
   document.getElementById('solo-ocultos-prod').checked = false;
   document.getElementById('ver-ocultos-prod').checked = false;
   document.getElementById('ver-duplicados-prod').checked = false;
+  document.getElementById('solo-costeados-prod').checked = false;
+  document.getElementById('solo-sin-costear-prod').checked = false;
   renderProductosAdmin();
 }
 function _filtroProdAdmOcultos() {
   document.getElementById('solo-ocultos-prod').checked = true;
   document.getElementById('ver-duplicados-prod').checked = false;
+  document.getElementById('solo-costeados-prod').checked = false;
+  document.getElementById('solo-sin-costear-prod').checked = false;
   renderProductosAdmin();
 }
 function _filtroProdAdmDuplicados() {
   document.getElementById('solo-ocultos-prod').checked = false;
   document.getElementById('ver-duplicados-prod').checked = true;
+  document.getElementById('solo-costeados-prod').checked = false;
+  document.getElementById('solo-sin-costear-prod').checked = false;
+  renderProductosAdmin();
+}
+// Costeados/Sin costear (2026-08-21, a pedido del usuario) — mismo patrón de atajo que las
+// demás tarjetas del resumen.
+function _filtroProdAdmCosteados() {
+  document.getElementById('solo-ocultos-prod').checked = false;
+  document.getElementById('ver-duplicados-prod').checked = false;
+  document.getElementById('solo-costeados-prod').checked = true;
+  document.getElementById('solo-sin-costear-prod').checked = false;
+  renderProductosAdmin();
+}
+function _filtroProdAdmSinCostear() {
+  document.getElementById('solo-ocultos-prod').checked = false;
+  document.getElementById('ver-duplicados-prod').checked = false;
+  document.getElementById('solo-costeados-prod').checked = false;
+  document.getElementById('solo-sin-costear-prod').checked = true;
   renderProductosAdmin();
 }
 function _filtroProdAdmTodos() {
@@ -425,6 +447,8 @@ function _filtroProdAdmTodos() {
   document.getElementById('solo-ocultos-prod').checked = false;
   document.getElementById('ver-ocultos-prod').checked = true;
   document.getElementById('ver-duplicados-prod').checked = false;
+  document.getElementById('solo-costeados-prod').checked = false;
+  document.getElementById('solo-sin-costear-prod').checked = false;
   renderProductosAdmin();
 }
 
@@ -446,6 +470,8 @@ function renderProductosAdmin() {
   const verOcultos = document.getElementById('ver-ocultos-prod')?.checked;
   const soloOcultos = document.getElementById('solo-ocultos-prod')?.checked;
   const soloDuplicados = document.getElementById('ver-duplicados-prod')?.checked;
+  const soloCosteados = document.getElementById('solo-costeados-prod')?.checked;
+  const soloSinCostear = document.getElementById('solo-sin-costear-prod')?.checked;
 
   // Nombres duplicados — se cuentan sobre TODO el catálogo (activos + ocultos), normalizando
   // may/min y espacios sobrantes, para detectar productos cargados dos veces con distinto
@@ -472,6 +498,11 @@ function renderProductosAdmin() {
   if (grupo) data = data.filter(p => p.grupo === grupo);
   if (q) data = data.filter(p => (p.nombre + ' ' + p.codigo + ' ' + (p.medidas||'')).toLowerCase().includes(q));
   if (soloDuplicados) data = data.filter(esDuplicado);
+  // Costeados/Sin costear (2026-08-21, a pedido del usuario) — mutuamente excluyentes, un
+  // producto no puede estar en las dos a la vez, así que "Solo costeados" manda si por algún
+  // motivo quedaran los dos marcados.
+  if (soloCosteados) data = data.filter(tieneCosteo);
+  else if (soloSinCostear) data = data.filter(p => !tieneCosteo(p));
   data.sort((a, b) => {
     const ca = _ordenCosteo.has(a.codigo), cb = _ordenCosteo.has(b.codigo);
     if (ca && cb) return _ordenCosteo.get(a.codigo) - _ordenCosteo.get(b.codigo);
@@ -482,10 +513,14 @@ function renderProductosAdmin() {
 
   const activos = CATALOGO.filter(p => p.activo !== false).length;
   const ocultos = CATALOGO.length - activos;
+  const totalCosteados = CATALOGO.filter(tieneCosteo).length;
+  const totalSinCostear = CATALOGO.length - totalCosteados;
   resumen.innerHTML = `
     <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--verde);min-width:130px;cursor:pointer" onclick="_filtroProdAdmActivos()" title="Clic para ver solo los productos activos"><div style="font-size:10px;font-weight:700;color:var(--verde);text-transform:uppercase">Productos activos</div><div style="font-size:18px;font-weight:800">${activos}</div></div>
     <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid #C62828;min-width:130px;cursor:pointer" onclick="_filtroProdAdmOcultos()" title="Clic para ver solo los ocultos"><div style="font-size:10px;font-weight:700;color:#C62828;text-transform:uppercase">Ocultos</div><div style="font-size:18px;font-weight:800">${ocultos}</div></div>
     <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid ${totalDuplicados ? '#E65100' : 'var(--gris-borde)'};min-width:130px;cursor:pointer" onclick="_filtroProdAdmDuplicados()" title="Clic para filtrar solo los duplicados"><div style="font-size:10px;font-weight:700;color:${totalDuplicados ? '#E65100' : 'var(--gris-medio)'};text-transform:uppercase">Nombres duplicados</div><div style="font-size:18px;font-weight:800">${totalDuplicados}</div></div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid #6A1B9A;min-width:130px;cursor:pointer" onclick="_filtroProdAdmCosteados()" title="Clic para ver solo los productos costeados"><div style="font-size:10px;font-weight:700;color:#6A1B9A;text-transform:uppercase">Costeados</div><div style="font-size:18px;font-weight:800">${totalCosteados}</div></div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--gris-medio);min-width:130px;cursor:pointer" onclick="_filtroProdAdmSinCostear()" title="Clic para ver solo los que faltan por costear"><div style="font-size:10px;font-weight:700;color:var(--gris-medio);text-transform:uppercase">Sin costear</div><div style="font-size:18px;font-weight:800">${totalSinCostear}</div></div>
     <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--azul);min-width:130px;cursor:pointer" onclick="_filtroProdAdmTodos()" title="Clic para ver todo el catálogo sin filtros"><div style="font-size:10px;font-weight:700;color:var(--azul);text-transform:uppercase">Mostrados</div><div style="font-size:18px;font-weight:800">${data.length}</div></div>`;
 
   if (!data.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">📦</div><div>${soloDuplicados ? 'No hay productos con nombre duplicado.' : 'Sin productos para este filtro.'}</div></td></tr>`; return; }

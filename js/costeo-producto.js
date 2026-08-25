@@ -340,7 +340,7 @@ function renderManoObraCosteo() {
   if (!tbody) return;
   const esPretensado = document.getElementById('m-costeo-tipo')?.value === 'pretensado';
   if (!_manoObraCosteoActual.length) {
-    tbody.innerHTML = `<tr><td colspan="${esPretensado ? 4 : 3}" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las cuadrillas de la línea de producción</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${esPretensado ? 5 : 4}" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las cuadrillas de la línea de producción</td></tr>`;
     return;
   }
   tbody.innerHTML = _manoObraCosteoActual.map((row, i) => {
@@ -353,6 +353,7 @@ function renderManoObraCosteo() {
     return `<tr>
       <td><select onchange="_manoObraCosteoActual[${i}].nombre=this.value;_actualizarResumenCosteo()">${_opcionesCuadrillaCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio)">${info}</td>
+      <td><input type="text" value="${_escAttr(row.nota || '')}" placeholder="ej: armado de molde, vaciado..." style="width:100%" oninput="_manoObraCosteoActual[${i}].nota=this.value;_actualizarResumenCosteo()"></td>
       ${celdaPretensado}
       <td><button class="btn btn-rojo btn-xs" onclick="_manoObraCosteoActual.splice(${i},1);renderManoObraCosteo();_actualizarResumenCosteo()">✕</button></td>
     </tr>`;
@@ -541,7 +542,7 @@ function calcularCosteoProducto(c) {
     const costoDia = cu ? _totalCuadrilla(cu).diario : 0;
     const costo = (cu && unidadesDia > 0) ? costoDia / unidadesDia : 0;
     manoObra += costo;
-    manoObraDetalle.push({ nombre: row.nombre, costoDia, costo, noEncontrado: !cu });
+    manoObraDetalle.push({ nombre: row.nota ? `${row.nombre} — ${row.nota}` : row.nombre, costoDia, costo, noEncontrado: !cu });
   });
   const herramientaMenor = manoObra * ((c.pctHerramientaMenor || 0) / 100);
 
@@ -689,7 +690,7 @@ function _calcularCosteoReforzado(c) {
     const costoDia = cu ? _totalCuadrilla(cu).diario : 0;
     const costo = (cu && unidadesDia > 0) ? costoDia / unidadesDia : 0;
     manoObra += costo;
-    manoObraDetalle.push({ nombre: row.nombre, costoDia, costo, noEncontrado: !cu });
+    manoObraDetalle.push({ nombre: row.nota ? `${row.nombre} — ${row.nota}` : row.nombre, costoDia, costo, noEncontrado: !cu });
   });
   const herramientaMenor = manoObra * ((c.pctHerramientaMenor || 0) / 100);
 
@@ -837,7 +838,7 @@ function _calcularCosteoPretensado(c) {
     const unidadesDiaFila = bancosDiaFila * metrosLinealesBanco;
     const costo = (cu && unidadesDiaFila > 0) ? costoDia / unidadesDiaFila : 0;
     manoObra += costo;
-    manoObraDetalle.push({ nombre: row.nombre, costoDia, costo, noEncontrado: !cu });
+    manoObraDetalle.push({ nombre: row.nota ? `${row.nombre} — ${row.nota}` : row.nombre, costoDia, costo, noEncontrado: !cu });
   });
   const herramientaMenor = manoObra * ((c.pctHerramientaMenor || 0) / 100);
 
@@ -1110,6 +1111,7 @@ function renderCosteoProductos() {
         <div class="flex-gap">
           <button class="btn btn-secundario btn-xs" onclick="abrirDetalleCosteoProducto('${nombreEsc}')" title="Ver consolidado">➕</button>
           <button class="btn btn-primario btn-xs" onclick="editarCosteoProducto('${nombreEsc}')">✏️</button>
+          <button class="btn btn-secundario btn-xs" onclick="duplicarCosteoProducto('${nombreEsc}')" title="Duplicar como base de un costeo nuevo">📋</button>
           <button class="btn btn-rojo btn-xs" onclick="eliminarCosteoProducto('${nombreEsc}')">🗑️</button>
         </div>
       </td>
@@ -1225,6 +1227,28 @@ function editarCosteoProducto(codigo) {
   renderInsumosCosteo();
   _elegirTipoEstructuraCosteo(c.tipoEstructura || 'vibrocompactado');
   document.getElementById('modal-costeo-producto').classList.add('abierto');
+}
+
+// Muchos productos comparten la misma estructura de costeo (mismas máquinas, misma mano de
+// obra, mismos insumos) y solo cambian rendimiento/cantidades — "Duplicar" evita rearmar todo
+// desde cero (2026-08-21, a pedido del usuario). Reutiliza TODO el prellenado de campos de
+// editarCosteoProducto() (para no duplicar esa lógica) y solo corrige lo que lo distingue de
+// una edición real: el producto de destino queda vacío (obligatorio elegir uno nuevo — el
+// desplegable ya excluye productos con costeo, así que ni siquiera se puede duplicar encima
+// del mismo producto de origen) y `codigo-anterior` queda vacío, para que guardarCosteoProducto()
+// cree un registro NUEVO en vez de reemplazar el de origen (ver ese `if` más abajo).
+function duplicarCosteoProducto(codigo) {
+  const c = COSTEO_PRODUCTOS.find(x => x.productoCodigo === codigo);
+  if (!c) return;
+  editarCosteoProducto(codigo);
+  document.getElementById('m-costeo-producto-codigo-anterior').value = '';
+  document.getElementById('m-costeo-producto').value = '';
+  document.getElementById('modal-costeo-producto-titulo').textContent = `🏗️ Nuevo Costeo de Producto (basado en ${c.productoNombre})`;
+  document.getElementById('costeo-producto-sugerencias').style.display = 'none';
+  // editarCosteoProducto() ya recalculó la vista en vivo con el producto de origen todavía
+  // puesto — se vuelve a calcular ahora que el campo Producto quedó vacío, para que el aviso
+  // de IVA y el resumen reflejen de una que falta elegir el producto nuevo.
+  _actualizarResumenCosteo();
 }
 
 function guardarCosteoProducto() {
