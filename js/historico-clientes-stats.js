@@ -225,20 +225,24 @@ function cambiarEstado(estado) {
   if (!cot) { cerrarModal('modal-estado'); return; }
 
   if (estado === 'Aceptada') {
-    // Si se acepta y hay varias opciones, preguntar cuál eligió el cliente
-    const ops = obtenerOpcionesCot(cot);
+    // Si hay varias versiones, preguntar cuál aprobó el cliente en realidad — no siempre es
+    // la más reciente (pudo negociar y volver a una versión anterior).
+    const cotAprobada = _elegirVersionAprobada(cot);
+    if (!cotAprobada) { cerrarModal('modal-estado'); return; } // canceló o versión inválida
+    // Si se acepta y esa versión tenía varias opciones, preguntar cuál eligió el cliente
+    const ops = obtenerOpcionesCot(cotAprobada);
     if (ops.length > 1) {
       const lista = ops.map((o, i) => `${i + 1}) Opción ${i + 1} — $${(o.totales?.total || 0).toLocaleString()}`).join('\n');
-      const resp = prompt(`El cliente aceptó la cotización ${cot.numero}.\n¿Cuál opción eligió?\n\n${lista}\n\nEscribe el número de la opción (1-${ops.length}):`, '1');
+      const resp = prompt(`El cliente aceptó la cotización ${cotAprobada.numero} ${cotAprobada.version || 'V1'}.\n¿Cuál opción eligió?\n\n${lista}\n\nEscribe el número de la opción (1-${ops.length}):`, '1');
       if (resp === null) { cerrarModal('modal-estado'); return; } // canceló
       const sel = parseInt(resp);
       if (!(sel >= 1 && sel <= ops.length)) { alert('Opción inválida. No se cambió el estado.'); cerrarModal('modal-estado'); return; }
-      cot.opcionAceptada = sel - 1;
+      cotAprobada.opcionAceptada = sel - 1;
     } else {
-      cot.opcionAceptada = 0;
+      cotAprobada.opcionAceptada = 0;
     }
     cerrarModal('modal-estado');
-    if (_intentarAceptarCotizacion(cot)) _confirmarAceptacionCotizacion(cot);
+    if (_intentarAceptarCotizacion(cot, cotAprobada)) _confirmarAceptacionCotizacion(cot, cotAprobada);
   } else {
     cot.estado = estado;
     sb.from('cotizaciones').upsert({
@@ -260,24 +264,51 @@ function cambiarEstado(estado) {
   renderEstadisticas();
 }
 
+// Al aceptar, si la cotización tiene varias versiones, pregunta cuál aprobó el cliente en
+// realidad — Pipeline/Histórico siempre muestran la más reciente como "vigente", pero en una
+// negociación real el cliente puede haber vuelto a una versión anterior (2026-08-25, a pedido
+// del usuario: "puede darse el caso en que el cliente no acepte la última versión"). Con una
+// sola versión no pregunta nada. Devuelve la versión elegida, o `undefined` si el usuario
+// canceló o escribió algo inválido (el llamador debe abortar sin cambiar nada en ese caso).
+function _elegirVersionAprobada(cot) {
+  const versiones = COTIZACIONES.filter(c => c.numero === cot.numero).sort((a, b) => {
+    const na = parseInt((a.version || 'V1').replace(/\D/g, '')) || 1;
+    const nb = parseInt((b.version || 'V1').replace(/\D/g, '')) || 1;
+    return nb - na;
+  });
+  if (versiones.length <= 1) return cot;
+  const lista = versiones.map((v, i) => `${i + 1}) ${v.version || 'V1'} — $${(v.totales?.total || 0).toLocaleString()} (${new Date(v.fecha + 'T12:00').toLocaleDateString('es-CO')})`).join('\n');
+  const resp = prompt(`La cotización ${cot.numero} tiene ${versiones.length} versiones.\n¿Cuál aprobó el cliente? (no siempre es la más reciente)\n\n${lista}\n\nEscribe el número de la versión (1-${versiones.length}):`, '1');
+  if (resp === null) return undefined;
+  const sel = parseInt(resp);
+  if (!(sel >= 1 && sel <= versiones.length)) { alert('Versión inválida. No se cambió el estado.'); return undefined; }
+  return versiones[sel - 1];
+}
+
 // Al aceptar una cotización, el Proyecto debe quedar diligenciado — es el dato que se
 // hereda a la Orden de Producción y de ahí a Logística (ver _confirmarAceptacionCotizacion()
 // y aplicarOrdenAEntrega() en js/logistica.js). Si todavía no tiene proyecto asignado, se
 // felicita al vendedor por cerrar la venta y se abre la ficha del cliente para registrar el
 // proyecto/obra y su contacto — la aceptación se retoma sola al guardar el cliente (ver
 // _completarAceptacionCotizacion()), o queda pendiente si se cancela esa ficha (ver cerrarModal()).
-let _cotAceptandoPendienteProyecto = null;
+// `cot` es siempre la versión vigente (la que Pipeline/Histórico muestran como "ACTIVA" — su
+// estado es el que se sincroniza ahí); `cotAprobada` es la versión que el cliente realmente
+// aprobó (puede ser una anterior, ver _elegirVersionAprobada()) y de la que sale la Orden de
+// Servicio. Con una sola versión, son el mismo objeto.
+let _cotAceptandoPendienteProyecto = null; // { latestId, aprobadaId } o null
 
-function _intentarAceptarCotizacion(cot) {
-  if (cot.cliente?.proyecto) return true;
-  _cotAceptandoPendienteProyecto = cot.id;
-  alert(`🎉 ¡Felicitaciones por cerrar la venta ${cot.numero}!\n\nAntes de continuar, registra el proyecto/obra y su contacto en la ficha del cliente — es el dato que usarán Producción, Logística y Calidad para programar la entrega.`);
-  const c = CLIENTES.find(cl => cl.nombre === cot.cliente?.nombre);
+function _intentarAceptarCotizacion(cot, cotAprobada) {
+  cotAprobada = cotAprobada || cot;
+  if (cotAprobada.cliente?.proyecto) return true;
+  _cotAceptandoPendienteProyecto = { latestId: cot.id, aprobadaId: cotAprobada.id };
+  alert(`🎉 ¡Felicitaciones por cerrar la venta ${cotAprobada.numero}!\n\nAntes de continuar, registra el proyecto/obra y su contacto en la ficha del cliente — es el dato que usarán Producción, Logística y Calidad para programar la entrega.`);
+  const c = CLIENTES.find(cl => cl.nombre === cotAprobada.cliente?.nombre);
   if (c) editarCliente(c.id); else abrirModalCliente();
   return false;
 }
 
-function _confirmarAceptacionCotizacion(cot) {
+function _confirmarAceptacionCotizacion(cot, cotAprobada) {
+  cotAprobada = cotAprobada || cot;
   cot.estado = 'Aceptada';
   sb.from('cotizaciones').upsert({
     numero: cot.numero,
@@ -292,7 +323,7 @@ function _confirmarAceptacionCotizacion(cot) {
     if (error) console.error('Error actualizando estado:', error.message);
   });
   const osExistente = ORDENES.find(o => o.cotizacion === cot.numero);
-  if (!osExistente) crearOrdenDesdeCotizacion(cot);
+  if (!osExistente) crearOrdenDesdeCotizacion(cotAprobada);
 }
 
 // ═══════════════════════════════
@@ -562,29 +593,32 @@ function guardarCliente() {
 // varios; si no se pudo asignar ninguno, la cotización se queda como estaba (se puede
 // reintentar "Aceptada" más adelante).
 function _completarAceptacionCotizacion(clienteData) {
-  const cotId = _cotAceptandoPendienteProyecto;
+  const pendiente = _cotAceptandoPendienteProyecto;
   _cotAceptandoPendienteProyecto = null;
-  const cot = COTIZACIONES.find(c => String(c.id) === String(cotId));
-  if (!cot) return;
+  if (!pendiente) return;
+  const cot = COTIZACIONES.find(c => String(c.id) === String(pendiente.latestId));
+  const cotAprobada = COTIZACIONES.find(c => String(c.id) === String(pendiente.aprobadaId)) || cot;
+  if (!cot || !cotAprobada) return;
   const proyectos = clienteData.proyectos || [];
   if (!proyectos.length) {
-    alert(`⚠️ La cotización ${cot.numero} todavía no quedó Aceptada — no se registró ningún proyecto para ${clienteData.nombre}. Vuelve a intentar "Aceptada" cuando el proyecto esté registrado.`);
+    alert(`⚠️ La cotización ${cotAprobada.numero} todavía no quedó Aceptada — no se registró ningún proyecto para ${clienteData.nombre}. Vuelve a intentar "Aceptada" cuando el proyecto esté registrado.`);
     return;
   }
   let proyectoElegido = proyectos[0].nombre;
   if (proyectos.length > 1) {
     const lista = proyectos.map((p, i) => `${i + 1}) ${p.nombre}`).join('\n');
-    const resp = prompt(`¿Qué proyecto corresponde a la cotización ${cot.numero}?\n\n${lista}\n\nEscribe el número (1-${proyectos.length}):`, '1');
+    const resp = prompt(`¿Qué proyecto corresponde a la cotización ${cotAprobada.numero}?\n\n${lista}\n\nEscribe el número (1-${proyectos.length}):`, '1');
     if (resp === null) {
-      alert(`La cotización ${cot.numero} todavía no quedó Aceptada — vuelve a intentar "Aceptada" cuando sepas qué proyecto asignarle.`);
+      alert(`La cotización ${cotAprobada.numero} todavía no quedó Aceptada — vuelve a intentar "Aceptada" cuando sepas qué proyecto asignarle.`);
       return;
     }
     const sel = parseInt(resp);
     proyectoElegido = (sel >= 1 && sel <= proyectos.length) ? proyectos[sel - 1].nombre : proyectos[0].nombre;
   }
-  cot.cliente.proyecto = proyectoElegido;
-  _confirmarAceptacionCotizacion(cot);
-  alert(`✅ Cotización ${cot.numero} aceptada — proyecto asignado: ${proyectoElegido}.`);
+  cotAprobada.cliente.proyecto = proyectoElegido;
+  cot.cliente.proyecto = proyectoElegido; // la versión vigente también queda coherente
+  _confirmarAceptacionCotizacion(cot, cotAprobada);
+  alert(`✅ Cotización ${cotAprobada.numero} aceptada — proyecto asignado: ${proyectoElegido}.`);
   renderHistorico();
   renderPipeline();
   renderEstadisticas();
@@ -918,7 +952,11 @@ function onDrop(e) {
   const cot = COTIZACIONES.find(c => String(c.id) === String(dragId));
   if (cot && cot.estado !== nuevoEstado) {
     if (nuevoEstado === 'Aceptada') {
-      if (_intentarAceptarCotizacion(cot)) _confirmarAceptacionCotizacion(cot);
+      // Misma pregunta de versión que en Histórico (ver _elegirVersionAprobada()) — la tarjeta
+      // del kanban siempre es la más reciente, pero el cliente pudo aprobar una anterior.
+      const cotAprobada = _elegirVersionAprobada(cot);
+      if (!cotAprobada) return;
+      if (_intentarAceptarCotizacion(cot, cotAprobada)) _confirmarAceptacionCotizacion(cot, cotAprobada);
     } else {
       cot.estado = nuevoEstado;
       const cotActualizada = { ...cot, estado: nuevoEstado };

@@ -75,9 +75,18 @@ Hasta el 2026-07-22 existía un solo campo de texto libre "Ciudad / Proyecto". A
 
 **Por qué es opcional al cotizar pero obligatorio al aceptar**: en la etapa de cotizar puede que el proyecto/obra todavía no exista como tal. Pero el Proyecto es justamente el dato que la Orden de Producción hereda (`crearOrdenDesdeCotizacion()`) y que de ahí pasa a Logística para autocompletar la entrega (`aplicarOrdenAEntrega()` en `js/logistica.js`) — así que sin proyecto asignado, esa cadena se rompe. Por eso, al pasar una cotización a **Aceptada** (`cambiarEstado()` o arrastrando en el kanban del Pipeline, `onDrop()`, ambos en `js/historico-clientes-stats.js`) sin que `cot.cliente.proyecto` tenga valor:
 
-1. `_intentarAceptarCotizacion(cot)` bloquea la aceptación, felicita al vendedor por cerrar la venta, y abre la ficha del cliente (`editarCliente()`) para que registre el proyecto y su contacto en obra.
+1. `_intentarAceptarCotizacion(cot, cotAprobada)` bloquea la aceptación, felicita al vendedor por cerrar la venta, y abre la ficha del cliente (`editarCliente()`) para que registre el proyecto y su contacto en obra.
 2. Al guardar esa ficha, `guardarCliente()` retoma la aceptación pendiente (`_completarAceptacionCotizacion()`): si el cliente ya tiene proyectos, usa el único que haya o pregunta cuál si hay varios, se lo asigna a la cotización, y ahí sí la marca Aceptada y crea la Orden de Servicio (`_confirmarAceptacionCotizacion()`).
 3. Si se cancela esa ficha sin guardar (`cerrarModal('modal-cliente')`), la aceptación queda pendiente sin completarse — se puede reintentar "Aceptada" más adelante.
+
+### Al aceptar con varias versiones, se pregunta cuál aprobó el cliente (2026-08-25)
+
+Pipeline y el renglón principal de Histórico siempre muestran la versión **más reciente** como "vigente" (`versionesLatest()`/`renderHistorico()`) — pero en una negociación real el cliente puede terminar aprobando una versión anterior, no la última (a pedido del usuario: "puede darse el caso en que el cliente no acepte la última versión, sino una anterior").
+
+- `_elegirVersionAprobada(cot)` — si la cotización tiene más de una versión, `prompt()` pidiendo cuál aprobó el cliente (mismo estilo que la pregunta de "¿cuál opción eligió?" que ya existía); con una sola versión no pregunta nada y la devuelve directo. Se usa en los dos caminos para marcar "Aceptada": el botón Estado de Histórico (`cambiarEstado()`) y arrastrar una tarjeta a la columna Aceptada del kanban (`onDrop()`).
+- De ahí en adelante conviven dos cotizaciones en juego: `cot` (la vigente/más reciente — la que Pipeline e Histórico muestran, y cuyo estado se marca "Aceptada" para que esas pantallas queden coherentes) y `cotAprobada` (la que el cliente realmente aprobó — puede ser la misma que `cot`, o una anterior). `_intentarAceptarCotizacion(cot, cotAprobada)` y `_confirmarAceptacionCotizacion(cot, cotAprobada)` reciben ambas; la Orden de Servicio sale de `crearOrdenDesdeCotizacion(cotAprobada)` — con sus ítems, cliente, transporte, condiciones y `versionCotizacion` reales, no los de la más reciente.
+- Si falta el Proyecto (ver arriba) y hay que pasar por la ficha del cliente, `_cotAceptandoPendienteProyecto` guarda `{ latestId, aprobadaId }` (los `id` de ambas cotizaciones) para que `_completarAceptacionCotizacion()` retome el flujo completo sin perder cuál de las dos versiones era la aprobada.
+- La pregunta de versión no toca el mecanismo de "¿cuál opción eligió?" (varias opciones de precio dentro de una misma versión, ver arriba) — son preguntas independientes; si la versión aprobada tiene varias opciones, se sigue preguntando cuál después de elegir la versión.
 
 ## Formulario de Nueva Cotización se limpia solo al guardar
 
