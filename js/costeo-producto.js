@@ -209,7 +209,7 @@ function _elegirTipoEstructuraCosteo(tipo) {
   const thUnidadesDia = document.getElementById('costeo-mo-th-unidades-dia');
   if (thUnidadesDia) thUnidadesDia.style.display = esPretensado ? 'none' : '';
   if (hintRendimiento) hintRendimiento.textContent = esPretensado
-    ? 'Metros lineales/banco, Hilos/banco y Longitud bruta del hilo son datos reales de la colada — con ellos se calcula solo el Acero de Pretensionamiento. Bancos/día es el rendimiento por defecto de toda la línea; cada cuadrilla o máquina lo puede anular más abajo si tiene un ritmo real distinto.'
+    ? 'Metros lineales/banco, Hilos/banco y Longitud bruta del hilo son datos reales de la colada — con ellos se calcula solo el Acero de Pretensionamiento. Días/banco (cuántos días le toma a la línea completar un banco) es el rendimiento por defecto de toda la línea; cada cuadrilla o máquina lo puede anular más abajo si tiene un ritmo real distinto.'
     : esReforzado
     ? 'El Volumen de concreto por unidad es un dato real de la pieza (viene de su diseño/geometría) — se digita directo. El peso equivalente se muestra abajo, derivado con una densidad de 2450 kg/m³, solo de referencia.'
     : 'Unidades / Bache es un dato real de planta (cuántas unidades rinde una mezclada completa de la mezcladora) — no se calcula desde el peso, se digita directo. La Materia Prima se reparte con este número, no con Peso/unidad.';
@@ -345,6 +345,22 @@ function renderMateriaPrimaExtraCosteo() {
 }
 function agregarMateriaPrimaExtraCosteo() { _materiaPrimaExtraCosteoActual.push({ nombre: '', cantidad: 0 }); renderMateriaPrimaExtraCosteo(); }
 
+// "Bancos/día" (cuántos bancos completa por día una cuadrilla/máquina) es un rendimiento
+// difícil de estimar directo — es mucho más natural pensarlo al revés: "¿cuántos DÍAS le toma
+// completar UN banco?" (a pedido del usuario, 2026-08-25: confundir las dos cosas ya causó
+// valores invertidos en costeos reales — una cuadrilla que en realidad hace 5 bancos/día quedó
+// registrada como 0,2 bancos/día, en vez de a 0,2 días/banco). Por eso los campos "Días/banco"
+// de Máquinas, Mano de Obra y Rendimiento de línea capturan y muestran el recíproco — el dato
+// que de verdad se guarda y con el que calcula todo el costeo sigue siendo `bancosDiaFila`/
+// `bancosDiaLinea` (bancos/día), sin cambiar la fórmula ni los datos ya guardados.
+function _diasBancoTexto(bancosDia) {
+  return (bancosDia > 0) ? String(Math.round((1 / bancosDia) * 10000) / 10000) : '';
+}
+function _bancosDiaDesdeDias(valorDias) {
+  const v = parseFloat(valorDias);
+  return (v > 0) ? 1 / v : 0;
+}
+
 // ── Máquinas involucradas (filas dinámicas) ──
 let _maquinasCosteoActual = [];
 function renderMaquinasCosteo() {
@@ -358,11 +374,11 @@ function renderMaquinasCosteo() {
   tbody.innerHTML = _maquinasCosteoActual.map((row, i) => {
     const m = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     const info = m ? `${_fmtMaq(calcularCostoMaquina(m).costoUnidad)}/${_labelUnidadUso(m.unidadUso)}` : '—';
-    // "Bancos/día" y "× hilo" solo aplican a Pretensado — cada máquina puede tener su propio
+    // "Días/banco" y "× hilo" solo aplican a Pretensado — cada máquina puede tener su propio
     // rendimiento real (Bobcat, Montacargas, Puente Grúa) o marcarse "× hilo" cuando se usa una
     // vez por cada hilo tensionado, no una vez por banco (caso real: Gato de Tensionamiento).
     const celdasPretensado = esPretensado ? `
-      <td><input type="number" min="0" step="0.01" value="${row.bancosDiaFila || ''}" placeholder="de línea" style="width:90px" oninput="_maquinasCosteoActual[${i}].bancosDiaFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>
+      <td><input type="number" min="0" step="0.01" value="${_diasBancoTexto(row.bancosDiaFila)}" placeholder="de línea" title="Días que le toma a esta máquina completar un banco" style="width:90px" oninput="_maquinasCosteoActual[${i}].bancosDiaFila=_bancosDiaDesdeDias(this.value);_actualizarResumenCosteo()"></td>
       <td style="text-align:center"><input type="checkbox" ${row.porHilo ? 'checked' : ''} onchange="_maquinasCosteoActual[${i}].porHilo=this.checked;_actualizarResumenCosteo()"></td>` : '';
     return `<tr>
       <td><select onchange="_maquinasCosteoActual[${i}].nombre=this.value;_actualizarResumenCosteo()">${_opcionesMaquinariaCosteo(row.nombre)}</select></td>
@@ -412,10 +428,10 @@ function renderManoObraCosteo() {
   tbody.innerHTML = _manoObraCosteoActual.map((row, i) => {
     const cu = CUADRILLAS_PRODUCTIVAS.find(x => x.nombre === row.nombre);
     const info = cu ? `${_fmt(_totalCuadrilla(cu).diario)}/día` : '—';
-    // "Bancos/día" solo aplica a Pretensado — cada cuadrilla real (Bobcat, Montacargas, Puente
+    // "Días/banco" solo aplica a Pretensado — cada cuadrilla real (Bobcat, Montacargas, Puente
     // Grúa, oficial+ayudantes) tiene su propio ritmo de producción; vacío = usa el de la línea.
     const celdaPretensado = esPretensado
-      ? `<td><input type="number" min="0" step="0.01" value="${row.bancosDiaFila || ''}" placeholder="de línea" style="width:90px" oninput="_manoObraCosteoActual[${i}].bancosDiaFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
+      ? `<td><input type="number" min="0" step="0.01" value="${_diasBancoTexto(row.bancosDiaFila)}" placeholder="de línea" title="Días que le toma a esta cuadrilla completar un banco" style="width:90px" oninput="_manoObraCosteoActual[${i}].bancosDiaFila=_bancosDiaDesdeDias(this.value);_actualizarResumenCosteo()"></td>` : '';
     // "Unidades/día" por fila — Vibrocompactado/Reforzado (2026-08-25, a pedido del usuario):
     // antes toda la mano de obra de la línea repartía siempre contra el mismo Unidades/día de
     // línea (Sección 3); mano de obra adicional para un proceso complementario (con su propio
@@ -528,7 +544,7 @@ function _leerFormularioCosteo() {
       metrosLinealesBanco: parseFloat(document.getElementById('m-costeo-metros-banco').value) || 0,
       hilosBanco: parseFloat(document.getElementById('m-costeo-hilos-banco').value) || 0,
       longitudBrutaHilo: parseFloat(document.getElementById('m-costeo-longitud-hilo').value) || 0,
-      bancosDiaLinea: parseFloat(document.getElementById('m-costeo-bancos-dia').value) || 0,
+      bancosDiaLinea: _bancosDiaDesdeDias(document.getElementById('m-costeo-bancos-dia').value),
     },
     maquinas: JSON.parse(JSON.stringify(_maquinasCosteoActual)).filter(x => x.nombre),
     manoObra: JSON.parse(JSON.stringify(_manoObraCosteoActual)).filter(x => x.nombre),
@@ -1038,7 +1054,7 @@ function _actualizarResumenCosteo() {
     ? `<div class="fila"><span>Volumen de concreto / ml</span><span>${(k.volumenUnidadM3 || 0).toLocaleString('es-CO', { maximumFractionDigits: 4 })} m³</span></div>
        <div class="fila"><span>Metros lineales / banco</span><span>${(k.metrosLinealesBanco || 0).toLocaleString('es-CO')} ml</span></div>
        <div class="fila"><span>Hilos de pretensado / banco</span><span>${(k.hilosBanco || 0).toLocaleString('es-CO')}</span></div>
-       <div class="fila"><span>Bancos / día (línea)</span><span>${(k.bancosDiaLinea || 0).toLocaleString('es-CO')}</span></div>`
+       <div class="fila"><span>Días / banco (línea)</span><span>${_diasBancoTexto(k.bancosDiaLinea) || 0}</span></div>`
     : esReforzado
     ? `<div class="fila"><span>Volumen de concreto por unidad</span><span>${(k.volumenUnidadM3 || 0).toLocaleString('es-CO', { maximumFractionDigits: 4 })} m³</span></div>
        <div class="fila sub"><span>≈ Peso equivalente (× 2450 kg/m³, solo de referencia)</span><span>${(k.pesoEstimadoKg || 0).toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg</span></div>
@@ -1338,7 +1354,7 @@ function editarCosteoProducto(codigo) {
   document.getElementById('m-costeo-metros-banco').value = r.metrosLinealesBanco || '';
   document.getElementById('m-costeo-hilos-banco').value = r.hilosBanco || '';
   document.getElementById('m-costeo-longitud-hilo').value = r.longitudBrutaHilo || '';
-  document.getElementById('m-costeo-bancos-dia').value = r.bancosDiaLinea || '';
+  document.getElementById('m-costeo-bancos-dia').value = _diasBancoTexto(r.bancosDiaLinea);
   document.getElementById('m-costeo-pct-desperdicio').value = c.pctDesperdicio || 0;
   document.getElementById('m-costeo-pct-herramienta').value = c.pctHerramientaMenor || 0;
   document.getElementById('m-costeo-margen-lista').value = c.margenLista ?? 30;
@@ -1522,7 +1538,7 @@ function abrirDetalleCosteoProducto(codigo) {
     ? `<span>${tipo.label}</span>
        <span><strong>Diseño:</strong> ${diseno ? `${_esc(diseno.codigo)} — ${_esc(diseno.nombre)}` : (_esc(c.disenoMezclaCodigo) || '—')}</span>
        <span><strong>Metros lineales/banco:</strong> ${(r.metrosLinealesBanco || 0).toLocaleString('es-CO')}</span>
-       <span><strong>Bancos/día:</strong> ${(r.bancosDiaLinea || 0).toLocaleString('es-CO')}</span>`
+       <span><strong>Días/banco:</strong> ${_diasBancoTexto(r.bancosDiaLinea) || 0}</span>`
     : esReforzado
     ? `<span>${tipo.label}</span>
        <span><strong>Diseño:</strong> ${diseno ? `${_esc(diseno.codigo)} — ${_esc(diseno.nombre)}` : (_esc(c.disenoMezclaCodigo) || '—')}</span>
@@ -1542,7 +1558,7 @@ function abrirDetalleCosteoProducto(codigo) {
         <div class="fila"><span>Metros lineales / banco</span><span>${(r.metrosLinealesBanco || 0).toLocaleString('es-CO')} ml</span></div>
         <div class="fila"><span>Hilos de pretensado / banco</span><span>${(r.hilosBanco || 0).toLocaleString('es-CO')}</span></div>
         <div class="fila"><span>Longitud bruta del hilo</span><span>${(r.longitudBrutaHilo || 0).toLocaleString('es-CO')} m</span></div>
-        <div class="fila"><span>Bancos / día <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(rendimiento por defecto de la línea)</span></span><span>${(r.bancosDiaLinea || 0).toLocaleString('es-CO')}</span></div>` : esReforzado ? `
+        <div class="fila"><span>Días / banco <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(rendimiento por defecto de la línea)</span></span><span>${_diasBancoTexto(r.bancosDiaLinea) || 0}</span></div>` : esReforzado ? `
         <div class="fila"><span>Volumen de concreto / unidad <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(del diseño de la pieza)</span></span><span>${(r.volumenUnidadM3 || 0).toLocaleString('es-CO', { maximumFractionDigits: 4 })} m³</span></div>
         <div class="fila sub"><span>≈ Peso equivalente (× 2450 kg/m³, solo de referencia)</span><span>${(k.pesoEstimadoKg || 0).toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg</span></div>
         <div class="fila"><span>Unidades / día</span><span>${(r.unidadesDia || 0).toLocaleString('es-CO')}</span></div>

@@ -37,8 +37,8 @@ async function cargarDatosSupabase() {
   AJUSTES_MEZCLA = (ajustes || []).filter(r => r.datos).map(r => _normalizarAjuste(r.datos));
   VIAJES = (entregas || []).filter(r => r.datos).map(r => r.datos);
   PARAMETROS_MO = pmo?.datos || _defaultParametrosMO();
-  CLASES_SALARIALES = (clasesMo || []).filter(r => r.datos).map(r => r.datos);
-  CUADRILLAS_PRODUCTIVAS = (cuadrillas || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
+  CLASES_SALARIALES = _normalizarOrdenLista((clasesMo || []).filter(r => r.datos).map(r => r.datos));
+  CUADRILLAS_PRODUCTIVAS = _normalizarOrdenLista((cuadrillas || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado })));
   MAQUINARIA_EQUIPOS = _normalizarOrdenLista((maquinas || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado })));
   INSUMOS_COSTOS = _normalizarOrdenLista((insumos || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado })));
   COSTEO_PRODUCTOS = _normalizarOrdenLista((costeoProd || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado })));
@@ -186,12 +186,12 @@ async function recargarParametrosMoRT() {
 }
 async function recargarClasesSalarialesRT() {
   const { data } = await sb.from('clases_salariales').select('datos').order('creado', { ascending: true });
-  CLASES_SALARIALES = (data || []).filter(r => r.datos).map(r => r.datos);
+  CLASES_SALARIALES = _normalizarOrdenLista((data || []).filter(r => r.datos).map(r => r.datos));
   rerenderPantallaActiva();
 }
 async function recargarCuadrillasRT() {
   const { data } = await sb.from('cuadrillas_productivas').select('datos, modificado').order('creado', { ascending: true });
-  CUADRILLAS_PRODUCTIVAS = (data || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado }));
+  CUADRILLAS_PRODUCTIVAS = _normalizarOrdenLista((data || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado })));
   rerenderPantallaActiva();
 }
 async function recargarMaquinariaRT() {

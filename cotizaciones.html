@@ -907,12 +907,12 @@
   <div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
     <table class="tabla-cots" id="tabla-clases-salariales">
       <thead><tr>
-        <th>ROLES</th><th style="text-align:center">MÚLT. SMMLV</th><th style="text-align:center">SUBS. TRANSPORTE</th>
+        <th style="width:28px"></th><th>ROLES</th><th style="text-align:center">MÚLT. SMMLV</th><th style="text-align:center">SUBS. TRANSPORTE</th>
         <th style="text-align:right">VALOR/HORA</th><th style="text-align:right">VALOR/DÍA</th><th style="text-align:right">VALOR/SEMANA</th><th style="text-align:right">VALOR/MES</th><th style="text-align:right">VALOR/AÑO</th>
         <th style="min-width:130px">ACCIONES</th>
       </tr></thead>
       <tbody id="clases-salariales-body">
-        <tr><td colspan="9" class="empty-state"><div class="icono">👷</div><div>No hay clases salariales registradas.</div></td></tr>
+        <tr><td colspan="10" class="empty-state"><div class="icono">👷</div><div>No hay clases salariales registradas.</div></td></tr>
       </tbody>
     </table>
   </div>
@@ -924,10 +924,10 @@
   <div class="card" style="padding:0;overflow:hidden">
     <table class="tabla-cots" id="tabla-cuadrillas">
       <thead><tr>
-        <th style="width:400px">CUADRILLA</th><th style="text-align:right">VALOR/HORA</th><th style="text-align:right">VALOR/DÍA</th><th style="text-align:right">VALOR/SEMANA</th><th style="text-align:right">VALOR/MES</th><th style="text-align:right">VALOR/AÑO</th><th style="min-width:110px">ACCIONES</th>
+        <th style="width:28px"></th><th style="width:400px">CUADRILLA</th><th style="text-align:right">VALOR/HORA</th><th style="text-align:right">VALOR/DÍA</th><th style="text-align:right">VALOR/SEMANA</th><th style="text-align:right">VALOR/MES</th><th style="text-align:right">VALOR/AÑO</th><th style="min-width:110px">ACCIONES</th>
       </tr></thead>
       <tbody id="cuadrillas-body">
-        <tr><td colspan="5" class="empty-state"><div class="icono">🧑‍🤝‍🧑</div><div>No hay cuadrillas registradas.</div></td></tr>
+        <tr><td colspan="8" class="empty-state"><div class="icono">🧑‍🤝‍🧑</div><div>No hay cuadrillas registradas.</div></td></tr>
       </tbody>
     </table>
   </div>
@@ -1556,7 +1556,7 @@
         <div class="form-grupo"><label>% Alambre Dulce <span class="hint">(sobre el peso del Acero)</span></label><input type="number" id="m-costeo-pct-alambre" min="0" step="0.1" value="2" oninput="_actualizarResumenCosteo()"></div>
       </div>
       <div id="rendimiento-banco-pretensado" class="form-grid" style="margin-top:10px;display:none">
-        <div class="form-grupo"><label>Bancos / día <span class="hint">(rendimiento por defecto de la línea — cada cuadrilla o máquina lo puede anular)</span></label><input type="number" id="m-costeo-bancos-dia" min="0" step="0.01" oninput="_actualizarResumenCosteo()"></div>
+        <div class="form-grupo"><label>Días / banco <span class="hint">(cuántos días le toma a la línea completar un banco — rendimiento por defecto, cada cuadrilla o máquina lo puede anular)</span></label><input type="number" id="m-costeo-bancos-dia" min="0" step="0.01" oninput="_actualizarResumenCosteo()"></div>
       </div>
       <div id="costeo-calculo-vivo" class="caja-costeo"></div>
       <div id="costeo-hint-rendimiento" style="font-size:11px;color:var(--gris-medio);margin-top:6px">Unidades / Bache es un dato real de planta (cuántas unidades rinde una mezclada completa de la mezcladora) — no se calcula desde el peso, se digita directo. La Materia Prima se reparte con este número, no con Peso/unidad.</div>
@@ -1566,7 +1566,7 @@
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo"><span class="num">4</span> Máquinas involucradas</div>
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Máquina</th><th style="width:140px">Costo</th><th id="costeo-maq-th-banco" style="width:110px;display:none">Bancos/día</th><th id="costeo-maq-th-hilo" style="width:80px;display:none">× hilo</th><th style="width:36px"></th><th style="width:36px"></th></tr></thead>
+        <thead><tr><th>Máquina</th><th style="width:140px">Costo</th><th id="costeo-maq-th-banco" style="width:110px;display:none">Días/banco</th><th id="costeo-maq-th-hilo" style="width:80px;display:none">× hilo</th><th style="width:36px"></th><th style="width:36px"></th></tr></thead>
         <tbody id="costeo-maquinas-body"></tbody>
       </table>
       <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarMaquinaCosteo()">+ Agregar máquina</button>
@@ -1576,7 +1576,7 @@
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo"><span class="num">5</span> Mano de obra involucrada</div>
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Cuadrilla</th><th style="width:140px">Costo</th><th>Función específica</th><th id="costeo-mo-th-banco" style="width:110px;display:none">Bancos/día</th><th id="costeo-mo-th-unidades-dia" style="width:110px">Unidades/día</th><th style="width:36px"></th></tr></thead>
+        <thead><tr><th>Cuadrilla</th><th style="width:140px">Costo</th><th>Función específica</th><th id="costeo-mo-th-banco" style="width:110px;display:none">Días/banco</th><th id="costeo-mo-th-unidades-dia" style="width:110px">Unidades/día</th><th style="width:36px"></th></tr></thead>
         <tbody id="costeo-mano-obra-body"></tbody>
       </table>
       <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarManoObraCosteo()">+ Agregar cuadrilla</button>
@@ -2289,16 +2289,16 @@
 <script src="js/produccion-diaria.js?v=20260821b"></script>
 <script src="js/produccion-materia-prima.js?v=20260821a"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
-<script src="js/costeo-mano-obra.js?v=20260819a"></script>
+<script src="js/costeo-mano-obra.js?v=20260825a"></script>
 <script src="js/costeo-maquinaria.js?v=20260821a"></script>
 <script src="js/costeo-referencia.js?v=20260821a"></script>
-<script src="js/costeo-producto.js?v=20260825d"></script>
+<script src="js/costeo-producto.js?v=20260825e"></script>
 <script src="js/calidad-mezclas.js?v=20260819a"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
 <script src="js/logistica.js?v=20260817a"></script>
 <script src="js/estadisticas-logistica.js?v=20260804c"></script>
 <script src="js/auth.js?v=20260804a"></script>
-<script src="js/datos-realtime.js?v=20260821a"></script>
+<script src="js/datos-realtime.js?v=20260825a"></script>
 <script src="js/cotizador.js?v=20260825a"></script>
 <script src="js/historico-clientes-stats.js?v=20260825a"></script>
 <script src="js/retenciones.js?v=20260809c"></script>

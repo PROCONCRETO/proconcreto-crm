@@ -293,13 +293,18 @@ function renderClasesSalariales() {
   const body = document.getElementById('clases-salariales-body');
   if (!body) return;
   if (!CLASES_SALARIALES.length) {
-    body.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">👷</div><div>No hay clases salariales registradas.</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="10" class="empty-state"><div class="icono">👷</div><div>No hay clases salariales registradas.</div></td></tr>`;
     return;
   }
+  // CLASES_SALARIALES ya llega ordenada por `orden` (_normalizarOrdenLista(), ver
+  // js/datos-realtime.js) — el handle de arrastre reordena el arreglo real, no una copia local
+  // (mismo patrón que Maquinaria y Costos de Referencia, 2026-08-25 a pedido del usuario).
   body.innerHTML = CLASES_SALARIALES.map(c => {
     const r = calcularCosteoClase(c, PARAMETROS_MO);
+    const nombreEsc = _escNombreOnclick(c.nombre);
     return `
-    <tr>
+    <tr ondragover="permitirSoltarClase(event)" ondragleave="quitarResaltadoSoltarClase(event)" ondrop="soltarClaseSobreClase(event,'${nombreEsc}')">
+      <td style="text-align:center"><span class="drag-handle" draggable="true" ondragstart="iniciarArrastreClase(event,'${nombreEsc}')" ondragend="terminarArrastreClase(event)" title="Arrastra para reordenar">☰</span></td>
       <td style="font-weight:600">${_esc(c.nombre)}</td>
       <td style="text-align:center">${Number(c.multiplicador).toFixed(2)}×</td>
       <td style="text-align:center">${c.aplicaSubsidioTransporte === false ? 'No' : 'Sí'}</td>
@@ -310,13 +315,44 @@ function renderClasesSalariales() {
       <td style="text-align:right">${_fmt(r.valorRealAnual)}</td>
       <td>
         <div class="flex-gap">
-          <button class="btn btn-secundario btn-xs" onclick="abrirDetalleClase('${_escNombreOnclick(c.nombre)}')" title="Ver discriminado del costo">➕</button>
-          <button class="btn btn-primario btn-xs" onclick="editarClaseSalarial('${_escNombreOnclick(c.nombre)}')">✏️</button>
-          <button class="btn btn-rojo btn-xs" onclick="eliminarClaseSalarial('${_escNombreOnclick(c.nombre)}')">🗑️</button>
+          <button class="btn btn-secundario btn-xs" onclick="abrirDetalleClase('${nombreEsc}')" title="Ver discriminado del costo">➕</button>
+          <button class="btn btn-primario btn-xs" onclick="editarClaseSalarial('${nombreEsc}')">✏️</button>
+          <button class="btn btn-rojo btn-xs" onclick="eliminarClaseSalarial('${nombreEsc}')">🗑️</button>
         </div>
       </td>
     </tr>`;
   }).join('');
+}
+let _claseArrastradaNombre = null;
+function iniciarArrastreClase(event, nombre) {
+  _claseArrastradaNombre = nombre;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', nombre);
+  event.currentTarget.closest('tr')?.classList.add('fila-arrastrando');
+}
+function terminarArrastreClase(event) {
+  event.currentTarget.closest('tr')?.classList.remove('fila-arrastrando');
+  _claseArrastradaNombre = null;
+}
+function permitirSoltarClase(event) {
+  if (!_claseArrastradaNombre) return;
+  event.preventDefault();
+  event.currentTarget.classList.add('fila-dragover');
+}
+function quitarResaltadoSoltarClase(event) {
+  event.currentTarget.classList.remove('fila-dragover');
+}
+function soltarClaseSobreClase(event, nombreDestino) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('fila-dragover');
+  if (!_claseArrastradaNombre) return;
+  const origen = _claseArrastradaNombre;
+  _claseArrastradaNombre = null;
+  const resultado = _reordenarPorArrastre(CLASES_SALARIALES, origen, nombreDestino, x => x.nombre,
+    c => sb.from('clases_salariales').upsert({ nombre: c.nombre, datos: c, modificado: new Date().toISOString() }, { onConflict: 'nombre' })
+      .then(({ error }) => { if (error) console.error('Error guardando orden de clase salarial:', error.message); }));
+  renderClasesSalariales();
+  return resultado;
 }
 
 function _claseCalculada(nombre) {
@@ -439,13 +475,18 @@ function renderCuadrillas() {
   const body = document.getElementById('cuadrillas-body');
   if (!body) return;
   if (!CUADRILLAS_PRODUCTIVAS.length) {
-    body.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">🧑‍🤝‍🧑</div><div>No hay cuadrillas registradas.</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">🧑‍🤝‍🧑</div><div>No hay cuadrillas registradas.</div></td></tr>`;
     return;
   }
+  // CUADRILLAS_PRODUCTIVAS ya llega ordenada por `orden` (_normalizarOrdenLista(), ver
+  // js/datos-realtime.js) — el handle de arrastre reordena el arreglo real, no una copia local
+  // (mismo patrón que Maquinaria y Costos de Referencia, 2026-08-25 a pedido del usuario).
   body.innerHTML = CUADRILLAS_PRODUCTIVAS.map(cu => {
     const t = _totalCuadrilla(cu);
+    const nombreEsc = _escNombreOnclick(cu.nombre);
     return `
-    <tr>
+    <tr ondragover="permitirSoltarCuadrilla(event)" ondragleave="quitarResaltadoSoltarCuadrilla(event)" ondrop="soltarCuadrillaSobreCuadrilla(event,'${nombreEsc}')">
+      <td style="text-align:center"><span class="drag-handle" draggable="true" ondragstart="iniciarArrastreCuadrilla(event,'${nombreEsc}')" ondragend="terminarArrastreCuadrilla(event)" title="Arrastra para reordenar">☰</span></td>
       <td style="font-weight:600">${_esc(cu.nombre)}</td>
       <td style="text-align:right">${_fmt(t.hora)}</td>
       <td style="text-align:right">${_fmt(t.diario)}</td>
@@ -454,13 +495,44 @@ function renderCuadrillas() {
       <td style="text-align:right">${_fmt(t.anual)}</td>
       <td>
         <div class="flex-gap">
-          <button class="btn btn-secundario btn-xs" onclick="abrirDetalleCuadrilla('${_escNombreOnclick(cu.nombre)}')" title="Ver qué conforma esta cuadrilla">➕</button>
-          <button class="btn btn-primario btn-xs" onclick="editarCuadrilla('${_escNombreOnclick(cu.nombre)}')">✏️</button>
-          <button class="btn btn-rojo btn-xs" onclick="eliminarCuadrilla('${_escNombreOnclick(cu.nombre)}')">🗑️</button>
+          <button class="btn btn-secundario btn-xs" onclick="abrirDetalleCuadrilla('${nombreEsc}')" title="Ver qué conforma esta cuadrilla">➕</button>
+          <button class="btn btn-primario btn-xs" onclick="editarCuadrilla('${nombreEsc}')">✏️</button>
+          <button class="btn btn-rojo btn-xs" onclick="eliminarCuadrilla('${nombreEsc}')">🗑️</button>
         </div>
       </td>
     </tr>`;
   }).join('');
+}
+let _cuadrillaArrastradaNombre = null;
+function iniciarArrastreCuadrilla(event, nombre) {
+  _cuadrillaArrastradaNombre = nombre;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', nombre);
+  event.currentTarget.closest('tr')?.classList.add('fila-arrastrando');
+}
+function terminarArrastreCuadrilla(event) {
+  event.currentTarget.closest('tr')?.classList.remove('fila-arrastrando');
+  _cuadrillaArrastradaNombre = null;
+}
+function permitirSoltarCuadrilla(event) {
+  if (!_cuadrillaArrastradaNombre) return;
+  event.preventDefault();
+  event.currentTarget.classList.add('fila-dragover');
+}
+function quitarResaltadoSoltarCuadrilla(event) {
+  event.currentTarget.classList.remove('fila-dragover');
+}
+function soltarCuadrillaSobreCuadrilla(event, nombreDestino) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('fila-dragover');
+  if (!_cuadrillaArrastradaNombre) return;
+  const origen = _cuadrillaArrastradaNombre;
+  _cuadrillaArrastradaNombre = null;
+  const resultado = _reordenarPorArrastre(CUADRILLAS_PRODUCTIVAS, origen, nombreDestino, x => x.nombre,
+    cu => sb.from('cuadrillas_productivas').upsert({ nombre: cu.nombre, datos: cu, modificado: new Date().toISOString() }, { onConflict: 'nombre' })
+      .then(({ error }) => { if (error) console.error('Error guardando orden de cuadrilla:', error.message); }));
+  renderCuadrillas();
+  return resultado;
 }
 
 // Discriminado de una cuadrilla — qué roles la conforman y cuánto pesa cada uno en el total
