@@ -545,6 +545,7 @@ function _leerFormularioCosteo() {
       hilosBanco: parseFloat(document.getElementById('m-costeo-hilos-banco').value) || 0,
       longitudBrutaHilo: parseFloat(document.getElementById('m-costeo-longitud-hilo').value) || 0,
       bancosDiaLinea: _bancosDiaDesdeDias(document.getElementById('m-costeo-bancos-dia').value),
+      itemAceroPretensado: document.getElementById('m-costeo-item-acero-pretensado')?.value || '',
     },
     maquinas: JSON.parse(JSON.stringify(_maquinasCosteoActual)).filter(x => x.nombre),
     manoObra: JSON.parse(JSON.stringify(_manoObraCosteoActual)).filter(x => x.nombre),
@@ -943,11 +944,20 @@ function _calcularCosteoPretensado(c) {
   // Dulce) no tiene fórmula — se carga como Insumo normal con reparto "Directo" (sección 6),
   // igual que Reforzado hace con su Desmoldante.
   const cantidadAcero = metrosLinealesBanco > 0 ? (hilosBanco * longitudBrutaHilo) / metrosLinealesBanco : 0;
-  const precioAcero = _precioInsumoPorNombre('Acero 5mm Pretensionamiento', productoGeneraIva);
+  // El ítem de Costos de Referencia se elige en un <select> (`m-costeo-item-acero-pretensado`,
+  // sección 3) en vez de buscarse por un nombre fijo — a pedido del usuario (2026-08-25: "no
+  // está arrastrando el precio de la ventana de Costos de referencia"), porque el nombre exacto
+  // "Acero 5mm Pretensionamiento" tenía que coincidir letra por letra con lo registrado ahí, y
+  // si no coincidía el precio quedaba en 0 en silencio (mismo riesgo que cualquier búsqueda por
+  // nombre fijo). Sin elegir nada (costeos ya guardados antes de este cambio), se sigue
+  // intentando ese nombre fijo como respaldo, para no dejar en 0 lo que ya funcionaba.
+  const _nombreItemAcero = r.itemAceroPretensado || 'Acero 5mm Pretensionamiento';
+  const _itemAceroExiste = INSUMOS_COSTOS.some(x => x.nombre === _nombreItemAcero);
+  const precioAcero = _precioInsumoPorNombre(_nombreItemAcero, productoGeneraIva);
   const costoAcero = cantidadAcero * precioAcero;
   if (cantidadAcero > 0) {
     materiaPrima += costoAcero;
-    materiaPrimaDetalle.push({ nombre: 'Acero de Pretensionamiento', unidad: 'm', cantidad: cantidadAcero, precio: precioAcero, costo: costoAcero });
+    materiaPrimaDetalle.push({ nombre: 'Acero de Pretensionamiento', unidad: 'm', cantidad: cantidadAcero, precio: precioAcero, costo: costoAcero, noEncontrado: !_itemAceroExiste });
   }
   const refuerzo = 0;
   const refuerzoDetalle = [];
@@ -1162,15 +1172,18 @@ function _costeosAfectadosPorCambio(filtro) {
   }).filter(Boolean);
 }
 
-// Un costeo "usa" un insumo si aparece directo en su tabla de Insumos, o indirecto vía el
-// Diseño de Mezcla que tiene asignado (Cemento/Agua/Agregados/Adiciones/Aditivos), o vía los
-// insumos hardcodeados de Refuerzo (Acero Figurado/Alambre Dulce en Reforzado, Acero 5mm
-// Pretensionamiento en Pretensado — ver _calcularCosteoReforzado()/_calcularCosteoPretensado()).
+// Un costeo "usa" un insumo si aparece directo en su tabla de Insumos, en su lista de Otras
+// Materias Primas (Pretensado), indirecto vía el Diseño de Mezcla que tiene asignado
+// (Cemento/Agua/Agregados/Adiciones/Aditivos), o vía los insumos de Refuerzo (Acero
+// Figurado/Alambre Dulce, hardcodeados en Reforzado; el Acero de Pretensionamiento de
+// Pretensado ya no es hardcodeado, se elige en `rendimiento.itemAceroPretensado` — ver
+// _calcularCosteoReforzado()/_calcularCosteoPretensado()).
 // `nombres` es un arreglo porque un insumo renombrado hay que buscarlo por el nombre nuevo Y el
 // anterior (los costeos ya guardados todavía referencian el nombre viejo hasta que alguien los
 // vuelva a guardar).
 function _costeoUsaInsumo(c, nombres) {
   if ((c.insumos || []).some(r => nombres.includes(r.nombre))) return true;
+  if ((c.materiaPrimaExtra || []).some(r => nombres.includes(r.nombre))) return true;
   const diseno = DISENOS_MEZCLA.find(d => d.codigo === c.disenoMezclaCodigo);
   const m = diseno?.materiales || {};
   if (nombres.includes(m.cementoProducto) || nombres.includes(m.aguaProducto)) return true;
@@ -1178,7 +1191,7 @@ function _costeoUsaInsumo(c, nombres) {
   if ((m.adiciones || []).some(a => nombres.includes(a.producto))) return true;
   if ((m.aditivos || []).some(a => nombres.includes(a.producto))) return true;
   if (c.tipoEstructura === 'reforzado' && (nombres.includes('Acero Figurado') || nombres.includes('Alambre Dulce'))) return true;
-  if (c.tipoEstructura === 'pretensado' && nombres.includes('Acero 5mm Pretensionamiento')) return true;
+  if (c.tipoEstructura === 'pretensado' && nombres.includes(c.rendimiento?.itemAceroPretensado || 'Acero 5mm Pretensionamiento')) return true;
   return false;
 }
 
@@ -1313,6 +1326,7 @@ function abrirModalCosteoProducto() {
   document.getElementById('m-costeo-hilos-banco').value = '';
   document.getElementById('m-costeo-longitud-hilo').value = '';
   document.getElementById('m-costeo-bancos-dia').value = '';
+  document.getElementById('m-costeo-item-acero-pretensado').innerHTML = _opcionesInsumoCosteo('');
   document.getElementById('m-costeo-pct-desperdicio').value = 4;
   document.getElementById('m-costeo-pct-herramienta').value = 2;
   document.getElementById('m-costeo-margen-lista').value = 30;
@@ -1355,6 +1369,7 @@ function editarCosteoProducto(codigo) {
   document.getElementById('m-costeo-hilos-banco').value = r.hilosBanco || '';
   document.getElementById('m-costeo-longitud-hilo').value = r.longitudBrutaHilo || '';
   document.getElementById('m-costeo-bancos-dia').value = _diasBancoTexto(r.bancosDiaLinea);
+  document.getElementById('m-costeo-item-acero-pretensado').innerHTML = _opcionesInsumoCosteo(r.itemAceroPretensado || '');
   document.getElementById('m-costeo-pct-desperdicio').value = c.pctDesperdicio || 0;
   document.getElementById('m-costeo-pct-herramienta').value = c.pctHerramientaMenor || 0;
   document.getElementById('m-costeo-margen-lista').value = c.margenLista ?? 30;
