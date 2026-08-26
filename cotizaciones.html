@@ -1723,10 +1723,14 @@
     </div>
 
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
-      <span>ENTREGAS DE ESTE VIAJE</span>
-      <button type="button" class="btn btn-secundario btn-xs" id="btn-agregar-entrega" onclick="agregarEntregaViaje()">+ Agregar entrega</button>
+      <span>ENTREGAS Y DILIGENCIAS DE ESTE VIAJE</span>
+      <div class="flex-gap">
+        <button type="button" class="btn btn-secundario btn-xs" id="btn-agregar-entrega" onclick="agregarEntregaViaje()">+ Agregar entrega</button>
+        <button type="button" class="btn btn-secundario btn-xs" id="btn-agregar-diligencia" onclick="agregarDiligenciaViaje()">+ Agregar diligencia</button>
+      </div>
     </div>
     <div id="viaje-entregas-wrap"></div>
+    <div id="viaje-diligencias-wrap"></div>
 
     <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:12px 0;padding-top:10px;border-top:1px solid var(--gris-borde)">
       <span style="font-size:12px;font-weight:700;color:var(--gris-medio)">PESO TOTAL DEL VIAJE:</span>
@@ -1745,7 +1749,7 @@
 <div class="modal-overlay" id="modal-cumplidos">
   <div class="modal" style="width:760px;max-width:95vw">
     <div class="modal-titulo">✅ Cumplidos pendientes</div>
-    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:12px">Entregas programadas hasta hoy que todavía no tienen un resultado registrado. Se van acumulando aquí (no solo las de ayer) hasta que las marques.</div>
+    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:12px">Entregas y diligencias programadas hasta hoy que todavía no tienen un resultado registrado. Se van acumulando aquí (no solo las de ayer) hasta que las marques.</div>
     <div id="cumplidos-lista" style="max-height:60vh;overflow-y:auto"></div>
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-cumplidos')">Cerrar</button>
@@ -2306,7 +2310,7 @@
 <script src="js/costeo-producto.js?v=20260825j"></script>
 <script src="js/calidad-mezclas.js?v=20260825a"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
-<script src="js/logistica.js?v=20260817a"></script>
+<script src="js/logistica.js?v=20260826b"></script>
 <script src="js/estadisticas-logistica.js?v=20260804c"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20260825a"></script>

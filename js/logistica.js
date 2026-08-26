@@ -258,6 +258,10 @@ function _moverViajeADia(v, fechaDestino) {
     if (!e.fechaOriginal) e.fechaOriginal = v.fecha;
     e.cumplido = { estado: 'pendiente' };
   });
+  _diligenciasDeViaje(v).forEach(d => {
+    if (!d.fechaOriginal) d.fechaOriginal = v.fecha;
+    d.cumplido = { estado: 'pendiente' };
+  });
   v.fecha = fechaDestino;
   v.orden = Date.now();
   return sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' })
@@ -303,6 +307,10 @@ function confirmarMotivoArrastre() {
     if (!e.reprogramaciones) e.reprogramaciones = [];
     e.reprogramaciones.push({ fecha: fechaDestino, causa, fechaConfirmacion: new Date().toISOString(), confirmadoPor: USUARIO_ACTUAL?.email });
   });
+  _diligenciasDeViaje(v).forEach(d => {
+    if (!d.reprogramaciones) d.reprogramaciones = [];
+    d.reprogramaciones.push({ fecha: fechaDestino, causa, fechaConfirmacion: new Date().toISOString(), confirmadoPor: USUARIO_ACTUAL?.email });
+  });
 
   Promise.resolve(_moverViajeADia(v, fechaDestino)).then(() => renderCalendarioLogistica());
   renderCalendarioLogistica();
@@ -315,7 +323,10 @@ function confirmarMotivoArrastre() {
 // fecha destino y se saca del viaje original — las demás entregas del viaje original no se tocan.
 function _moverEntregaADia(v, entregaIndex, fechaDestino) {
   const entregas = v.entregas || _entregasDeViaje(v);
-  if (entregas.length <= 1) return _moverViajeADia(v, fechaDestino);
+  // El viaje puede tener también diligencias — solo se mueve el viaje completo si esta entrega
+  // es de verdad el único ítem (sin diligencias tampoco); si no, se separa solo la entrega y las
+  // diligencias se quedan donde estaban, sin moverse.
+  if (entregas.length + _diligenciasDeViaje(v).length <= 1) return _moverViajeADia(v, fechaDestino);
 
   const [e] = entregas.splice(entregaIndex, 1);
   v.pesoTotal = entregas.reduce((s, e2) => s + (e2.productos || []).reduce((s2, p) => s2 + (Number(p.peso) || 0), 0), 0);
@@ -337,6 +348,34 @@ function _moverEntregaADia(v, entregaIndex, fechaDestino) {
     sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' }),
     sb.from('entregas_programadas').upsert({ id: viajeNuevo.id, datos: viajeNuevo, modificado: new Date().toISOString() }, { onConflict: 'id' }),
   ]).then(resultados => resultados.forEach(({ error }) => { if (error) console.error('Error moviendo entrega:', error.message); }));
+}
+
+// Mueve UNA diligencia de un viaje a otra fecha — espejo exacto de _moverEntregaADia, pero sobre
+// `v.diligencias`. Si la diligencia es el único ítem del viaje (sin entregas tampoco), mueve el
+// viaje entero; si no, la separa en un viaje nuevo y deja las entregas/demás diligencias intactas.
+function _moverDiligenciaADia(v, diligenciaIndex, fechaDestino) {
+  const diligencias = v.diligencias || _diligenciasDeViaje(v);
+  if (_entregasDeViaje(v).length + diligencias.length <= 1) return _moverViajeADia(v, fechaDestino);
+
+  const [d] = diligencias.splice(diligenciaIndex, 1);
+  const viajeNuevo = {
+    id: String(Date.now()) + '-r',
+    fecha: fechaDestino,
+    destino: v.destino,
+    vehiculo: v.vehiculo,
+    estado: 'Programada',
+    observaciones: `Separado del viaje del ${v.fecha}.`,
+    entregas: [],
+    diligencias: [d],
+    pesoTotal: 0,
+    creadoPor: USUARIO_ACTUAL?.email,
+    creadoEn: new Date().toISOString(),
+  };
+  VIAJES.unshift(viajeNuevo);
+  return Promise.all([
+    sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' }),
+    sb.from('entregas_programadas').upsert({ id: viajeNuevo.id, datos: viajeNuevo, modificado: new Date().toISOString() }, { onConflict: 'id' }),
+  ]).then(resultados => resultados.forEach(({ error }) => { if (error) console.error('Error moviendo diligencia:', error.message); }));
 }
 
 function soltarViajeEnDia(event, fechaDestino) {
@@ -570,6 +609,18 @@ let _viajeBloqueadoActual = false;
 function _lineaVaciaEntrega() { return { producto: '', cantidad: 0, peso: 0 }; }
 function _entregaVaciaViaje() { return { ordenId: '', ordenNumero: '', cliente: '', destino: '', contactoObraNombre: '', contactoObraTelefono: '', productos: [_lineaVaciaEntrega()], cumplido: { estado: 'pendiente' } }; }
 
+// ── Diligencias (2026-08-25, a pedido del usuario) ──
+// Un camión a veces hace tareas distintas de entregar producto — recoger materia prima, llevar
+// una herramienta, una visita a obra, etc. — que no encajan en el modelo de "entrega" (cliente +
+// productos + peso + Orden de Producción). Es una lista APARTE (`viaje.diligencias`, nunca
+// `viaje.entregas`) a propósito, para que Estadísticas (que solo lee `entregas`) ni se entere de
+// que existen — solo texto libre (descripción/lugar/contacto), sin producto ni peso ni vínculo a
+// cliente. El seguimiento de cumplido reutiliza el mismo mecanismo que las entregas
+// (Hecha/Reprogramar/Cancelar en "✅ Cumplidos"), a pedido explícito del usuario, pero sin
+// desarrollar ninguna estadística nueva para esto.
+function _diligenciaVacia() { return { descripcion: '', lugar: '', contactoNombre: '', contactoTelefono: '', cumplido: { estado: 'pendiente' } }; }
+function _diligenciasDeViaje(v) { return v.diligencias || []; }
+
 const _ETIQUETA_CUMPLIDO = { pendiente: '⏳ Pendiente', hecha: '✅ Hecha', reprogramada: '🔁 Reprogramada', cancelada: '❌ Cancelada' };
 
 // ── Encadenamiento con Órdenes de Producción ──
@@ -719,6 +770,57 @@ function renderEntregasViaje() {
   actualizarPesoTotalViaje();
 }
 
+// ── Diligencias del viaje (filas dinámicas, sección aparte de Entregas) ──
+let _diligenciasViajeActual = [];
+
+function renderDiligenciasViaje() {
+  const wrap = document.getElementById('viaje-diligencias-wrap');
+  if (!wrap) return;
+  if (!_diligenciasViajeActual.length) { wrap.innerHTML = ''; return; }
+
+  const titulo = `<div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px">🔧 DILIGENCIAS DE ESTE VIAJE</div>`;
+
+  if (_viajeBloqueadoActual) {
+    wrap.innerHTML = titulo + _diligenciasViajeActual.map(d => {
+      const c = _cumplidoDeEntrega(d);
+      return `
+      <div class="card" style="padding:12px;margin-bottom:10px;background:#FFF8F0;box-shadow:none;border:1px solid #FFCC80;border-left:3px solid var(--naranja)">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+          <div style="font-size:13px;font-weight:700">${_esc(d.descripcion) || 'Sin descripción'}</div>
+          <div style="font-size:11px;font-weight:700">${_ETIQUETA_CUMPLIDO[c.estado] || _ETIQUETA_CUMPLIDO.pendiente}${c.estado === 'reprogramada' && c.nuevaFecha ? ` → ${_esc(c.nuevaFecha)}` : ''}</div>
+        </div>
+        <div style="font-size:11px;color:var(--gris-medio);margin-bottom:2px">Lugar: ${_esc(d.lugar) || '—'}</div>
+        <div style="font-size:11px;color:var(--gris-medio)">Contacto: ${d.contactoNombre ? _esc(d.contactoNombre) + (d.contactoTelefono ? ' — ' + _esc(d.contactoTelefono) : '') : '—'}</div>
+        ${c.estado === 'cancelada' && c.causa ? `<div style="font-size:11px;color:var(--rojo);margin-top:4px">Causa: ${_esc(c.causa)}</div>` : ''}
+      </div>`;
+    }).join('');
+    return;
+  }
+
+  wrap.innerHTML = titulo + _diligenciasViajeActual.map((d, di) => `
+    <div class="card" style="padding:12px;margin-bottom:10px;background:#FFF8F0;box-shadow:none;border:1px solid #FFCC80;border-left:3px solid var(--naranja)">
+      <div class="form-grid" style="margin-bottom:8px">
+        <div class="form-grupo"><label>Descripción *</label><input type="text" value="${_esc(d.descripcion)}" oninput="_diligenciasViajeActual[${di}].descripcion=this.value" placeholder="Ej: Recoger 5 sacos de cemento en Ferretería X"></div>
+        <div class="form-grupo"><label>Lugar *</label><input type="text" value="${_esc(d.lugar)}" oninput="_diligenciasViajeActual[${di}].lugar=this.value" placeholder="Ej: Ferretería X, Manizales"></div>
+      </div>
+      <div class="form-grid" style="margin-bottom:8px">
+        <div class="form-grupo"><label>Contacto <span style="font-weight:400;text-transform:none">(opcional)</span></label><input type="text" value="${_esc(d.contactoNombre)}" oninput="_diligenciasViajeActual[${di}].contactoNombre=this.value" placeholder="Nombre de quien recibe/entrega"></div>
+        <div class="form-grupo"><label>Teléfono contacto</label><input type="text" value="${_esc(d.contactoTelefono)}" oninput="_diligenciasViajeActual[${di}].contactoTelefono=this.value" placeholder="Ej: 3101234567"></div>
+      </div>
+      <div style="text-align:right"><button type="button" class="btn btn-rojo btn-xs" onclick="eliminarDiligenciaViaje(${di})">🗑️ Quitar diligencia</button></div>
+    </div>`).join('');
+}
+
+function agregarDiligenciaViaje() {
+  _diligenciasViajeActual.push(_diligenciaVacia());
+  renderDiligenciasViaje();
+}
+
+function eliminarDiligenciaViaje(di) {
+  _diligenciasViajeActual.splice(di, 1);
+  renderDiligenciasViaje();
+}
+
 // Trazabilidad Cliente → Proyecto (ver poblarSelectProyectosDeCliente en
 // calidad-ajuste-mezcla.js): el Destino específico/Proyecto de la entrega ya no se escribe a
 // mano, se elige de los proyectos que ese cliente tiene registrados. Si el cliente cambia, el
@@ -833,7 +935,6 @@ function agregarEntregaViaje() {
 
 function eliminarEntregaViaje(ei) {
   _entregasViajeActual.splice(ei, 1);
-  if (!_entregasViajeActual.length) _entregasViajeActual.push(_entregaVaciaViaje());
   renderEntregasViaje();
 }
 
@@ -882,6 +983,7 @@ function _aplicarBloqueoModalViaje(bloqueado) {
   _CAMPOS_VIAJE_BLOQUEABLES.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = bloqueado; });
   document.getElementById('viaje-bloqueado-banner').style.display = bloqueado ? 'block' : 'none';
   document.getElementById('btn-agregar-entrega').style.display = bloqueado ? 'none' : 'inline-flex';
+  document.getElementById('btn-agregar-diligencia').style.display = bloqueado ? 'none' : 'inline-flex';
   document.getElementById('btn-guardar-viaje').style.display = bloqueado ? 'none' : 'inline-flex';
 }
 
@@ -927,8 +1029,12 @@ function abrirModalViaje(fecha) {
   document.getElementById('m-viaje-obs').value = '';
   document.getElementById('btn-eliminar-viaje').style.display = 'none';
   _aplicarBloqueoModalViaje(false);
-  _entregasViajeActual = [_entregaVaciaViaje()];
+  // Arrancan vacías a propósito — el usuario elige con cuál de los dos botones empezar
+  // ("+ Agregar entrega" / "+ Agregar diligencia"); no se asume que todo viaje es una entrega.
+  _entregasViajeActual = [];
   renderEntregasViaje();
+  _diligenciasViajeActual = [];
+  renderDiligenciasViaje();
   document.getElementById('modal-viaje').classList.add('abierto');
 }
 
@@ -949,9 +1055,12 @@ function editarViaje(id) {
   // recalcula en vivo contra el catálogo actual (mismo criterio que los Ajustes de Mezcla:
   // un viaje ya programado no debe cambiar solo porque un producto se actualizó después).
   const entregasPrevias = _entregasDeViaje(v);
-  _entregasViajeActual = JSON.parse(JSON.stringify(entregasPrevias.length ? entregasPrevias : [_entregaVaciaViaje()]));
+  _entregasViajeActual = JSON.parse(JSON.stringify(entregasPrevias));
   _entregasViajeActual.forEach(e => { if (!e.productos || !e.productos.length) e.productos = [_lineaVaciaEntrega()]; if (!e.cumplido) e.cumplido = { estado: 'pendiente' }; if (e.ordenId === undefined) e.ordenId = ''; if (e.ordenNumero === undefined) e.ordenNumero = ''; if (!e.fechaOriginal) e.fechaOriginal = v.fecha; });
   renderEntregasViaje();
+  _diligenciasViajeActual = JSON.parse(JSON.stringify(_diligenciasDeViaje(v)));
+  _diligenciasViajeActual.forEach(d => { if (!d.cumplido) d.cumplido = { estado: 'pendiente' }; if (!d.fechaOriginal) d.fechaOriginal = v.fecha; });
+  renderDiligenciasViaje();
   document.getElementById('modal-viaje').classList.add('abierto');
 }
 
@@ -981,13 +1090,28 @@ function guardarViaje() {
     }))
     .filter(e => e.cliente || e.productos.length);
 
-  if (!entregasLimpias.length) { alert('Agrega al menos una entrega con un producto.'); return; }
   for (const e of entregasLimpias) {
     if (e.cliente && typeof _clienteValidoAjuste === 'function' && !_clienteValidoAjuste(e.cliente)) {
       alert(`El cliente "${e.cliente}" no existe en la base de datos de Cotizaciones y Ventas.\nCréalo allá primero, o selecciona uno existente de la lista.`);
       return;
     }
   }
+
+  const diligenciasLimpias = _diligenciasViajeActual
+    .map(d => ({
+      descripcion: (d.descripcion || '').trim(),
+      lugar: (d.lugar || '').trim(),
+      contactoNombre: (d.contactoNombre || '').trim(),
+      contactoTelefono: (d.contactoTelefono || '').trim(),
+      fechaOriginal: d.fechaOriginal || fecha,
+      cumplido: _cumplidoDeEntrega(d),
+    }))
+    .filter(d => d.descripcion || d.lugar);
+
+  // Un viaje puede ser solo una diligencia (ej. el camión sale únicamente a recoger una materia
+  // prima, sin entregar nada ese viaje) — por eso la validación exige al menos UNA entrega O
+  // UNA diligencia, no entrega obligatoria.
+  if (!entregasLimpias.length && !diligenciasLimpias.length) { alert('Agrega al menos una entrega con un producto, o una diligencia.'); return; }
 
   const editId = document.getElementById('m-viaje-id').value;
   const previo = editId ? VIAJES.find(x => String(x.id) === String(editId)) : null;
@@ -1000,6 +1124,7 @@ function guardarViaje() {
     estado: document.getElementById('m-viaje-estado').value,
     observaciones: document.getElementById('m-viaje-obs').value.trim(),
     entregas: entregasLimpias,
+    diligencias: diligenciasLimpias,
     pesoTotal,
     creadoPor: previo ? previo.creadoPor : USUARIO_ACTUAL?.email,
     creadoEn: previo ? (previo.creadoEn || new Date().toISOString()) : new Date().toISOString(),
@@ -1043,8 +1168,26 @@ function entregasPendientesAcumuladas() {
   return filas;
 }
 
+// Espejo de entregasPendientesAcumuladas() sobre viaje.diligencias — lista APARTE a propósito
+// (ver nota junto a _diligenciasDeViaje) para que nada de esto se mezcle con las estadísticas
+// de entregas.
+function diligenciasPendientesAcumuladas() {
+  const hoy = _fmtISO(new Date());
+  const filas = [];
+  VIAJES.forEach(v => {
+    if (v.fecha > hoy) return;
+    _diligenciasDeViaje(v).forEach((d, di) => {
+      if (_cumplidoDeEntrega(d).estado === 'pendiente') {
+        filas.push({ viajeId: v.id, diligenciaIndex: di, fecha: v.fecha, destinoViaje: v.destino, vehiculo: v.vehiculo, diligencia: d });
+      }
+    });
+  });
+  filas.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  return filas;
+}
+
 function actualizarBadgeCumplidos() {
-  const n = entregasPendientesAcumuladas().length;
+  const n = entregasPendientesAcumuladas().length + diligenciasPendientesAcumuladas().length;
   const el = document.getElementById('btn-cumplidos-texto');
   if (el) el.textContent = n ? `✅ Cumplidos (${n})` : '✅ Cumplidos';
 }
@@ -1052,22 +1195,27 @@ function actualizarBadgeCumplidos() {
 function abrirModalCumplidos() {
   _accionAbiertaKey = null;
   _accionAbiertaTipo = null;
+  _accionAbiertaKeyDiligencia = null;
+  _accionAbiertaTipoDiligencia = null;
   renderListaCumplidos();
   document.getElementById('modal-cumplidos').classList.add('abierto');
 }
 
 let _accionAbiertaKey = null;  // `${viajeId}-${entregaIndex}` de la fila con el panel de Reprogramar/Cancelar abierto
 let _accionAbiertaTipo = null; // 'reprogramar' | 'cancelar' — cuál de los dos paneles mostrar
+let _accionAbiertaKeyDiligencia = null;  // mismo mecanismo que _accionAbiertaKey, pero para diligencias (estado aparte para no chocar con el panel de una entrega abierto al mismo tiempo)
+let _accionAbiertaTipoDiligencia = null;
 
 function renderListaCumplidos() {
   const cont = document.getElementById('cumplidos-lista');
   if (!cont) return;
   const filas = entregasPendientesAcumuladas();
-  if (!filas.length) {
-    cont.innerHTML = '<div class="empty-state"><div class="icono">✅</div><div>No hay entregas pendientes de confirmar. ¡Al día!</div></div>';
+  const filasDiligencias = diligenciasPendientesAcumuladas();
+  if (!filas.length && !filasDiligencias.length) {
+    cont.innerHTML = '<div class="empty-state"><div class="icono">✅</div><div>No hay entregas ni diligencias pendientes de confirmar. ¡Al día!</div></div>';
     return;
   }
-  cont.innerHTML = filas.map(f => {
+  const htmlEntregas = filas.map(f => {
     const key = `${f.viajeId}-${f.entregaIndex}`;
     const pesoEntrega = (f.entrega.productos || []).reduce((s, p) => s + (Number(p.peso) || 0), 0);
     const fechaLegible = new Date(f.fecha + 'T12:00').toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short' });
@@ -1096,6 +1244,37 @@ function renderListaCumplidos() {
       ` : ''}
     </div>`;
   }).join('');
+
+  const htmlDiligencias = filasDiligencias.map(f => {
+    const key = `${f.viajeId}-${f.diligenciaIndex}`;
+    const fechaLegible = new Date(f.fecha + 'T12:00').toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short' });
+    const vecesRepro = _countReprogramaciones(f.diligencia);
+    const panelAbierto = _accionAbiertaKeyDiligencia === key;
+    return `
+    <div class="card" style="padding:10px 12px;margin-bottom:8px;border:1px solid #FFCC80;border-left:3px solid var(--naranja);box-shadow:none">
+      <div style="margin-bottom:8px">
+        <div style="font-size:12.5px;font-weight:700;text-transform:capitalize">🔧 ${fechaLegible} — ${_esc(f.diligencia.descripcion) || 'Sin descripción'}${vecesRepro ? ` <span style="color:var(--naranja);font-size:11px">🔁×${vecesRepro}</span>` : ''}</div>
+        <div style="font-size:11px;color:var(--gris-medio)">${_esc(f.diligencia.lugar || f.destinoViaje)} · ${_esc(f.vehiculo)}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-primario btn-xs" onclick="marcarCumplidoDiligencia('${f.viajeId}',${f.diligenciaIndex},'hecha')">✅ Hecha</button>
+        <button class="btn btn-secundario btn-xs" onclick="toggleAccionCumplidoDiligencia('${f.viajeId}',${f.diligenciaIndex},'reprogramar')">🔁 Reprogramar</button>
+        <button class="btn btn-rojo btn-xs" onclick="toggleAccionCumplidoDiligencia('${f.viajeId}',${f.diligenciaIndex},'cancelar')">❌ Cancelada</button>
+      </div>
+      ${panelAbierto ? `
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--gris-borde)">
+          ${_accionAbiertaTipoDiligencia === 'reprogramar' ? `<input type="date" id="dil-reprogramar-fecha-${key}" min="${_fmtISO(new Date())}" style="padding:5px 7px;border:1px solid var(--gris-borde);border-radius:4px;font-size:12px">` : ''}
+          <select id="dil-causa-${key}" style="padding:5px 7px;border:1px solid var(--gris-borde);border-radius:4px;font-size:12px;flex:1;min-width:220px">
+            <option value="">Causa de la ${_accionAbiertaTipoDiligencia === 'reprogramar' ? 'reprogramación' : 'cancelación'}...</option>
+            ${CAUSAS_REPROGRAMACION_CANCELACION.map(c => `<option value="${c}">${c}</option>`).join('')}
+          </select>
+          <button class="btn btn-primario btn-xs" onclick="${_accionAbiertaTipoDiligencia === 'reprogramar' ? `confirmarReprogramacionDiligencia('${f.viajeId}',${f.diligenciaIndex})` : `confirmarCancelacionDiligencia('${f.viajeId}',${f.diligenciaIndex})`}">Confirmar</button>
+        </div>
+      ` : ''}
+    </div>`;
+  }).join('');
+
+  cont.innerHTML = htmlEntregas + (htmlDiligencias ? `<div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px">🔧 DILIGENCIAS</div>${htmlDiligencias}` : '');
 }
 
 function toggleAccionCumplido(viajeId, entregaIndex, tipo) {
@@ -1164,6 +1343,71 @@ function marcarCumplidoEntrega(viajeId, entregaIndex, estado, nuevaFecha, causa)
 
   _accionAbiertaKey = null;
   _accionAbiertaTipo = null;
+  renderListaCumplidos();
+  renderCalendarioLogistica();
+}
+
+// ── Cumplidos de diligencias — espejo exacto de toggleAccionCumplido/confirmarReprogramacion/
+// confirmarCancelacion/marcarCumplidoEntrega, pero sobre v.diligencias. Se duplica en vez de
+// generalizar con un parámetro de tipo a propósito, para no tocar el flujo de entregas (delicado
+// y ya en uso) — mismo criterio aplicado en toda esta sesión para las diligencias.
+function toggleAccionCumplidoDiligencia(viajeId, diligenciaIndex, tipo) {
+  const key = `${viajeId}-${diligenciaIndex}`;
+  if (_accionAbiertaKeyDiligencia === key && _accionAbiertaTipoDiligencia === tipo) { _accionAbiertaKeyDiligencia = null; _accionAbiertaTipoDiligencia = null; }
+  else { _accionAbiertaKeyDiligencia = key; _accionAbiertaTipoDiligencia = tipo; }
+  renderListaCumplidos();
+}
+
+function confirmarReprogramacionDiligencia(viajeId, diligenciaIndex) {
+  const key = `${viajeId}-${diligenciaIndex}`;
+  const inputFecha = document.getElementById(`dil-reprogramar-fecha-${key}`);
+  const nuevaFecha = inputFecha ? inputFecha.value : '';
+  const inputCausa = document.getElementById(`dil-causa-${key}`);
+  const causa = inputCausa ? inputCausa.value : '';
+  if (!nuevaFecha) { alert('Elige la nueva fecha.'); return; }
+  if (!causa) { alert('Elige la causa de la reprogramación.'); return; }
+  const v = VIAJES.find(x => String(x.id) === String(viajeId));
+  if (v && nuevaFecha === v.fecha) {
+    alert('Esa es la misma fecha del viaje actual — si la diligencia se va a hacer más tarde el mismo día, no hace falta reprogramarla: déjala pendiente y márcala como "Hecha" cuando se complete.');
+    return;
+  }
+  marcarCumplidoDiligencia(viajeId, diligenciaIndex, 'reprogramada', nuevaFecha, causa);
+}
+
+function confirmarCancelacionDiligencia(viajeId, diligenciaIndex) {
+  const key = `${viajeId}-${diligenciaIndex}`;
+  const inputCausa = document.getElementById(`dil-causa-${key}`);
+  const causa = inputCausa ? inputCausa.value : '';
+  if (!causa) { alert('Elige la causa de la cancelación.'); return; }
+  marcarCumplidoDiligencia(viajeId, diligenciaIndex, 'cancelada', null, causa);
+}
+
+function marcarCumplidoDiligencia(viajeId, diligenciaIndex, estado, nuevaFecha, causa) {
+  const v = VIAJES.find(x => String(x.id) === String(viajeId));
+  if (!v) return;
+  if (!v.diligencias) v.diligencias = _diligenciasDeViaje(v);
+  const d = v.diligencias[diligenciaIndex];
+  if (!d) return;
+  if (!d.fechaOriginal) d.fechaOriginal = v.fecha;
+
+  if (estado === 'reprogramada') {
+    if (!d.reprogramaciones) d.reprogramaciones = [];
+    d.reprogramaciones.push({ fecha: nuevaFecha, causa: causa || '', fechaConfirmacion: new Date().toISOString(), confirmadoPor: USUARIO_ACTUAL?.email });
+    d.cumplido = { estado: 'pendiente' };
+    Promise.resolve(_moverDiligenciaADia(v, diligenciaIndex, nuevaFecha)).then(() => renderCalendarioLogistica());
+    _accionAbiertaKeyDiligencia = null;
+    _accionAbiertaTipoDiligencia = null;
+    renderListaCumplidos();
+    return;
+  }
+
+  d.cumplido = { estado, fechaConfirmacion: new Date().toISOString(), confirmadoPor: USUARIO_ACTUAL?.email };
+  if (estado === 'cancelada') d.cumplido.causa = causa || '';
+  sb.from('entregas_programadas').upsert({ id: v.id, datos: v, modificado: new Date().toISOString() }, { onConflict: 'id' })
+    .then(({ error }) => { if (error) console.error('Error guardando cumplido:', error.message); });
+
+  _accionAbiertaKeyDiligencia = null;
+  _accionAbiertaTipoDiligencia = null;
   renderListaCumplidos();
   renderCalendarioLogistica();
 }

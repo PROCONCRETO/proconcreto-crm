@@ -55,10 +55,29 @@ Botón "✅ Cumplidos" en la barra de Programación de Viajes, con contador de e
 
 **Causa de reprogramación/cancelación**: tanto "Reprogramar" como "Cancelada" en Cumplidos piden elegir una causa de un desplegable (`CAUSAS_REPROGRAMACION_CANCELACION` en `logistica.js`, mismo catálogo para las dos acciones — 7 opciones fijas, ej. "No se tiene acceso a la obra por condiciones de la vía o espacio", "El cliente canceló el pedido"), obligatoria para confirmar. Se guarda en `reprogramaciones[].causa` (reprogramación, un valor por cada vez) o en `cumplido.causa` (cancelación, resultado final). Alimenta las gráficas de "Causas más frecuentes" en Estadísticas, para identificar patrones y tomar acciones correctivas.
 
+## Diligencias (2026-08-26)
+
+Un camión a veces hace tareas distintas de entregar producto — recoger materia prima, llevar una herramienta, una visita a obra, etc. — que no encajan en el modelo de entrega (cliente + productos + peso + Orden de Producción). A pedido del usuario, el modal de "Nuevo Viaje" tiene un segundo botón junto a "+ Agregar entrega": **"+ Agregar diligencia"** (`agregarDiligenciaViaje()`), que agrega una fila de texto libre — Descripción, Lugar, Contacto (opcional, nombre + teléfono) — sin cliente, producto, peso ni vínculo a Orden de Producción (decisión explícita: "siempre texto libre", sin buscador de cliente).
+
+**El modal arranca sin ninguna fila de entrega ni de diligencia** (`abrirModalViaje()`) — antes de esta sección siempre había una entrega vacía por defecto, lo que sugería que todo viaje era una entrega; ahora las filas solo aparecen cuando el usuario pulsa uno de los dos botones, y quitar la última entrega (`eliminarEntregaViaje()`) ya no vuelve a agregar una vacía automáticamente (mismo comportamiento que `eliminarDiligenciaViaje()`, que nunca lo hizo). El encabezado de la sección dice "ENTREGAS Y DILIGENCIAS DE ESTE VIAJE" para que ambos tipos se vean como opciones igual de válidas, no una la excepción de la otra.
+
+**Modelo de datos deliberadamente separado**: `viaje.diligencias` es un arreglo APARTE de `viaje.entregas` — nunca se mezclan en la misma lista. `_diligenciasDeViaje(v)` es el único punto de lectura (mismo patrón que `_entregasDeViaje(v)`). Esto es a propósito, por pedido explícito del usuario ("sin que afecte las estadísticas de entregas y sin desarrollar estadísticas para esto"): como Estadísticas (`estadisticas-logistica.js`) solo lee `entregas`, las diligencias quedan invisibles ahí por construcción — no hace falta ninguna lógica de exclusión, y no se construyó ninguna estadística nueva para diligencias.
+
+**Cumplidos reutiliza el mismo flujo que entregas**, duplicado función por función en vez de generalizado con un parámetro de tipo (mismo criterio de "no tocar el código de entregas, que es delicado y ya está en uso" aplicado en toda la sesión):
+- `diligenciasPendientesAcumuladas()` — espejo de `entregasPendientesAcumuladas()`, mismo criterio de acumulación (hoy o cualquier día anterior, estado `pendiente`).
+- El contador del botón "✅ Cumplidos" (`actualizarBadgeCumplidos()`) suma entregas **y** diligencias pendientes en un solo número.
+- `renderListaCumplidos()` pinta ambas listas en el mismo panel: las entregas primero, y si hay diligencias pendientes un encabezado "🔧 DILIGENCIAS" con sus propias tarjetas (borde naranja para distinguirlas a simple vista).
+- `toggleAccionCumplidoDiligencia()` / `confirmarReprogramacionDiligencia()` / `confirmarCancelacionDiligencia()` / `marcarCumplidoDiligencia()` — mismo comportamiento que sus equivalentes de entrega (Hecha/Reprogramar/Cancelar, misma causa obligatoria del catálogo `CAUSAS_REPROGRAMACION_CANCELACION`, mismo historial `reprogramaciones[]`). Usan IDs de DOM con prefijo `dil-` (`dil-reprogramar-fecha-`, `dil-causa-`) y estado de panel abierto aparte (`_accionAbiertaKeyDiligencia`/`_accionAbiertaTipoDiligencia`) para no chocar con el panel de una entrega abierto al mismo tiempo.
+- `_moverDiligenciaADia()` — espejo de `_moverEntregaADia()`: si la diligencia es el único ítem del viaje (sin entregas tampoco), mueve el viaje entero; si el viaje tiene más ítems, separa solo la diligencia en un viaje nuevo en la fecha destino.
+
+**Un viaje puede ser solo una diligencia**, sin ninguna entrega (ej. el camión sale únicamente a recoger una materia prima) — `guardarViaje()` exige al menos una entrega con producto O una diligencia, no entrega obligatoria.
+
+**Viajes mixtos (entrega + diligencia en el mismo viaje)**: `_moverEntregaADia()`/`_moverDiligenciaADia()` deciden si mueven el viaje completo o separan solo el ítem mirando la suma de `entregas.length + diligencias.length`, no solo el arreglo propio — así reprogramar la única entrega de un viaje que también tiene diligencias no arrastra esas diligencias a la fecha nueva por accidente (y viceversa). `_moverViajeADia()` (usado al arrastrar el chip completo en el calendario) y `confirmarMotivoArrastre()` (causa de arrastre) sí procesan entregas y diligencias por igual, porque ahí se está moviendo el viaje entero a propósito.
+
 ## Datos
 
 - Tabla Supabase: `entregas_programadas` (el nombre de la tabla no se cambió al renombrar Despacho→Viaje, para no requerir migración de base de datos).
-- Cada fila guarda un viaje completo en `datos` (JSONB), con el arreglo de entregas en el campo `entregas`. Los viajes guardados antes del rename de 2026-07-16 tienen ese arreglo en el campo viejo `clientes` — el código lee `entregas || clientes` para que sigan funcionando, y los migra al campo nuevo la próxima vez que se editan y guardan.
+- Cada fila guarda un viaje completo en `datos` (JSONB), con el arreglo de entregas en el campo `entregas` y el de diligencias en `diligencias` (ver sección Diligencias arriba). Los viajes guardados antes del rename de 2026-07-16 tienen ese arreglo en el campo viejo `clientes` — el código lee `entregas || clientes` para que sigan funcionando, y los migra al campo nuevo la próxima vez que se editan y guardan.
 
 ## Estadísticas (dashboard)
 
