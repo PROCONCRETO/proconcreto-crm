@@ -89,16 +89,37 @@ function _extraerResistenciaConsuas(texto) {
 // La fila de la PRIMERA probeta trae además, pegado al final de la misma línea, el grupo de
 // "resistencia promedio" (misma forma de 4 números que una probeta) — por eso se recorre línea
 // por línea tomando como mucho UN valor por línea, así ese promedio (2do grupo de esa línea)
-// queda descartado solo en vez de colarse como si fuera otra probeta. ──
+// queda descartado solo en vez de colarse como si fuera otra probeta.
+//
+// Bug real (reportado 2026-08-25, con un informe de 2 muestras): cuando el informe trae más de
+// un cilindro, la última fila de probeta de la muestra ANTERIOR puede caer dentro de las 5
+// líneas hacia atrás del cilindro ACTUAL — confirmado corriendo el parser contra un informe
+// real de 2 muestras (1515 y 1517): la última probeta de 1515 (línea 22) quedaba a solo 1 línea
+// de la primera probeta real de 1517 (línea 23), así que al recorrer la ventana hacia atrás
+// EN ORDEN (de la más vieja a la más nueva) se topaba primero con la de 1515 y la tomaba como
+// si fuera la 1ra probeta de 1517 — dejando solo 2 probetas reales de 1517 (se llenaban las 3
+// con esa intrusa + las 2 primeras genuinas, nunca se llegaba a la 3ra real). Por eso la
+// búsqueda hacia atrás va de la línea MÁS CERCANA al cilindro hacia la más lejana (se detiene
+// en el primer match, que es el más cercano) — nunca cruza a la muestra anterior porque nunca
+// sigue buscando más atrás una vez que encuentra algo. Hacia adelante no cambia: ya iba de más
+// cercano a más lejano (orden natural), y por eso nunca tuvo este problema. ──
 function _extractorAsprecon(lineas, cilindroNo) {
   const fechaLinea = lineas.find(l => /FECHA DE REALIZACI[ÓO]N DE ENSAYO/i.test(l));
   const idx = _lineaCilindro(lineas, cilindroNo);
-  const ventana = idx === -1 ? [] : lineas.slice(Math.max(0, idx - 5), idx + 10);
   const probetas = [];
-  for (const linea of ventana) {
-    const grupos = _extraerResistenciasMPa(linea);
-    if (grupos.length) probetas.push(grupos[0]);
-    if (probetas.length >= 3) break;
+  if (idx !== -1) {
+    // Hacia atrás: de la línea más cercana al cilindro hacia la más lejana — se detiene en el
+    // PRIMER match (el más cercano), así nunca alcanza a cruzar a la muestra anterior.
+    for (let i = idx - 1; i >= Math.max(0, idx - 5); i--) {
+      const grupos = _extraerResistenciasMPa(lineas[i]);
+      if (grupos.length) { probetas.push(grupos[0]); break; }
+    }
+    probetas.reverse(); // queda en orden cronológico (probeta 1, luego lo que se sume hacia adelante)
+    // Desde la línea del cilindro hacia adelante, en orden natural.
+    for (let i = idx; i < Math.min(lineas.length, idx + 10) && probetas.length < 3; i++) {
+      const grupos = _extraerResistenciasMPa(lineas[i]);
+      if (grupos.length) probetas.push(grupos[0]);
+    }
   }
   // Códigos de probeta (ej. "T2-21, T2-22, T2-23, T2-24") al final de la descripción del
   // elemento, quedan como Observaciones.

@@ -265,15 +265,16 @@ const _LABEL_ROL_AGREGADO_COSTEO = { arena: 'Arena', grava: 'Triturado Grueso' }
 // $/L antes de costear. Es una conversión física EXACTA (1 m³ = 1000 L), a diferencia de
 // kg↔m³ que necesitaría una densidad supuesta — por eso solo se automatiza para volumen.
 // `unidadReceta` es la unidad que de verdad usa la receta para ese material (ej. 'L' para
-// agua); si no se pasa, o si el insumo ya está en esa unidad, no se convierte nada.
-const _CONVERSION_UNIDAD_VOLUMEN = { 'm3->L': 1000, 'L->m3': 0.001 };
+// agua, 'g' para aditivos — ver más abajo); si no se pasa, o si el insumo ya está en esa
+// unidad, no se convierte nada.
+const _CONVERSION_UNIDAD = { 'm3->L': 1000, 'L->m3': 0.001, 'kg->g': 1000, 'g->kg': 0.001 };
 function _precioInsumoPorNombre(nombre, productoGeneraIva, unidadReceta) {
   const i = INSUMOS_COSTOS.find(x => x.nombre === nombre);
   if (!i) return 0;
   const costo = calcularCostoInsumo(i);
   let precio = productoGeneraIva ? costo.costoSinIva : costo.valorFinal;
   if (unidadReceta && i.unidad && i.unidad !== unidadReceta) {
-    const factor = _CONVERSION_UNIDAD_VOLUMEN[`${i.unidad}->${unidadReceta}`];
+    const factor = _CONVERSION_UNIDAD[`${i.unidad}->${unidadReceta}`];
     if (factor) precio = precio / factor;
   }
   return precio;
@@ -281,13 +282,15 @@ function _precioInsumoPorNombre(nombre, productoGeneraIva, unidadReceta) {
 
 // Peso total de la mezcla (kg/m³, aprox — agua en L se trata como kg) — se usa para sacar
 // cuánto pesa una cochada, y de ahí cuántas unidades rinde (ver calcularCosteoProducto()).
+// Los aditivos se dosifican en GRAMOS (ver renderAditivosDiseno() en calidad-mezclas.js), así
+// que se convierten a kg (÷1000) antes de sumarlos al resto, que sí está en kg.
 function _pesoTotalMezclaM3(diseno) {
   if (!diseno) return 0;
   const m = diseno.materiales || {};
   let peso = (m.cemento || 0) + (m.agua || 0);
   (m.agregados || []).forEach(a => { peso += Number(a.cantidad) || 0; });
   (m.adiciones || []).forEach(a => { peso += Number(a.cantidad) || 0; });
-  (m.aditivos || []).forEach(a => { peso += Number(a.dosis) || 0; });
+  (m.aditivos || []).forEach(a => { peso += (Number(a.dosis) || 0) / 1000; });
   return peso;
 }
 
@@ -309,7 +312,7 @@ function _actualizarPreviewDiseno() {
     if ((Number(a.cantidad) || 0) > 0) filas.push(`<div class="fila"><span>${a.producto || 'Adición'}</span><span>${a.cantidad} kg/m³</span></div>`);
   });
   (m.aditivos || []).forEach(a => {
-    if ((Number(a.dosis) || 0) > 0) filas.push(`<div class="fila"><span>${a.producto || a.tipo}</span><span>${a.dosis} kg/m³</span></div>`);
+    if ((Number(a.dosis) || 0) > 0) filas.push(`<div class="fila"><span>${a.producto || a.tipo}</span><span>${a.dosis} g/m³</span></div>`);
   });
   filas.push(`<div class="fila" style="border-top:1px solid #BFDBFE;margin-top:4px;padding-top:5px;font-weight:700"><span>Peso total de la mezcla</span><span>≈ ${_pesoTotalMezclaM3(diseno).toLocaleString('es-CO')} kg/m³</span></div>`);
   div.innerHTML = filas.join('');
@@ -639,10 +642,10 @@ function calcularCosteoProducto(c) {
     (m.aditivos || []).forEach(a => {
       if (!((Number(a.dosis) || 0) > 0)) return;
       const cantidad = ((Number(a.dosis) || 0) * capacidadCochadaM3) / unidadesBache;
-      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
+      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva, 'g');
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: a.producto || a.tipo, unidad: 'kg', cantidad, precio, costo });
+      materiaPrimaDetalle.push({ nombre: a.producto || a.tipo, unidad: 'g', cantidad, precio, costo });
     });
   }
   const desperdicio = materiaPrima * ((c.pctDesperdicio || 0) / 100);
@@ -771,10 +774,10 @@ function _calcularCosteoReforzado(c) {
     (m.aditivos || []).forEach(a => {
       if (!((Number(a.dosis) || 0) > 0)) return;
       const cantidad = (Number(a.dosis) || 0) * volumenUnidadM3;
-      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
+      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva, 'g');
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: a.producto || a.tipo, unidad: 'kg', cantidad, precio, costo });
+      materiaPrimaDetalle.push({ nombre: a.producto || a.tipo, unidad: 'g', cantidad, precio, costo });
     });
   }
   const desperdicio = materiaPrima * ((c.pctDesperdicio || 0) / 100);
@@ -922,10 +925,10 @@ function _calcularCosteoPretensado(c) {
     (m.aditivos || []).forEach(a => {
       if (!((Number(a.dosis) || 0) > 0)) return;
       const cantidad = (Number(a.dosis) || 0) * volumenUnidadM3;
-      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
+      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva, 'g');
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: a.producto || a.tipo, unidad: 'kg', cantidad, precio, costo });
+      materiaPrimaDetalle.push({ nombre: a.producto || a.tipo, unidad: 'g', cantidad, precio, costo });
     });
   }
   const desperdicio = materiaPrima * ((c.pctDesperdicio || 0) / 100);

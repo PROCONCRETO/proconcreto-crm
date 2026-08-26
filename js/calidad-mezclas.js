@@ -201,6 +201,13 @@ function renderAditivosDiseno() {
   // (sumaPorTipo('Superplastificante')/('Acelerante') en calidad-ajuste-mezcla.js) — no se
   // puede volver un producto libre sin romper ese cálculo. "Producto" es aparte: el ítem
   // real de Costos de Referencia que le da precio a esta dosis específica.
+  // Dosis en GRAMOS (2026-08-25, a pedido del usuario — antes decía "kg o %", pero el "%" nunca
+  // se implementó en ningún cálculo real, y el resto de la app (Ajuste Diario/Formato de
+  // Producción, ver calidad-ajuste-mezcla.js) ya mostraba esta misma cantidad como gramos —
+  // unificar en gramos evita decimales confusos para el operario en dosis típicamente pequeñas.
+  // Costeo de Producto hace la conversión g→kg al costear (ver _precioInsumoPorNombre() en
+  // costeo-producto.js), porque el insumo se sigue vendiendo y registrando en Costos de
+  // Referencia en kg (así lo factura el proveedor).
   tbody.innerHTML = _aditivosDisenoActual.map((a, i) => `
     <tr>
       <td>
@@ -211,7 +218,7 @@ function renderAditivosDiseno() {
         </select>
       </td>
       <td><select onchange="_aditivosDisenoActual[${i}].producto=this.value">${_opcionesProductoCatalogo(a.producto || '', 'aditivo')}</select></td>
-      <td><input type="number" value="${a.dosis}" min="0" step="0.01" onchange="_aditivosDisenoActual[${i}].dosis=parseFloat(this.value)||0"></td>
+      <td><input type="number" value="${a.dosis}" min="0" step="1" onchange="_aditivosDisenoActual[${i}].dosis=parseFloat(this.value)||0"></td>
       <td><button class="btn btn-rojo btn-xs" onclick="eliminarAditivoDiseno(${i})">✕</button></td>
     </tr>`).join('');
 }
