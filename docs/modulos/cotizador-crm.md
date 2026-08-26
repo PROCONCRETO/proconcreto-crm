@@ -47,6 +47,8 @@ El modo "Por peso" (consolidado, sin importar el destino) no cambió.
 
 `pipeline`, `historico`, `clientes`, `estadisticas`
 
+**Orden de las tarjetas en Pipeline (2026-08-26)**: dentro de cada columna del kanban, las tarjetas se ordenan por `fecha` de la cotización, más reciente primero (`renderPipeline()` en `js/historico-clientes-stats.js`) — antes no tenían ningún orden explícito, quedaban en el orden en que Supabase las devolvía al cargar, sin relación con la fecha.
+
 ## Lectura de RUT (autocompletar cliente desde el PDF)
 
 En el modal de Nuevo/Editar Cliente, el botón "📄 Muéstrame el RUT del cliente" (zona de arrastrar-y-soltar o buscar archivo, ubicada al final del formulario, justo antes de los botones Cancelar/Guardar) lee el PDF del RUT **completo en el navegador** con [pdf.js](https://mozilla.github.io/pdf.js/) (CDN) — el archivo nunca se sube a Supabase ni se guarda en ningún lado, solo se procesa en memoria y se descarta.
@@ -89,6 +91,18 @@ Pipeline y el renglón principal de Histórico siempre muestran la versión **m�
 - De ahí en adelante conviven dos cotizaciones en juego: `cot` (la vigente/más reciente — la que Pipeline e Histórico muestran, y cuyo estado se marca "Aceptada" para que esas pantallas queden coherentes) y `cotAprobada` (la que el cliente realmente aprobó — puede ser la misma que `cot`, o una anterior). `_intentarAceptarCotizacion(cot, cotAprobada)` y `_confirmarAceptacionCotizacion(cot, cotAprobada)` reciben ambas; la Orden de Servicio sale de `crearOrdenDesdeCotizacion(cotAprobada)` — con sus ítems, cliente, transporte, condiciones y `versionCotizacion` reales, no los de la más reciente.
 - Si falta el Proyecto (ver arriba) y hay que pasar por la ficha del cliente, `_cotAceptandoPendienteProyecto` guarda `{ latestId, aprobadaId }` (los `id` de ambas cotizaciones) para que `_completarAceptacionCotizacion()` retome el flujo completo sin perder cuál de las dos versiones era la aprobada.
 - La pregunta de versión no toca el mecanismo de "¿cuál opción eligió?" (varias opciones de precio dentro de una misma versión, ver arriba) — son preguntas independientes; si la versión aprobada tiene varias opciones, se sigue preguntando cuál después de elegir la versión.
+
+### Bug real: la Orden de Servicio se quedaba con la versión vieja (2026-08-26)
+
+Reportado por el usuario: aceptó la V2 de una cotización (la que el cliente de verdad aprobó), Cotizaciones mostró correctamente la V2 como "Aceptada", pero la Orden de Producción que llegó a Producción/Logística traía los datos de la V1.
+
+**Causa**: `_confirmarAceptacionCotizacion(cot, cotAprobada)` solo llamaba `crearOrdenDesdeCotizacion(cotAprobada)` cuando **no existía ninguna** Orden de Servicio para ese número (`if (!osExistente) crearOrdenDesdeCotizacion(cotAprobada)`). Si ya existía una — por ejemplo, porque alguien había marcado "Aceptada" con la V1 seleccionada por error antes de corregir a la V2 — la función no hacía nada: ni creaba una nueva, ni actualizaba la existente. El estado de la cotización sí quedaba coherente (`cot.estado = 'Aceptada'` en la V2), dando la falsa impresión de que todo estaba bien, pero la Orden real seguía con los ítems/totales de la versión vieja indefinidamente.
+
+**Arreglo**: ahora se compara `osExistente.versionCotizacion` contra `cotAprobada.version`. Si no coinciden, se le pregunta al usuario (con `confirm()`, mismo estilo que el resto de estas confirmaciones) si quiere actualizar la Orden existente con los ítems/totales/condiciones de la versión recién aprobada — nunca se sobrescribe en silencio, porque la orden puede ya estar en producción y conviene que quien acepta lo confirme a propósito. `_actualizarOrdenDesdeCotizacion(orden, cot)` (nueva función, espejo de `crearOrdenDesdeCotizacion()`) solo toca los campos que vienen de la cotización (ítems, totales, condiciones, transporte, cargue/descargue, vendedor, cliente, `versionCotizacion`, `opcionElegida`) — preserva intactos `id`, `numero`, `estado` (de producción), `prioridad`, `fechaEntrega` y `observaciones`, para no perder avance operativo ya registrado en la orden.
+
+**Para corregir una orden que ya quedó mal** (como la que reportó el usuario): sobre la cotización ya marcada "Aceptada" con la versión correcta, abrir "Estado" de nuevo y volver a elegir "✅ Aceptada" — el flujo se repite, vuelve a preguntar la versión (si hay varias), y con el arreglo ya detecta el desfase contra la Orden existente y ofrece actualizarla. No hace falta editar nada a mano en Supabase.
+
+Verificado ejecutando la función real (no solo revisión de código) contra 3 escenarios armados a propósito: OS existente de otra versión (detecta el desfase, actualiza en el sitio sin duplicar, preserva los campos de producción), sin OS previa (crea una nueva normalmente) y OS que ya coincide con la versión aprobada (no pregunta ni toca nada) — los tres se comportaron como se esperaba.
 
 ### El nombre del PDF descargable incluye la versión (2026-08-26)
 

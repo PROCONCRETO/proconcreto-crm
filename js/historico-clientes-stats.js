@@ -323,7 +323,46 @@ function _confirmarAceptacionCotizacion(cot, cotAprobada) {
     if (error) console.error('Error actualizando estado:', error.message);
   });
   const osExistente = ORDENES.find(o => o.cotizacion === cot.numero);
-  if (!osExistente) crearOrdenDesdeCotizacion(cotAprobada);
+  if (!osExistente) {
+    crearOrdenDesdeCotizacion(cotAprobada);
+  } else if ((osExistente.versionCotizacion || 'V1') !== (cotAprobada.version || 'V1')) {
+    // Bug real reportado (2026-08-26): el cliente aprobó la V2, se aceptó la V2 en Cotizaciones,
+    // pero Producción seguía viendo la V1 — porque ya existía una Orden de Servicio para este
+    // número (de un intento anterior, ej. si alguien había aceptado la V1 por error antes de
+    // corregir a la V2) y esta función simplemente no hacía nada si ya había una. Ahora se
+    // detecta el desfase de versión y se ofrece actualizar la orden existente con los datos de
+    // la versión recién aprobada, en vez de dejarla desactualizada en silencio.
+    if (confirm(`⚠️ Ya existe la Orden de Servicio ${osExistente.numero} para la cotización ${cot.numero}, pero se creó desde la ${osExistente.versionCotizacion || 'V1'} — no desde la ${cotAprobada.version || 'V1'} que se acaba de aceptar.\n\n¿Actualizar la Orden ${osExistente.numero} con los ítems y totales de la ${cotAprobada.version || 'V1'}?\n\nEsto solo actualiza los datos comerciales (ítems, totales, condiciones) — no toca el estado de producción de la orden ni su fecha de entrega.`)) {
+      _actualizarOrdenDesdeCotizacion(osExistente, cotAprobada);
+    }
+  }
+}
+
+// Actualiza una Orden de Servicio ya existente con los ítems/totales/condiciones de la versión
+// de cotización que de verdad se aprobó — espejo de crearOrdenDesdeCotizacion() pero sobre una
+// orden que ya existe, preservando su estado de producción (id, número, estado, prioridad,
+// fecha de entrega, observaciones) intacto. Ver la nota en _confirmarAceptacionCotizacion().
+function _actualizarOrdenDesdeCotizacion(orden, cot) {
+  const ops = obtenerOpcionesCot(cot);
+  const idxOp = (cot.opcionAceptada != null && ops[cot.opcionAceptada]) ? cot.opcionAceptada : 0;
+  const op = ops[idxOp];
+  const itemsOp = op.items || [];
+  orden.versionCotizacion = cot.version || 'V1';
+  orden.opcionElegida = ops.length > 1 ? ('Opción ' + (idxOp + 1)) : '';
+  orden.cliente = cot.cliente?.nombre || orden.cliente;
+  orden.clienteData = cot.cliente;
+  orden.descripcion = itemsOp.map(i => `${i.nombre} (${i.cantidad} ${i.unidad})`).join(' / ');
+  orden.items = itemsOp;
+  orden.transporte = op.transporte;
+  orden.cargue = op.cargue;
+  orden.descargue = op.descargue;
+  orden.condiciones = cot.condiciones;
+  orden.vendedor = cot.vendedor;
+  orden.totales = op.totales;
+  orden.cantidad = itemsOp.reduce((s, i) => s + (i.cantidad || 0), 0);
+  sb.from('ordenes_servicio').upsert({ numero: orden.numero, datos: orden, modificado: new Date().toISOString() }, { onConflict: 'numero' })
+    .then(({ error }) => { if (error) console.error('Error actualizando OS con la versión aprobada:', error.message); });
+  alert(`✅ Orden ${orden.numero} actualizada con los datos de la cotización ${cot.numero} ${cot.version || 'V1'}.`);
 }
 
 // ═══════════════════════════════
@@ -873,7 +912,9 @@ function renderPipeline() {
   const latest = _filtrarPorPeriodoVendedor(versionesLatest(), 'pipe', _periodoPipeline);
 
   board.innerHTML = COLUMNAS.map(col => {
-    const cards = latest.filter(c => c.estado === col.id);
+    // Más reciente primero (a pedido del usuario) — antes quedaban en el orden de llegada de
+    // Supabase, sin relación con la fecha de la cotización.
+    const cards = latest.filter(c => c.estado === col.id).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
     const totalCol = cards.reduce((s, c) => s + c.totales.total, 0);
     const cardsHTML = cards.length
       ? cards.map(c => `
