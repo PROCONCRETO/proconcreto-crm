@@ -621,7 +621,7 @@ function calcularCosteoProducto(c) {
       const precio = _precioInsumoPorNombre(m[`${k}Producto`], productoGeneraIva, _UNIDAD_RECETA_MATERIAL[k]);
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo, esCemento: k === 'cemento' });
+      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo, esCemento: k === 'cemento', noEncontrado: !INSUMOS_COSTOS.some(x => x.nombre === m[`${k}Producto`]) });
     });
     (m.agregados || []).forEach(a => {
       if (!((Number(a.volumen) || 0) > 0)) return;
@@ -629,7 +629,7 @@ function calcularCosteoProducto(c) {
       const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: a.producto || _LABEL_ROL_AGREGADO_COSTEO[a.rolBase] || a.rolBase, unidad: 'm³', cantidad, precio, costo });
+      materiaPrimaDetalle.push({ nombre: a.producto || _LABEL_ROL_AGREGADO_COSTEO[a.rolBase] || a.rolBase, unidad: 'm³', cantidad, precio, costo, noEncontrado: !INSUMOS_COSTOS.some(x => x.nombre === a.producto) });
     });
     (m.adiciones || []).forEach(a => {
       if (!((Number(a.cantidad) || 0) > 0)) return;
@@ -637,7 +637,7 @@ function calcularCosteoProducto(c) {
       const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: a.producto || 'Adición', unidad: 'kg', cantidad, precio, costo });
+      materiaPrimaDetalle.push({ nombre: a.producto || 'Adición', unidad: 'kg', cantidad, precio, costo, noEncontrado: !INSUMOS_COSTOS.some(x => x.nombre === a.producto) });
     });
     (m.aditivos || []).forEach(a => {
       if (!((Number(a.dosis) || 0) > 0)) return;
@@ -691,9 +691,9 @@ function calcularCosteoProducto(c) {
     const costoIns = calcularCostoInsumo(ins);
     const precio = productoGeneraIva ? costoIns.costoSinIva : costoIns.valorFinal;
     if (row.reparto === 'dia') {
-      if (unidadesDia > 0) { const costo = (row.cantidad * precio) / unidadesDia; consumos += costo; consumosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, precio, costo }); }
+      if (unidadesDia > 0) { const costo = (row.cantidad * precio) / unidadesDia; consumos += costo; consumosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, unidad: _labelUnidadInsumo(ins.unidad), precio, costo }); }
     } else {
-      if (r.unidadesEstiba > 0) { const costo = (row.cantidad * precio) / r.unidadesEstiba; empaque += costo; empaqueDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, precio, costo }); }
+      if (r.unidadesEstiba > 0) { const costo = (row.cantidad * precio) / r.unidadesEstiba; empaque += costo; empaqueDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, unidad: _labelUnidadInsumo(ins.unidad), precio, costo }); }
     }
   });
 
@@ -753,7 +753,7 @@ function _calcularCosteoReforzado(c) {
       const precio = _precioInsumoPorNombre(m[`${k}Producto`], productoGeneraIva, _UNIDAD_RECETA_MATERIAL[k]);
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo, esCemento: k === 'cemento' });
+      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo, esCemento: k === 'cemento', noEncontrado: !INSUMOS_COSTOS.some(x => x.nombre === m[`${k}Producto`]) });
     });
     (m.agregados || []).forEach(a => {
       if (!((Number(a.volumen) || 0) > 0)) return;
@@ -761,7 +761,7 @@ function _calcularCosteoReforzado(c) {
       const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: a.producto || _LABEL_ROL_AGREGADO_COSTEO[a.rolBase] || a.rolBase, unidad: 'm³', cantidad, precio, costo });
+      materiaPrimaDetalle.push({ nombre: a.producto || _LABEL_ROL_AGREGADO_COSTEO[a.rolBase] || a.rolBase, unidad: 'm³', cantidad, precio, costo, noEncontrado: !INSUMOS_COSTOS.some(x => x.nombre === a.producto) });
     });
     (m.adiciones || []).forEach(a => {
       if (!((Number(a.cantidad) || 0) > 0)) return;
@@ -769,7 +769,7 @@ function _calcularCosteoReforzado(c) {
       const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: a.producto || 'Adición', unidad: 'kg', cantidad, precio, costo });
+      materiaPrimaDetalle.push({ nombre: a.producto || 'Adición', unidad: 'kg', cantidad, precio, costo, noEncontrado: !INSUMOS_COSTOS.some(x => x.nombre === a.producto) });
     });
     (m.aditivos || []).forEach(a => {
       if (!((Number(a.dosis) || 0) > 0)) return;
@@ -847,13 +847,13 @@ function _calcularCosteoReforzado(c) {
     const costoIns = calcularCostoInsumo(ins);
     const precio = productoGeneraIva ? costoIns.costoSinIva : costoIns.valorFinal;
     if (row.reparto === 'dia') {
-      if (unidadesDia > 0) { const costo = (row.cantidad * precio) / unidadesDia; consumos += costo; consumosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, precio, costo }); }
+      if (unidadesDia > 0) { const costo = (row.cantidad * precio) / unidadesDia; consumos += costo; consumosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, unidad: _labelUnidadInsumo(ins.unidad), precio, costo }); }
     } else if (row.reparto === 'directo') {
       const costo = row.cantidad * precio;
       otros += costo;
-      otrosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, precio, costo });
+      otrosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, unidad: _labelUnidadInsumo(ins.unidad), precio, costo });
     } else {
-      if (r.unidadesEstiba > 0) { const costo = (row.cantidad * precio) / r.unidadesEstiba; empaque += costo; empaqueDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, precio, costo }); }
+      if (r.unidadesEstiba > 0) { const costo = (row.cantidad * precio) / r.unidadesEstiba; empaque += costo; empaqueDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, unidad: _labelUnidadInsumo(ins.unidad), precio, costo }); }
     }
   });
 
@@ -904,7 +904,7 @@ function _calcularCosteoPretensado(c) {
       const precio = _precioInsumoPorNombre(m[`${k}Producto`], productoGeneraIva, _UNIDAD_RECETA_MATERIAL[k]);
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo, esCemento: k === 'cemento' });
+      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo, esCemento: k === 'cemento', noEncontrado: !INSUMOS_COSTOS.some(x => x.nombre === m[`${k}Producto`]) });
     });
     (m.agregados || []).forEach(a => {
       if (!((Number(a.volumen) || 0) > 0)) return;
@@ -912,7 +912,7 @@ function _calcularCosteoPretensado(c) {
       const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: a.producto || _LABEL_ROL_AGREGADO_COSTEO[a.rolBase] || a.rolBase, unidad: 'm³', cantidad, precio, costo });
+      materiaPrimaDetalle.push({ nombre: a.producto || _LABEL_ROL_AGREGADO_COSTEO[a.rolBase] || a.rolBase, unidad: 'm³', cantidad, precio, costo, noEncontrado: !INSUMOS_COSTOS.some(x => x.nombre === a.producto) });
     });
     (m.adiciones || []).forEach(a => {
       if (!((Number(a.cantidad) || 0) > 0)) return;
@@ -920,7 +920,7 @@ function _calcularCosteoPretensado(c) {
       const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
       const costo = cantidad * precio;
       materiaPrima += costo;
-      materiaPrimaDetalle.push({ nombre: a.producto || 'Adición', unidad: 'kg', cantidad, precio, costo });
+      materiaPrimaDetalle.push({ nombre: a.producto || 'Adición', unidad: 'kg', cantidad, precio, costo, noEncontrado: !INSUMOS_COSTOS.some(x => x.nombre === a.producto) });
     });
     (m.aditivos || []).forEach(a => {
       if (!((Number(a.dosis) || 0) > 0)) return;
@@ -1032,13 +1032,13 @@ function _calcularCosteoPretensado(c) {
     const costoIns = calcularCostoInsumo(ins);
     const precio = productoGeneraIva ? costoIns.costoSinIva : costoIns.valorFinal;
     if (row.reparto === 'dia') {
-      if (unidadesDiaLinea > 0) { const costo = (row.cantidad * precio) / unidadesDiaLinea; consumos += costo; consumosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, precio, costo }); }
+      if (unidadesDiaLinea > 0) { const costo = (row.cantidad * precio) / unidadesDiaLinea; consumos += costo; consumosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, unidad: _labelUnidadInsumo(ins.unidad), precio, costo }); }
     } else if (row.reparto === 'directo') {
       const costo = row.cantidad * precio;
       otros += costo;
-      otrosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, precio, costo });
+      otrosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, unidad: _labelUnidadInsumo(ins.unidad), precio, costo });
     } else {
-      if (r.unidadesEstiba > 0) { const costo = (row.cantidad * precio) / r.unidadesEstiba; empaque += costo; empaqueDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, precio, costo }); }
+      if (r.unidadesEstiba > 0) { const costo = (row.cantidad * precio) / r.unidadesEstiba; empaque += costo; empaqueDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, unidad: _labelUnidadInsumo(ins.unidad), precio, costo }); }
     }
   });
 
@@ -1461,12 +1461,17 @@ function _pctCosteoProd(costo, totalUnidad) {
 }
 
 // Fila de una tabla de detalle del consolidado: Nombre | Cantidad (con unidad) | Precio | Costo | % del costo total.
+// La columna "Valor/Unidad" (antes "Precio", 2026-08-25 a pedido del usuario: "pon VALOR/UNIDAD
+// como lo tienes en las filas editables") ahora muestra el precio CON su unidad al lado (ej.
+// "$642,60/kg"), igual que ya lo hacía la fila editable de Insumos (`renderInsumosCosteo()`,
+// `_fmtRef(...) + '/' + _labelUnidadInsumo(...)`)  — antes solo mostraba el número, sin decir
+// de qué unidad, distinto de cómo ya se veía en la fila editable.
 function _filaDetalleCosteo(nombre, cantidad, unidad, precio, costo, noEncontrado, totalUnidad) {
   const nombreHtml = noEncontrado ? `${_esc(nombre)} <span style="color:var(--rojo);font-size:11px">(ya no existe)</span>` : _esc(nombre);
   return `<tr>
     <td>${nombreHtml}</td>
     <td style="text-align:right;color:var(--gris-medio)">${cantidad != null ? cantidad.toLocaleString('es-CO', { maximumFractionDigits: 4 }) + (unidad ? ' ' + _esc(unidad) : '') : '—'}</td>
-    <td style="text-align:right;color:var(--gris-medio)">${precio != null ? _fmtCosteoProd(precio) : '—'}</td>
+    <td style="text-align:right;color:var(--gris-medio)">${precio != null ? _fmtCosteoProd(precio) + (unidad ? '/' + _esc(unidad) : '') : '—'}</td>
     <td style="text-align:right;font-weight:700">${_fmtCosteoProd(costo)}</td>
     <td style="text-align:right;color:var(--gris-medio);font-size:12px">${_pctCosteoProd(costo, totalUnidad)}</td>
   </tr>`;
@@ -1478,7 +1483,7 @@ function _seccionDetalleCosteo(titulo, filasHtml, vacioTexto) {
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo">${titulo}</div>
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Insumo</th><th style="text-align:right;width:130px">Cantidad</th><th style="text-align:right;width:110px">Precio</th><th style="text-align:right;width:110px">Costo/unidad</th><th style="text-align:right;width:70px">% Costo</th></tr></thead>
+        <thead><tr><th>Insumo</th><th style="text-align:right;width:130px">Cantidad</th><th style="text-align:right;width:110px">Valor/Unidad</th><th style="text-align:right;width:110px">Costo/unidad</th><th style="text-align:right;width:70px">% Costo</th></tr></thead>
         <tbody>${filasHtml || `<tr><td colspan="5" style="text-align:center;color:var(--gris-medio);font-size:12px">${vacioTexto}</td></tr>`}</tbody>
       </table>
     </div>`;
@@ -1509,27 +1514,27 @@ function _seccionesDetalleCosteo(c, k) {
         'Sin refuerzo agregado.')
     : '';
 
-  const filasMO = k.manoObraDetalle.map(f => _filaDetalleCosteo(f.nombre, null, null, f.costoDia ? f.costoDia : null, f.costo, f.noEncontrado, k.totalUnidad)).join('')
+  const filasMO = k.manoObraDetalle.map(f => _filaDetalleCosteo(f.nombre, null, 'día', f.costoDia ? f.costoDia : null, f.costo, f.noEncontrado, k.totalUnidad)).join('')
     + (k.manoObraDetalle.length ? `<tr style="border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right;color:var(--gris-medio)">+ Herramienta Menor (${c.pctHerramientaMenor}%)</td><td style="text-align:right;font-weight:700">${_fmtCosteoProd(k.herramientaMenor)}</td><td style="text-align:right;color:var(--gris-medio);font-size:12px">${_pctCosteoProd(k.herramientaMenor, k.totalUnidad)}</td></tr>
        <tr style="font-weight:700"><td colspan="3" style="text-align:right">Subtotal Mano de Obra</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.manoObra + k.herramientaMenor)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.manoObra + k.herramientaMenor, k.totalUnidad)}</td></tr>` : '');
   const seccionMO = _seccionDetalleCosteo('👷 Mano de Obra <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(Precio = costo/día de la cuadrilla)</span>', filasMO, 'Sin cuadrillas agregadas.');
 
-  const filasMaq = k.maquinariaDetalle.map(f => _filaDetalleCosteo(f.nombre, null, null, f.costoUnidad ? f.costoUnidad : null, f.costo, f.noEncontrado, k.totalUnidad)).join('')
+  const filasMaq = k.maquinariaDetalle.map(f => _filaDetalleCosteo(f.nombre, null, f.unidadUso, f.costoUnidad ? f.costoUnidad : null, f.costo, f.noEncontrado, k.totalUnidad)).join('')
     + (k.maquinariaDetalle.length ? `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Maquinaria</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.maquinaria)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.maquinaria, k.totalUnidad)}</td></tr>` : '');
   const seccionMaq = _seccionDetalleCosteo('🔧 Maquinaria <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(Precio = costo/ciclo o costo/día de la máquina)</span>', filasMaq, 'Sin máquinas agregadas.');
 
-  const filasEmp = k.empaqueDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, null, f.precio, f.costo, false, k.totalUnidad)).join('')
+  const filasEmp = k.empaqueDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, f.unidad, f.precio, f.costo, false, k.totalUnidad)).join('')
     + (k.empaqueDetalle.length ? `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Empaque</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.empaque)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.empaque, k.totalUnidad)}</td></tr>` : '');
   const seccionEmp = _seccionDetalleCosteo('📦 Insumos de empaque', filasEmp, 'Sin insumos de empaque.');
 
-  const filasCons = k.consumosDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, null, f.precio, f.costo, false, k.totalUnidad)).join('')
+  const filasCons = k.consumosDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, f.unidad, f.precio, f.costo, false, k.totalUnidad)).join('')
     + (k.consumosDetalle.length ? `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Consumos</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.consumos)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.consumos, k.totalUnidad)}</td></tr>` : '');
   const seccionCons = _seccionDetalleCosteo('⚡ Consumos <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(energía/agua/combustible)</span>', filasCons, 'Sin consumos agregados.');
 
   // Otros insumos — reparto "directo" (Desmoldante y similares); solo aparece si hay filas.
   const seccionOtros = k.otrosDetalle.length
     ? _seccionDetalleCosteo('📎 Otros insumos <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(cantidad directa por unidad)</span>',
-        k.otrosDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, null, f.precio, f.costo, false, k.totalUnidad)).join('')
+        k.otrosDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, f.unidad, f.precio, f.costo, false, k.totalUnidad)).join('')
         + `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Otros insumos</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.otros)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.otros, k.totalUnidad)}</td></tr>`,
         '')
     : '';
