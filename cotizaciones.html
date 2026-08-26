@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PROCONCRETO — Sistema de Cotizaciones</title>
-<link rel="stylesheet" href="css/estilos.css?v=20260821a">
+<title>ProSuite — Proconcreto</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect x='1' y='1' width='38' height='38' rx='10' fill='%23003F7F'/%3E%3Ctext x='9' y='29' font-family='Arial, sans-serif' font-weight='900' font-size='24' fill='%23FFFFFF'%3EP%3C/text%3E%3Crect x='21' y='21' width='15' height='15' rx='4' fill='%238BC53F'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/estilos.css?v=20260825a">
 </head>
 <body>
 
@@ -12,8 +13,11 @@
 <div id="login-overlay">
   <div class="login-box">
     <div class="login-logo"><img src="logo.png" alt="Proconcreto"></div>
-    <div class="login-titulo">Proconcreto CRM</div>
-    <div class="login-sub">Ingresa con tu cuenta de empresa</div>
+    <div class="prosuite-login-mark">
+      <svg class="prosuite-icono" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="#003F7F"/><text x="9" y="29" font-family="Arial, sans-serif" font-weight="900" font-size="24" fill="#FFFFFF">P</text><rect x="21" y="21" width="15" height="15" rx="4" fill="#8BC53F"/></svg>
+      <span class="prosuite-wordmark prosuite-wordmark-claro"><span class="ps-pro">Pro</span><span class="ps-suite-claro">Suite</span></span>
+    </div>
+    <div class="login-sub">Proconcreto CRM · Ingresa con tu cuenta de empresa</div>
     <div class="form-grupo" style="margin-bottom:12px">
       <label>Correo electrónico</label>
       <input type="email" id="login-email" placeholder="usuario@proconcreto.com.co" autocomplete="email">
@@ -65,7 +69,10 @@
 
 <!-- NAV PRINCIPAL -->
 <nav class="nav-top">
-  <div class="nav-logo"><img src="logo.png" alt="Proconcreto Prefabricados"></div>
+  <div class="nav-logo" title="ProSuite — Proconcreto Prefabricados">
+    <svg class="prosuite-icono" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="#003F7F"/><text x="9" y="29" font-family="Arial, sans-serif" font-weight="900" font-size="24" fill="#FFFFFF">P</text><rect x="21" y="21" width="15" height="15" rx="4" fill="#8BC53F"/></svg>
+    <span class="prosuite-wordmark"><span class="ps-pro">Pro</span><span class="ps-suite">Suite</span></span>
+  </div>
   <button class="nav-modulo activo" onclick="activarModulo('cotizaciones')">📋 Cotizaciones y Ventas</button>
   <button class="nav-modulo" onclick="activarModulo('produccion')">🏭 Producción</button>
   <button class="nav-modulo" onclick="activarModulo('logistica')">🚛 Logística</button>

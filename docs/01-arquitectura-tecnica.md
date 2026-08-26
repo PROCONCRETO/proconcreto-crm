@@ -10,6 +10,14 @@
 | Librerías de terceros (CDN) | Chart.js, jsPDF, html2canvas, SheetJS (xlsx.js) | Gráficos, generación de PDF de cotizaciones/certificados, e importación/exportación de Excel |
 | Dev local | `serve.ps1` (servidor HTTP casero en PowerShell, puerto 8080) | Sirve los estáticos y expone `POST /guardar-cotizacion` para respaldar cotizaciones como JSON en `cotizaciones-guardadas/` (local, fuera del repo) |
 
+## Marca del aplicativo — "ProSuite" (2026-08-25)
+
+El aplicativo (este mismo CRM/ERP interno, todos sus módulos) tiene nombre propio desde ahora: **ProSuite**, distinto del logo de la empresa (Proconcreto Prefabricados, `logo.png`) — la relación es "Proconcreto es la empresa, ProSuite es la herramienta que usan". A pedido del usuario ("necesito que le des una identidad a la imagen... para que empiece a generar recordación en los usuarios"), se le dio identidad visual propia en vez de dejarlo como texto plano:
+
+- **Ícono**: un cuadrado redondeado azul (`#003F7F`, el mismo `--azul` que ya domina toda la interfaz) con una "P" blanca y una placa verde (`#8BC53F`, el verde de "Pro" en el logo de Proconcreto) superpuesta en la esquina — el verde es la costura visual intencional entre ambas marcas. Es un `<svg>` inline (rects + text, sin paths complejos) para que se vea nítido a cualquier tamaño, reutilizado tal cual como favicon (`<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,...">`, sin archivo aparte) y en los dos puntos donde aparece la marca en `cotizaciones.html`.
+- **Wordmark**: "Pro" en verde + "Suite" en el color que mejor contraste haga con el fondo (blanco sobre el nav azul oscuro `#001F3F`; el propio `--azul` sobre el fondo blanco del login) — clases `.prosuite-wordmark`/`.ps-pro`/`.ps-suite`/`.ps-suite-claro` en `css/estilos.css`.
+- **Dónde aparece**: reemplazó el logo de Proconcreto en el nav superior (`.nav-logo`, el punto de mayor frecuencia de uso, a propósito — es donde más construye recordación en el día a día) — el logo de la empresa se queda intacto en el login (`logo.png`, sin tocar) y ahí se le sumó la marca ProSuite justo debajo, como el producto que ofrece esa empresa. `<title>` pasó de "PROCONCRETO — Sistema de Cotizaciones" a "ProSuite — Proconcreto".
+
 ## Cómo se guardan los datos en Supabase
 
 Patrón consistente en casi todas las tablas: **una columna JSONB `datos`** con el objeto completo, más metadatos mínimos (`estado`, `creado`). Es decir, no hay un esquema relacional normalizado por campo — agregar un campo nuevo a una entidad es agregarlo al objeto JS y ya, sin migración de base de datos.

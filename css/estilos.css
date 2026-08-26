@@ -23,8 +23,21 @@
      .nav-top ancla en top:0, .nav (subnav) justo debajo, a la altura de .nav-top (50px), para
      que las dos queden siempre visibles sin taparse entre sí. */
   .nav-top { background: #001F3F; color: white; display: flex; align-items: center; padding: 0 24px; height: 50px; gap: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); position: sticky; top: 0; z-index: 30; }
-  .nav-logo { margin-right: 20px; display: flex; align-items: center; }
+  .nav-logo { margin-right: 20px; display: flex; align-items: center; gap: 8px; }
   .nav-logo img { height: 42px; width: auto; object-fit: contain; filter: brightness(0) invert(1); }
+
+  /* ── Marca ProSuite (2026-08-25) — el nombre del aplicativo en sí, separado del logo de la
+     empresa (Proconcreto, que sigue viviendo tal cual en el login). Ícono en SVG inline
+     (reutilizado en el nav y en el login, mismo markup) en vez de un .png, para que quede nítido
+     en cualquier tamaño y sirva también de favicon sin depender de un archivo aparte. */
+  .prosuite-icono { height: 32px; width: 32px; flex-shrink: 0; }
+  .prosuite-wordmark { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; }
+  .prosuite-wordmark .ps-pro { color: #8BC53F; }
+  .prosuite-wordmark .ps-suite { color: #FFFFFF; }
+  .prosuite-wordmark-claro { font-size: 24px; }
+  .prosuite-wordmark-claro .ps-suite-claro { color: var(--azul); }
+  .prosuite-login-mark { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; }
+  .prosuite-login-mark .prosuite-icono { height: 38px; width: 38px; }
   .nav-modulo { background: none; border: none; color: rgba(255,255,255,0.65); cursor: pointer; padding: 6px 16px; border-radius: var(--radio); font-size: 12px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; transition: all .15s; display: flex; align-items: center; gap: 6px; }
   .nav-modulo:hover { background: rgba(255,255,255,0.1); color: white; }
   .nav-modulo.activo { background: var(--azul); color: white; }
