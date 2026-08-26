@@ -18,6 +18,14 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', Arial, sans-serif; background: #F0F4F8; color: var(--gris-oscuro); font-size: 14px; }
 
+  /* ── Marca de agua (2026-08-25, a pedido del usuario, maquetado y aprobado antes de subir) ──
+     Logo de Proconcreto de fondo, grande y sutil, en todas las pantallas. `position: fixed` +
+     centrado para que no se mueva con el scroll; z-index bajo para quedar detrás de tarjetas y
+     formularios, y debajo de .nav-top/.nav (z-index 30/29, sólidas) para no taparlas nunca.
+     `pointer-events: none` para que nunca intercepte un clic. */
+  .marca-agua { position: fixed; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; pointer-events: none; overflow: hidden; }
+  .marca-agua img { width: 62vw; max-width: 900px; opacity: 0.05; filter: grayscale(1); }
+
   /* ── NAV PRINCIPAL (módulos) ── */
   /* Ambas barras quedan fijas arriba al hacer scroll (2026-08-19, a pedido del usuario) —
      .nav-top ancla en top:0, .nav (subnav) justo debajo, a la altura de .nav-top (50px), para

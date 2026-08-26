@@ -18,6 +18,14 @@ El aplicativo (este mismo CRM/ERP interno, todos sus módulos) tiene nombre prop
 - **Wordmark**: "Pro" en verde + "Suite" en el color que mejor contraste haga con el fondo (blanco sobre el nav azul oscuro `#001F3F`; el propio `--azul` sobre el fondo blanco del login) — clases `.prosuite-wordmark`/`.ps-pro`/`.ps-suite`/`.ps-suite-claro` en `css/estilos.css`.
 - **Dónde aparece**: reemplazó el logo de Proconcreto en el nav superior (`.nav-logo`, el punto de mayor frecuencia de uso, a propósito — es donde más construye recordación en el día a día) — el logo de la empresa se queda intacto en el login (`logo.png`, sin tocar) y ahí se le sumó la marca ProSuite justo debajo, como el producto que ofrece esa empresa. `<title>` pasó de "PROCONCRETO — Sistema de Cotizaciones" a "ProSuite — Proconcreto".
 
+### Marca de agua del logo de Proconcreto (2026-08-25)
+
+A pedido del usuario ("una marca de agua sutil que muestre el logo grande en todas las ventanas") — maquetado primero como Artifact (captura real de la pantalla "Nueva Cotización" con la marca ya aplicada) y aprobado antes de subirlo, mismo criterio que otras decisiones de diseño de esta sesión.
+
+- `.marca-agua` (`css/estilos.css`) — el `<img src="logo.png">` de siempre, pero grande (`62vw`, máx. 900px), centrado, en escala de grises y al **5% de opacidad**. `position: fixed` para que no se mueva con el scroll (siempre visible, en cualquier punto de cualquier pantalla) y `pointer-events: none` para que nunca intercepte un clic.
+- Un solo `<div class="marca-agua">` justo después de `<body>` en `cotizaciones.html` — como todas las `.pantalla` viven superpuestas en el mismo documento (ver "Navegación" más abajo), un único elemento alcanza para las pantallas del aplicativo entero, sin repetirlo por módulo.
+- `z-index: 1` — por debajo de `.nav-top`/`.nav` (30/29, con fondo sólido, nunca se ven afectadas) y por debajo de las tarjetas/formularios de contenido (que no fijan `z-index`, así que se pintan encima en el orden normal del documento).
+
 ## Cómo se guardan los datos en Supabase
 
 Patrón consistente en casi todas las tablas: **una columna JSONB `datos`** con el objeto completo, más metadatos mínimos (`estado`, `creado`). Es decir, no hay un esquema relacional normalizado por campo — agregar un campo nuevo a una entidad es agregarlo al objeto JS y ya, sin migración de base de datos.
