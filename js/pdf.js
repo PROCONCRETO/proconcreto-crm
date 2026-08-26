@@ -89,7 +89,14 @@ async function descargarPDF(numCot) {
     const fecha = (cot?.fecha || document.getElementById('fecha-cot').value || new Date().toISOString().split('T')[0]).replace(/-/g, '_');
     const nombreCliente = cot?.cliente?.nombre || document.getElementById('cliente-nombre').value || '';
     const cliente = nombreCliente.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '_');
-    pdf.save(`${numCot}_${fecha}_${cliente}.pdf`);
+    // La versión se lee del campo de la vista previa (no de `cot`, que puede resolver a la
+    // primera versión guardada con este número si hay varias) — así el nombre del archivo
+    // siempre corresponde a la versión que se está descargando de verdad. V1 no se marca en el
+    // nombre (es la versión por defecto); V2, V3... sí, para no confundir versiones distintas
+    // que de otra forma solo se distinguirían por la fecha dentro del PDF.
+    const version = document.getElementById('version-cot')?.value || 'V1';
+    const sufijoVersion = version !== 'V1' ? `_${version}` : '';
+    pdf.save(`${numCot}${sufijoVersion}_${fecha}_${cliente}.pdf`);
   } finally {
     if (btn) { btn.textContent = '⬇️ Descargar PDF'; btn.disabled = false; }
   }
