@@ -16,15 +16,27 @@
     --radio: 6px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; background: #F0F4F8; color: var(--gris-oscuro); font-size: 14px; }
+  /* `isolation: isolate` obliga a <body> a formar su propia capa de apilamiento, para que
+     `mix-blend-mode` en `.marca-agua` (ver más abajo) solo se mezcle con el contenido de la
+     app y no con nada fuera de <body>. */
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #F0F4F8; color: var(--gris-oscuro); font-size: 14px; isolation: isolate; }
 
-  /* ── Marca de agua (2026-08-25, a pedido del usuario, maquetado y aprobado antes de subir) ──
-     Logo de Proconcreto de fondo, grande y sutil, en todas las pantallas. `position: fixed` +
-     centrado para que no se mueva con el scroll; z-index bajo para quedar detrás de tarjetas y
-     formularios, y debajo de .nav-top/.nav (z-index 30/29, sólidas) para no taparlas nunca.
-     `pointer-events: none` para que nunca intercepte un clic. */
-  .marca-agua { position: fixed; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; pointer-events: none; overflow: hidden; }
-  .marca-agua img { width: 62vw; max-width: 900px; opacity: 0.05; filter: grayscale(1); }
+  /* ── Marca de agua (2026-08-25, a pedido del usuario, maquetado y aprobado antes de subir;
+     ajustada el mismo día — bug real reportado "no veo la marca de agua": la primera versión
+     la ponía DETRÁS de las tarjetas/formularios (semánticamente lo correcto para una "marca de
+     agua"), pero como casi toda pantalla de esta app es tarjetas blancas apiladas una tras
+     otra, casi no queda fondo visible en ningún momento — el logo terminaba tapado casi
+     siempre, invisible en la práctica). Ahora va ENCIMA del contenido pero con
+     `mix-blend-mode: multiply`: en vez de un rectángulo gris opaco tapando lo de abajo, las
+     zonas oscuras del logo oscurecen levemente lo que haya debajo (tarjeta blanca, fondo gris,
+     barra azul) y las zonas claras casi no se notan — se ve como una marca de agua real sobre
+     cualquier superficie, sin esconderse detrás de las tarjetas ni estorbar la lectura. ──
+     `position: fixed` + centrado para que no se mueva con el scroll. z-index apenas por encima
+     del contenido normal (que no fija z-index propio) pero bien por debajo de los modales
+     (`.modal-overlay`, z-index 200) para que un modal abierto lo tape con su fondo oscuro, como
+     corresponde. `pointer-events: none` para que nunca intercepte un clic. */
+  .marca-agua { position: fixed; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; pointer-events: none; overflow: hidden; }
+  .marca-agua img { width: 62vw; max-width: 900px; opacity: 0.15; filter: grayscale(1); mix-blend-mode: multiply; }
 
   /* ── NAV PRINCIPAL (módulos) ── */
   /* Ambas barras quedan fijas arriba al hacer scroll (2026-08-19, a pedido del usuario) —
