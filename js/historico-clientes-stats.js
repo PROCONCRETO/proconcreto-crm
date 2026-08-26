@@ -471,27 +471,29 @@ function filtrarClientes(q) {
 // mientras el modal está abierto, se guarda dentro del cliente al hacer Guardar.
 let _proyectosClienteActual = [];
 
+// Se pasó de una tabla de 3 columnas a una tarjeta por proyecto (2026-08-26) para poder agregar
+// Dirección sin apretar demasiado el modal (560px de ancho) — una tabla de 4 columnas de texto
+// libre ahí ya quedaba incómoda de leer/editar.
 function renderProyectosCliente() {
   const wrap = document.getElementById('proyectos-cliente-wrap');
   if (!wrap) return;
   if (!_proyectosClienteActual.length) { wrap.innerHTML = ''; return; }
-  wrap.innerHTML = `
-    <table class="tabla-items" style="width:100%">
-      <thead><tr><th>Proyecto</th><th>Contacto</th><th>Teléfono</th><th style="width:36px"></th></tr></thead>
-      <tbody>
-        ${_proyectosClienteActual.map((p, i) => `
-          <tr>
-            <td><input type="text" value="${_esc(p.nombre)}" oninput="_proyectosClienteActual[${i}].nombre=this.value" placeholder="Ej: Torres del Parque"></td>
-            <td><input type="text" value="${_esc(p.contacto)}" oninput="_proyectosClienteActual[${i}].contacto=this.value" placeholder="Ing. ..."></td>
-            <td><input type="text" value="${_esc(p.telefono)}" oninput="_proyectosClienteActual[${i}].telefono=this.value"></td>
-            <td><button class="btn btn-rojo btn-xs" onclick="eliminarProyectoCliente(${i})">✕</button></td>
-          </tr>`).join('')}
-      </tbody>
-    </table>`;
+  wrap.innerHTML = _proyectosClienteActual.map((p, i) => `
+    <div class="card" style="padding:10px 12px;margin-bottom:8px;background:#FAFBFC;box-shadow:none;border:1px solid var(--gris-borde)">
+      <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:8px">
+        <div class="form-grupo" style="flex:1"><label>Proyecto</label><input type="text" value="${_esc(p.nombre)}" oninput="_proyectosClienteActual[${i}].nombre=this.value" placeholder="Ej: Torres del Parque"></div>
+        <button class="btn btn-rojo btn-xs" onclick="eliminarProyectoCliente(${i})">✕</button>
+      </div>
+      <div class="form-grid" style="margin-bottom:8px">
+        <div class="form-grupo"><label>Contacto</label><input type="text" value="${_esc(p.contacto)}" oninput="_proyectosClienteActual[${i}].contacto=this.value" placeholder="Ing. ..."></div>
+        <div class="form-grupo"><label>Teléfono</label><input type="text" value="${_esc(p.telefono)}" oninput="_proyectosClienteActual[${i}].telefono=this.value"></div>
+      </div>
+      <div class="form-grupo"><label>Dirección <span class="hint">(para el link de Google Maps del imprimible de viajes)</span></label><input type="text" value="${_esc(p.direccion)}" oninput="_proyectosClienteActual[${i}].direccion=this.value" placeholder="Ej: Cra 23 #45-12, o un punto de referencia reconocible en Maps"></div>
+    </div>`).join('');
 }
 
 function agregarProyectoCliente() {
-  _proyectosClienteActual.push({ nombre: '', contacto: '', telefono: '' });
+  _proyectosClienteActual.push({ nombre: '', contacto: '', telefono: '', direccion: '' });
   renderProyectosCliente();
 }
 

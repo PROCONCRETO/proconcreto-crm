@@ -832,6 +832,7 @@ function _alCambiarClienteEntrega(ei) {
   _entregasViajeActual[ei].destino = '';
   _entregasViajeActual[ei].contactoObraNombre = '';
   _entregasViajeActual[ei].contactoObraTelefono = '';
+  _entregasViajeActual[ei].direccionEntrega = '';
   const elNombre = document.getElementById(`entrega-contacto-nombre-${ei}`);
   const elTel = document.getElementById(`entrega-contacto-tel-${ei}`);
   if (elNombre) elNombre.value = '';
@@ -848,6 +849,10 @@ function _alElegirProyectoEntrega(ei, nombreProyecto) {
   const proyecto = cliente?.proyectos?.find(p => p.nombre === nombreProyecto);
   e.contactoObraNombre = proyecto?.contacto || '';
   e.contactoObraTelefono = proyecto?.telefono || '';
+  // Dirección real del proyecto (si está registrada) — no se muestra en pantalla, solo alimenta
+  // el link de Google Maps del imprimible de viajes (más precisa que el nombre del proyecto +
+  // la ciudad, que es lo que se usa si no hay dirección registrada — ver imprimirProgramacionDia).
+  e.direccionEntrega = proyecto?.direccion || '';
   const elNombre = document.getElementById(`entrega-contacto-nombre-${ei}`);
   const elTel = document.getElementById(`entrega-contacto-tel-${ei}`);
   if (elNombre) elNombre.value = e.contactoObraNombre;
@@ -1081,6 +1086,7 @@ function guardarViaje() {
       fechaOriginal: e.fechaOriginal || fecha,
       cliente: (e.cliente || '').trim(),
       destino: (e.destino || '').trim(),
+      direccionEntrega: (e.direccionEntrega || '').trim(),
       contactoObraNombre: (e.contactoObraNombre || '').trim(),
       contactoObraTelefono: (e.contactoObraTelefono || '').trim(),
       productos: (e.productos || [])
@@ -1459,13 +1465,25 @@ function imprimirProgramacionDia(fechaStr) {
         `<tr><td>${_esc(p.producto)}</td><td class="num">${p.cantidad || 0}</td><td class="num">${(Number(p.peso) || 0).toFixed(2)} ton</td></tr>`
       ).join('');
       const pesoEntrega = (e.productos || []).reduce((s, p) => s + (Number(p.peso) || 0), 0);
+      // Tag de ubicación: abre Google Maps con el destino específico + la Ciudad de Destino del
+      // viaje (mejora la precisión del geocodificado — "Km 3 vía..." solo no dice en qué
+      // municipio, la ciudad del viaje sí la completa). Es un enlace real en la vista previa en
+      // pantalla; en el PDF descargado se convierte en una anotación de enlace de jsPDF sobre la
+      // imagen rasterizada (ver descargarProgramacionDiaPDF/_enlacesMapaEnPagina), porque el PDF
+      // se genera pintando imágenes página por página, no texto — un <a> normal ahí no sería
+      // clickeable si no se agrega esa anotación aparte.
+      // Si el proyecto tiene Dirección registrada (ver "+ Agregar proyecto" en la ficha del
+      // cliente), se usa esa — es un texto geocodificable de verdad. Si no, se cae al nombre del
+      // destino específico + la ciudad del viaje (menos preciso, pero mejor que nada).
+      const ubicacionQuery = e.direccionEntrega || [e.destino, v.destino].filter(Boolean).join(', ');
+      const mapsUrl = e.destino ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ubicacionQuery + ', Colombia')}` : '';
       return `
       <div class="pv-entrega">
         <div class="pv-entrega-top">
           <div class="pv-check"></div>
           <div class="pv-entrega-quien">
             <div class="cliente">${_esc(e.cliente) || 'Sin cliente'}</div>
-            ${e.destino ? `<div class="sitio">${_esc(e.destino)}</div>` : ''}
+            ${e.destino ? `<a class="sitio pv-maps-link" href="${mapsUrl}" target="_blank" rel="noopener">📍 ${_esc(e.destino)}</a>` : ''}
           </div>
           ${e.ordenNumero ? `<div class="pv-entrega-orden">Orden ${_esc(e.ordenNumero)}</div>` : ''}
         </div>
@@ -1555,11 +1573,27 @@ async function descargarProgramacionDiaPDF() {
     const topImg = await cargarImagen('membrete-top.jpg');
     const headerH = pageW * (topImg.naturalHeight / topImg.naturalWidth);
     const contentEl = document.getElementById('prog-dia-content');
-    const contentCanvas = await html2canvas(contentEl, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    const escalaCanvas = 2.5;
+    // Posición/tamaño de cada tag de ubicación ANTES de rasterizar (html2canvas convierte todo
+    // en imagen — el <a href="https://maps..."> real de la vista previa deja de ser un enlace
+    // ahí; se guarda su rectángulo en el mismo espacio de píxeles que contentCanvas, para poder
+    // agregarlo como anotación de enlace de jsPDF más abajo, página por página).
+    const contentRect = contentEl.getBoundingClientRect();
+    const enlacesMapa = Array.from(contentEl.querySelectorAll('.pv-maps-link')).map(el => {
+      const r = el.getBoundingClientRect();
+      return {
+        top: (r.top - contentRect.top) * escalaCanvas,
+        left: (r.left - contentRect.left) * escalaCanvas,
+        width: r.width * escalaCanvas,
+        height: r.height * escalaCanvas,
+        url: el.getAttribute('href'),
+      };
+    });
+    const contentCanvas = await html2canvas(contentEl, { scale: escalaCanvas, useCORS: true, backgroundColor: '#ffffff', logging: false });
     const pxToMm = pageW / contentCanvas.width;
     const contentH_px = _alturaContenidoReal(contentCanvas);
     const footerEl = document.getElementById('prog-dia-footer');
-    const footerCanvas = await html2canvas(footerEl, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    const footerCanvas = await html2canvas(footerEl, { scale: escalaCanvas, useCORS: true, backgroundColor: '#ffffff', logging: false });
     const footerH = footerCanvas.height * pxToMm;
     const availH = pageH - headerH - footerH - 6;
     const pageH_px = availH / pxToMm;
@@ -1580,6 +1614,17 @@ async function descargarProgramacionDiaPDF() {
       sliceCanvas.getContext('2d').drawImage(contentCanvas, 0, Math.floor(cursorY), contentCanvas.width, Math.ceil(sliceH_px), 0, 0, contentCanvas.width, Math.ceil(sliceH_px));
       pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, headerH + 2, pageW, sliceH_px * pxToMm);
       pdf.addImage(footerData, 'JPEG', 0, pageH - footerH, pageW, footerH);
+
+      // Anotaciones de enlace sobre esta página — un rectángulo invisible del mismo tamaño y
+      // posición del tag "📍 destino" (ya pintado como parte de la imagen), para que siga
+      // siendo clickeable en el PDF descargado y abra Google Maps.
+      enlacesMapa.forEach(en => {
+        const centroY = en.top + en.height / 2;
+        if (centroY >= cursorY && centroY < bottom) {
+          pdf.link(en.left * pxToMm, headerH + 2 + (en.top - cursorY) * pxToMm, en.width * pxToMm, en.height * pxToMm, { url: en.url });
+        }
+      });
+
       cursorY = bottom;
       pageIndex++;
     }

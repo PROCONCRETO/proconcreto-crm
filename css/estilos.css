@@ -323,7 +323,7 @@
   .pv-check { width: 18px; height: 18px; border: 2px solid var(--gris-oscuro); border-radius: 4px; flex-shrink: 0; margin-top: 2px; }
   .pv-entrega-quien { flex: 1; min-width: 0; }
   .pv-entrega-quien .cliente { font-size: 14px; font-weight: 800; line-height: 1.25; }
-  .pv-entrega-quien .sitio { font-size: 11px; color: var(--gris-medio); margin-top: 1px; }
+  .pv-entrega-quien .sitio { display: inline-block; font-size: 11px; color: #1565C0; font-weight: 700; text-decoration: none; margin-top: 1px; }
   .pv-entrega-orden { text-align: right; font-size: 9.5px; color: var(--gris-medio); white-space: nowrap; }
 
   .pv-contacto { display: flex; align-items: center; gap: 7px; background: #FFF9E8; border: 1px solid #F0DFA0; border-radius: 6px; padding: 5px 9px; margin-bottom: 9px; font-size: 11px; }
