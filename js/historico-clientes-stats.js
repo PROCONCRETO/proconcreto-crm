@@ -1127,6 +1127,6 @@ function cerrarModal(id) {
   // una aceptación (ver _intentarAceptarCotizacion()), esa cotización se queda sin aceptar.
   if (id === 'modal-cliente' && _cotAceptandoPendienteProyecto) _cotAceptandoPendienteProyecto = null;
 }
-document.querySelectorAll('.modal-overlay').forEach(m => {
-  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('abierto'); });
-});
+// Antes, cualquier ventana (creación de cliente, Diseño de Mezcla, etc.) se cerraba sola al
+// hacer clic afuera, en el fondo oscuro — se quitó (2026-08-25, a pedido del usuario: "se pierde
+// el trabajo adelantado"). Ahora una ventana solo se cierra con su botón de Guardar/Cancelar/✕.
