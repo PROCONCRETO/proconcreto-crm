@@ -196,7 +196,7 @@ function _elegirTipoEstructuraCosteo(tipo) {
   // pedido del usuario (2026-08-25); los demás tipos no la muestran.
   const mpExtraWrap = document.getElementById('costeo-mp-extra-wrap');
   if (mpExtraWrap) mpExtraWrap.style.display = esPretensado ? '' : 'none';
-  // Columnas "Bancos/día" (Máquinas y Mano de Obra) y "× hilo" (Máquinas) solo tienen sentido
+  // Columnas "Bancos/día" (Máquinas y Mano de Obra) y "N° hilos" (Máquinas) solo tienen sentido
   // para Pretensado, que reparte por banco. Vibrocompactado/Reforzado tienen su propia columna
   // por fila equivalente en Mano de Obra, "Unidades/día" (2026-08-25, a pedido del usuario: "hay
   // mano de obra que se pone adicional para procesos complementarios que debemos darles un
@@ -377,12 +377,16 @@ function renderMaquinasCosteo() {
   tbody.innerHTML = _maquinasCosteoActual.map((row, i) => {
     const m = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     const info = m ? `${_fmtMaq(calcularCostoMaquina(m).costoUnidad)}/${_labelUnidadUso(m.unidadUso)}` : '—';
-    // "Días/banco" y "× hilo" solo aplican a Pretensado — cada máquina puede tener su propio
-    // rendimiento real (Bobcat, Montacargas, Puente Grúa) o marcarse "× hilo" cuando se usa una
-    // vez por cada hilo tensionado, no una vez por banco (caso real: Gato de Tensionamiento).
+    // "Días/banco" y "N° de hilos" solo aplican a Pretensado. "N° de hilos" reemplaza al
+    // checkbox "× hilo" que había antes (2026-08-25, a pedido del usuario: "no le veo mucho
+    // sentido" — el checkbox usaba SIEMPRE los hilos totales del banco, sin poder distinguir
+    // que el elemento real (la pieza que se está fabricando, ej. "Vigueta H11 2H") puede tener
+    // menos hilos que el banco completo). Con valor, la máquina se usa una vez POR CADA hilo DE
+    // ESE ELEMENTO (no del banco) — caso real: Prensa de Tensionamiento. Vacío = se reparte
+    // igual que las demás máquinas de su unidad de uso (una vez por banco, por m³, etc.).
     const celdasPretensado = esPretensado ? `
       <td><input type="number" min="0" step="0.01" value="${_diasBancoTexto(row.bancosDiaFila)}" placeholder="de línea" title="Días que le toma a esta máquina completar un banco" style="width:90px" oninput="_maquinasCosteoActual[${i}].bancosDiaFila=_bancosDiaDesdeDias(this.value);_actualizarResumenCosteo()"></td>
-      <td style="text-align:center"><input type="checkbox" ${row.porHilo ? 'checked' : ''} onchange="_maquinasCosteoActual[${i}].porHilo=this.checked;_actualizarResumenCosteo()"></td>` : '';
+      <td><input type="number" min="0" step="1" value="${row.numeroHilos || ''}" placeholder="—" title="N° de hilos de ESTE elemento (no del banco completo) — con valor, se usa una vez por cada hilo" style="width:70px" oninput="_maquinasCosteoActual[${i}].numeroHilos=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
     return `<tr>
       <td><select onchange="_maquinasCosteoActual[${i}].nombre=this.value;_actualizarResumenCosteo()">${_opcionesMaquinariaCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio)">${info}</td>
@@ -998,9 +1002,11 @@ function _calcularCosteoPretensado(c) {
   // UNA vez por banco completo, sin importar cuántos hilos tenga). Tres excepciones reales:
   // "m³" escala con el volumen de concreto (mezcladora, vibrador de aguja, igual que Reforzado);
   // "día" tiene su propio rendimiento por fila igual que Mano de Obra (Bobcat, Montacargas,
-  // Puente Grúa — confirmado que su ritmo real coincide con el de su operario); y la fila
-  // marcada "× hilo" se usa una vez POR CADA hilo tensionado, no una vez por banco (único caso
-  // real: Gato de Tensionamiento — confirmado exacto: 600 × 27 ÷ 840 = 19,285714).
+  // Puente Grúa — confirmado que su ritmo real coincide con el de su operario); y la fila con
+  // "N° de hilos" diligenciado se usa una vez POR CADA hilo del ELEMENTO (no del banco completo
+  // — reemplaza el checkbox "× hilo" que sí usaba los hilos del banco, 2026-08-25, a pedido del
+  // usuario: caso real, Prensa de Tensionamiento — confirmado: costoUnidad × N° hilos del
+  // elemento ÷ Metros lineales/banco).
   let maquinaria = 0;
   const maquinariaDetalle = [];
   (c.maquinas || []).forEach(row => {
@@ -1008,7 +1014,7 @@ function _calcularCosteoPretensado(c) {
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
     const costoUnidad = calcularCostoMaquina(maq).costoUnidad;
     let costo = 0;
-    if (row.porHilo) costo = metrosLinealesBanco > 0 ? (costoUnidad * hilosBanco) / metrosLinealesBanco : 0;
+    if (row.numeroHilos > 0) costo = metrosLinealesBanco > 0 ? (costoUnidad * row.numeroHilos) / metrosLinealesBanco : 0;
     else if (maq.unidadUso === 'm3') costo = costoUnidad * volumenUnidadM3;
     else if (maq.unidadUso === 'dia') {
       const bancosDiaFila = row.bancosDiaFila || bancosDiaLinea;
