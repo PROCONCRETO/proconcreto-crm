@@ -277,12 +277,22 @@ function _elegirVersionAprobada(cot) {
     return nb - na;
   });
   if (versiones.length <= 1) return cot;
-  const lista = versiones.map((v, i) => `${i + 1}) ${v.version || 'V1'} — $${(v.totales?.total || 0).toLocaleString()} (${new Date(v.fecha + 'T12:00').toLocaleDateString('es-CO')})`).join('\n');
-  const resp = prompt(`La cotización ${cot.numero} tiene ${versiones.length} versiones.\n¿Cuál aprobó el cliente? (no siempre es la más reciente)\n\n${lista}\n\nEscribe el número de la versión (1-${versiones.length}):`, '1');
+  // Bug real reportado (2026-08-26): la lista se mostraba numerada por POSICIÓN (1, 2, 3... de
+  // arriba a abajo, más reciente primero), no por el número real de la versión. Con V1 y V2, la
+  // lista quedaba "1) V2 ... / 2) V1 ...", así que si el usuario quería la V2 y — con toda
+  // lógica — escribía "2" (pensando en "versión 2"), en realidad seleccionaba la POSICIÓN 2 de
+  // la lista, que era la V1. El estado de la cotización sí quedaba bien (se marca sobre `cot`,
+  // que siempre es la vigente), pero la Orden de Servicio salía de la versión equivocada. Ahora
+  // se compara lo que el usuario escribe contra el número real de cada versión (`v.version`),
+  // no contra su posición en la lista — sin importar el orden en que se muestren.
+  const lista = versiones.map(v => `${v.version || 'V1'} — $${(v.totales?.total || 0).toLocaleString()} (${new Date(v.fecha + 'T12:00').toLocaleDateString('es-CO')})`).join('\n');
+  const numMasReciente = parseInt((versiones[0].version || 'V1').replace(/\D/g, '')) || 1;
+  const resp = prompt(`La cotización ${cot.numero} tiene ${versiones.length} versiones.\n¿Cuál aprobó el cliente? (no siempre es la más reciente)\n\n${lista}\n\nEscribe el número de esa versión (ej: si aprobó la V2, escribe 2):`, String(numMasReciente));
   if (resp === null) return undefined;
-  const sel = parseInt(resp);
-  if (!(sel >= 1 && sel <= versiones.length)) { alert('Versión inválida. No se cambió el estado.'); return undefined; }
-  return versiones[sel - 1];
+  const numTecleado = parseInt(String(resp).replace(/\D/g, ''));
+  const elegida = versiones.find(v => (parseInt((v.version || 'V1').replace(/\D/g, '')) || 1) === numTecleado);
+  if (!elegida) { alert('Versión inválida. No se cambió el estado.'); return undefined; }
+  return elegida;
 }
 
 // Al aceptar una cotización, el Proyecto debe quedar diligenciado — es el dato que se
