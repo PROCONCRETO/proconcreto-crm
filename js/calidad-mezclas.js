@@ -160,9 +160,12 @@ function renderDisenosMezcla() {
   const q = (document.getElementById('buscar-diseno')?.value || '').toLowerCase();
   let data = [...DISENOS_MEZCLA];
   if (q) data = data.filter(d => (d.codigo + ' ' + d.nombre).toLowerCase().includes(q));
-  data.sort((a, b) => (b.creadoEn || '').localeCompare(a.creadoEn || ''));
+  // Orden manual (2026-08-27, a pedido del usuario — reemplaza el de más reciente primero) —
+  // DISENOS_MEZCLA ya llega ordenado por `orden` desde la carga (_normalizarOrdenLista(), ver
+  // js/datos-realtime.js), así que basta con no volver a ordenar aquí; se aplica DESPUÉS del
+  // filtro de búsqueda, igual que en Costeo de Producto/Costos de Referencia/Maquinaria.
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">🧪</div><div>No hay diseños de mezcla registrados.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">🧪</div><div>No hay diseños de mezcla registrados.</div></td></tr>`;
     return;
   }
   tbody.innerHTML = data.map(d => {
@@ -170,7 +173,8 @@ function renderDisenosMezcla() {
     const ultimoActor = d.modificadoPor || d.creadoPor;
     const nombreActor = _esc(USUARIOS_CRM[ultimoActor]?.nombre || ultimoActor) || '—';
     const etiquetaActor = d.modificadoPor ? 'Modificó' : 'Elaboró';
-    return `<tr style="border-top:2px solid var(--azul-oscuro);${inactivo ? 'opacity:.55' : ''}">
+    return `<tr style="border-top:2px solid var(--azul-oscuro);${inactivo ? 'opacity:.55' : ''}" ondragover="permitirSoltarDiseno(event)" ondragleave="quitarResaltadoSoltarDiseno(event)" ondrop="soltarDisenoSobreDiseno(event,'${d.id}')">
+      <td style="text-align:center"><span class="drag-handle" draggable="true" ondragstart="iniciarArrastreDiseno(event,'${d.id}')" ondragend="terminarArrastreDiseno(event)" title="Arrastra para reordenar">☰</span></td>
       <td style="font-weight:700;color:var(--azul)">${_esc(d.codigo)}</td>
       <td style="font-weight:600">${_esc(d.nombre)}</td>
       <td style="text-align:center;font-weight:700">${d.resistenciaDiseno || '—'} MPa</td>
@@ -186,6 +190,41 @@ function renderDisenosMezcla() {
       </td>
     </tr>`;
   }).join('');
+}
+
+// ── Reordenar por arrastre (mismo patrón que Costeo de Producto/Costos de Referencia/
+// Maquinaria — ver js/config.js) — opera sobre DISENOS_MEZCLA completo, no la vista filtrada
+// `data`, así que sigue siendo consistente aunque haya un buscador activo en ese momento. ──
+let _disenoArrastradoId = null;
+function iniciarArrastreDiseno(event, id) {
+  _disenoArrastradoId = id;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', id);
+  event.currentTarget.closest('tr')?.classList.add('fila-arrastrando');
+}
+function terminarArrastreDiseno(event) {
+  event.currentTarget.closest('tr')?.classList.remove('fila-arrastrando');
+  _disenoArrastradoId = null;
+}
+function permitirSoltarDiseno(event) {
+  if (!_disenoArrastradoId) return;
+  event.preventDefault();
+  event.currentTarget.classList.add('fila-dragover');
+}
+function quitarResaltadoSoltarDiseno(event) {
+  event.currentTarget.classList.remove('fila-dragover');
+}
+function soltarDisenoSobreDiseno(event, idDestino) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('fila-dragover');
+  if (!_disenoArrastradoId) return;
+  const origen = _disenoArrastradoId;
+  _disenoArrastradoId = null;
+  const resultado = _reordenarPorArrastre(DISENOS_MEZCLA, origen, idDestino, x => x.id,
+    d => sb.from('disenos_mezcla').upsert({ id: d.id, datos: d, modificado: new Date().toISOString() }, { onConflict: 'id' })
+      .then(({ error }) => { if (error) console.error('Error guardando orden de diseño de mezcla:', error.message); }));
+  renderDisenosMezcla();
+  return resultado;
 }
 
 let _aditivosDisenoActual = [];

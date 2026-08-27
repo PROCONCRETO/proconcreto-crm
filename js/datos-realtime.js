@@ -31,7 +31,7 @@ async function cargarDatosSupabase() {
   if (e16) console.warn('Tabla costeo_productos no disponible aún — corre sql/2026-08-02_costeo_producto.sql en Supabase.');
   ORDENES = (ords || []).filter(r => r.datos).map(r => r.datos);
   PRODUCCIONES = (prods || []).filter(r => r.datos).map(r => r.datos);
-  DISENOS_MEZCLA = (disenos || []).filter(r => r.datos).map(r => _normalizarDiseno(r.datos));
+  DISENOS_MEZCLA = _normalizarOrdenLista((disenos || []).filter(r => r.datos).map(r => _normalizarDiseno(r.datos)));
   ENSAYOS_CALIDAD = (ensayos || []).filter(r => r.datos).map(r => r.datos);
   MATERIA_PRIMA = (mprima || []).filter(r => r.datos).map(r => r.datos);
   AJUSTES_MEZCLA = (ajustes || []).filter(r => r.datos).map(r => _normalizarAjuste(r.datos));
@@ -156,7 +156,7 @@ async function recargarProductosRT() {
 }
 async function recargarDisenosRT() {
   const { data } = await sb.from('disenos_mezcla').select('datos').order('creado', { ascending: false });
-  DISENOS_MEZCLA = (data || []).filter(r => r.datos).map(r => _normalizarDiseno(r.datos));
+  DISENOS_MEZCLA = _normalizarOrdenLista((data || []).filter(r => r.datos).map(r => _normalizarDiseno(r.datos)));
   rerenderPantallaActiva();
 }
 async function recargarEnsayosRT() {
