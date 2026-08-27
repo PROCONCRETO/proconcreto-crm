@@ -1458,32 +1458,43 @@ function imprimirProgramacionDia(fechaStr) {
     const entregasViaje = _entregasDeViaje(v);
 
     const entregasHTML = entregasViaje.map(e => {
+      // Teléfono de contacto como link "tel:" (2026-08-27, a pedido del usuario) — al pincharlo,
+      // el celular ofrece marcar directo. `telHref` limpia el número a solo dígitos y un "+"
+      // inicial (si lo trae) — lo que se ve en pantalla sigue siendo el número tal como se
+      // digitó, el "tel:" del href es lo único que se normaliza. Misma clase `pv-tel-link` que
+      // `pv-maps-link` para que descargarProgramacionDiaPDF() también lo embeba como enlace real
+      // en el PDF descargado (ver esa función — el selector ya cubre ambas clases).
+      const telHref = (e.contactoObraTelefono || '').replace(/[^\d+]/g, '');
       const contactoHTML = e.contactoObraNombre
-        ? `<div class="pv-contacto"><b>👤 Recibe: ${_esc(e.contactoObraNombre)}</b>${e.contactoObraTelefono ? `<span class="tel">📞 ${_esc(e.contactoObraTelefono)}</span>` : ''}</div>`
+        ? `<div class="pv-contacto"><b>👤 Recibe: ${_esc(e.contactoObraNombre)}</b>${e.contactoObraTelefono ? `<a class="tel pv-tel-link" href="tel:${telHref}">📞 ${_esc(e.contactoObraTelefono)}</a>` : ''}</div>`
         : `<div class="pv-contacto sin-datos">Sin contacto registrado en obra — confirmar con el cliente antes de salir</div>`;
       const productosHTML = (e.productos || []).filter(p => p.producto).map(p =>
         `<tr><td>${_esc(p.producto)}</td><td class="num">${p.cantidad || 0}</td><td class="num">${(Number(p.peso) || 0).toFixed(2)} ton</td></tr>`
       ).join('');
       const pesoEntrega = (e.productos || []).reduce((s, p) => s + (Number(p.peso) || 0), 0);
-      // Tag de ubicación: abre Google Maps con el destino específico + la Ciudad de Destino del
-      // viaje (mejora la precisión del geocodificado — "Km 3 vía..." solo no dice en qué
-      // municipio, la ciudad del viaje sí la completa). Es un enlace real en la vista previa en
+      // Tag de ubicación: abre Google Maps. Antes se armaba una búsqueda de texto a partir del
+      // destino específico/ciudad — el usuario reportó que eso no necesariamente cae en el sitio
+      // real ("se está generando con el nombre del proyecto pero este no necesariamente está
+      // mostrando la ubicación"). Ahora se ata ÚNICAMENTE a un link real de Google Maps pegado
+      // en el proyecto del cliente (campo "Dirección", ver "+ Agregar proyecto"): sin ese link
+      // pegado, el destino se muestra como texto plano, sin ningún enlace inventado — mejor sin
+      // link que con uno que lleve al lugar equivocado. Es un enlace real en la vista previa en
       // pantalla; en el PDF descargado se convierte en una anotación de enlace de jsPDF sobre la
       // imagen rasterizada (ver descargarProgramacionDiaPDF/_enlacesMapaEnPagina), porque el PDF
       // se genera pintando imágenes página por página, no texto — un <a> normal ahí no sería
       // clickeable si no se agrega esa anotación aparte.
-      // Si el proyecto tiene Dirección registrada (ver "+ Agregar proyecto" en la ficha del
-      // cliente), se usa esa — es un texto geocodificable de verdad. Si no, se cae al nombre del
-      // destino específico + la ciudad del viaje (menos preciso, pero mejor que nada).
-      const ubicacionQuery = e.direccionEntrega || [e.destino, v.destino].filter(Boolean).join(', ');
-      const mapsUrl = e.destino ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ubicacionQuery + ', Colombia')}` : '';
+      const direccionPegada = (e.direccionEntrega || '').trim();
+      const mapsUrl = /^https?:\/\//i.test(direccionPegada) ? direccionPegada : '';
+      const sitioHTML = !e.destino ? '' : mapsUrl
+        ? `<a class="sitio pv-maps-link" href="${mapsUrl}" target="_blank" rel="noopener">📍 ${_esc(e.destino)}</a>`
+        : `<div class="sitio-sin-link">📍 ${_esc(e.destino)}</div>`;
       return `
       <div class="pv-entrega">
         <div class="pv-entrega-top">
           <div class="pv-check"></div>
           <div class="pv-entrega-quien">
             <div class="cliente">${_esc(e.cliente) || 'Sin cliente'}</div>
-            ${e.destino ? `<a class="sitio pv-maps-link" href="${mapsUrl}" target="_blank" rel="noopener">📍 ${_esc(e.destino)}</a>` : ''}
+            ${sitioHTML}
           </div>
           ${e.ordenNumero ? `<div class="pv-entrega-orden">Orden ${_esc(e.ordenNumero)}</div>` : ''}
         </div>
@@ -1574,12 +1585,13 @@ async function descargarProgramacionDiaPDF() {
     const headerH = pageW * (topImg.naturalHeight / topImg.naturalWidth);
     const contentEl = document.getElementById('prog-dia-content');
     const escalaCanvas = 2.5;
-    // Posición/tamaño de cada tag de ubicación ANTES de rasterizar (html2canvas convierte todo
-    // en imagen — el <a href="https://maps..."> real de la vista previa deja de ser un enlace
-    // ahí; se guarda su rectángulo en el mismo espacio de píxeles que contentCanvas, para poder
-    // agregarlo como anotación de enlace de jsPDF más abajo, página por página).
+    // Posición/tamaño de cada enlace real (tag de ubicación Y teléfono de contacto) ANTES de
+    // rasterizar (html2canvas convierte todo en imagen — un <a href="https://maps..."> o
+    // <a href="tel:..."> real de la vista previa deja de ser un enlace ahí; se guarda su
+    // rectángulo en el mismo espacio de píxeles que contentCanvas, para poder agregarlo como
+    // anotación de enlace de jsPDF más abajo, página por página).
     const contentRect = contentEl.getBoundingClientRect();
-    const enlacesMapa = Array.from(contentEl.querySelectorAll('.pv-maps-link')).map(el => {
+    const enlacesMapa = Array.from(contentEl.querySelectorAll('.pv-maps-link, .pv-tel-link')).map(el => {
       const r = el.getBoundingClientRect();
       return {
         top: (r.top - contentRect.top) * escalaCanvas,

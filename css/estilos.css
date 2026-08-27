@@ -329,11 +329,14 @@
      del tamaño real de este elemento en pantalla (ver descargarProgramacionDiaPDF en
      logistica.js), así que un padding más grande aquí agranda ambos a la vez. */
   .pv-entrega-quien .sitio { display: inline-block; font-size: 13px; color: #1565C0; font-weight: 700; text-decoration: none; margin-top: 3px; padding: 5px 11px 5px 7px; background: #EAF2FC; border-radius: 6px; }
+  /* Sin link real de Maps pegado en el proyecto — texto plano, a propósito sin el look de
+     "botón" de .sitio, para no insinuar que se puede pinchar cuando no hay a dónde llevar. */
+  .pv-entrega-quien .sitio-sin-link { font-size: 11px; color: var(--gris-medio); margin-top: 1px; }
   .pv-entrega-orden { text-align: right; font-size: 9.5px; color: var(--gris-medio); white-space: nowrap; }
 
   .pv-contacto { display: flex; align-items: center; gap: 7px; background: #FFF9E8; border: 1px solid #F0DFA0; border-radius: 6px; padding: 5px 9px; margin-bottom: 9px; font-size: 11px; }
   .pv-contacto b { font-weight: 800; }
-  .pv-contacto .tel { margin-left: auto; font-weight: 800; color: #B8860B; white-space: nowrap; }
+  .pv-contacto .tel { margin-left: auto; font-weight: 800; color: #B8860B; white-space: nowrap; text-decoration: none; padding: 2px 4px; }
   .pv-contacto.sin-datos { background: var(--gris-claro); border-color: var(--gris-borde); color: var(--gris-medio); font-style: italic; }
 
   .pv-productos { width: 100%; border-collapse: collapse; margin-bottom: 9px; }

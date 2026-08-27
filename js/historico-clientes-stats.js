@@ -537,7 +537,7 @@ function renderProyectosCliente() {
         <div class="form-grupo"><label>Contacto</label><input type="text" value="${_esc(p.contacto)}" oninput="_proyectosClienteActual[${i}].contacto=this.value" placeholder="Ing. ..."></div>
         <div class="form-grupo"><label>Teléfono</label><input type="text" value="${_esc(p.telefono)}" oninput="_proyectosClienteActual[${i}].telefono=this.value"></div>
       </div>
-      <div class="form-grupo"><label>Dirección <span class="hint">(para el link de Google Maps del imprimible de viajes)</span></label><input type="text" value="${_esc(p.direccion)}" oninput="_proyectosClienteActual[${i}].direccion=this.value" placeholder="Ej: Cra 23 #45-12, o un punto de referencia reconocible en Maps"></div>
+      <div class="form-grupo"><label>Link de Google Maps <span class="hint">(opcional — para el tag de ubicación del imprimible de viajes)</span></label><input type="text" value="${_esc(p.direccion)}" oninput="_proyectosClienteActual[${i}].direccion=this.value" placeholder="Pega aquí el link real (Google Maps → Compartir → Copiar enlace)"></div>
     </div>`).join('');
 }
 
