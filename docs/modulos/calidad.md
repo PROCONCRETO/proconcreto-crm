@@ -53,6 +53,20 @@ El usuario aclaró que "el metacaolín en realidad es una adición, y pueden exi
 
 **Capacidad de cochada de la mezcladora** (`maquinaria_equipos`, campo `capacidadCochadaM3`, en `js/costeo-maquinaria.js`): el volumen que mezcla una tanda de la mezcladora — dato de la **máquina**, no del diseño ni del producto (ej. "Mezcladora Columbia" = 0,6 m³). Solo aplica a mezcladoras; el resto de máquinas queda en 0. Sirve para que Costeo de Producto convierta un Diseño de Mezcla (dado por m³) a "por cochada" y saque cuántas unidades de producto rinde cada tanda — ver `docs/modulos/costeo.md`.
 
+### Renombrar el código de un diseño se cascadea a todo lo que lo referencia (2026-08-27)
+
+El diseño en sí se guarda con un `id` estable (`disenos_mezcla`, `onConflict: 'id'`) — renombrar su `codigo` no lo duplica ni lo pierde. El problema es que **otras 3 partes de la app guardan una copia fija del código como referencia**, no un enlace vivo por `id`, y ninguna se actualizaba sola al renombrar (pregunta real del usuario: "si le cambio el nombre al código de los diseños de mezcla, me altera algo?" — sí, y bastante):
+
+- **Costeo de Producto** (`costeo_productos.disenoMezclaCodigo`) — `calcularCosteoProducto()` busca el diseño por ese código en cada cálculo (`DISENOS_MEZCLA.find(d => d.codigo === c.disenoMezclaCodigo)`). Sin el rename en cascada, un código huérfano hace que `diseno` salga `undefined` y `m = diseno?.materiales || {}` — la Materia Prima del costeo (cemento, agua, agregados, aditivos) se cae a $0 **en silencio**, sin ninguna advertencia en la lista principal.
+- **Productos del catálogo** (`productos.diseno_mezcla`) — usado para filtrar qué productos son "compatibles" con un diseño en Ajuste Diario (`PRODUCTOS.filter(p => p.disenoMezcla === disenoActual)`); con el código huérfano, ese filtro deja de encontrar productos.
+- **Calidad** (`ensayos_calidad.disenoCodigo`, `ajustes_mezcla.disenoCodigo`) — registros históricos pierden el enlace al diseño: el nombre/resistencia deja de mostrarse junto a ensayos/ajustes viejos, y `_proximaRevisionDiseno()`/`_segmentoRevisionDiseno()` (qué versión de la receta estaba vigente en esa fecha, usado en Análisis Estadístico) deja de coincidir.
+
+**Arreglo, en `guardarDiseno()` (`js/calidad-mezclas.js`)**:
+- **Choque de código**: si el código nuevo ya lo usa OTRO diseño (comparando por `id`, no por el mismo registro que se está editando), se bloquea con alert antes de guardar nada — no existía ninguna validación de unicidad de código antes de esto.
+- **Detección de rename**: si `existente.codigo !== codigo` (edición de un diseño que ya existía), se cuentan las referencias actuales al código viejo en las 4 tablas. Si hay alguna, se pide confirmación explícita con el detalle ("Esto también actualizará N costeos de producto, M productos del catálogo..."); si el usuario cancela, **no se guarda nada, ni siquiera el diseño mismo** (aborta todo el `guardarDiseno()`).
+- **`_renombrarCodigoDiseno(codigoViejo, codigoNuevo, afectados)`**: recorre las 4 listas ya filtradas, reasigna el campo de código en cada registro y hace upsert a su tabla correspondiente (`costeo_productos`, `productos`, `ensayos_calidad`, `ajustes_mezcla`). Se llama **antes** de `_revisarImpactoPrecios()` (el mecanismo existente de "Impacto en el catálogo", ver `docs/modulos/costeo.md`) — así, cuando ese impacto recalcula cada costeo afectado, ya encuentra el diseño con el código nuevo y el costo sale igual que antes (un rename puro no debería mover ningún precio); si se hiciera al revés, el impacto vería costeos con el código todavía huérfano y mostraría una caída de precio falsa.
+- Verificado ejecutando `guardarDiseno()` real (no solo revisión de código) contra 3 escenarios: rename confirmado (las 4 referencias + el diseño mismo quedan actualizados, exactamente 5 upserts a las 5 tablas correctas, sin duplicar el diseño), choque de código bloqueado (sin upserts, sin cambios), y rename cancelado en el aviso de impacto (nada se guarda, ni siquiera el diseño).
+
 ## Cliente → Proyecto en Ajuste Diario
 
 ## Cliente → Proyecto en Ajuste Diario

@@ -1260,11 +1260,18 @@ function renderCosteoProductos() {
     const k = calcularCosteoProducto(c);
     const tipo = TIPOS_ESTRUCTURA_COSTEO[c.tipoEstructura] || TIPOS_ESTRUCTURA_COSTEO.vibrocompactado;
     const nombreEsc = _escNombreOnclick(c.productoCodigo);
+    // Precio/Unidad = precio de lista ACTUAL del catálogo (`producto.lista`), no el "precio
+    // sugerido" del costeo (`k.precioSugeridoLista`) — son el mismo número la mayoría del
+    // tiempo (ver "Impacto en precios" más abajo, que los mantiene sincronizados), pero el de
+    // catálogo es el que de verdad se cotiza; si todavía no se ha aprobado el último impacto de
+    // un cambio de costo, pueden estar temporalmente desalineados, y el de catálogo es el real.
+    const productoCat = CATALOGO.find(p => p.codigo === c.productoCodigo);
     return `<tr ondragover="permitirSoltarCosteoProducto(event)" ondragleave="quitarResaltadoSoltarCosteoProducto(event)" ondrop="soltarCosteoProductoSobreCosteoProducto(event,'${nombreEsc}')">
       <td style="text-align:center"><span class="drag-handle" draggable="true" ondragstart="iniciarArrastreCosteoProducto(event,'${nombreEsc}')" ondragend="terminarArrastreCosteoProducto(event)" title="Arrastra para reordenar">☰</span></td>
       <td style="font-weight:600">${_esc(c.productoNombre)}</td>
       <td><span class="badge-tipo" style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:600;background:${tipo.bg};color:${tipo.fg}">${tipo.label}</span></td>
       <td style="text-align:right;font-weight:700;color:var(--azul)">${_fmtCosteoProd(k.totalUnidad)}</td>
+      <td style="text-align:right;font-weight:700;color:var(--verde)">${productoCat ? _fmtCosteoProd(productoCat.lista) : '<span style="color:var(--rojo);font-weight:600;font-size:11px">no encontrado</span>'}</td>
       <td style="font-size:12px;color:var(--gris-medio)">${_esc(c.disenoMezclaCodigo) || '—'}</td>
       <td style="font-size:12px;color:var(--gris-medio)">${c._modificado ? new Date(c._modificado).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
       <td>

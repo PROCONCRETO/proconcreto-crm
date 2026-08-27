@@ -340,6 +340,38 @@ function guardarDiseno() {
 
   const editId = document.getElementById('m-diseno-id').value;
   const existente = editId ? DISENOS_MEZCLA.find(x => String(x.id) === String(editId)) : null;
+
+  const colision = DISENOS_MEZCLA.find(x => x.codigo === codigo && String(x.id) !== String(editId));
+  if (colision) { alert(`El código "${codigo}" ya lo usa el diseño "${colision.nombre}" — elige un código distinto.`); return; }
+
+  // Renombrar el código de un diseño existente rompe todo lo que hoy lo referencia por ese
+  // texto exacto (no por el `id`, que no cambia): Costeo de Producto, Productos del catálogo,
+  // Ensayos de laboratorio y Ajustes Diarios de humedad — ninguno se actualiza solo (bug real
+  // reportado por el usuario: "si le cambio el nombre al código... me altera algo?"). Antes de
+  // guardar, se avisa cuántas referencias hay y se cascadea el rename a todas — ver
+  // _renombrarCodigoDiseno() más abajo, llamada justo después de guardar el diseño.
+  const esRenombreCodigo = existente && existente.codigo !== codigo;
+  let _impactoRenombreCodigo = null;
+  if (esRenombreCodigo) {
+    _impactoRenombreCodigo = {
+      costeos: COSTEO_PRODUCTOS.filter(c => c.disenoMezclaCodigo === existente.codigo),
+      productos: CATALOGO.filter(p => p.disenoMezcla === existente.codigo),
+      ensayos: ENSAYOS_CALIDAD.filter(e => e.disenoCodigo === existente.codigo),
+      ajustes: AJUSTES_MEZCLA.filter(a => a.disenoCodigo === existente.codigo),
+    };
+    const total = _impactoRenombreCodigo.costeos.length + _impactoRenombreCodigo.productos.length + _impactoRenombreCodigo.ensayos.length + _impactoRenombreCodigo.ajustes.length;
+    if (total > 0) {
+      const detalle = [
+        _impactoRenombreCodigo.costeos.length ? `${_impactoRenombreCodigo.costeos.length} costeo${_impactoRenombreCodigo.costeos.length === 1 ? '' : 's'} de producto` : '',
+        _impactoRenombreCodigo.productos.length ? `${_impactoRenombreCodigo.productos.length} producto${_impactoRenombreCodigo.productos.length === 1 ? '' : 's'} del catálogo` : '',
+        _impactoRenombreCodigo.ensayos.length ? `${_impactoRenombreCodigo.ensayos.length} ensayo${_impactoRenombreCodigo.ensayos.length === 1 ? '' : 's'} de laboratorio` : '',
+        _impactoRenombreCodigo.ajustes.length ? `${_impactoRenombreCodigo.ajustes.length} ajuste${_impactoRenombreCodigo.ajustes.length === 1 ? '' : 's'} diario de humedad` : '',
+      ].filter(Boolean).join(', ');
+      const ok = confirm(`Vas a cambiar el código de "${existente.codigo}" a "${codigo}".\n\nEsto también actualizará ${detalle}, que hoy referencian el código "${existente.codigo}" — para que sigan encontrando este diseño.\n\n¿Continuar?`);
+      if (!ok) return;
+    }
+  }
+
   const materialesNuevos = {
     cemento: cantidadesMat.cemento,
     cementoProducto: productosMat.cemento,
@@ -383,9 +415,43 @@ function guardarDiseno() {
   if (idx >= 0) DISENOS_MEZCLA[idx] = diseno; else DISENOS_MEZCLA.unshift(diseno);
   sb.from('disenos_mezcla').upsert({ id: diseno.id, datos: diseno, modificado: new Date().toISOString() }, { onConflict: 'id' })
     .then(({ error }) => { if (error) console.error('Error guardando diseño:', error.message); });
+  // Cascada del rename ANTES de revisar impacto en precios — así _costeosAfectadosPorCambio()
+  // (que recalcula cada costeo buscando su diseño por `disenoMezclaCodigo`) ya encuentra el
+  // diseño con el código nuevo, en vez de ver un código huérfano y calcular Materia Prima en $0.
+  if (esRenombreCodigo) _renombrarCodigoDiseno(existente.codigo, codigo, _impactoRenombreCodigo);
   cerrarModal('modal-diseno');
   renderDisenosMezcla();
   _revisarImpactoPrecios(`Diseño de Mezcla "${codigo}" actualizado en Calidad`, c => c.disenoMezclaCodigo === codigo);
+}
+
+// Actualiza en cascada todas las referencias al código VIEJO de un diseño (Costeo de Producto,
+// Productos del catálogo, Ensayos de laboratorio, Ajustes Diarios de humedad) para que sigan
+// apuntando al diseño después de un rename — ver la nota en guardarDiseno(). `afectados` ya
+// viene filtrado (calculado antes de guardar, para poder avisar cuántas cosas se iban a tocar).
+function _renombrarCodigoDiseno(codigoViejo, codigoNuevo, afectados) {
+  afectados.costeos.forEach(c => {
+    c.disenoMezclaCodigo = codigoNuevo;
+    sb.from('costeo_productos').upsert({ producto_codigo: c.productoCodigo, datos: c, modificado: new Date().toISOString() }, { onConflict: 'producto_codigo' })
+      .then(({ error }) => { if (error) console.error('Error actualizando código de diseño en costeo:', error.message); });
+  });
+  afectados.productos.forEach(p => {
+    p.disenoMezcla = codigoNuevo;
+    _upsertProducto(p).then(({ error }) => { if (error) console.error('Error actualizando código de diseño en producto:', error.message); });
+  });
+  afectados.ensayos.forEach(e => {
+    e.disenoCodigo = codigoNuevo;
+    sb.from('ensayos_calidad').upsert({ id: e.id, datos: e, modificado: new Date().toISOString() }, { onConflict: 'id' })
+      .then(({ error }) => { if (error) console.error('Error actualizando código de diseño en ensayo:', error.message); });
+  });
+  afectados.ajustes.forEach(a => {
+    a.disenoCodigo = codigoNuevo;
+    sb.from('ajustes_mezcla').upsert({ id: a.id, datos: a, modificado: new Date().toISOString() }, { onConflict: 'id' })
+      .then(({ error }) => { if (error) console.error('Error actualizando código de diseño en ajuste:', error.message); });
+  });
+  const n = afectados.costeos.length + afectados.productos.length + afectados.ensayos.length + afectados.ajustes.length;
+  if (n > 0) {
+    alert(`Código actualizado de "${codigoViejo}" a "${codigoNuevo}" — se actualizaron ${n} referencia${n === 1 ? '' : 's'} en Costeo de Producto, el catálogo de Productos y Calidad para que sigan encontrando este diseño.`);
+  }
 }
 
 function eliminarDiseno(id) {

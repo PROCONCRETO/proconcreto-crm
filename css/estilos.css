@@ -323,7 +323,12 @@
   .pv-check { width: 18px; height: 18px; border: 2px solid var(--gris-oscuro); border-radius: 4px; flex-shrink: 0; margin-top: 2px; }
   .pv-entrega-quien { flex: 1; min-width: 0; }
   .pv-entrega-quien .cliente { font-size: 14px; font-weight: 800; line-height: 1.25; }
-  .pv-entrega-quien .sitio { display: inline-block; font-size: 11px; color: #1565C0; font-weight: 700; text-decoration: none; margin-top: 1px; }
+  /* Tag de ubicación agrandado (2026-08-27, a pedido del usuario, "para que se pueda pinchar
+     más fácil") — el padding + fondo no solo se ve más como un botón, también agranda de verdad
+     el área táctil: el rectángulo de enlace que se agrega al PDF descargado se calcula a partir
+     del tamaño real de este elemento en pantalla (ver descargarProgramacionDiaPDF en
+     logistica.js), así que un padding más grande aquí agranda ambos a la vez. */
+  .pv-entrega-quien .sitio { display: inline-block; font-size: 13px; color: #1565C0; font-weight: 700; text-decoration: none; margin-top: 3px; padding: 5px 11px 5px 7px; background: #EAF2FC; border-radius: 6px; }
   .pv-entrega-orden { text-align: right; font-size: 9.5px; color: var(--gris-medio); white-space: nowrap; }
 
   .pv-contacto { display: flex; align-items: center; gap: 7px; background: #FFF9E8; border: 1px solid #F0DFA0; border-radius: 6px; padding: 5px 9px; margin-bottom: 9px; font-size: 11px; }
