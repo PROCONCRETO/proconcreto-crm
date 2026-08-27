@@ -129,7 +129,7 @@ function renderItems() {
         <div style="font-size:10px;color:#90A4AE">${_esc(it.codigo)}</div>
       </td>
       <td><span style="color:${it.iva==='SI'?'var(--rojo)':'var(--verde)'};font-weight:700;font-size:12px">${it.iva}</span></td>
-      <td><input type="number" value="${it.precio}" style="width:90px" onchange="actualizarItem(${i},'precio',this.value)"></td>
+      <td style="font-weight:600">$${it.precio.toLocaleString()}</td>
       <td><input type="number" min="0" max="50" value="${it.descuento}" style="width:60px" onchange="actualizarItem(${i},'descuento',this.value)">%</td>
       <td style="font-weight:600;color:var(--azul)">$${adjUnit.toLocaleString()}${alerta}</td>
       <td style="font-weight:700">$${total.toLocaleString()}</td>
@@ -407,7 +407,7 @@ function renderOpcionesExtra() {
         <td><span style="background:var(--gris-claro);padding:3px 6px;border-radius:4px;font-size:11px;font-weight:700">${it.unidad}</span></td>
         <td><div style="font-weight:600;font-size:13px">${_esc(it.nombre)}</div><div style="font-size:11px;color:var(--gris-medio)">${_esc(it.medidas)}</div></td>
         <td><span style="color:${it.iva === 'SI' ? 'var(--rojo)' : 'var(--verde)'};font-weight:700;font-size:12px">${it.iva}</span></td>
-        <td><input type="number" value="${it.precio}" style="width:84px" onchange="actualizarItemOpcion(${idx},${i},'precio',this.value)"></td>
+        <td style="font-weight:600">$${it.precio.toLocaleString()}</td>
         <td><input type="number" min="0" max="50" value="${it.descuento}" style="width:54px" onchange="actualizarItemOpcion(${idx},${i},'descuento',this.value)">%</td>
         <td style="font-weight:600;color:var(--azul)">$${adj.toLocaleString()}</td>
         <td style="font-weight:700">$${tot.toLocaleString()}</td>
