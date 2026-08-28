@@ -1484,7 +1484,19 @@ function imprimirProgramacionDia(fechaStr) {
       // imagen rasterizada (ver descargarProgramacionDiaPDF/_enlacesMapaEnPagina), porque el PDF
       // se genera pintando imágenes página por página, no texto — un <a> normal ahí no sería
       // clickeable si no se agrega esa anotación aparte.
-      const direccionPegada = (e.direccionEntrega || '').trim();
+      // Bug real reportado (2026-08-28): "he subido varias ubicaciones de los proyectos... y no
+      // me está generando el link". Causa: `e.direccionEntrega` es una FOTO fija que solo se
+      // toma una vez, al elegir el proyecto en el desplegable (`_alElegirProyectoEntrega()`) —
+      // si la entrega ya existía cuando se agregó/corrigió el link del proyecto después, esa
+      // foto se quedó vacía para siempre y nada la vuelve a refrescar sola. Ahora se resuelve la
+      // dirección EN VIVO contra el proyecto actual del cliente (mismo cliente + mismo nombre de
+      // proyecto que `e.destino`) cada vez que se imprime, así que agregar el link a un proyecto
+      // ya funciona de inmediato para todos los viajes existentes, sin tener que reabrir y volver
+      // a guardar cada uno. Se cae a la foto guardada solo si no se encuentra el proyecto en vivo
+      // (cliente borrado, proyecto renombrado desde entonces).
+      const clienteEntrega = (typeof CLIENTES !== 'undefined' ? CLIENTES : []).find(c => c.nombre.trim().toLowerCase() === (e.cliente || '').trim().toLowerCase());
+      const proyectoEntrega = clienteEntrega?.proyectos?.find(p => p.nombre === e.destino);
+      const direccionPegada = (proyectoEntrega?.direccion || e.direccionEntrega || '').trim();
       const mapsUrl = /^https?:\/\//i.test(direccionPegada) ? direccionPegada : '';
       const sitioHTML = !e.destino ? '' : mapsUrl
         ? `<a class="sitio pv-maps-link" href="${mapsUrl}" target="_blank" rel="noopener">📍 ${_esc(e.destino)}</a>`
