@@ -76,6 +76,8 @@ async function mostrarApp() {
   }
   const navCentroCostos = document.getElementById('nav-centro-costos');
   if (navCentroCostos) navCentroCostos.style.display = _esUsuarioCentroCostos() ? '' : 'none';
+  const inicioBtnCosteo = document.getElementById('inicio-btn-costeo');
+  if (inicioBtnCosteo) inicioBtnCosteo.style.display = _esUsuarioCentroCostos() ? '' : 'none';
   await cargarDatosSupabase();
   poblarGrupos();
   _resetFormularioCotizacion();

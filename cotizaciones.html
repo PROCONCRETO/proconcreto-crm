@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ProSuite — Proconcreto</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect x='1' y='1' width='38' height='38' rx='10' fill='%23003F7F'/%3E%3Ctext x='9' y='29' font-family='Arial, sans-serif' font-weight='900' font-size='24' fill='%23FFFFFF'%3EP%3C/text%3E%3Crect x='21' y='21' width='15' height='15' rx='4' fill='%238BC53F'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="css/estilos.css?v=20260827c">
+<link rel="stylesheet" href="css/estilos.css?v=20260827e">
 </head>
 <body>
 
@@ -71,11 +71,11 @@
 
 <!-- NAV PRINCIPAL -->
 <nav class="nav-top">
-  <div class="nav-logo" title="ProSuite — Proconcreto Prefabricados">
+  <div class="nav-logo" title="Ir a Inicio" onclick="irInicio()" role="button" tabindex="0" onkeydown="if(event.key==='Enter')irInicio()">
     <svg class="prosuite-icono" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="#003F7F"/><text x="9" y="29" font-family="Arial, sans-serif" font-weight="900" font-size="24" fill="#FFFFFF">P</text><rect x="21" y="21" width="15" height="15" rx="4" fill="#8BC53F"/></svg>
     <span class="prosuite-wordmark"><span class="ps-pro">Pro</span><span class="ps-suite">Suite</span></span>
   </div>
-  <button class="nav-modulo activo" onclick="activarModulo('cotizaciones')">📋 Cotizaciones y Ventas</button>
+  <button class="nav-modulo" onclick="activarModulo('cotizaciones')">📋 Cotizaciones y Ventas</button>
   <button class="nav-modulo" onclick="activarModulo('produccion')">🏭 Producción</button>
   <button class="nav-modulo" onclick="activarModulo('logistica')">🚛 Logística</button>
   <button class="nav-modulo" onclick="activarModulo('calidad')">🔬 Calidad</button>
@@ -88,7 +88,7 @@
 </nav>
 
 <!-- SUB-NAV: COTIZACIONES Y VENTAS -->
-<nav class="nav" id="subnav-cotizaciones">
+<nav class="nav" id="subnav-cotizaciones" style="display:none">
   <button class="nav-btn activo" onclick="ir('nueva-cotizacion')">➕ Nueva Cotización</button>
   <button class="nav-btn" onclick="ir('pipeline')">🗂️ Pipeline</button>
   <button class="nav-btn" onclick="ir('historico')">📋 Histórico</button>
@@ -125,9 +125,44 @@
 </nav>
 
 <!-- ═══════════════════════════════════════
+     PANTALLA: INICIO
+═══════════════════════════════════════ -->
+<div id="pantalla-inicio" class="pantalla activa">
+  <div class="inicio-wrap">
+    <div class="inicio-hero">
+      <svg class="prosuite-icono" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="#003F7F"/><text x="9" y="29" font-family="Arial, sans-serif" font-weight="900" font-size="24" fill="#FFFFFF">P</text><rect x="21" y="21" width="15" height="15" rx="4" fill="#8BC53F"/></svg>
+      <span class="prosuite-wordmark prosuite-wordmark-claro"><span class="ps-pro">Pro</span><span class="ps-suite-claro">Suite</span></span>
+    </div>
+    <div class="inicio-sub">Proconcreto Prefabricados · Elige un módulo para empezar</div>
+    <div class="inicio-grid">
+      <button class="inicio-modulo" onclick="activarModulo('cotizaciones')">
+        <span class="inicio-modulo-icono">📋</span>
+        <span class="inicio-modulo-nombre">Cotizaciones y Ventas</span>
+      </button>
+      <button class="inicio-modulo" onclick="activarModulo('produccion')">
+        <span class="inicio-modulo-icono">🏭</span>
+        <span class="inicio-modulo-nombre">Producción</span>
+      </button>
+      <button class="inicio-modulo" onclick="activarModulo('logistica')">
+        <span class="inicio-modulo-icono">🚛</span>
+        <span class="inicio-modulo-nombre">Logística</span>
+      </button>
+      <button class="inicio-modulo" onclick="activarModulo('calidad')">
+        <span class="inicio-modulo-icono">🔬</span>
+        <span class="inicio-modulo-nombre">Calidad</span>
+      </button>
+      <button class="inicio-modulo" id="inicio-btn-costeo" onclick="activarModulo('costeo')">
+        <span class="inicio-modulo-icono">💰</span>
+        <span class="inicio-modulo-nombre">Centro de Costos</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
      PANTALLA: NUEVA COTIZACIÓN
 ═══════════════════════════════════════ -->
-<div id="pantalla-nueva-cotizacion" class="pantalla activa">
+<div id="pantalla-nueva-cotizacion" class="pantalla">
 
   <!-- Cabecera -->
   <div class="card">
@@ -2300,7 +2335,7 @@
 <script src="js/config.js?v=20260821a"></script>
 <script src="js/calculadora-inputs.js?v=20260825a"></script>
 <script src="js/catalogo.js?v=20260821a"></script>
-<script src="js/navegacion.js?v=20260804b"></script>
+<script src="js/navegacion.js?v=20260827a"></script>
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
 <script src="js/produccion-diaria.js?v=20260821b"></script>
 <script src="js/produccion-materia-prima.js?v=20260821a"></script>
@@ -2314,7 +2349,7 @@
 <script src="js/logistica.js?v=20260827c"></script>
 <script src="js/estadisticas-logistica.js?v=20260804c"></script>
 <script src="js/auth.js?v=20260804a"></script>
-<script src="js/datos-realtime.js?v=20260827a"></script>
+<script src="js/datos-realtime.js?v=20260827b"></script>
 <script src="js/cotizador.js?v=20260827a"></script>
 <script src="js/historico-clientes-stats.js?v=20260827a"></script>
 <script src="js/retenciones.js?v=20260809c"></script>

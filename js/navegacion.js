@@ -10,11 +10,30 @@ let itemsActuales = [];
 // políticas RLS de Supabase (sql/2026-08-04_rls_centro_costos.sql).
 const _PANTALLAS_CENTRO_COSTOS = ['productos', 'costeo-mo', 'costeo-maquinaria', 'costeo-referencia', 'costeo-producto'];
 
+// ── Inicio (2026-08-27, a pedido del usuario) ──
+// Pantalla de aterrizaje siempre al abrir el programa, con un botón mediano-grande por cada
+// módulo — el logo de ProSuite en la barra superior (`.nav-logo`, `onclick="irInicio()"`) es el
+// botón de acceso para volver aquí desde cualquier pantalla.
+function irInicio() {
+  document.getElementById('vista-previa').style.display = 'none';
+  document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+  document.querySelectorAll('.nav-modulo').forEach(b => b.classList.remove('activo'));
+  document.getElementById('subnav-cotizaciones').style.display = 'none';
+  document.getElementById('subnav-produccion').style.display = 'none';
+  document.getElementById('subnav-logistica').style.display = 'none';
+  document.getElementById('subnav-calidad').style.display = 'none';
+  document.getElementById('subnav-costeo').style.display = 'none';
+  document.getElementById('pantalla-inicio').classList.add('activa');
+}
+
 function activarModulo(modulo) {
   if (modulo === 'costeo' && !_esUsuarioCentroCostos()) { alert('No tienes acceso a Centro de Costos.'); return; }
   document.getElementById('vista-previa').style.display = 'none';
   document.querySelectorAll('.nav-modulo').forEach(b => b.classList.remove('activo'));
-  event.currentTarget.classList.add('activo');
+  // Se busca el botón del módulo en la barra superior por el `modulo` en vez de usar
+  // `event.currentTarget` — así el resaltado del módulo activo queda correcto sin importar si
+  // se entró desde la barra superior o desde un botón de Inicio (que no es un `.nav-modulo`).
+  document.querySelector(`.nav-modulo[onclick*="'${modulo}'"]`)?.classList.add('activo');
   document.getElementById('subnav-cotizaciones').style.display = modulo === 'cotizaciones' ? 'flex' : 'none';
   document.getElementById('subnav-produccion').style.display = modulo === 'produccion' ? 'flex' : 'none';
   document.getElementById('subnav-logistica').style.display = modulo === 'logistica' ? 'flex' : 'none';
