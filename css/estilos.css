@@ -310,7 +310,7 @@
      día arriba, tipografía grande en lo que se necesita ver rápido, contacto en obra destacado,
      barra de capacidad con alerta de sobrecarga, casilla+firma por entrega para dejar soporte
      físico de la entrega. ── */
-  .pv-resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--gris-borde); border: 1px solid var(--gris-borde); border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+  .pv-resumen { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--gris-borde); border: 1px solid var(--gris-borde); border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
   .pv-resumen .celda { background: #fff; padding: 9px 10px; text-align: center; }
   .pv-resumen .celda .n { font-size: 20px; font-weight: 800; color: #003F7F; line-height: 1; }
   .pv-resumen .celda .n.alerta { color: #C62828; }
@@ -350,6 +350,10 @@
      "botón" de .sitio, para no insinuar que se puede pinchar cuando no hay a dónde llevar. */
   .pv-entrega-quien .sitio-sin-link { font-size: 11px; color: var(--gris-medio); margin-top: 1px; }
   .pv-entrega-orden { text-align: right; font-size: 9.5px; color: var(--gris-medio); white-space: nowrap; }
+  /* Diligencia dentro del imprimible (2026-08-28) — mismo acento naranja que ya identifica una
+     diligencia en Nuevo Viaje y en Cumplidos, para distinguirla de una entrega de un vistazo en
+     la hoja impresa. */
+  .pv-diligencia { border-left: 3px solid var(--naranja); background: #FFF8F0; }
 
   .pv-contacto { display: flex; align-items: center; gap: 7px; background: #FFF9E8; border: 1px solid #F0DFA0; border-radius: 6px; padding: 5px 9px; margin-bottom: 9px; font-size: 11px; }
   .pv-contacto b { font-weight: 800; }

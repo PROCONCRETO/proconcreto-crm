@@ -1439,9 +1439,10 @@ function imprimirProgramacionDia(fechaStr) {
   // Resumen del día — lo primero que se lee, antes de entrar al detalle de cada viaje
   // (2026-08-04, rediseño a pedido del usuario: "los conductores y programadores se me están
   // quejando que no entienden bien").
-  let totalEntregas = 0, totalPeso = 0, vehiculosAlLimite = 0;
+  let totalEntregas = 0, totalDiligencias = 0, totalPeso = 0, vehiculosAlLimite = 0;
   viajesDia.forEach(v => {
     totalEntregas += _entregasDeViaje(v).length;
+    totalDiligencias += _diligenciasDeViaje(v).length;
     totalPeso += Number(v.pesoTotal) || 0;
     const capacidad = CAPACIDAD_VEHICULO[v.vehiculo];
     if (capacidad && (Number(v.pesoTotal) || 0) > capacidad) vehiculosAlLimite++;
@@ -1511,6 +1512,35 @@ function imprimirProgramacionDia(fechaStr) {
       </div>`;
     }).join('') || `<div class="pv-entrega"><span style="color:#999;font-style:italic;font-size:12px">Viaje sin entregas cargadas todavía</span></div>`;
 
+    // Diligencias del viaje (2026-08-28, a pedido del usuario: "las diligencias no están
+    // quedando registradas en el PDF... inclúyelas") — tarjeta con acento naranja, mismo color
+    // que ya identifica una diligencia en Nuevo Viaje y en Cumplidos, para distinguirla de una
+    // entrega de un vistazo en la hoja impresa. Sin tag de Maps (las diligencias no tienen un
+    // campo de dirección/link como las entregas, solo `lugar` en texto libre — no hay nada real
+    // a qué atarlo, mismo criterio que llevó a quitar los links inventados de las entregas).
+    const diligenciasViaje = _diligenciasDeViaje(v);
+    const diligenciasHTML = diligenciasViaje.map(d => {
+      const telHrefDil = (d.contactoTelefono || '').replace(/[^\d+]/g, '');
+      const contactoDilHTML = d.contactoNombre
+        ? `<div class="pv-contacto"><b>👤 Contacto: ${_esc(d.contactoNombre)}</b>${d.contactoTelefono ? `<a class="tel pv-tel-link" href="tel:${telHrefDil}">📞 ${_esc(d.contactoTelefono)}</a>` : ''}</div>`
+        : '';
+      return `
+      <div class="pv-entrega pv-diligencia">
+        <div class="pv-entrega-top">
+          <div class="pv-check"></div>
+          <div class="pv-entrega-quien">
+            <div class="cliente">🔧 ${_esc(d.descripcion) || 'Diligencia'}</div>
+            ${d.lugar ? `<div class="sitio-sin-link">📍 ${_esc(d.lugar)}</div>` : ''}
+          </div>
+        </div>
+        ${contactoDilHTML}
+        <div class="pv-firma">
+          <div class="pv-firma-campo">Firma / Sello</div>
+          <div class="pv-firma-campo hora">Hora</div>
+        </div>
+      </div>`;
+    }).join('');
+
     return `
       <div class="pv-viaje">
         <div class="pv-viaje-head">
@@ -1521,7 +1551,7 @@ function imprimirProgramacionDia(fechaStr) {
           </div>
           <div class="pv-viaje-destino">
             <div class="ciudad">${_esc(v.destino) || '—'}</div>
-            <div class="n-entregas">${entregasViaje.length} entrega${entregasViaje.length === 1 ? '' : 's'}</div>
+            <div class="n-entregas">${entregasViaje.length} entrega${entregasViaje.length === 1 ? '' : 's'}${diligenciasViaje.length ? ` · ${diligenciasViaje.length} diligencia${diligenciasViaje.length === 1 ? '' : 's'}` : ''}</div>
           </div>
         </div>
         <div class="pv-viaje-carga${excedido ? ' excedido' : ''}">
@@ -1530,6 +1560,7 @@ function imprimirProgramacionDia(fechaStr) {
           ${excedido ? `<span class="flag">⚠ Sobre capacidad</span>` : `<span class="num">${capacidad ? pctBarra + '%' : ''}</span>`}
         </div>
         ${entregasHTML}
+        ${diligenciasHTML}
         ${v.observaciones ? `<div class="pv-obs"><b>Obs:</b> ${_esc(v.observaciones)}</div>` : ''}
       </div>`;
   }).join('');
@@ -1554,6 +1585,7 @@ function imprimirProgramacionDia(fechaStr) {
         <div class="pv-resumen">
           <div class="celda"><div class="n">${viajesDia.length}</div><div class="l">Viaje${viajesDia.length === 1 ? '' : 's'}</div></div>
           <div class="celda"><div class="n">${totalEntregas}</div><div class="l">Entrega${totalEntregas === 1 ? '' : 's'}</div></div>
+          <div class="celda"><div class="n">${totalDiligencias}</div><div class="l">Diligencia${totalDiligencias === 1 ? '' : 's'}</div></div>
           <div class="celda"><div class="n">${totalPeso.toFixed(1)}</div><div class="l">Ton. programadas</div></div>
           <div class="celda"><div class="n${vehiculosAlLimite ? ' alerta' : ''}">${vehiculosAlLimite}</div><div class="l">Vehículo${vehiculosAlLimite === 1 ? '' : 's'} al límite</div></div>
         </div>
