@@ -176,7 +176,10 @@ const _DIAS_VENTANA_CONSUMO_CEMENTO = 30;
 const _KG_STOCK_ROJO = 15000;
 const _KG_STOCK_AMBAR = 30000;
 function _colorStockCemento(stock) {
-  if (stock <= _KG_STOCK_ROJO) return { bg: '#FFEBEE', fg: '#C62828' };
+  // El rojo crítico usa un tono propio (no el `--rojo` #C62828 del resto de la app) más intenso
+  // que el ámbar de abajo — a pedido del usuario, porque el #C62828 original se confundía de un
+  // vistazo con el #E65100 del ámbar en este borde delgado de 3px (2026-08-30).
+  if (stock <= _KG_STOCK_ROJO) return { bg: '#FFEBEE', fg: '#D50000' };
   if (stock <= _KG_STOCK_AMBAR) return { bg: '#FFF3E0', fg: '#E65100' };
   return { bg: '#E8F5E9', fg: '#2E7D32' };
 }
