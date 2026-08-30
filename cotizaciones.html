@@ -2357,6 +2357,33 @@
   </div>
 </div>
 
+<!-- Historial de entradas/salidas de una referencia — clic en el producto en Inventario de
+     Producto Terminado (2026-08-30, a pedido del usuario) -->
+<div class="modal-overlay" id="modal-historial-inventario">
+  <div class="modal" style="width:640px;max-width:95vw">
+    <div class="modal-titulo" id="historial-inv-titulo">📦 Historial de producto</div>
+    <div id="historial-inv-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
+    <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin-bottom:8px">📥 ENTRADAS (PRODUCCIÓN)</div>
+    <div style="max-height:220px;overflow-y:auto;margin-bottom:16px;border:1px solid var(--gris-borde);border-radius:var(--radio)">
+      <table class="tabla-cots" style="font-size:12px">
+        <thead><tr><th>Fecha</th><th style="text-align:right">Cantidad</th><th>Responsable</th><th>Orden</th></tr></thead>
+        <tbody id="historial-inv-entradas-body"></tbody>
+      </table>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin-bottom:8px">📤 SALIDAS (DESPACHOS)</div>
+    <div style="max-height:220px;overflow-y:auto;margin-bottom:8px;border:1px solid var(--gris-borde);border-radius:var(--radio)">
+      <table class="tabla-cots" style="font-size:12px">
+        <thead><tr><th>Fecha</th><th style="text-align:right">Cantidad</th><th>Cliente</th><th>Orden</th><th>Origen</th></tr></thead>
+        <tbody id="historial-inv-salidas-body"></tbody>
+      </table>
+    </div>
+    <div style="font-size:10.5px;color:var(--gris-medio);margin-bottom:16px">Una salida solo cuenta cuando la entrega se marca "Hecha" en Logística — programada y pendiente no descuenta. "Orden marcada Despachado" es el respaldo manual del tablero de Producción para despachos que nunca se programaron como entrega en Logística; su fecha es la de entrega estimada de la orden, no hay un registro exacto de cuándo se marcó.</div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-historial-inventario')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════════════
      VISTA PREVIA IMPRIMIBLE
 ═══════════════════════════════════════ -->
@@ -2372,7 +2399,7 @@
 <script src="js/catalogo.js?v=20260821a"></script>
 <script src="js/navegacion.js?v=20260829a"></script>
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
-<script src="js/produccion-diaria.js?v=20260821b"></script>
+<script src="js/produccion-diaria.js?v=20260830a"></script>
 <script src="js/produccion-materia-prima.js?v=20260821a"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
@@ -2381,7 +2408,7 @@
 <script src="js/costeo-producto.js?v=20260827a"></script>
 <script src="js/calidad-mezclas.js?v=20260827b"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
-<script src="js/logistica.js?v=20260829c"></script>
+<script src="js/logistica.js?v=20260830a"></script>
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260804c"></script>
 <script src="js/auth.js?v=20260804a"></script>

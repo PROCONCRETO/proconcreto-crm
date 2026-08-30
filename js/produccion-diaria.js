@@ -221,15 +221,115 @@ function calcularInventario() {
     inv[k].producido += Number(p.cantidad) || 0;
     if ((p.fecha || '') > inv[k].ultima) inv[k].ultima = p.fecha || '';
   });
-  // Despachado: ítems de órdenes en estado "Despachado"
-  ORDENES.filter(o => o.estado === 'Despachado').forEach(o => {
-    (o.items || []).forEach(it => {
+  // Despachado: lo que YA salió de planta de verdad (2026-08-30, a pedido del usuario — antes esto
+  // solo miraba órdenes marcadas manualmente "Despachado" en Producción, sin relación real con si
+  // sus entregas ya se habían hecho o no. Ahora la señal principal es Cumplidos de Logística: "una
+  // entrega programada y no hecha no ha salido de planta, sigue en inventario; una entrega Hecha sí
+  // salió, se resta").
+  // Por cada orden, se resta lo MAYOR entre (a) lo que sus entregas ya marcadas "Hecha" en
+  // Logística suman por producto (_cantidadEntregadaPorProducto(), en logistica.js) y (b) si la
+  // orden sigue marcada manualmente "Despachado" en el tablero de Producción, el pedido completo —
+  // ese respaldo cubre despachos que nunca se programaron como entrega en Logística (ej. un cliente
+  // que retira en planta). (a) y (b) NUNCA se suman entre sí para el mismo producto — competirían
+  // por lo mismo y duplicarían el descuento.
+  ORDENES.forEach(o => {
+    const entregadoPorClave = typeof _cantidadEntregadaPorProducto === 'function' ? _cantidadEntregadaPorProducto(o.id) : {};
+    const items = typeof _itemsDeOrden === 'function' ? _itemsDeOrden(o) : (o.items || []);
+    items.forEach(it => {
       const k = it.nombre;
       if (!k || !inv[k]) return; // solo descontar si el producto existe en inventario
-      inv[k].despachado += Number(it.cantidad) || 0;
+      const clave = typeof _claveItemOrden === 'function' ? _claveItemOrden(it) : k;
+      const entregado = entregadoPorClave[clave] || 0;
+      const pedidoCompleto = o.estado === 'Despachado' ? (Number(it.cantidad) || 0) : 0;
+      inv[k].despachado += Math.max(entregado, pedidoCompleto);
     });
   });
+  // Entregas "Hecha" sin orden vinculada (ver _cantidadEntregadaSinOrdenPorNombre() en logistica.js)
+  // — no hay ninguna orden con la que comparar, siempre restan directo.
+  if (typeof _cantidadEntregadaSinOrdenPorNombre === 'function') {
+    const sueltas = _cantidadEntregadaSinOrdenPorNombre();
+    Object.keys(sueltas).forEach(k => { if (inv[k]) inv[k].despachado += sueltas[k]; });
+  }
   return Object.values(inv).map(r => ({ ...r, enInventario: r.producido - r.despachado }));
+}
+
+// Historial de entradas y salidas de UN producto — para el detalle que se abre al pinchar una
+// referencia en Inventario de Producto Terminado (2026-08-30, a pedido del usuario). "Entradas" =
+// registros de Producción Diaria de ese producto. "Salidas" = exactamente el mismo desglose que ya
+// usa calcularInventario() para su columna DESPACHADO (entregas "Hecha" con o sin orden, más el
+// respaldo manual de una orden "Despachado" que no cubrieron sus entregas) — así la suma de
+// "Salidas" de este historial siempre coincide con lo que muestra la tabla de Inventario.
+function _historialInventarioProducto(nombreProducto) {
+  const entradas = PRODUCCIONES
+    .filter(p => p.producto === nombreProducto)
+    .map(p => ({ fecha: p.fecha || '', cantidad: Number(p.cantidad) || 0, responsable: p.responsable || '', orden: p.orden || '' }))
+    .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+
+  const salidas = [];
+  if (typeof VIAJES !== 'undefined' && typeof _entregasDeViaje === 'function' && typeof _cumplidoDeEntrega === 'function' && typeof _nombrePlanoDeProducto === 'function') {
+    VIAJES.forEach(v => {
+      _entregasDeViaje(v).forEach(e => {
+        if (_cumplidoDeEntrega(e).estado !== 'hecha') return;
+        (e.productos || []).forEach(p => {
+          if (_nombrePlanoDeProducto(p.producto) !== nombreProducto) return;
+          salidas.push({
+            fecha: (e.cumplido?.fechaConfirmacion || '').slice(0, 10) || v.fecha || '',
+            cantidad: Number(p.cantidad) || 0,
+            cliente: e.cliente || '—',
+            orden: e.ordenNumero || (e.ordenId ? '' : 'Sin orden'),
+            tipo: 'entrega',
+          });
+        });
+      });
+    });
+  }
+  ORDENES.filter(o => o.estado === 'Despachado').forEach(o => {
+    const items = typeof _itemsDeOrden === 'function' ? _itemsDeOrden(o) : (o.items || []);
+    const entregadoPorClave = typeof _cantidadEntregadaPorProducto === 'function' ? _cantidadEntregadaPorProducto(o.id) : {};
+    items.forEach(it => {
+      if (it.nombre !== nombreProducto) return;
+      const clave = typeof _claveItemOrden === 'function' ? _claveItemOrden(it) : it.nombre;
+      const delta = (Number(it.cantidad) || 0) - (entregadoPorClave[clave] || 0);
+      if (delta <= 0) return; // ya cubierto por entregas "Hecha" reales — no duplicar
+      salidas.push({ fecha: o.fechaEntrega || '', cantidad: delta, cliente: o.cliente || '—', orden: o.numero, tipo: 'manual' });
+    });
+  });
+  salidas.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+
+  return { entradas, salidas };
+}
+
+function verHistorialInventario(nombreProducto) {
+  const r = calcularInventario().find(x => x.producto === nombreProducto);
+  document.getElementById('historial-inv-titulo').textContent = `📦 ${nombreProducto}`;
+  document.getElementById('historial-inv-resumen').innerHTML = r ? `
+    <div style="background:#F5F7FA;border-radius:6px;padding:6px 12px;font-size:12px"><b>Producido:</b> ${r.producido.toLocaleString()} ${_esc(r.unidad)}</div>
+    <div style="background:#F5F7FA;border-radius:6px;padding:6px 12px;font-size:12px"><b>Despachado:</b> ${r.despachado.toLocaleString()} ${_esc(r.unidad)}</div>
+    <div style="background:#F5F7FA;border-radius:6px;padding:6px 12px;font-size:12px"><b>En inventario:</b> ${r.enInventario.toLocaleString()} ${_esc(r.unidad)}</div>` : '';
+
+  const { entradas, salidas } = _historialInventarioProducto(nombreProducto);
+  const fmtFecha = f => f ? new Date(f + 'T12:00').toLocaleDateString('es-CO') : '—';
+
+  document.getElementById('historial-inv-entradas-body').innerHTML = entradas.length
+    ? entradas.map(e => `<tr>
+        <td>${fmtFecha(e.fecha)}</td>
+        <td style="text-align:right">${e.cantidad.toLocaleString()}</td>
+        <td>${_esc(e.responsable) || '—'}</td>
+        <td>${_esc(e.orden) || '—'}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="4" class="empty-state" style="padding:12px"><div>Sin registros de producción para este producto.</div></td></tr>`;
+
+  document.getElementById('historial-inv-salidas-body').innerHTML = salidas.length
+    ? salidas.map(s => `<tr>
+        <td>${fmtFecha(s.fecha)}</td>
+        <td style="text-align:right">${s.cantidad.toLocaleString()}</td>
+        <td>${_esc(s.cliente)}</td>
+        <td>${_esc(s.orden) || '—'}</td>
+        <td style="color:var(--gris-medio);font-size:11px">${s.tipo === 'manual' ? 'Orden marcada "Despachado"' : 'Entrega "Hecha" en Logística'}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="5" class="empty-state" style="padding:12px"><div>Sin salidas registradas para este producto.</div></td></tr>`;
+
+  document.getElementById('modal-historial-inventario').classList.add('abierto');
 }
 
 function poblarFiltroGrupoInv() {
@@ -280,7 +380,7 @@ function renderInventario() {
     const bajo = r.enInventario <= 0;
     return `
     <tr style="border-top:1px solid var(--gris-borde)">
-      <td style="font-weight:600;color:var(--azul)">${_esc(r.producto)}</td>
+      <td style="font-weight:600;color:var(--azul);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px" onclick="verHistorialInventario('${_escNombreOnclick(r.producto)}')" title="Ver historial de entradas y salidas">${_esc(r.producto)}</td>
       <td style="color:var(--gris-medio)">${_esc(r.grupo)}</td>
       <td>${_esc(r.unidad)}</td>
       <td style="text-align:right">${r.producido.toLocaleString()}</td>

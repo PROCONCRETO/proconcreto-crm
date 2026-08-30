@@ -689,15 +689,53 @@ function _cantidadEntregadaPorProducto(ordenId) {
   return mapa;
 }
 
+// Resuelve la "clave" que guarda una línea de entrega (puede ser "código — nombre" si el producto
+// viene del catálogo — ver _claveItemOrden()/_textoProducto() — o el nombre plano si no) al NOMBRE
+// PLANO del producto: el mismo esquema que usan PRODUCCIONES/calcularInventario()
+// (produccion-diaria.js), que nunca guardan el código. La usa calcularInventario() para poder
+// restar las entregas "Hecha" que no están vinculadas a ninguna orden (2026-08-30).
+function _nombrePlanoDeProducto(clave) {
+  if (!clave) return '';
+  const prod = (typeof PRODUCTOS !== 'undefined' ? PRODUCTOS : []).find(p => typeof _textoProducto === 'function' && _textoProducto(p) === clave);
+  return prod ? prod.nombre : clave;
+}
+
+// Suma, por NOMBRE de producto, lo entregado "Hecha" de entregas SIN orden vinculada (ordenId
+// vacío) — un despacho suelto (ej. recogido en planta sin ir por una orden formal) también sale
+// físicamente de planta y debe restar del inventario igual que uno con orden. Las entregas CON
+// orden se cuentan aparte, por orden, en calcularInventario() (vía _cantidadEntregadaPorProducto())
+// para poder compararlas contra el pedido completo de esa orden sin duplicar — ver el comentario
+// ahí. 2026-08-30, a pedido del usuario: "cuando se hace una entrega, el producto ya salió de
+// planta por tanto no se tiene en inventario" — antes calcularInventario() solo restaba órdenes
+// marcadas manualmente "Despachado" en Producción, sin relación real con si sus entregas ya se
+// habían hecho o no.
+function _cantidadEntregadaSinOrdenPorNombre() {
+  const mapa = {};
+  VIAJES.forEach(v => {
+    _entregasDeViaje(v).forEach(e => {
+      if (e.ordenId) return; // vinculada a una orden — se cuenta aparte, ver arriba
+      if (_cumplidoDeEntrega(e).estado !== 'hecha') return;
+      (e.productos || []).forEach(p => {
+        const nombre = _nombrePlanoDeProducto(p.producto);
+        if (!nombre) return;
+        mapa[nombre] = (mapa[nombre] || 0) + (Number(p.cantidad) || 0);
+      });
+    });
+  });
+  return mapa;
+}
+
 // Igual que _cantidadEntregadaPorProducto() pero sin filtrar por "hecha" — cuenta cualquier
 // entrega vinculada a la orden que no esté cancelada (2026-08-29, a pedido del usuario, para
 // encadenar Producción→Logística sin permitir programar dos veces el mismo saldo). Se usa para
 // saber cuánto de la orden YA quedó comprometido en algún viaje (entregado o todavía pendiente de
 // entregar) y no volver a ofrecerlo al vincular la orden a una entrega nueva — ver
 // aplicarOrdenAEntrega() más abajo y renderOrdenesDespacho() en js/logistica-ordenes-despacho.js.
-// A propósito NO se usa para inventario de planta: calcularInventario() (js/produccion-diaria.js)
-// se queda intacto, el material solo se descuenta cuando la entrega se marca "Hecha" — programarla
-// no lo mueve (confirmado explícitamente por el usuario, para no distorsionar el inventario real).
+// A propósito NO se usa para inventario de planta mientras la entrega sigue pendiente: el material
+// solo se descuenta cuando la entrega se marca "Hecha" (ver calcularInventario() en
+// js/produccion-diaria.js, y _cantidadEntregadaPorProducto()/_cantidadEntregadaSinOrdenPorNombre()
+// más abajo) — programar una entrega nueva, por sí solo, no lo mueve (confirmado explícitamente por
+// el usuario, para no distorsionar el inventario real mientras el material sigue en planta).
 function _cantidadProgramadaPorProducto(ordenId) {
   const mapa = {};
   VIAJES.forEach(v => {
