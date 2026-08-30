@@ -119,6 +119,7 @@ function rerenderPantallaActiva() {
     case 'pantalla-analisis-estadistico': renderAnalisisEstadistico(); break;
     case 'pantalla-materia-prima': renderMateriaPrima(); break;
     case 'pantalla-logistica': renderCalendarioLogistica(); break;
+    case 'pantalla-ordenes-despacho': renderOrdenesDespacho(); break;
     case 'pantalla-logistica-estadisticas': renderEstadisticasLogistica(); break;
     case 'pantalla-costeo-mo': renderCosteoManoObra(); break;
     case 'pantalla-costeo-maquinaria': renderCosteoMaquinaria(); break;

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ProSuite — Proconcreto</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect x='1' y='1' width='38' height='38' rx='10' fill='%23003F7F'/%3E%3Ctext x='9' y='29' font-family='Arial, sans-serif' font-weight='900' font-size='24' fill='%23FFFFFF'%3EP%3C/text%3E%3Crect x='21' y='21' width='15' height='15' rx='4' fill='%238BC53F'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="css/estilos.css?v=20260828a">
+<link rel="stylesheet" href="css/estilos.css?v=20260829a">
 </head>
 <body>
 
@@ -106,6 +106,7 @@
 
 <nav class="nav" id="subnav-logistica" style="display:none">
   <button class="nav-btn activo" onclick="ir('logistica')">🚛 Programación de Viajes</button>
+  <button class="nav-btn" onclick="ir('ordenes-despacho')">📦 Órdenes de Despacho</button>
   <button class="nav-btn" onclick="ir('logistica-estadisticas')">📊 Estadísticas</button>
 </nav>
 
@@ -804,6 +805,40 @@
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#00838F;margin-right:4px"></span>GTU668 / José Ramiro Ciro (11 ton)</span>
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#E65100;margin-right:4px"></span>Camión sencillo tercerizado (11 ton)</span>
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#6A1B9A;margin-right:4px"></span>Tractocamión tercerizado (34 ton)</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: ÓRDENES DE DESPACHO (LOGÍSTICA)
+═══════════════════════════════════════ -->
+<div id="pantalla-ordenes-despacho" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Órdenes de Despacho</div>
+  </div>
+  <div class="flex-gap" style="margin-bottom:16px;align-items:center">
+    <input type="text" id="buscar-ordenes-despacho" class="buscador-input" placeholder="🔍 Buscar orden o cliente..." oninput="renderOrdenesDespacho()">
+    <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--gris-medio);cursor:pointer">
+      <input type="checkbox" id="mostrar-programadas-despacho" onchange="renderOrdenesDespacho()">
+      Mostrar completamente programadas
+    </label>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="tabla-cots" id="tabla-ordenes-despacho">
+      <thead>
+        <tr>
+          <th>N° ORDEN</th>
+          <th>CLIENTE</th>
+          <th>PENDIENTE DE PROGRAMAR</th>
+          <th>INVENTARIO</th>
+          <th>FECHA ENTREGA</th>
+          <th>ESTADO</th>
+          <th style="min-width:220px">ACCIONES</th>
+        </tr>
+      </thead>
+      <tbody id="ordenes-despacho-body">
+        <tr><td colspan="7" class="empty-state"><div class="icono">📦</div><div>No hay órdenes listas para despachar.</div></td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -2335,7 +2370,7 @@
 <script src="js/config.js?v=20260821a"></script>
 <script src="js/calculadora-inputs.js?v=20260825a"></script>
 <script src="js/catalogo.js?v=20260821a"></script>
-<script src="js/navegacion.js?v=20260827a"></script>
+<script src="js/navegacion.js?v=20260829a"></script>
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
 <script src="js/produccion-diaria.js?v=20260821b"></script>
 <script src="js/produccion-materia-prima.js?v=20260821a"></script>
@@ -2346,10 +2381,11 @@
 <script src="js/costeo-producto.js?v=20260827a"></script>
 <script src="js/calidad-mezclas.js?v=20260827b"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
-<script src="js/logistica.js?v=20260828b"></script>
+<script src="js/logistica.js?v=20260829c"></script>
+<script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260804c"></script>
 <script src="js/auth.js?v=20260804a"></script>
-<script src="js/datos-realtime.js?v=20260827b"></script>
+<script src="js/datos-realtime.js?v=20260829a"></script>
 <script src="js/cotizador.js?v=20260827a"></script>
 <script src="js/historico-clientes-stats.js?v=20260827a"></script>
 <script src="js/retenciones.js?v=20260809c"></script>

@@ -493,19 +493,25 @@ function _renderListadoLogistica(festivosMap, hoyStr, primerDia, diasEnMes) {
           ${idxViaje < viajesDia.length - 1 ? `<span onclick="event.stopPropagation();moverViajeOrden('${v.id}',1)" title="Bajar prioridad">▼</span>` : ''}
         </span>` : '';
       const entregasViaje = _entregasDeViaje(v);
+      const diligenciasViaje = _diligenciasDeViaje(v);
       const dragAttrs = `draggable="${!diaBloqueado}" ondragstart="iniciarArrastreViaje(event,'${v.id}')" ondragend="terminarArrastreViaje(event)" ondragover="permitirSoltarViaje(event)" ondrop="soltarViajeSobreViaje(event,'${v.id}')"`;
 
-      if (!entregasViaje.length) {
+      // "Sin viajes cargados" solo cuando de verdad no hay ni entregas ni diligencias — antes
+      // este mensaje salía incluso para un viaje que era SOLO una diligencia, sugiriendo que
+      // estaba vacío cuando en realidad tenía contenido (bug real reportado: "la programación de
+      // diligencias... no se está viendo reflejada en el calendario ni en el listado").
+      if (!entregasViaje.length && !diligenciasViaje.length) {
         html += `
         <div class="log-lst-entrega" ${dragAttrs} onclick="editarViaje('${v.id}')" style="border-left-color:${colorViaje}" title="${diaBloqueado ? '' : 'Arrastra para mover o reordenar el viaje'}">
           <span class="log-lst-entrega-vehiculo" style="background:${colorViaje}">${_esc(v.vehiculo) || 'Sin vehículo'}</span>
-          <span class="log-lst-entrega-vacia">Viaje sin entregas cargadas todavía</span>
+          <span class="log-lst-entrega-vacia">Viaje sin entregas ni diligencias cargadas todavía</span>
           ${flechas}
         </div>`;
         return;
       }
 
-      entregasViaje.forEach((e, idxEntrega) => {
+      let primeraFila = true;
+      entregasViaje.forEach((e) => {
         const c = _cumplidoDeEntrega(e);
         const etiqueta = _ETIQUETA_CUMPLIDO[c.estado] || _ETIQUETA_CUMPLIDO.pendiente;
         const pesoEntrega = (e.productos || []).reduce((s, p) => s + (Number(p.peso) || 0), 0);
@@ -517,8 +523,28 @@ function _renderListadoLogistica(festivosMap, hoyStr, primerDia, diasEnMes) {
           <span class="log-lst-entrega-productos" title="${_esc(productosTxt)}">${_esc(productosTxt)}</span>
           <span class="log-lst-entrega-peso">${pesoEntrega.toFixed(2)} ton</span>
           <span class="log-lst-entrega-estado">${etiqueta}</span>
-          ${idxEntrega === 0 ? flechas : ''}
+          ${primeraFila ? flechas : ''}
         </div>`;
+        primeraFila = false;
+      });
+
+      // Diligencias del viaje — mismo tipo de fila que una entrega (para que quepan en el mismo
+      // listado), con acento naranja para distinguirlas de un vistazo (mismo color que ya las
+      // identifica en Nuevo Viaje, Cumplidos y el imprimible del día).
+      diligenciasViaje.forEach((d) => {
+        const c = _cumplidoDeEntrega(d);
+        const etiqueta = _ETIQUETA_CUMPLIDO[c.estado] || _ETIQUETA_CUMPLIDO.pendiente;
+        const lugarTxt = _esc(d.lugar) || 'Sin lugar especificado';
+        html += `
+        <div class="log-lst-entrega log-lst-diligencia${c.estado === 'cancelada' ? ' log-lst-entrega-cancelada' : ''}" ${dragAttrs} onclick="editarViaje('${v.id}')" style="border-left-color:var(--naranja)" title="${diaBloqueado ? '' : 'Arrastra para mover o reordenar el viaje'}">
+          <span class="log-lst-entrega-vehiculo" style="background:${colorViaje}">${_esc(v.vehiculo) || '—'}</span>
+          <span class="log-lst-entrega-cliente">🔧 ${_esc(d.descripcion) || 'Diligencia'}${d.lugar ? `<span class="log-lst-entrega-destino"> — ${lugarTxt}</span>` : ''}</span>
+          <span class="log-lst-entrega-productos" title="${_esc(d.contactoNombre)}">${d.contactoNombre ? 'Contacto: ' + _esc(d.contactoNombre) : ''}</span>
+          <span class="log-lst-entrega-peso">—</span>
+          <span class="log-lst-entrega-estado">${etiqueta}</span>
+          ${primeraFila ? flechas : ''}
+        </div>`;
+        primeraFila = false;
       });
     });
   }
@@ -567,18 +593,25 @@ function renderCalendarioLogistica() {
         <div class="log-cal-viajes">
           ${viajesDia.map((v, idxViaje) => {
             const nEntregas = _entregasDeViaje(v).length;
+            const nDiligencias = _diligenciasDeViaje(v).length;
             const peso = Number(v.pesoTotal) || 0;
             const pct = pctCumplidoViaje(v);
             const pctTxt = (fechaStr <= hoyStr && pct !== null) ? ` — ${pct}% cumplido` : '';
-            const tituloTip = `${_esc(v.destino)}${v.vehiculo ? ' — ' + _esc(v.vehiculo) : ''} — ${nEntregas} entrega${nEntregas === 1 ? '' : 's'} — ${peso.toFixed(2)} ton${v.estado ? ' — ' + _esc(v.estado) : ''}${pctTxt}`;
+            const dilTip = nDiligencias ? ` — ${nDiligencias} diligencia${nDiligencias === 1 ? '' : 's'}` : '';
+            const tituloTip = `${_esc(v.destino)}${v.vehiculo ? ' — ' + _esc(v.vehiculo) : ''} — ${nEntregas} entrega${nEntregas === 1 ? '' : 's'}${dilTip} — ${peso.toFixed(2)} ton${v.estado ? ' — ' + _esc(v.estado) : ''}${pctTxt}`;
             const flechas = viajesDia.length > 1 ? `
               <span class="log-cal-viaje-flechas">
                 ${idxViaje > 0 ? `<span onclick="event.stopPropagation();moverViajeOrden('${v.id}',-1)" title="Subir prioridad">▲</span>` : ''}
                 ${idxViaje < viajesDia.length - 1 ? `<span onclick="event.stopPropagation();moverViajeOrden('${v.id}',1)" title="Bajar prioridad">▼</span>` : ''}
               </span>` : '';
+            // Si el viaje es SOLO diligencias (sin entregas), mostrar "0 ent" en el chip es
+            // confuso — se omite y solo se muestra el conteo de diligencias.
+            const partesChip = [];
+            if (nEntregas || !nDiligencias) partesChip.push(`${nEntregas} ent`);
+            if (nDiligencias) partesChip.push(`${nDiligencias} dil`);
             return `
             <div class="log-cal-viaje" draggable="${!diaBloqueado}" ondragstart="iniciarArrastreViaje(event,'${v.id}')" ondragend="terminarArrastreViaje(event)" ondragover="permitirSoltarViaje(event)" ondrop="soltarViajeSobreViaje(event,'${v.id}')" style="background:${COLOR_VEHICULO_VIAJE[v.vehiculo] || '#607D8B'}${v.estado === 'Cancelada' ? ';opacity:.5;text-decoration:line-through' : ''}" onclick="event.stopPropagation();editarViaje('${v.id}')" title="${tituloTip}${diaBloqueado ? '' : ' — arrastra para mover o reordenar'}">
-              <span class="log-cal-viaje-texto">${_esc(v.destino) || 'Viaje'} · ${nEntregas} ent · ${peso.toFixed(1)}t${fechaStr <= hoyStr && pct !== null ? ` · ${pct}%` : ''}</span>${flechas}
+              <span class="log-cal-viaje-texto">${_esc(v.destino) || 'Viaje'} · ${partesChip.join(' · ')} · ${peso.toFixed(1)}t${fechaStr <= hoyStr && pct !== null ? ` · ${pct}%` : ''}</span>${flechas}
             </div>`;
           }).join('')}
         </div>
@@ -641,14 +674,36 @@ function _claveItemOrden(item) {
 }
 
 // Suma, por producto, lo ya entregado (entregas de cualquier viaje vinculadas a esta orden y
-// marcadas "hecha" en Cumplidos) — es lo que alimenta el saldo pendiente de la orden y el
-// valor por defecto al vincular una nueva entrega a la misma orden.
+// marcadas "hecha" en Cumplidos) — usada por renderSaldoOrden() en Producción (js/ordenes-produccion.js,
+// modal "Editar Orden"), que pregunta "qué salió de verdad" — a propósito NO se toca ni se usa
+// para el saldo que se sugiere al programar una entrega (ver _cantidadProgramadaPorProducto()).
 function _cantidadEntregadaPorProducto(ordenId) {
   const mapa = {};
   VIAJES.forEach(v => {
     _entregasDeViaje(v).forEach(e => {
       if (!ordenId || String(e.ordenId) !== String(ordenId)) return;
       if (_cumplidoDeEntrega(e).estado !== 'hecha') return;
+      (e.productos || []).forEach(p => { mapa[p.producto] = (mapa[p.producto] || 0) + (Number(p.cantidad) || 0); });
+    });
+  });
+  return mapa;
+}
+
+// Igual que _cantidadEntregadaPorProducto() pero sin filtrar por "hecha" — cuenta cualquier
+// entrega vinculada a la orden que no esté cancelada (2026-08-29, a pedido del usuario, para
+// encadenar Producción→Logística sin permitir programar dos veces el mismo saldo). Se usa para
+// saber cuánto de la orden YA quedó comprometido en algún viaje (entregado o todavía pendiente de
+// entregar) y no volver a ofrecerlo al vincular la orden a una entrega nueva — ver
+// aplicarOrdenAEntrega() más abajo y renderOrdenesDespacho() en js/logistica-ordenes-despacho.js.
+// A propósito NO se usa para inventario de planta: calcularInventario() (js/produccion-diaria.js)
+// se queda intacto, el material solo se descuenta cuando la entrega se marca "Hecha" — programarla
+// no lo mueve (confirmado explícitamente por el usuario, para no distorsionar el inventario real).
+function _cantidadProgramadaPorProducto(ordenId) {
+  const mapa = {};
+  VIAJES.forEach(v => {
+    _entregasDeViaje(v).forEach(e => {
+      if (!ordenId || String(e.ordenId) !== String(ordenId)) return;
+      if (_cumplidoDeEntrega(e).estado === 'cancelada') return;
       (e.productos || []).forEach(p => { mapa[p.producto] = (mapa[p.producto] || 0) + (Number(p.cantidad) || 0); });
     });
   });
@@ -673,11 +728,14 @@ function aplicarOrdenAEntrega(ei, ordenId) {
   e.contactoObraNombre = orden.clienteData?.contacto || e.contactoObraNombre;
   e.contactoObraTelefono = orden.clienteData?.cel || e.contactoObraTelefono;
 
-  const entregadoPorClave = _cantidadEntregadaPorProducto(ordenId);
+  // Resta lo ya PROGRAMADO (entregado + pendiente de entregar en cualquier viaje activo), no solo
+  // lo entregado — evita ofrecer dos veces el mismo saldo si la orden ya se vinculó a otro viaje
+  // que todavía no se marca "Hecha" (2026-08-29, ver _cantidadProgramadaPorProducto() más arriba).
+  const programadoPorClave = _cantidadProgramadaPorProducto(ordenId);
   const items = _itemsDeOrden(orden);
   e.productos = items.length ? items.map(it => {
     const clave = _claveItemOrden(it);
-    const saldo = Math.max(0, (Number(it.cantidad) || 0) - (entregadoPorClave[clave] || 0));
+    const saldo = Math.max(0, (Number(it.cantidad) || 0) - (programadoPorClave[clave] || 0));
     const prodCat = it.codigo && typeof PRODUCTOS !== 'undefined' ? PRODUCTOS.find(p => p.codigo === it.codigo) : null;
     const pesoUnitario = prodCat ? (Number(prodCat.peso) || 0) : 0;
     return { producto: clave, cantidad: saldo, peso: (saldo * pesoUnitario) / 1000 };
@@ -734,7 +792,7 @@ function renderEntregasViaje() {
             <div id="entrega-cliente-resultados-${ei}" style="display:none;position:absolute;z-index:60;left:0;right:0;margin-top:2px;border:1.5px solid #93C5FD;border-radius:8px;background:#fff;max-height:220px;overflow-y:auto;box-shadow:var(--sombra-md)"></div>
           </div>
         </div>
-        <div class="form-grupo"><label>Destino específico / Proyecto</label>
+        <div class="form-grupo"><label>Destino específico / Proyecto *</label>
           <select id="entrega-proyecto-${ei}" onchange="_alElegirProyectoEntrega(${ei},this.value)" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
         </div>
       </div>
@@ -1099,6 +1157,20 @@ function guardarViaje() {
   for (const e of entregasLimpias) {
     if (e.cliente && typeof _clienteValidoAjuste === 'function' && !_clienteValidoAjuste(e.cliente)) {
       alert(`El cliente "${e.cliente}" no existe en la base de datos de Cotizaciones y Ventas.\nCréalo allá primero, o selecciona uno existente de la lista.`);
+      return;
+    }
+    // Destino específico/Proyecto obligatorio (2026-08-29, a pedido del usuario: "para
+    // garantizar que salga en el imprimible la ubicación de google") — sin proyecto elegido,
+    // `e.destino` queda vacío y el tag de ubicación del imprimible no tiene ni siquiera el
+    // texto plano de respaldo (ver imprimirProgramacionDia() en esta misma sección: el tag
+    // solo se pinta `if (e.destino)`). Elegir el proyecto no garantiza por sí solo el link
+    // clickeable de Maps — eso depende además de que ESE proyecto tenga su "Link de Google
+    // Maps" registrado (ver "Proyectos del cliente" en docs/modulos/cotizador-crm.md) — pero
+    // es el paso obligatorio para que el tag exista y, en cuanto se agregue el link al
+    // proyecto, se resuelva solo (ver "Bug real: agregar el link a un proyecto..." en
+    // docs/modulos/logistica.md).
+    if (!e.destino) {
+      alert(`Selecciona el "Destino específico/Proyecto" de la entrega a "${e.cliente || 'este cliente'}" antes de guardar — es obligatorio, para que el tag de ubicación de Google Maps salga en el imprimible de viajes.\n\nSi el cliente todavía no tiene ningún proyecto registrado, créalo primero en su ficha (Clientes → "+ Agregar proyecto").`);
       return;
     }
   }

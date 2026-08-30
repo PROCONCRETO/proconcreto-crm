@@ -49,6 +49,8 @@ function activarModulo(modulo) {
   if (modulo === 'logistica') {
     document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
     document.getElementById('pantalla-logistica').classList.add('activa');
+    document.querySelectorAll('#subnav-logistica .nav-btn').forEach(b => b.classList.remove('activo'));
+    document.querySelector('#subnav-logistica .nav-btn[onclick*="ir(\'logistica\')"]')?.classList.add('activo');
     renderCalendarioLogistica();
   }
   if (modulo === 'produccion') {
@@ -99,6 +101,7 @@ function ir(pantalla) {
   if (pantalla === 'analisis-estadistico') renderAnalisisEstadistico();
   if (pantalla === 'materia-prima') renderMateriaPrima();
   if (pantalla === 'logistica') renderCalendarioLogistica();
+  if (pantalla === 'ordenes-despacho') renderOrdenesDespacho();
   if (pantalla === 'logistica-estadisticas') renderEstadisticasLogistica();
   if (pantalla === 'productos') renderProductosAdmin();
   if (pantalla === 'costeo-mo') renderCosteoManoObra();

@@ -24,6 +24,8 @@ Una orden puede traer un desglose por producto (`items[]`, cuando viene de una c
 
 Al editar una orden (`editarOrden()`), se muestra una tabla de **Pedido / Entregado / Saldo** por producto (`renderSaldoOrden()`), cruzando con las entregas de Logística vinculadas a esa orden y marcadas "Hecha" en Cumplidos (`_cantidadEntregadaPorProducto()`). Así se ve de un vistazo si una orden ya se entregó completa, parcial, o sigue pendiente.
 
+**Pasar la orden a Logística (2026-08-29)**: la pantalla "📦 Órdenes de Despacho" de Logística (`js/logistica-ordenes-despacho.js`, ver `docs/modulos/logistica.md`) lista, sin salir de este módulo ni tener que buscarla a mano, las órdenes ya listas o con algo de inventario disponible, con un botón que abre directo el modal de "Nuevo Viaje" con la orden ya vinculada. Es una vista calculada, no toca `ORDENES` ni el estado de la orden — la transición a "Despachado" sigue siendo 100% manual desde este tablero.
+
 ## Materia Prima (movida de Calidad, 2026-08-19)
 
 La pantalla Materia Prima (recepciones de cemento, arena, grava, agua, aditivos...) vivía en Calidad — el usuario pidió moverla a Producción. Cambio puramente de navegación: mismo archivo renombrado (`js/calidad-materia-prima.js` → `js/produccion-materia-prima.js`), mismo CRUD contra la tabla `materia_prima`, sin cambios de esquema por la mudanza en sí. El botón "🧱 Materia Prima" pasó del subnav de Calidad al de Producción (después de "📦 Inventario"); `ir('materia-prima')` no cambió, solo el subnav donde vive el botón.
