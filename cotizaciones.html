@@ -423,12 +423,12 @@
     <div class="card-titulo">Vendedor / Responsable</div>
     <div class="form-grid">
       <div class="form-grupo">
-        <label>Nombre</label>
-        <input type="text" id="vendedor-nombre" value="">
+        <label>Nombre <span style="font-weight:400;text-transform:none">(automático, según el correo con el que iniciaste sesión)</span></label>
+        <input type="text" id="vendedor-nombre" value="" readonly style="background:#F7FAFC;color:var(--gris-medio)">
       </div>
       <div class="form-grupo">
-        <label>Cargo</label>
-        <input type="text" id="vendedor-cargo" value="">
+        <label>Cargo <span style="font-weight:400;text-transform:none">(automático)</span></label>
+        <input type="text" id="vendedor-cargo" value="" readonly style="background:#F7FAFC;color:var(--gris-medio)">
       </div>
     </div>
   </div>
@@ -2413,7 +2413,7 @@
 <script src="js/estadisticas-logistica.js?v=20260804c"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20260829a"></script>
-<script src="js/cotizador.js?v=20260827a"></script>
+<script src="js/cotizador.js?v=20260830a"></script>
 <script src="js/historico-clientes-stats.js?v=20260827a"></script>
 <script src="js/retenciones.js?v=20260809c"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->

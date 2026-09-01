@@ -881,10 +881,26 @@ function _resetFormularioCotizacion() {
   renderOpcionesExtra();
   if (typeof cargarRetenciones === 'function') cargarRetenciones(null);
   document.getElementById('fecha-cot').value = new Date().toISOString().split('T')[0];
+  // Vendedor/Cargo se bloquean a los del listado fijo (2026-08-30, a pedido del usuario): antes
+  // eran texto libre y, aunque se autocompletaban desde USUARIOS_CRM, cualquiera podía retocarlos
+  // antes de guardar — con el tiempo eso dejó varias grafías distintas para la misma persona
+  // (mayúsculas, tildes, apellido completo o no) guardadas en cotizaciones ya hechas, y el filtro
+  // de vendedor del Pipeline (que arma su desplegable con los nombres EXACTOS que encuentra en
+  // COTIZACIONES) terminó mostrando cada variante como si fuera un vendedor distinto.
+  const inputNombre = document.getElementById('vendedor-nombre');
+  const inputCargo = document.getElementById('vendedor-cargo');
   const perfil = USUARIOS_CRM[USUARIO_ACTUAL?.email];
   if (perfil) {
-    document.getElementById('vendedor-nombre').value = perfil.nombre;
-    document.getElementById('vendedor-cargo').value = perfil.cargo;
+    inputNombre.value = perfil.nombre;
+    inputCargo.value = perfil.cargo;
+    inputNombre.readOnly = true;
+    inputCargo.readOnly = true;
+  } else {
+    // Correo autenticado que todavía no está en USUARIOS_CRM (el login no exige estar en esa
+    // lista — ver docs/modulos/autenticacion.md) — se deja editable como respaldo, para no dejar
+    // a alguien sin poder crear una cotización solo porque falta agregarlo al listado fijo.
+    inputNombre.readOnly = false;
+    inputCargo.readOnly = false;
   }
   renderItems();
 }
@@ -892,6 +908,57 @@ function _resetFormularioCotizacion() {
 function limpiarFormulario() {
   if (!confirm('¿Limpiar el formulario actual?')) return;
   _resetFormularioCotizacion();
+}
+
+// ═══════════════════════════════
+// LIMPIEZA ÚNICA — variantes de nombre de vendedor en cotizaciones YA guardadas (2026-08-30)
+// ═══════════════════════════════
+// El campo Vendedor/Cargo de una cotización nueva ya quedó bloqueado al listado fijo
+// (_resetFormularioCotizacion(), arriba) — pero antes de ese cambio era texto libre, y aunque se
+// autocompletaba desde USUARIOS_CRM, se podía retocar antes de guardar. Con el tiempo eso dejó
+// varias grafías distintas para la misma persona ya guardadas en cotizaciones reales, y el filtro
+// de vendedor del Pipeline (arma su desplegable con los nombres EXACTOS que encuentra en
+// COTIZACIONES) las mostraba como si fueran vendedores distintos — reportado por el usuario con
+// una captura del desplegable. Este mapa es la corrección confirmada explícitamente por el usuario
+// mensaje por mensaje, no una suposición mía:
+//   - "Jenniffer López" / "Valentina Escobar" / "VALENTINA ESCOBAR MEJIA" / "Maria Alejandra
+//     Escobar" son variantes de escritura de la misma persona que el listado fijo.
+//   - "Juan Esteban Valencia Montoya" — el usuario confirmó explícitamente que es la MISMA persona
+//     que "Juan Esteban Valencia" (no dos personas distintas), así que también se corrige.
+// No se puede correr como script aparte: la tabla `cotizaciones` en Supabase exige sesión
+// autenticada (RLS) — hay que ejecutarlo UNA sola vez desde la consola del navegador, ya logueado
+// en la app real: _normalizarVendedoresHistoricos()
+const _MAPA_VENDEDORES_HISTORICO = {
+  'Jenniffer López': 'Jennifer Lopez',
+  'VALENTINA ESCOBAR MEJIA': 'Valentina Escobar Mejia',
+  'Valentina Escobar': 'Valentina Escobar Mejia',
+  'Maria Alejandra Escobar': 'Maria Alejandra Escobar Mejia',
+  'Juan Esteban Valencia Montoya': 'Juan Esteban Valencia',
+};
+
+async function _normalizarVendedoresHistoricos() {
+  const afectadas = COTIZACIONES.filter(c => c.vendedor?.nombre && _MAPA_VENDEDORES_HISTORICO[c.vendedor.nombre]);
+  if (!afectadas.length) { alert('No hay ninguna cotización con un nombre de vendedor por corregir — nada que hacer.'); return; }
+
+  const resumen = afectadas.map(c => `${c.numero} ${c.version || 'V1'}: "${c.vendedor.nombre}" → "${_MAPA_VENDEDORES_HISTORICO[c.vendedor.nombre]}"`);
+  console.log('Cotizaciones a corregir:\n' + resumen.join('\n'));
+  if (!confirm(`Se van a corregir ${afectadas.length} cotizaciones (detalle completo impreso en la consola).\n\n¿Continuar?`)) return;
+
+  let ok = 0, fallidas = [];
+  for (const cot of afectadas) {
+    const nombreAnterior = cot.vendedor.nombre;
+    cot.vendedor.nombre = _MAPA_VENDEDORES_HISTORICO[nombreAnterior];
+    const { error } = await sb.from('cotizaciones').upsert({
+      numero: cot.numero, version: cot.version, estado: cot.estado,
+      cliente: cot.cliente, items: cot.items, condiciones: cot.condiciones,
+      datos: cot, modificado: new Date().toISOString(),
+    }, { onConflict: 'numero,version' });
+    if (error) { cot.vendedor.nombre = nombreAnterior; fallidas.push(`${cot.numero} ${cot.version}: ${error.message}`); }
+    else ok++;
+  }
+  console.log(`Corregidas: ${ok}. Fallidas: ${fallidas.length}${fallidas.length ? '\n' + fallidas.join('\n') : ''}`);
+  alert(`✅ ${ok} cotizaciones corregidas.${fallidas.length ? `\n⚠️ ${fallidas.length} con error — detalle en la consola.` : ''}`);
+  if (typeof rerenderPantallaActiva === 'function') rerenderPantallaActiva();
 }
 
 // ═══════════════════════════════
