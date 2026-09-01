@@ -936,18 +936,40 @@ const _MAPA_VENDEDORES_HISTORICO = {
   'Juan Esteban Valencia Montoya': 'Juan Esteban Valencia',
 };
 
+// La primera corrida (2026-08-30) dejó "Valentina Escobar" sin corregir a pesar de estar en el
+// mapa — el nombre guardado traía espacios de más (dobles, o al principio/final) que no coincidían
+// con la clave exacta del mapa. Se compara normalizando espacios en blanco (nunca mayúsculas ni
+// tildes — esas variantes ya están explícitas en el mapa arriba, comparar sin distinguirlas sería
+// adivinar en vez de corregir solo lo confirmado) tanto del lado guardado como del lado del mapa.
+function _normEspacios(s) { return (s || '').replace(/\s+/g, ' ').trim(); }
+function _vendedorCanonico(nombreGuardado) {
+  const nombreNorm = _normEspacios(nombreGuardado);
+  const entry = Object.entries(_MAPA_VENDEDORES_HISTORICO).find(([variante]) => _normEspacios(variante) === nombreNorm);
+  return entry ? entry[1] : null;
+}
+
+// Diagnóstico — imprime cada nombre de vendedor DISTINTO que hay hoy en COTIZACIONES, cuántas
+// cotizaciones tiene y su forma exacta entre comillas (JSON.stringify revela espacios de más o
+// caracteres invisibles que a simple vista no se notan) — para depurar un caso que
+// _normalizarVendedoresHistoricos() no logre emparejar contra el mapa de arriba.
+function _listarVendedoresActuales() {
+  const conteo = {};
+  COTIZACIONES.forEach(c => { const n = c.vendedor?.nombre; if (n) conteo[n] = (conteo[n] || 0) + 1; });
+  console.log(Object.entries(conteo).sort((a, b) => b[1] - a[1]).map(([n, c]) => `${c}× ${JSON.stringify(n)}`).join('\n'));
+}
+
 async function _normalizarVendedoresHistoricos() {
-  const afectadas = COTIZACIONES.filter(c => c.vendedor?.nombre && _MAPA_VENDEDORES_HISTORICO[c.vendedor.nombre]);
+  const afectadas = COTIZACIONES.filter(c => c.vendedor?.nombre && _vendedorCanonico(c.vendedor.nombre));
   if (!afectadas.length) { alert('No hay ninguna cotización con un nombre de vendedor por corregir — nada que hacer.'); return; }
 
-  const resumen = afectadas.map(c => `${c.numero} ${c.version || 'V1'}: "${c.vendedor.nombre}" → "${_MAPA_VENDEDORES_HISTORICO[c.vendedor.nombre]}"`);
+  const resumen = afectadas.map(c => `${c.numero} ${c.version || 'V1'}: "${c.vendedor.nombre}" → "${_vendedorCanonico(c.vendedor.nombre)}"`);
   console.log('Cotizaciones a corregir:\n' + resumen.join('\n'));
   if (!confirm(`Se van a corregir ${afectadas.length} cotizaciones (detalle completo impreso en la consola).\n\n¿Continuar?`)) return;
 
   let ok = 0, fallidas = [];
   for (const cot of afectadas) {
     const nombreAnterior = cot.vendedor.nombre;
-    cot.vendedor.nombre = _MAPA_VENDEDORES_HISTORICO[nombreAnterior];
+    cot.vendedor.nombre = _vendedorCanonico(nombreAnterior);
     const { error } = await sb.from('cotizaciones').upsert({
       numero: cot.numero, version: cot.version, estado: cot.estado,
       cliente: cot.cliente, items: cot.items, condiciones: cot.condiciones,
