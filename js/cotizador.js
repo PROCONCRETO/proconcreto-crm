@@ -139,8 +139,32 @@ function renderItems() {
   recalcular();
 }
 
+// Descuento % más alto que se le puede dar a un producto sin que el precio ajustado quede por
+// debajo de su mínimo — antes solo se avisaba "⚠️ Bajo mínimo" pero se dejaba guardar igual, a
+// pedido del usuario: "permite hacer cotizaciones por debajo del precio mínimo que no es debido...
+// configurémoslo para que no permita otorgar descuentos que den precios por debajo del mínimo"
+// (2026-08-31). Busca directamente el % más alto probando cada entero 50→0 contra el mismo cálculo
+// que usa adjUnit en todos lados (Math.round) — nunca una fórmula de "despejar %", que con
+// aritmética de punto flotante puede quedar mal por un entero (ej. precio 1000/mínimo 800: el 20%
+// exacto se calculaba como 19.999999999999996 y redondeaba mal hacia abajo).
+function _descuentoMaximoPermitido(precio, minimo) {
+  if (!(precio > 0) || !(minimo > 0)) return 50;
+  for (let d = 50; d >= 0; d--) {
+    if (Math.round(precio * (1 - d / 100)) >= minimo) return d;
+  }
+  return 0;
+}
+
 function actualizarItem(i, campo, val) {
   itemsActuales[i][campo] = parseFloat(val) || 0;
+  if (campo === 'descuento') {
+    const it = itemsActuales[i];
+    const maxDesc = _descuentoMaximoPermitido(it.precio, it.minimo);
+    if (it.descuento > maxDesc) {
+      it.descuento = maxDesc;
+      mostrarToast(`⚠️ Descuento limitado a ${maxDesc}% — con más, "${it.nombre}" quedaría por debajo de su precio mínimo ($${it.minimo.toLocaleString()})`);
+    }
+  }
   renderItems();
 }
 
@@ -375,7 +399,15 @@ function agregarItemOpcionCodigo(idx, codigo) {
 }
 
 function actualizarItemOpcion(idx, i, campo, val) {
-  opcionesExtra[idx].items[i][campo] = parseFloat(val) || 0;
+  const it = opcionesExtra[idx].items[i];
+  it[campo] = parseFloat(val) || 0;
+  if (campo === 'descuento') {
+    const maxDesc = _descuentoMaximoPermitido(it.precio, it.minimo);
+    if (it.descuento > maxDesc) {
+      it.descuento = maxDesc;
+      mostrarToast(`⚠️ Descuento limitado a ${maxDesc}% — con más, "${it.nombre}" quedaría por debajo de su precio mínimo ($${it.minimo.toLocaleString()})`);
+    }
+  }
   renderOpcionesExtra();
 }
 
@@ -402,6 +434,7 @@ function renderOpcionesExtra() {
     const filas = op.items.map((it, i) => {
       const adj = Math.round(it.precio * (1 - (it.descuento || 0) / 100));
       const tot = Math.round(adj * it.cantidad);
+      const alerta = adj < it.minimo ? `<span style="color:var(--rojo);font-size:10px;display:block">⚠️ Bajo mínimo ($${it.minimo.toLocaleString()})</span>` : '';
       return `<tr>
         <td><input type="number" min="0.1" step="0.1" value="${it.cantidad}" style="width:64px" onchange="actualizarItemOpcion(${idx},${i},'cantidad',this.value)"></td>
         <td><span style="background:var(--gris-claro);padding:3px 6px;border-radius:4px;font-size:11px;font-weight:700">${it.unidad}</span></td>
@@ -409,7 +442,7 @@ function renderOpcionesExtra() {
         <td><span style="color:${it.iva === 'SI' ? 'var(--rojo)' : 'var(--verde)'};font-weight:700;font-size:12px">${it.iva}</span></td>
         <td style="font-weight:600">$${it.precio.toLocaleString()}</td>
         <td><input type="number" min="0" max="50" value="${it.descuento}" style="width:54px" onchange="actualizarItemOpcion(${idx},${i},'descuento',this.value)">%</td>
-        <td style="font-weight:600;color:var(--azul)">$${adj.toLocaleString()}</td>
+        <td style="font-weight:600;color:var(--azul)">$${adj.toLocaleString()}${alerta}</td>
         <td style="font-weight:700">$${tot.toLocaleString()}</td>
         <td><button class="btn btn-rojo btn-xs" onclick="eliminarItemOpcion(${idx},${i})">✕</button></td>
       </tr>`;
@@ -676,6 +709,17 @@ async function guardarCotizacion() {
   }
   if (itemsActuales.length === 0) {
     alert('Agrega al menos un producto.');
+    return;
+  }
+  // Respaldo además del límite que ya pone actualizarItem()/actualizarItemOpcion() al escribir el
+  // descuento — cubre datos que lleguen por otro camino (ej. una nueva versión de una cotización
+  // vieja, guardada antes de este límite, con un ítem ya por debajo de su mínimo).
+  const bajoMinimo = [
+    ...itemsActuales.filter(it => Math.round(it.precio * (1 - it.descuento / 100)) < it.minimo),
+    ...opcionesExtra.flatMap(op => op.items.filter(it => Math.round(it.precio * (1 - (it.descuento || 0) / 100)) < it.minimo)),
+  ];
+  if (bajoMinimo.length) {
+    alert(`⚠️ No se puede guardar: ${bajoMinimo.map(it => `"${it.nombre}"`).join(', ')} ${bajoMinimo.length === 1 ? 'quedó' : 'quedaron'} con un precio por debajo de su mínimo. Baja el descuento antes de guardar.`);
     return;
   }
   let subtotal = 0, iva = 0, pesoTotal = 0;
