@@ -118,6 +118,12 @@ function renderEstadisticasProduccion() {
   const conCiclo = vibrocompactados.filter(p => mapaCiclo[p.producto]);
   const sinCiclo = vibrocompactados.filter(p => !mapaCiclo[p.producto]);
   const totalCiclos = conCiclo.reduce((s, p) => s + (Number(p.cantidad) || 0) / mapaCiclo[p.producto], 0);
+  // Promedio de ciclos por DÍA DE PRODUCCIÓN (2026-09-09, a pedido del usuario) — se divide entre
+  // los días que de verdad tuvieron ciclos (mismo criterio de "solo días de producción" que ya
+  // usan las gráficas de tendencia), no entre los días corridos de la ventana del período — un fin
+  // de semana o un día sin producción no debería diluir el promedio.
+  const diasConCiclos = new Set(conCiclo.map(p => p.fecha)).size;
+  const promedioCiclosDia = diasConCiclos > 0 ? totalCiclos / diasConCiclos : null;
 
   const totalPrimera = vibrocompactados.reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
   const totalMerma = vibrocompactados.reduce((s, p) => s + (Number(p.merma) || 0), 0);
@@ -130,6 +136,7 @@ function renderEstadisticasProduccion() {
   const tarjetas = document.getElementById('est-prod-tarjetas');
   if (tarjetas) {
     tarjetas.innerHTML = _tarjetaKPI(totalCiclos > 0 ? Math.round(totalCiclos).toLocaleString() : '—', 'Ciclos de producción')
+      + _tarjetaKPI(promedioCiclosDia !== null ? promedioCiclosDia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Ciclos promedio / día')
       + _tarjetaKPI(totalPrimera.toLocaleString(), 'Unidades de primera')
       + _tarjetaKPI(totalMerma.toLocaleString(), 'Merma (ud)', totalMerma ? 'var(--rojo)' : null)
       + _tarjetaKPI(totalSegundas.toLocaleString(), 'Segundas (ud)', totalSegundas ? 'var(--naranja)' : null)
@@ -186,14 +193,27 @@ function _chartTendenciaProduccion(vibrocompactados, periodoDias, mapaCiclo) {
     const fechas = vibrocompactados.map(p => p.fecha).sort();
     dias = fechas.length ? Math.max(1, Math.round((hoy - new Date(fechas[0] + 'T12:00')) / 86400000) + 1) : 30;
   }
-  const labels = [], ciclosD = [];
+  // detalleD: por día, el desglose por producto (ciclos + unidades de primera de CADA producto
+  // fabricado ese día) — para el tooltip (2026-09-09, a pedido del usuario: "cuando toquemos un
+  // punto, incluyamos el producto que se fabricó y la cantidad de primera"), ya que un día de la
+  // vista general puede sumar ciclos de varios productos distintos, y el número agregado solo no
+  // dice cuál se fabricó ni cuánto.
+  const labels = [], ciclosD = [], detalleD = [];
   for (let i = dias - 1; i >= 0; i--) {
     const f = _fmtISO(_sumarDias(hoy, -i));
-    const ciclos = vibrocompactados.filter(p => p.fecha === f && mapaCiclo[p.producto])
-      .reduce((s, p) => s + (Number(p.cantidad) || 0) / mapaCiclo[p.producto], 0);
+    const delDia = vibrocompactados.filter(p => p.fecha === f && mapaCiclo[p.producto]);
+    if (!delDia.length) continue;
+    const porProducto = {};
+    delDia.forEach(p => {
+      if (!porProducto[p.producto]) porProducto[p.producto] = { ciclos: 0, primera: 0 };
+      porProducto[p.producto].ciclos += (Number(p.cantidad) || 0) / mapaCiclo[p.producto];
+      porProducto[p.producto].primera += Number(p.cantidad) || 0;
+    });
+    const ciclos = Object.values(porProducto).reduce((s, r) => s + r.ciclos, 0);
     if (!ciclos) continue;
     labels.push(new Date(f + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }));
     ciclosD.push(Math.round(ciclos * 10) / 10);
+    detalleD.push(Object.entries(porProducto).sort((a, b) => b[1].ciclos - a[1].ciclos));
   }
   if (_chartTendenciaProduccionInst) _chartTendenciaProduccionInst.destroy();
   _chartTendenciaProduccionInst = new Chart(ctx, {
@@ -204,7 +224,13 @@ function _chartTendenciaProduccion(vibrocompactados, periodoDias, mapaCiclo) {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: (c) => ` ${c.parsed.y.toLocaleString()} ciclos` } },
+        tooltip: {
+          callbacks: {
+            title: (items) => `${items[0].label} — ${items[0].parsed.y.toLocaleString()} ciclos`,
+            label: (c) => (detalleD[c.dataIndex] || []).map(([nombre, r]) =>
+              `${nombre}: ${(Math.round(r.ciclos * 10) / 10).toLocaleString()} ciclos (${r.primera.toLocaleString()} ud primera)`),
+          },
+        },
       },
       scales: {
         x: { grid: { display: false }, ticks: { color: '#898781', maxRotation: 0, autoSkip: true, maxTicksLimit: 10, font: { size: 10 } } },
