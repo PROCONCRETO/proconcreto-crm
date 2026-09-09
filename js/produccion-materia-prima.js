@@ -176,11 +176,19 @@ const _DIAS_VENTANA_CONSUMO_CEMENTO = 30;
 const _KG_STOCK_ROJO = 15000;
 const _KG_STOCK_AMBAR = 30000;
 function _colorStockCemento(stock) {
-  // El rojo crítico usa un tono propio (no el `--rojo` #C62828 del resto de la app) más intenso
-  // que el ámbar de abajo — a pedido del usuario, porque el #C62828 original se confundía de un
-  // vistazo con el #E65100 del ámbar en este borde delgado de 3px (2026-08-30).
-  if (stock <= _KG_STOCK_ROJO) return { bg: '#FFEBEE', fg: '#D50000' };
-  if (stock <= _KG_STOCK_AMBAR) return { bg: '#FFF3E0', fg: '#E65100' };
+  // Rojo/ámbar propios (no los `--rojo`/`--naranja` del resto de la app) — el primer intento
+  // (2026-08-30, #D50000 vs #E65100) seguía sin distinguirse bien a pedido del usuario. Verificado
+  // con el validador de color de la skill dataviz (scripts/validate_palette.js — ΔE en OKLab,
+  // no a ojo): #D50000 vs #E65100 medía ΔE 9.6 en visión normal, por debajo del piso de 15 (el
+  // validador lo marca como "hard to tell apart even with full color vision"). #D32F2F vs #FF8F00
+  // (2026-09-09) sube eso a ΔE 21.7 — el ámbar se corrió hacia un dorado más amarillo (más lejos
+  // del rojo en el círculo de color) y el rojo a un tono más puro, en vez de rojo-anaranjado.
+  // Contraste de cada color contra su propia tarjeta: rojo y verde ≥3:1 (PASS); el ámbar queda en
+  // 2.23:1 (WARN, por debajo de 3:1) — aceptable porque el número más importante de la tarjeta (el
+  // stock en kg) nunca usa este color, siempre es texto neutro oscuro; el ámbar solo tinta el
+  // rótulo y "días de cobertura", en negrita.
+  if (stock <= _KG_STOCK_ROJO) return { bg: '#FFEBEE', fg: '#D32F2F' };
+  if (stock <= _KG_STOCK_AMBAR) return { bg: '#FFF3E0', fg: '#FF8F00' };
   return { bg: '#E8F5E9', fg: '#2E7D32' };
 }
 

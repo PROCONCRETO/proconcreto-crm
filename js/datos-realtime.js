@@ -118,6 +118,7 @@ function rerenderPantallaActiva() {
     case 'pantalla-control-ensayos': renderEnsayosCalidad(); break;
     case 'pantalla-analisis-estadistico': renderAnalisisEstadistico(); break;
     case 'pantalla-materia-prima': renderMateriaPrima(); break;
+    case 'pantalla-produccion-estadisticas': renderEstadisticasProduccion(); break;
     case 'pantalla-logistica': renderCalendarioLogistica(); break;
     case 'pantalla-ordenes-despacho': renderOrdenesDespacho(); break;
     case 'pantalla-logistica-estadisticas': renderEstadisticasLogistica(); break;

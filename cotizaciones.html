@@ -102,6 +102,7 @@
   <button class="nav-btn" onclick="ir('produccion-diaria')">📅 Producción Diaria</button>
   <button class="nav-btn" onclick="ir('inventario')">📦 Inventario</button>
   <button class="nav-btn" onclick="ir('materia-prima')">🧱 Materia Prima</button>
+  <button class="nav-btn" onclick="ir('produccion-estadisticas')">📊 Estadísticas</button>
 </nav>
 
 <nav class="nav" id="subnav-logistica" style="display:none">
@@ -740,6 +741,51 @@
         <tr><td colspan="9" class="empty-state"><div class="icono">🧱</div><div>No hay materia prima registrada.</div></td></tr>
       </tbody>
     </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: PRODUCCIÓN — ESTADÍSTICAS
+═══════════════════════════════════════ -->
+<div id="pantalla-produccion-estadisticas" class="pantalla">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Estadísticas de Producción — Vibrocompactados</div>
+    <div style="display:flex;border:1px solid var(--gris-borde);border-radius:var(--radio);overflow:hidden">
+      <button id="est-prod-btn-7" onclick="setPeriodoProduccion(7)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">7 días</button>
+      <button id="est-prod-btn-30" onclick="setPeriodoProduccion(30)" style="padding:6px 14px;border:none;background:var(--azul);color:white;font-size:12px;font-weight:600;cursor:pointer">30 días</button>
+      <button id="est-prod-btn-90" onclick="setPeriodoProduccion(90)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">90 días</button>
+      <button id="est-prod-btn-0" onclick="setPeriodoProduccion(0)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">Todo</button>
+    </div>
+  </div>
+
+  <div class="stats-grid" id="est-prod-tarjetas"></div>
+  <div id="est-prod-nota-sin-clasificar"></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card">
+      <div class="card-titulo">Tendencia de producción (unidades de primera)</div>
+      <div style="height:280px;position:relative"><canvas id="chart-prod-tendencia"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-titulo">Tendencia de merma y segundas</div>
+      <div style="height:280px;position:relative"><canvas id="chart-prod-tendencia-deficiencia"></canvas></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card">
+      <div class="card-titulo">Productos más producidos (unidades de primera)</div>
+      <div style="height:280px;position:relative"><canvas id="chart-prod-ranking-volumen"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-titulo">Productos con mayor % de deficiencia</div>
+      <div style="height:280px;position:relative"><canvas id="chart-prod-ranking-deficiencia"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-titulo">Consumo de cemento por unidad (de primera) — tendencia</div>
+    <div style="height:260px;position:relative"><canvas id="chart-prod-cemento-unidad"></canvas></div>
   </div>
 </div>
 
@@ -2410,10 +2456,11 @@
 <script src="js/config.js?v=20260821a"></script>
 <script src="js/calculadora-inputs.js?v=20260825a"></script>
 <script src="js/catalogo.js?v=20260821a"></script>
-<script src="js/navegacion.js?v=20260829a"></script>
+<script src="js/navegacion.js?v=20260909a"></script>
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
 <script src="js/produccion-diaria.js?v=20260909b"></script>
-<script src="js/produccion-materia-prima.js?v=20260830a"></script>
+<script src="js/produccion-materia-prima.js?v=20260909a"></script>
+<script src="js/estadisticas-produccion.js?v=20260909b"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
 <script src="js/costeo-maquinaria.js?v=20260821a"></script>
@@ -2425,7 +2472,7 @@
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260804c"></script>
 <script src="js/auth.js?v=20260804a"></script>
-<script src="js/datos-realtime.js?v=20260829a"></script>
+<script src="js/datos-realtime.js?v=20260909a"></script>
 <script src="js/cotizador.js?v=20260831a"></script>
 <script src="js/historico-clientes-stats.js?v=20260827a"></script>
 <script src="js/retenciones.js?v=20260809c"></script>

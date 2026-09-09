@@ -100,6 +100,7 @@ function ir(pantalla) {
   if (pantalla === 'control-ensayos') renderEnsayosCalidad();
   if (pantalla === 'analisis-estadistico') renderAnalisisEstadistico();
   if (pantalla === 'materia-prima') renderMateriaPrima();
+  if (pantalla === 'produccion-estadisticas') renderEstadisticasProduccion();
   if (pantalla === 'logistica') renderCalendarioLogistica();
   if (pantalla === 'ordenes-despacho') renderOrdenesDespacho();
   if (pantalla === 'logistica-estadisticas') renderEstadisticasLogistica();
