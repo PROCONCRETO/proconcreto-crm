@@ -2139,6 +2139,16 @@
       <label>Producto *</label>
       <select id="m-prod-producto" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
     </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo">
+        <label>Merma <span style="font-weight:400;text-transform:none">(huecos, ciclos descartados, mala calidad)</span></label>
+        <input type="number" id="m-prod-merma" placeholder="0" min="0">
+      </div>
+      <div class="form-grupo">
+        <label>Segundas <span style="font-weight:400;text-transform:none">(deficiencia menor de calidad)</span></label>
+        <input type="number" id="m-prod-segundas" placeholder="0" min="0">
+      </div>
+    </div>
     <div class="form-grupo" style="margin-bottom:10px">
       <label>Orden de producción asociada</label>
       <select id="m-prod-orden" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
@@ -2399,7 +2409,7 @@
 <script src="js/catalogo.js?v=20260821a"></script>
 <script src="js/navegacion.js?v=20260829a"></script>
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
-<script src="js/produccion-diaria.js?v=20260830a"></script>
+<script src="js/produccion-diaria.js?v=20260909a"></script>
 <script src="js/produccion-materia-prima.js?v=20260830a"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>

@@ -35,6 +35,20 @@ function renderProduccionDiaria() {
   const hoy = new Date().toISOString().split('T')[0];
   const totalHoy = PRODUCCIONES.filter(p => p.fecha === hoy).reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
   const totalMostrado = data.reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
+  // Merma/Segundas (2026-09-09, a pedido del usuario) — deficiencias del proceso de
+  // vibrocompactado: merma = huecos en placas, ciclos descartados de la máquina, mala calidad;
+  // segundas = deficiencia menor de calidad. "Cantidad producida" sigue siendo SOLO unidades de
+  // primera — merma/segundas son campos aparte, nunca se suman ahí.
+  const totalMerma = data.reduce((s, p) => s + (Number(p.merma) || 0), 0);
+  const totalSegundas = data.reduce((s, p) => s + (Number(p.segundas) || 0), 0);
+  const totalIntentado = totalMostrado + totalMerma + totalSegundas;
+  const pctDeficiencia = totalIntentado > 0 ? ((totalMerma + totalSegundas) / totalIntentado) * 100 : 0;
+  // Consumo promedio de cemento por unidad: consumo total / unidades de PRIMERA producidas (nunca
+  // incluye merma ni segundas en el divisor — a pedido explícito del usuario, "sigamoslo
+  // calculando... resultado de dividir el consumo total de cemento entre las unidades de primera
+  // producidas").
+  const totalCemento = data.reduce((s, p) => s + (Number(p.consumoCemento) || 0), 0);
+  const cementoPorUnidad = totalMostrado > 0 && totalCemento > 0 ? totalCemento / totalMostrado : null;
   resumen.innerHTML = `
     <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--verde);min-width:140px">
       <div style="font-size:10px;font-weight:700;color:var(--verde);text-transform:uppercase">Producido hoy</div>
@@ -44,6 +58,23 @@ function renderProduccionDiaria() {
       <div style="font-size:10px;font-weight:700;color:var(--azul);text-transform:uppercase">${hayFiltro ? 'Filtrado' : 'Total registros'}</div>
       <div style="font-size:18px;font-weight:800;color:var(--gris-oscuro)">${totalMostrado.toLocaleString()} ud</div>
       <div style="font-size:11px;color:var(--gris-medio)">${data.length} registro${data.length===1?'':'s'}</div>
+    </div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid #E65100;min-width:140px">
+      <div style="font-size:10px;font-weight:700;color:#E65100;text-transform:uppercase">Merma</div>
+      <div style="font-size:18px;font-weight:800;color:var(--gris-oscuro)">${totalMerma.toLocaleString()} ud</div>
+    </div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid #8E24AA;min-width:140px">
+      <div style="font-size:10px;font-weight:700;color:#8E24AA;text-transform:uppercase">Segundas</div>
+      <div style="font-size:18px;font-weight:800;color:var(--gris-oscuro)">${totalSegundas.toLocaleString()} ud</div>
+    </div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid ${pctDeficiencia > 10 ? '#C62828' : (pctDeficiencia > 5 ? '#E65100' : '#2E7D32')};min-width:140px">
+      <div style="font-size:10px;font-weight:700;color:var(--gris-medio);text-transform:uppercase">% Deficiencia</div>
+      <div style="font-size:18px;font-weight:800;color:var(--gris-oscuro)">${pctDeficiencia.toLocaleString('es-CO', { maximumFractionDigits: 1 })}%</div>
+      <div style="font-size:11px;color:var(--gris-medio)">merma + segundas / intentado</div>
+    </div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--gris-medio);min-width:170px">
+      <div style="font-size:10px;font-weight:700;color:var(--gris-medio);text-transform:uppercase">Cemento / unidad (primera)</div>
+      <div style="font-size:18px;font-weight:800;color:var(--gris-oscuro)">${cementoPorUnidad !== null ? cementoPorUnidad.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' kg' : '—'}</div>
     </div>`;
 
   if (!data.length) {
@@ -54,7 +85,7 @@ function renderProduccionDiaria() {
     <tr style="border-top:2px solid var(--azul-oscuro)">
       <td style="font-weight:600">${p.fecha ? new Date(p.fecha+'T12:00').toLocaleDateString('es-CO') : '—'}</td>
       <td style="font-weight:600;color:var(--azul)">${_esc(p.producto) || '—'}</td>
-      <td style="font-weight:700">${(Number(p.cantidad)||0).toLocaleString()} <span style="font-size:11px;color:var(--gris-medio);font-weight:400">${_esc(p.unidad) || 'ud'}</span></td>
+      <td style="font-weight:700">${(Number(p.cantidad)||0).toLocaleString()} <span style="font-size:11px;color:var(--gris-medio);font-weight:400">${_esc(p.unidad) || 'ud'}</span>${_subLineaMermaSegundas(p)}</td>
       ${_celdaCementoProduccion(p)}
       <td>${p.orden ? `<span style="font-size:11px;background:#E3F2FD;color:#1565C0;padding:2px 6px;border-radius:3px;font-weight:600">${_esc(p.orden)}</span>` : '—'}</td>
       <td>${_esc(p.responsable) || '—'}</td>
@@ -94,6 +125,18 @@ function _celdaCementoProduccion(p) {
   </td>`;
 }
 
+// Sub-línea bajo la cantidad producida (de primera) mostrando merma/segundas de ese registro, si
+// tiene — igual que _celdaCementoProduccion(), no ocupa columna aparte.
+function _subLineaMermaSegundas(p) {
+  const merma = Number(p.merma) || 0;
+  const segundas = Number(p.segundas) || 0;
+  if (!merma && !segundas) return '';
+  const partes = [];
+  if (merma) partes.push(`<span style="color:#E65100">${merma.toLocaleString()} merma</span>`);
+  if (segundas) partes.push(`<span style="color:#8E24AA">${segundas.toLocaleString()} segundas</span>`);
+  return `<div style="font-size:10px;font-weight:400">${partes.join(' · ')}</div>`;
+}
+
 function poblarSelectProductos() {
   const sel = document.getElementById('m-prod-producto');
   if (!sel) return;
@@ -128,6 +171,8 @@ function abrirModalProduccion() {
   document.getElementById('m-prod-fecha').value = new Date().toISOString().split('T')[0];
   document.getElementById('m-prod-cantidad').value = '';
   document.getElementById('m-prod-producto').value = '';
+  document.getElementById('m-prod-merma').value = '';
+  document.getElementById('m-prod-segundas').value = '';
   document.getElementById('m-prod-orden').value = '';
   const perfil = USUARIOS_CRM[USUARIO_ACTUAL?.email];
   document.getElementById('m-prod-responsable').value = perfil?.nombre || '';
@@ -147,6 +192,8 @@ function editarProduccion(id) {
   document.getElementById('m-prod-fecha').value = p.fecha || '';
   document.getElementById('m-prod-cantidad').value = p.cantidad || '';
   document.getElementById('m-prod-producto').value = p.producto || '';
+  document.getElementById('m-prod-merma').value = p.merma || '';
+  document.getElementById('m-prod-segundas').value = p.segundas || '';
   // Si la orden asociada ya no está en la lista activa, agregarla
   if (p.orden && !document.querySelector(`#m-prod-orden option[value="${p.orden}"]`)) {
     const opt = document.createElement('option'); opt.value = p.orden; opt.textContent = p.orden; document.getElementById('m-prod-orden').appendChild(opt);
@@ -173,6 +220,8 @@ function guardarProduccion() {
     unidad: prodCat?.unidad || 'ud',
     grupo: prodCat?.grupo || '',
     cantidad,
+    merma: parseFloat(document.getElementById('m-prod-merma').value) || 0,
+    segundas: parseFloat(document.getElementById('m-prod-segundas').value) || 0,
     orden: document.getElementById('m-prod-orden').value,
     responsable: document.getElementById('m-prod-responsable').value.trim(),
     observaciones: document.getElementById('m-prod-obs').value.trim(),
