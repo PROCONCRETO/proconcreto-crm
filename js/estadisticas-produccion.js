@@ -275,15 +275,23 @@ function _chartTendenciaDeficiencia(vibrocompactados, periodoDias) {
     const fechas = vibrocompactados.map(p => p.fecha).sort();
     dias = fechas.length ? Math.max(1, Math.round((hoy - new Date(fechas[0] + 'T12:00')) / 86400000) + 1) : 30;
   }
-  const labels = [], mermaD = [], segundasD = [];
+  // En % frente a la producción de primera de ese día (2026-09-09, a pedido del usuario: "muéstralas
+  // en términos porcentuales frente a la producción de primera") — mermaPct/segundasPct = merma o
+  // segundas del día / PRIMERA del día × 100 (el divisor es solo primera, no lo intentado — distinto
+  // de la tarjeta "% Deficiencia", que sí divide entre lo intentado; acá el usuario pidió puntualmente
+  // "frente a la producción de primera"). Un día sin nada de primera no tiene con qué calcular el %,
+  // se omite igual que un día sin ninguna merma/segundas.
+  const labels = [], mermaPctD = [], segundasPctD = [];
   for (let i = dias - 1; i >= 0; i--) {
     const f = _fmtISO(_sumarDias(hoy, -i));
     const delDia = vibrocompactados.filter(p => p.fecha === f);
+    const primera = delDia.reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
     const merma = delDia.reduce((s, p) => s + (Number(p.merma) || 0), 0);
     const segundas = delDia.reduce((s, p) => s + (Number(p.segundas) || 0), 0);
-    if (!merma && !segundas) continue;
+    if (!primera || (!merma && !segundas)) continue;
     labels.push(new Date(f + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }));
-    mermaD.push(merma); segundasD.push(segundas);
+    mermaPctD.push(Math.round((merma / primera) * 1000) / 10);
+    segundasPctD.push(Math.round((segundas / primera) * 1000) / 10);
   }
   if (_chartTendenciaDeficienciaInst) _chartTendenciaDeficienciaInst.destroy();
   _chartTendenciaDeficienciaInst = new Chart(ctx, {
@@ -291,8 +299,8 @@ function _chartTendenciaDeficiencia(vibrocompactados, periodoDias) {
     data: {
       labels,
       datasets: [
-        { label: 'Merma', data: mermaD, borderColor: '#d03b3b', backgroundColor: 'rgba(208,59,59,0.1)', fill: true, borderWidth: 2, pointRadius: labels.length > 31 ? 0 : 3, tension: 0.2 },
-        { label: 'Segundas', data: segundasD, borderColor: '#fab219', backgroundColor: 'rgba(250,178,25,0.1)', fill: true, borderWidth: 2, pointRadius: labels.length > 31 ? 0 : 3, tension: 0.2 },
+        { label: 'Merma', data: mermaPctD, borderColor: '#d03b3b', backgroundColor: 'rgba(208,59,59,0.1)', fill: true, borderWidth: 2, pointRadius: labels.length > 31 ? 0 : 3, tension: 0.2 },
+        { label: 'Segundas', data: segundasPctD, borderColor: '#fab219', backgroundColor: 'rgba(250,178,25,0.1)', fill: true, borderWidth: 2, pointRadius: labels.length > 31 ? 0 : 3, tension: 0.2 },
       ],
     },
     options: {
@@ -300,11 +308,11 @@ function _chartTendenciaDeficiencia(vibrocompactados, periodoDias) {
       maintainAspectRatio: false,
       plugins: {
         legend: { position: 'bottom', labels: { color: '#52514e', boxWidth: 12, padding: 12, font: { size: 11 } } },
-        tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${c.parsed.y} ud` } },
+        tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${c.parsed.y}% de la producción de primera` } },
       },
       scales: {
         x: { grid: { display: false }, ticks: { color: '#898781', maxRotation: 0, autoSkip: true, maxTicksLimit: 10, font: { size: 10 } } },
-        y: { beginAtZero: true, grid: { color: '#e1e0d9' }, ticks: { color: '#898781', precision: 0 } },
+        y: { beginAtZero: true, grid: { color: '#e1e0d9' }, ticks: { color: '#898781', callback: (v) => v + '%' } },
       },
     },
   });
