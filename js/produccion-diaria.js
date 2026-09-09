@@ -137,22 +137,56 @@ function _subLineaMermaSegundas(p) {
   return `<div style="font-size:10px;font-weight:400">${partes.join(' · ')}</div>`;
 }
 
-function poblarSelectProductos() {
-  const sel = document.getElementById('m-prod-producto');
-  if (!sel) return;
-  // Agrupar productos por grupo
+// Buscador de Producto en Registrar/Editar Producción (2026-09-09, a pedido del usuario: "que se
+// depliegue el desplegable pero también se pueda buscar") — reemplaza el <select> nativo (que
+// agrupaba por grupo con <optgroup>, pero no se podía filtrar escribiendo) por el mismo patrón de
+// buscador con resultados flotantes que ya usa Cliente/Producto en el modal de Viaje de Logística
+// (filtrarClienteEntrega()/filtrarProductosEntrega() en js/logistica.js) — con una diferencia a
+// propósito: acá SÍ se muestra la lista completa (agrupada por grupo, igual que antes) apenas se
+// hace foco en el campo con el cursor vacío, para no perder la posibilidad de "desplegar y elegir"
+// que sí tenía el <select> — filtrarProductosEntrega() de Logística, en cambio, solo muestra algo
+// una vez se escriben 2+ caracteres. El campo de texto SIGUE siendo id="m-prod-producto" (guarda
+// el nombre del producto elegido directo en su .value, igual que antes con el <select>) para no
+// tener que tocar guardarProduccion()/abrirModalProduccion()/editarProduccion().
+function filtrarProductoProduccion() {
+  const inputEl = document.getElementById('m-prod-producto');
+  const div = document.getElementById('m-prod-producto-resultados');
+  if (!inputEl || !div) return;
+  const q = inputEl.value.toLowerCase().trim();
   const grupos = {};
-  PRODUCTOS.forEach(p => { (grupos[p.grupo] = grupos[p.grupo] || []).push(p); });
-  let html = '<option value="">— Selecciona un producto —</option>';
-  Object.keys(grupos).sort().forEach(g => {
-    html += `<optgroup label="${_esc(g)}">`;
-    grupos[g].forEach(p => {
-      html += `<option value="${_esc(p.nombre)}" data-unidad="${_esc(p.unidad)}">${_esc(p.nombre)}</option>`;
-    });
-    html += '</optgroup>';
+  PRODUCTOS.forEach(p => {
+    if (q && !((p.nombre + ' ' + p.codigo).toLowerCase().includes(q))) return;
+    (grupos[p.grupo] = grupos[p.grupo] || []).push(p);
   });
-  sel.innerHTML = html;
+  const gruposOrdenados = Object.keys(grupos).sort();
+  div.innerHTML = gruposOrdenados.length
+    ? gruposOrdenados.map(g => `
+      <div style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--gris-medio);text-transform:uppercase;background:#F8FAFC;position:sticky;top:0">${_esc(g)}</div>
+      ${grupos[g].map(p => `
+        <div onclick="elegirProductoProduccion('${_escNombreOnclick(p.nombre)}')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
+          <div style="font-weight:600;font-size:13px;color:#1e293b">${_esc(p.nombre)}</div>
+          <div style="font-size:11px;color:#64748b">${_esc(p.codigo)}</div>
+        </div>`).join('')}
+    `).join('')
+    : '<div style="padding:10px 14px;color:#888;font-size:12px">Sin resultados para esta búsqueda.</div>';
+  div.style.display = 'block';
 }
+
+function elegirProductoProduccion(nombre) {
+  const inputEl = document.getElementById('m-prod-producto');
+  if (inputEl) inputEl.value = nombre;
+  const div = document.getElementById('m-prod-producto-resultados');
+  if (div) div.style.display = 'none';
+}
+
+// Mismo patrón que el listener global de Logística (js/logistica.js) para sus buscadores propios —
+// cierra el desplegable de resultados al hacer clic fuera del campo/lista.
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.buscador-producto-prod')) {
+    const div = document.getElementById('m-prod-producto-resultados');
+    if (div) div.style.display = 'none';
+  }
+});
 
 function poblarSelectOrdenesProd() {
   const sel = document.getElementById('m-prod-orden');
@@ -166,7 +200,6 @@ function poblarSelectOrdenesProd() {
 function abrirModalProduccion() {
   document.getElementById('m-prod-id').value = '';
   document.getElementById('modal-produccion-titulo').textContent = '📅 Registrar Producción';
-  poblarSelectProductos();
   poblarSelectOrdenesProd();
   document.getElementById('m-prod-fecha').value = new Date().toISOString().split('T')[0];
   document.getElementById('m-prod-cantidad').value = '';
@@ -179,6 +212,7 @@ function abrirModalProduccion() {
   document.getElementById('m-prod-obs').value = '';
   document.getElementById('m-prod-consumo-cemento').value = '';
   document.getElementById('m-prod-bodega-cemento').value = '';
+  document.getElementById('m-prod-producto-resultados').style.display = 'none';
   document.getElementById('modal-produccion').classList.add('abierto');
 }
 
@@ -187,7 +221,6 @@ function editarProduccion(id) {
   if (!p) return;
   document.getElementById('m-prod-id').value = p.id;
   document.getElementById('modal-produccion-titulo').textContent = '✏️ Editar Producción';
-  poblarSelectProductos();
   poblarSelectOrdenesProd();
   document.getElementById('m-prod-fecha').value = p.fecha || '';
   document.getElementById('m-prod-cantidad').value = p.cantidad || '';
@@ -203,6 +236,7 @@ function editarProduccion(id) {
   document.getElementById('m-prod-obs').value = p.observaciones || '';
   document.getElementById('m-prod-consumo-cemento').value = p.consumoCemento || '';
   document.getElementById('m-prod-bodega-cemento').value = p.bodegaCemento || '';
+  document.getElementById('m-prod-producto-resultados').style.display = 'none';
   document.getElementById('modal-produccion').classList.add('abierto');
 }
 

@@ -2131,29 +2131,32 @@
         <input type="date" id="m-prod-fecha">
       </div>
       <div class="form-grupo">
-        <label>Cantidad producida *</label>
-        <input type="number" id="m-prod-cantidad" placeholder="0" min="0">
+        <label>Orden de producción asociada</label>
+        <select id="m-prod-orden" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="">— Sin orden asociada —</option>
+        </select>
       </div>
     </div>
     <div class="form-grupo" style="margin-bottom:10px">
       <label>Producto *</label>
-      <select id="m-prod-producto" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      <div class="buscador-producto-prod" style="position:relative">
+        <input type="text" id="m-prod-producto" placeholder="Busca o elige un producto..." autocomplete="off" onfocus="filtrarProductoProduccion()" oninput="filtrarProductoProduccion()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <div id="m-prod-producto-resultados" style="display:none;position:absolute;left:0;right:0;top:100%;margin-top:2px;background:#fff;border:1.5px solid #93C5FD;border-radius:8px;max-height:280px;overflow-y:auto;z-index:50;box-shadow:0 4px 16px rgba(0,0,0,0.12)"></div>
+      </div>
     </div>
-    <div class="form-grid" style="margin-bottom:10px">
+    <div class="form-grid-3" style="margin-bottom:10px">
       <div class="form-grupo">
-        <label>Merma <span style="font-weight:400;text-transform:none">(huecos, ciclos descartados, mala calidad)</span></label>
+        <label style="display:block;min-height:2.4em">Cantidad producida *</label>
+        <input type="number" id="m-prod-cantidad" placeholder="0" min="0">
+      </div>
+      <div class="form-grupo">
+        <label style="display:block;min-height:2.4em" title="Huecos en las placas, ciclos descartados desde la máquina, producto de mala calidad">Merma</label>
         <input type="number" id="m-prod-merma" placeholder="0" min="0">
       </div>
       <div class="form-grupo">
-        <label>Segundas <span style="font-weight:400;text-transform:none">(deficiencia menor de calidad)</span></label>
+        <label style="display:block;min-height:2.4em" title="Producto con deficiencia menor de calidad">Segundas</label>
         <input type="number" id="m-prod-segundas" placeholder="0" min="0">
       </div>
-    </div>
-    <div class="form-grupo" style="margin-bottom:10px">
-      <label>Orden de producción asociada</label>
-      <select id="m-prod-orden" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
-        <option value="">— Sin orden asociada —</option>
-      </select>
     </div>
     <div class="form-grupo" style="margin-bottom:10px">
       <label>Responsable / Turno</label>
@@ -2409,7 +2412,7 @@
 <script src="js/catalogo.js?v=20260821a"></script>
 <script src="js/navegacion.js?v=20260829a"></script>
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
-<script src="js/produccion-diaria.js?v=20260909a"></script>
+<script src="js/produccion-diaria.js?v=20260909b"></script>
 <script src="js/produccion-materia-prima.js?v=20260830a"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
