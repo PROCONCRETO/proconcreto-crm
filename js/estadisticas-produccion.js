@@ -224,11 +224,17 @@ function _chartTendenciaProduccion(vibrocompactados, periodoDias, mapaCiclo) {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
+        // Tooltip por renglones, en este orden (2026-09-09, a pedido del usuario: "escribe en este
+        // orden y por renglones: fecha / producto / ciclos / unidades") — la fecha va como título
+        // (una sola vez); por cada producto fabricado ese día, un bloque de 3 renglones.
         tooltip: {
           callbacks: {
-            title: (items) => `${items[0].label} — ${items[0].parsed.y.toLocaleString()} ciclos`,
-            label: (c) => (detalleD[c.dataIndex] || []).map(([nombre, r]) =>
-              `${nombre}: ${(Math.round(r.ciclos * 10) / 10).toLocaleString()} ciclos (${r.primera.toLocaleString()} ud primera)`),
+            title: (items) => items[0].label,
+            label: (c) => (detalleD[c.dataIndex] || []).flatMap(([nombre, r]) => [
+              `Producto: ${nombre}`,
+              `Ciclos: ${(Math.round(r.ciclos * 10) / 10).toLocaleString()}`,
+              `Unidades: ${r.primera.toLocaleString()}`,
+            ]),
           },
         },
       },
@@ -307,17 +313,38 @@ function _chartTendenciaDeficiencia(vibrocompactados, periodoDias) {
   // de la tarjeta "% Deficiencia", que sí divide entre lo intentado; acá el usuario pidió puntualmente
   // "frente a la producción de primera"). Un día sin nada de primera no tiene con qué calcular el %,
   // se omite igual que un día sin ninguna merma/segundas.
-  const labels = [], mermaPctD = [], segundasPctD = [];
+  // detalleD: por día, el desglose por producto (igual que la gráfica de Ciclos de arriba, mismo
+  // pedido del usuario: "escribe en este orden y por renglones: fecha / producto / ciclos /
+  // unidades... haz lo mismo en la gráfica de mermas y segundas" — acá el equivalente de "ciclos"
+  // es Merma/Segundas %, que es lo que esta gráfica sí mide). Solo incluye productos que ese día
+  // tuvieron ALGO de merma o segundas — uno con 0%/0% no aporta nada al tooltip de deficiencia.
+  const labels = [], mermaPctD = [], segundasPctD = [], detalleD = [];
   for (let i = dias - 1; i >= 0; i--) {
     const f = _fmtISO(_sumarDias(hoy, -i));
     const delDia = vibrocompactados.filter(p => p.fecha === f);
-    const primera = delDia.reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
-    const merma = delDia.reduce((s, p) => s + (Number(p.merma) || 0), 0);
-    const segundas = delDia.reduce((s, p) => s + (Number(p.segundas) || 0), 0);
+    const porProducto = {};
+    delDia.forEach(p => {
+      if (!porProducto[p.producto]) porProducto[p.producto] = { primera: 0, merma: 0, segundas: 0 };
+      porProducto[p.producto].primera += Number(p.cantidad) || 0;
+      porProducto[p.producto].merma += Number(p.merma) || 0;
+      porProducto[p.producto].segundas += Number(p.segundas) || 0;
+    });
+    const primera = Object.values(porProducto).reduce((s, r) => s + r.primera, 0);
+    const merma = Object.values(porProducto).reduce((s, r) => s + r.merma, 0);
+    const segundas = Object.values(porProducto).reduce((s, r) => s + r.segundas, 0);
     if (!primera || (!merma && !segundas)) continue;
     labels.push(new Date(f + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }));
     mermaPctD.push(Math.round((merma / primera) * 1000) / 10);
     segundasPctD.push(Math.round((segundas / primera) * 1000) / 10);
+    detalleD.push(Object.entries(porProducto)
+      .filter(([, r]) => r.primera > 0 && (r.merma || r.segundas))
+      .map(([nombre, r]) => ({
+        nombre,
+        mermaPct: Math.round((r.merma / r.primera) * 1000) / 10,
+        segundasPct: Math.round((r.segundas / r.primera) * 1000) / 10,
+        primera: r.primera,
+      }))
+      .sort((a, b) => (b.mermaPct + b.segundasPct) - (a.mermaPct + a.segundasPct)));
   }
   if (_chartTendenciaDeficienciaInst) _chartTendenciaDeficienciaInst.destroy();
   _chartTendenciaDeficienciaInst = new Chart(ctx, {
@@ -332,9 +359,27 @@ function _chartTendenciaDeficiencia(vibrocompactados, periodoDias) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      // 'index'+intersect:false: para que el tooltip aparezca completo sin importar si el mouse
+      // queda más cerca de la línea de Merma o de la de Segundas (por defecto Chart.js solo activa
+      // el dataset más cercano bajo el cursor) — necesario porque el desglose por producto se arma
+      // una sola vez, desde el dataset 0 (ver el callback de abajo), y debe verse siempre.
+      interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { position: 'bottom', labels: { color: '#52514e', boxWidth: 12, padding: 12, font: { size: 11 } } },
-        tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${c.parsed.y}% de la producción de primera` } },
+        tooltip: {
+          callbacks: {
+            title: (items) => items[0].label,
+            label: (c) => {
+              if (c.datasetIndex !== 0) return []; // el desglose ya lo puso el dataset 0 (Merma) — no duplicar
+              return (detalleD[c.dataIndex] || []).flatMap(r => [
+                `Producto: ${r.nombre}`,
+                `Merma: ${r.mermaPct}%`,
+                `Segundas: ${r.segundasPct}%`,
+                `Unidades: ${r.primera.toLocaleString()}`,
+              ]);
+            },
+          },
+        },
       },
       scales: {
         x: { grid: { display: false }, ticks: { color: '#898781', maxRotation: 0, autoSkip: true, maxTicksLimit: 10, font: { size: 10 } } },
