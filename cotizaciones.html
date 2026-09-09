@@ -757,13 +757,18 @@
       <button id="est-prod-btn-0" onclick="setPeriodoProduccion(0)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">Todo</button>
     </div>
   </div>
+  <div style="margin-bottom:16px">
+    <select id="est-prod-filtro-producto" class="buscador-input" style="width:auto;min-width:260px" onchange="renderEstadisticasProduccion()">
+      <option value="">Todos los productos (vista general)</option>
+    </select>
+  </div>
 
   <div class="stats-grid" id="est-prod-tarjetas"></div>
   <div id="est-prod-nota-sin-clasificar"></div>
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div class="card">
-      <div class="card-titulo">Tendencia de producción (unidades de primera)</div>
+      <div class="card-titulo">Tendencia de producción (ciclos)</div>
       <div style="height:280px;position:relative"><canvas id="chart-prod-tendencia"></canvas></div>
     </div>
     <div class="card">
@@ -772,9 +777,14 @@
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <div id="card-prod-unidades-filtrado" class="card" style="display:none">
+    <div class="card-titulo">Unidades producidas (de primera) — producto filtrado</div>
+    <div style="height:280px;position:relative"><canvas id="chart-prod-unidades-filtrado"></canvas></div>
+  </div>
+
+  <div id="est-prod-cards-ranking" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div class="card">
-      <div class="card-titulo">Productos más producidos (unidades de primera)</div>
+      <div class="card-titulo">Productos con más ciclos de producción</div>
       <div style="height:280px;position:relative"><canvas id="chart-prod-ranking-volumen"></canvas></div>
     </div>
     <div class="card">
@@ -2460,7 +2470,7 @@
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
 <script src="js/produccion-diaria.js?v=20260909b"></script>
 <script src="js/produccion-materia-prima.js?v=20260909a"></script>
-<script src="js/estadisticas-produccion.js?v=20260909b"></script>
+<script src="js/estadisticas-produccion.js?v=20260909c"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
 <script src="js/costeo-maquinaria.js?v=20260821a"></script>

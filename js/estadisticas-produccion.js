@@ -33,6 +33,28 @@ function _mapaTipoEstructuraPorProducto() {
   return mapa;
 }
 
+// Mapa {nombreProducto: unidadesCiclo} — mismo cruce CATALOGO↔COSTEO_PRODUCTOS que el mapa de
+// arriba, pero lee costeo.rendimiento.unidadesCiclo (`calcularCosteoProducto()`, costeo-producto.js
+// — "Unidades/Ciclo" del cuestionario de Vibrocompactado: cuántas piezas terminadas salen de un
+// solo ciclo de la máquina, un dato real de planta, distinto para cada producto). Un producto
+// vibrocompactado CON Costeo guardado pero sin "Unidades/Ciclo" digitado (0 o vacío) queda fuera de
+// este mapa — no hay con qué convertir sus unidades a ciclos, aunque sigue contando en unidades.
+function _unidadesCicloPorProducto() {
+  const codigoPorNombre = {};
+  (typeof CATALOGO !== 'undefined' ? CATALOGO : []).forEach(p => { codigoPorNombre[p.nombre] = p.codigo; });
+  const cicloPorCodigo = {};
+  (typeof COSTEO_PRODUCTOS !== 'undefined' ? COSTEO_PRODUCTOS : []).forEach(c => {
+    const uc = c.rendimiento?.unidadesCiclo;
+    if (c.tipoEstructura === 'vibrocompactado' && uc > 0) cicloPorCodigo[c.productoCodigo] = uc;
+  });
+  const mapa = {};
+  Object.keys(codigoPorNombre).forEach(nombre => {
+    const uc = cicloPorCodigo[codigoPorNombre[nombre]];
+    if (uc) mapa[nombre] = uc;
+  });
+  return mapa;
+}
+
 // Ventana rodante — mismo patrón que _periodoLogistica/setPeriodoLogistica() en
 // estadisticas-logistica.js (7/30/90 días o todo, dias=0 = todo).
 let _periodoProduccion = 30;
@@ -72,7 +94,30 @@ function _colorDeficiencia(pct) {
 
 function renderEstadisticasProduccion() {
   if (typeof Chart === 'undefined') return; // Chart.js aún no cargó (pantalla no visible todavía)
-  const { vibrocompactados, sinClasificar } = _datosEstadisticasProduccion(_periodoProduccion);
+  const { vibrocompactados: todosVibro, sinClasificar } = _datosEstadisticasProduccion(_periodoProduccion);
+
+  // Filtro de producto (2026-09-09, a pedido del usuario) — se puebla SIEMPRE desde el conjunto
+  // SIN filtrar (todosVibro), preservando lo ya elegido, para no perder las demás opciones del
+  // desplegable cuando ya hay un producto elegido.
+  const selProducto = document.getElementById('est-prod-filtro-producto');
+  let productoFiltro = '';
+  if (selProducto) {
+    const prevValor = selProducto.value;
+    const productos = [...new Set(todosVibro.map(p => p.producto))].sort();
+    selProducto.innerHTML = '<option value="">Todos los productos (vista general)</option>' + productos.map(p => `<option value="${_esc(p)}">${_esc(p)}</option>`).join('');
+    selProducto.value = productos.includes(prevValor) ? prevValor : '';
+    productoFiltro = selProducto.value;
+  }
+  const vibrocompactados = productoFiltro ? todosVibro.filter(p => p.producto === productoFiltro) : todosVibro;
+
+  // Ciclos: "la producción de productos de diferentes referencias no es comparable... la máquina
+  // no produce las mismas unidades por ciclo para cada producto" (2026-09-09, a pedido del
+  // usuario) — un ciclo de la máquina es la unidad de esfuerzo real, comparable entre productos
+  // distintos; las unidades terminadas no lo son (un ciclo puede dar 1 pieza grande o 40 chicas).
+  const mapaCiclo = _unidadesCicloPorProducto();
+  const conCiclo = vibrocompactados.filter(p => mapaCiclo[p.producto]);
+  const sinCiclo = vibrocompactados.filter(p => !mapaCiclo[p.producto]);
+  const totalCiclos = conCiclo.reduce((s, p) => s + (Number(p.cantidad) || 0) / mapaCiclo[p.producto], 0);
 
   const totalPrimera = vibrocompactados.reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
   const totalMerma = vibrocompactados.reduce((s, p) => s + (Number(p.merma) || 0), 0);
@@ -84,7 +129,8 @@ function renderEstadisticasProduccion() {
 
   const tarjetas = document.getElementById('est-prod-tarjetas');
   if (tarjetas) {
-    tarjetas.innerHTML = _tarjetaKPI(totalPrimera.toLocaleString(), 'Unidades de primera')
+    tarjetas.innerHTML = _tarjetaKPI(totalCiclos > 0 ? Math.round(totalCiclos).toLocaleString() : '—', 'Ciclos de producción')
+      + _tarjetaKPI(totalPrimera.toLocaleString(), 'Unidades de primera')
       + _tarjetaKPI(totalMerma.toLocaleString(), 'Merma (ud)', totalMerma ? 'var(--rojo)' : null)
       + _tarjetaKPI(totalSegundas.toLocaleString(), 'Segundas (ud)', totalSegundas ? 'var(--naranja)' : null)
       + _tarjetaKPI(pctDeficiencia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + '%', '% Deficiencia', totalIntentado ? _colorDeficiencia(pctDeficiencia) : null)
@@ -93,24 +139,45 @@ function renderEstadisticasProduccion() {
 
   const nota = document.getElementById('est-prod-nota-sin-clasificar');
   if (nota) {
-    nota.innerHTML = sinClasificar.length
-      ? `<div style="background:#FFF3E0;color:#E65100;border-radius:var(--radio);padding:8px 14px;font-size:12px;margin-bottom:16px">⚠️ ${sinClasificar.length} registro${sinClasificar.length === 1 ? '' : 's'} de producto${sinClasificar.length === 1 ? '' : 's'} sin Costeo de Producto guardado no se incluye${sinClasificar.length === 1 ? '' : 'n'} en estas estadísticas — regístrale su Costeo (Centro de Costos → Costeo de Producto, tipo "Vibrocompactado") para que empiece a contar aquí.</div>`
-      : '';
+    const notas = [];
+    if (sinClasificar.length) notas.push(`⚠️ ${sinClasificar.length} registro${sinClasificar.length === 1 ? '' : 's'} sin Costeo de Producto guardado no se incluye${sinClasificar.length === 1 ? '' : 'n'} en estas estadísticas. Regístralo en Centro de Costos → Costeo de Producto, tipo "Vibrocompactado".`);
+    if (sinCiclo.length) notas.push(`⚠️ ${sinCiclo.length} registro${sinCiclo.length === 1 ? '' : 's'} de producto${sinCiclo.length === 1 ? '' : 's'} vibrocompactado con Costeo pero sin "Unidades/Ciclo" registrado no cuenta${sinCiclo.length === 1 ? '' : 'n'} en Ciclos de producción (sí sigue contando en unidades, merma, segundas y cemento). Completa ese dato en su Costeo → Rendimiento.`);
+    nota.innerHTML = notas.map(t => `<div style="background:#FFF3E0;color:#E65100;border-radius:var(--radio);padding:8px 14px;font-size:12px;margin-bottom:8px">${t}</div>`).join('');
   }
 
-  _chartTendenciaProduccion(vibrocompactados, _periodoProduccion);
+  _chartTendenciaProduccion(vibrocompactados, _periodoProduccion, mapaCiclo);
   _chartTendenciaDeficiencia(vibrocompactados, _periodoProduccion);
-  _chartRankingVolumen(vibrocompactados);
-  _chartRankingDeficiencia(vibrocompactados);
   _chartCementoPorUnidad(vibrocompactados, _periodoProduccion);
+
+  // Un ranking de comparación entre productos no dice nada con un solo producto filtrado — se
+  // oculta y en su lugar se muestra la tendencia de unidades de ESE producto (donde unidades y
+  // ciclos sí son directamente comparables entre sí, a diferencia de la vista general).
+  const cardsRanking = document.getElementById('est-prod-cards-ranking');
+  const cardUnidadesFiltro = document.getElementById('card-prod-unidades-filtrado');
+  if (productoFiltro) {
+    if (cardsRanking) cardsRanking.style.display = 'none';
+    if (cardUnidadesFiltro) cardUnidadesFiltro.style.display = '';
+    _chartUnidadesFiltrado(vibrocompactados, _periodoProduccion);
+  } else {
+    if (cardsRanking) cardsRanking.style.display = '';
+    if (cardUnidadesFiltro) cardUnidadesFiltro.style.display = 'none';
+    _chartRankingVolumen(vibrocompactados, mapaCiclo);
+    _chartRankingDeficiencia(vibrocompactados);
+  }
 }
 
-// ── Tendencia de producción (unidades de primera) ──
-// Mismo mecanismo que _chartTendencia() en estadisticas-logistica.js: recorre día por día la
-// ventana y OMITE los días sin producción de primera (no pinta un punto en cero), para que la
-// línea no se aplaste en cada hueco.
+// ── Tendencia de producción (ciclos) ──
+// Se expresa en CICLOS, no en unidades de primera (2026-09-09, a pedido del usuario) — comparar
+// unidades crudas entre productos con distinto "Unidades/Ciclo" (ver _unidadesCicloPorProducto())
+// no refleja el esfuerzo real de máquina; un ciclo sí es comparable entre productos. Se mantiene
+// así incluso cuando hay un producto filtrado, por consistencia — la gráfica de unidades del
+// producto filtrado (_chartUnidadesFiltrado()) es la que aparece aparte en ese caso. ciclos del
+// día = suma de (cantidad de primera / unidadesCiclo) de cada registro cuyo producto SÍ tiene ese
+// dato — los que no lo tienen quedan fuera (ver nota "sin Unidades/Ciclo" en el render principal).
+// Mismo mecanismo de "solo días con actividad" que el resto de gráficas de tendencia — un día sin
+// ciclos no pinta un punto en cero.
 let _chartTendenciaProduccionInst = null;
-function _chartTendenciaProduccion(vibrocompactados, periodoDias) {
+function _chartTendenciaProduccion(vibrocompactados, periodoDias, mapaCiclo) {
   const ctx = document.getElementById('chart-prod-tendencia');
   if (!ctx) return;
   const hoy = new Date();
@@ -119,18 +186,63 @@ function _chartTendenciaProduccion(vibrocompactados, periodoDias) {
     const fechas = vibrocompactados.map(p => p.fecha).sort();
     dias = fechas.length ? Math.max(1, Math.round((hoy - new Date(fechas[0] + 'T12:00')) / 86400000) + 1) : 30;
   }
-  const labels = [], primeraD = [];
+  const labels = [], ciclosD = [];
+  for (let i = dias - 1; i >= 0; i--) {
+    const f = _fmtISO(_sumarDias(hoy, -i));
+    const ciclos = vibrocompactados.filter(p => p.fecha === f && mapaCiclo[p.producto])
+      .reduce((s, p) => s + (Number(p.cantidad) || 0) / mapaCiclo[p.producto], 0);
+    if (!ciclos) continue;
+    labels.push(new Date(f + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }));
+    ciclosD.push(Math.round(ciclos * 10) / 10);
+  }
+  if (_chartTendenciaProduccionInst) _chartTendenciaProduccionInst.destroy();
+  _chartTendenciaProduccionInst = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Ciclos', data: ciclosD, borderColor: '#0ca30c', backgroundColor: 'rgba(12,163,12,0.1)', fill: true, borderWidth: 2, pointRadius: labels.length > 31 ? 0 : 3, tension: 0.2 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => ` ${c.parsed.y.toLocaleString()} ciclos` } },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#898781', maxRotation: 0, autoSkip: true, maxTicksLimit: 10, font: { size: 10 } } },
+        y: { beginAtZero: true, grid: { color: '#e1e0d9' }, ticks: { color: '#898781' } },
+      },
+    },
+  });
+}
+
+// ── Unidades producidas — SOLO cuando hay un producto filtrado (2026-09-09, a pedido del
+// usuario: "si filtramos algún producto, sí podemos hacerlo por ciclos y por unidades para ver el
+// desempeño de una referencia en particular") — dentro de UN mismo producto, unidades y ciclos son
+// directamente proporcionales (ciclos × Unidades/Ciclo = unidades), así que mostrar unidades sí
+// tiene sentido acá aunque no lo tenga en la vista general con varios productos mezclados. Gráfica
+// aparte (no una segunda serie en la de Ciclos) para no forzar un eje doble — mismo criterio que
+// Merma/Segundas.
+let _chartUnidadesFiltradoInst = null;
+function _chartUnidadesFiltrado(vibrocompactados, periodoDias) {
+  const ctx = document.getElementById('chart-prod-unidades-filtrado');
+  if (!ctx) return;
+  const hoy = new Date();
+  let dias = periodoDias;
+  if (!dias) {
+    const fechas = vibrocompactados.map(p => p.fecha).sort();
+    dias = fechas.length ? Math.max(1, Math.round((hoy - new Date(fechas[0] + 'T12:00')) / 86400000) + 1) : 30;
+  }
+  const labels = [], unidadesD = [];
   for (let i = dias - 1; i >= 0; i--) {
     const f = _fmtISO(_sumarDias(hoy, -i));
     const primera = vibrocompactados.filter(p => p.fecha === f).reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
     if (!primera) continue;
     labels.push(new Date(f + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }));
-    primeraD.push(primera);
+    unidadesD.push(primera);
   }
-  if (_chartTendenciaProduccionInst) _chartTendenciaProduccionInst.destroy();
-  _chartTendenciaProduccionInst = new Chart(ctx, {
+  if (_chartUnidadesFiltradoInst) _chartUnidadesFiltradoInst.destroy();
+  _chartUnidadesFiltradoInst = new Chart(ctx, {
     type: 'line',
-    data: { labels, datasets: [{ label: 'Primera', data: primeraD, borderColor: '#0ca30c', backgroundColor: 'rgba(12,163,12,0.1)', fill: true, borderWidth: 2, pointRadius: labels.length > 31 ? 0 : 3, tension: 0.2 }] },
+    data: { labels, datasets: [{ label: 'Unidades', data: unidadesD, borderColor: '#2a78d6', backgroundColor: 'rgba(42,120,214,0.1)', fill: true, borderWidth: 2, pointRadius: labels.length > 31 ? 0 : 3, tension: 0.2 }] },
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -198,14 +310,20 @@ function _chartTendenciaDeficiencia(vibrocompactados, periodoDias) {
   });
 }
 
-// ── Ranking de productos por volumen (top 10, unidades de primera) ──
+// ── Ranking de productos por volumen (top 10, en CICLOS) ──
+// En ciclos, no en unidades (mismo motivo que la tendencia de arriba) — solo aparece en la vista
+// general (sin producto filtrado; ver renderEstadisticasProduccion()), porque comparar un producto
+// contra sí mismo no dice nada. Productos sin "Unidades/Ciclo" en su Costeo no entran acá.
 let _chartRankingVolumenInst = null;
-function _chartRankingVolumen(vibrocompactados) {
+function _chartRankingVolumen(vibrocompactados, mapaCiclo) {
   const ctx = document.getElementById('chart-prod-ranking-volumen');
   if (!ctx) return;
   const conteo = {};
-  vibrocompactados.forEach(p => { conteo[p.producto] = (conteo[p.producto] || 0) + (Number(p.cantidad) || 0); });
-  const top = Object.entries(conteo).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  vibrocompactados.forEach(p => {
+    if (!mapaCiclo[p.producto]) return;
+    conteo[p.producto] = (conteo[p.producto] || 0) + (Number(p.cantidad) || 0) / mapaCiclo[p.producto];
+  });
+  const top = Object.entries(conteo).map(([n, c]) => [n, Math.round(c * 10) / 10]).sort((a, b) => b[1] - a[1]).slice(0, 10);
   if (_chartRankingVolumenInst) _chartRankingVolumenInst.destroy();
   _chartRankingVolumenInst = new Chart(ctx, {
     type: 'bar',
@@ -216,10 +334,10 @@ function _chartRankingVolumen(vibrocompactados) {
       indexAxis: 'y',
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: (c) => ` ${c.parsed.x.toLocaleString()} ud de primera` } },
+        tooltip: { callbacks: { label: (c) => ` ${c.parsed.x.toLocaleString()} ciclos` } },
       },
       scales: {
-        x: { beginAtZero: true, grid: { color: '#e1e0d9' }, ticks: { color: '#898781', precision: 0 } },
+        x: { beginAtZero: true, grid: { color: '#e1e0d9' }, ticks: { color: '#898781' } },
         y: { grid: { display: false }, ticks: { color: '#0b0b0b', font: { size: 11 } } },
       },
     },
