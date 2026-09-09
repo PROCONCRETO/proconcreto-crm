@@ -58,6 +58,9 @@ function _unidadesCicloPorProducto() {
 // Ventana rodante — mismo patrón que _periodoLogistica/setPeriodoLogistica() en
 // estadisticas-logistica.js (7/30/90 días o todo, dias=0 = todo).
 let _periodoProduccion = 30;
+// Último producto filtrado aplicado en el render (para que exportarEstadisticasProduccionExcel()
+// exporte exactamente lo que está en pantalla, sin recalcular el <select> por su cuenta).
+let _ultimoProductoFiltroProduccion = '';
 function setPeriodoProduccion(dias) {
   _periodoProduccion = dias;
   [7, 30, 90, 0].forEach(d => {
@@ -109,6 +112,7 @@ function renderEstadisticasProduccion() {
     productoFiltro = selProducto.value;
   }
   const vibrocompactados = productoFiltro ? todosVibro.filter(p => p.producto === productoFiltro) : todosVibro;
+  _ultimoProductoFiltroProduccion = productoFiltro;
 
   // Ciclos: "la producción de productos de diferentes referencias no es comparable... la máquina
   // no produce las mismas unidades por ciclo para cada producto" (2026-09-09, a pedido del
@@ -570,4 +574,80 @@ function _tablaProduccionHoy(vibrocompactados, mapaCiclo) {
     : '';
 
   tbody.innerHTML = filasHtml + totalHtml;
+}
+
+// ── Exportar a Excel (2026-09-09, a pedido del usuario) ──
+// El usuario pidió poder auditar "los datos que estás usando para los gráficos y para los
+// indicadores" — así que esto exporta el detalle CRUDO por registro (no solo los totales de las
+// tarjetas), respetando el período y el producto filtrado que estén activos en pantalla, con la
+// misma lógica de filtrado que usa renderEstadisticasProduccion(). Sigue el patrón ya establecido
+// en exportarCatalogoExcel() (js/catalogo.js): aoa_to_sheet → book_new → book_append_sheet →
+// writeFile. Se agrega una segunda hoja con los registros "sin Costeo" que el dashboard excluye,
+// para que el hueco de cobertura también quede auditable, no solo mencionado en la nota naranja.
+function exportarEstadisticasProduccionExcel() {
+  if (typeof XLSX === 'undefined') { alert('La librería de Excel no cargó. Verifica tu conexión.'); return; }
+
+  const { vibrocompactados: todosVibro, sinClasificar } = _datosEstadisticasProduccion(_periodoProduccion);
+  const productoFiltro = _ultimoProductoFiltroProduccion;
+  const vibrocompactados = productoFiltro ? todosVibro.filter(p => p.producto === productoFiltro) : todosVibro;
+
+  if (!vibrocompactados.length && !sinClasificar.length) {
+    alert('No hay datos para exportar con los filtros actuales.');
+    return;
+  }
+
+  const mapaCiclo = _unidadesCicloPorProducto();
+  const etiquetaPeriodo = _periodoProduccion === 0 ? 'Todo' : `Últimos ${_periodoProduccion} días`;
+
+  const filas = [...vibrocompactados].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '') || (a.producto || '').localeCompare(b.producto || ''));
+
+  const rows = [
+    ['Estadísticas de Producción — Vibrocompactados'],
+    ['Período:', etiquetaPeriodo],
+    ['Producto filtrado:', productoFiltro || 'Todos los productos (vista general)'],
+    ['Generado:', new Date().toLocaleString('es-CO')],
+    [],
+    ['Fecha', 'Producto', 'Cantidad (primera)', 'Unidad', 'Merma', 'Segundas', '% Deficiencia', 'Consumo Cemento (kg)', 'Unidades/Ciclo (Costeo)', 'Ciclos'],
+  ];
+  filas.forEach(p => {
+    const cantidad = Number(p.cantidad) || 0;
+    const merma = Number(p.merma) || 0;
+    const segundas = Number(p.segundas) || 0;
+    const intentado = cantidad + merma + segundas;
+    const pctDeficiencia = intentado > 0 ? Math.round(((merma + segundas) / intentado) * 1000) / 10 : 0;
+    const unidadesCiclo = mapaCiclo[p.producto] || '';
+    const ciclos = mapaCiclo[p.producto] ? Math.round((cantidad / mapaCiclo[p.producto]) * 100) / 100 : '';
+    rows.push([
+      p.fecha || '',
+      p.producto || '',
+      cantidad,
+      p.unidad || 'ud',
+      merma,
+      segundas,
+      pctDeficiencia,
+      Number(p.consumoCemento) || 0,
+      unidadesCiclo,
+      ciclos,
+    ]);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Producción filtrada');
+
+  if (sinClasificar.length) {
+    const filasExcluidas = [...sinClasificar].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '') || (a.producto || '').localeCompare(b.producto || ''));
+    const rowsExcl = [
+      ['Registros sin Costeo de Producto — excluidos de las estadísticas'],
+      ['Período:', etiquetaPeriodo],
+      [],
+      ['Fecha', 'Producto', 'Cantidad', 'Unidad', 'Merma', 'Segundas', 'Consumo Cemento (kg)'],
+    ];
+    filasExcluidas.forEach(p => rowsExcl.push([p.fecha || '', p.producto || '', Number(p.cantidad) || 0, p.unidad || 'ud', Number(p.merma) || 0, Number(p.segundas) || 0, Number(p.consumoCemento) || 0]));
+    const wsExcl = XLSX.utils.aoa_to_sheet(rowsExcl);
+    XLSX.utils.book_append_sheet(wb, wsExcl, 'Sin clasificar');
+  }
+
+  const fecha = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `Estadisticas_Produccion_Vibrocompactados_${fecha}.xlsx`);
 }

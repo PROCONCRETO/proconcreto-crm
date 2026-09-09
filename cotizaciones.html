@@ -756,6 +756,7 @@
       <button id="est-prod-btn-90" onclick="setPeriodoProduccion(90)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">90 días</button>
       <button id="est-prod-btn-0" onclick="setPeriodoProduccion(0)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">Todo</button>
     </div>
+    <button class="btn btn-secundario" onclick="exportarEstadisticasProduccionExcel()">⬇️ Exportar Excel</button>
   </div>
   <div style="margin-bottom:16px">
     <select id="est-prod-filtro-producto" class="buscador-input" style="width:auto;min-width:260px" onchange="renderEstadisticasProduccion()">
@@ -2488,7 +2489,7 @@
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
 <script src="js/produccion-diaria.js?v=20260909b"></script>
 <script src="js/produccion-materia-prima.js?v=20260909a"></script>
-<script src="js/estadisticas-produccion.js?v=20260909h"></script>
+<script src="js/estadisticas-produccion.js?v=20260909i"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
 <script src="js/costeo-maquinaria.js?v=20260821a"></script>
