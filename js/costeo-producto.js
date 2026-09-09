@@ -1646,3 +1646,24 @@ function _cementoTeoricoPorUnidad(productoNombre) {
   const filaCemento = k.materiaPrimaDetalle.find(f => f.esCemento);
   return filaCemento ? filaCemento.cantidad : null;
 }
+
+// Rendimiento TEÓRICO de unidades/día de un producto, según su Costeo de Producto guardado —
+// usado por Producción Diaria para comparar la cantidad realmente producida en un día contra este
+// teórico (2026-09-09, a pedido del usuario). `null` si el producto no existe, no tiene Costeo
+// guardado, o el rendimiento diario no está diligenciado (0/vacío) — no hay con qué comparar
+// todavía, no es un error.
+// - Vibrocompactado/Reforzado: `k.unidadesDia` ya viene calculado (ver calcularCosteoProducto()).
+// - Pretensado: ese tipo se costea por metro lineal, no por unidad, así que `k.unidadesDia` no
+//   existe — se arma acá con bancosDiaLinea × metrosLinealesBanco (el rendimiento diario de la
+//   línea aplicado al metraje que rinde un banco de ESE producto en particular).
+function _unidadesTeoricasDiaPorProducto(productoNombre) {
+  const prod = CATALOGO.find(p => p.nombre === productoNombre);
+  if (!prod) return null;
+  const costeo = COSTEO_PRODUCTOS.find(c => c.productoCodigo === prod.codigo);
+  if (!costeo) return null;
+  const k = calcularCosteoProducto(costeo);
+  const teorico = costeo.tipoEstructura === 'pretensado'
+    ? (k.bancosDiaLinea || 0) * (k.metrosLinealesBanco || 0)
+    : (k.unidadesDia || 0);
+  return teorico > 0 ? teorico : null;
+}

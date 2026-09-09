@@ -85,7 +85,7 @@ function renderProduccionDiaria() {
     <tr style="border-top:2px solid var(--azul-oscuro)">
       <td style="font-weight:600">${p.fecha ? new Date(p.fecha+'T12:00').toLocaleDateString('es-CO') : '—'}</td>
       <td style="font-weight:600;color:var(--azul)">${_esc(p.producto) || '—'}</td>
-      <td style="font-weight:700">${(Number(p.cantidad)||0).toLocaleString()} <span style="font-size:11px;color:var(--gris-medio);font-weight:400">${_esc(p.unidad) || 'ud'}</span>${_subLineaMermaSegundas(p)}</td>
+      <td style="font-weight:700">${(Number(p.cantidad)||0).toLocaleString()} <span style="font-size:11px;color:var(--gris-medio);font-weight:400">${_esc(p.unidad) || 'ud'}</span>${_subLineaVariacionUnidadesDia(p)}${_subLineaMermaSegundas(p)}</td>
       ${_celdaCementoProduccion(p)}
       <td>${p.orden ? `<span style="font-size:11px;background:#E3F2FD;color:#1565C0;padding:2px 6px;border-radius:3px;font-weight:600">${_esc(p.orden)}</span>` : '—'}</td>
       <td>${_esc(p.responsable) || '—'}</td>
@@ -123,6 +123,24 @@ function _celdaCementoProduccion(p) {
     ${bodegaLabel ? `<div style="font-size:10px;color:var(--gris-medio)">${_esc(bodegaLabel)}</div>` : ''}
     ${badge}
   </td>`;
+}
+
+// Sub-línea bajo la cantidad producida mostrando la variación frente al rendimiento TEÓRICO
+// diario del Costeo de Producto (Vibrocompactado: ciclos/día × unidades/ciclo; Reforzado:
+// Unidades/día digitado; Pretensado: bancos/día × metros lineales/banco de ESE producto — ver
+// _unidadesTeoricasDiaPorProducto() en js/costeo-producto.js), 2026-09-09 a pedido del usuario.
+// Mismo patrón visual y mismos umbrales de color que _celdaCementoProduccion() ("vs teórico"),
+// por consistencia. Sin Costeo guardado o sin ese rendimiento diligenciado, no se muestra nada
+// (no hay con qué comparar todavía).
+function _subLineaVariacionUnidadesDia(p) {
+  const cantidad = Number(p.cantidad) || 0;
+  if (!(cantidad > 0)) return '';
+  const teorico = typeof _unidadesTeoricasDiaPorProducto === 'function' ? _unidadesTeoricasDiaPorProducto(p.producto) : null;
+  if (!(teorico > 0)) return '';
+  const pct = ((cantidad - teorico) / teorico) * 100;
+  const abs = Math.abs(pct);
+  const color = abs <= 10 ? '#2E7D32' : (abs <= 25 ? '#E65100' : '#C62828');
+  return `<div style="font-size:10px;font-weight:700;color:${color}">${pct >= 0 ? '+' : ''}${pct.toLocaleString('es-CO', { maximumFractionDigits: 1 })}% vs teórico/día</div>`;
 }
 
 // Sub-línea bajo la cantidad producida (de primera) mostrando merma/segundas de ese registro, si
