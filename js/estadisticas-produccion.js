@@ -155,6 +155,7 @@ function renderEstadisticasProduccion() {
   _chartTendenciaProduccion(vibrocompactados, _periodoProduccion, mapaCiclo);
   _chartTendenciaDeficiencia(vibrocompactados, _periodoProduccion);
   _chartCementoPorUnidad(vibrocompactados, _periodoProduccion);
+  _tablaProduccionHoy(vibrocompactados, mapaCiclo);
 
   // Un ranking de comparación entre productos no dice nada con un solo producto filtrado — se
   // oculta y en su lugar se muestra la tendencia de unidades de ESE producto (donde unidades y
@@ -517,4 +518,56 @@ function _chartCementoPorUnidad(vibrocompactados, periodoDias) {
       },
     },
   });
+}
+
+// ── Tabla "Producción de hoy — por producto" (2026-09-09, a pedido del usuario: "sácame una
+// tabla con el producto y los ciclos diarios de las producciones a hoy") ──
+// A diferencia de las gráficas de tendencia (que recorren la ventana de período elegida: 7/30/90/
+// Todo), esta tabla siempre muestra SOLO el día de hoy, sin importar el período seleccionado —
+// respeta el filtro de producto si hay uno activo (mismo `vibrocompactados` que recibe el resto
+// de gráficas). Un producto sin "Unidades/Ciclo" en su Costeo muestra "—" en Ciclos (no hay con
+// qué convertir), pero sigue contando en Unidades.
+function _tablaProduccionHoy(vibrocompactados, mapaCiclo) {
+  const tbody = document.getElementById('tabla-prod-hoy-body');
+  if (!tbody) return;
+  const hoy = _fmtISO(new Date());
+  const deHoy = vibrocompactados.filter(p => p.fecha === hoy);
+
+  const porProducto = {};
+  deHoy.forEach(p => {
+    if (!porProducto[p.producto]) porProducto[p.producto] = { primera: 0 };
+    porProducto[p.producto].primera += Number(p.cantidad) || 0;
+  });
+  const filas = Object.entries(porProducto).map(([nombre, r]) => ({
+    nombre,
+    ciclos: mapaCiclo[nombre] ? Math.round((r.primera / mapaCiclo[nombre]) * 10) / 10 : null,
+    primera: r.primera,
+  })).sort((a, b) => (b.ciclos ?? -1) - (a.ciclos ?? -1));
+
+  if (!filas.length) {
+    tbody.innerHTML = `<tr><td colspan="3" class="empty-state"><div class="icono">📅</div><div>Todavía no hay producción registrada hoy.</div></td></tr>`;
+    return;
+  }
+
+  const filasHtml = filas.map(f => `
+    <tr>
+      <td style="font-weight:600">${_esc(f.nombre)}</td>
+      <td style="text-align:right">${f.ciclos !== null ? f.ciclos.toLocaleString('es-CO') : '—'}</td>
+      <td style="text-align:right">${f.primera.toLocaleString()}</td>
+    </tr>`).join('');
+
+  // Fila de total, solo si hay más de un producto (con uno solo el total repetiría la única fila).
+  const totalHtml = filas.length > 1
+    ? (() => {
+        const totalCiclos = filas.reduce((s, f) => s + (f.ciclos || 0), 0);
+        const totalPrimera = filas.reduce((s, f) => s + f.primera, 0);
+        return `<tr style="border-top:2px solid var(--azul-oscuro);font-weight:700">
+          <td>Total</td>
+          <td style="text-align:right">${(Math.round(totalCiclos * 10) / 10).toLocaleString('es-CO')}</td>
+          <td style="text-align:right">${totalPrimera.toLocaleString()}</td>
+        </tr>`;
+      })()
+    : '';
+
+  tbody.innerHTML = filasHtml + totalHtml;
 }

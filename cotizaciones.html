@@ -777,6 +777,24 @@
     </div>
   </div>
 
+  <div class="card">
+    <div class="card-titulo" id="titulo-tabla-prod-hoy">Producción de hoy — por producto</div>
+    <div style="overflow-x:auto">
+      <table class="tabla-cots" id="tabla-prod-hoy">
+        <thead>
+          <tr>
+            <th>PRODUCTO</th>
+            <th style="text-align:right">CICLOS</th>
+            <th style="text-align:right">UNIDADES (PRIMERA)</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-prod-hoy-body">
+          <tr><td colspan="3" class="empty-state"><div class="icono">📅</div><div>Todavía no hay producción registrada hoy.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <div id="card-prod-unidades-filtrado" class="card" style="display:none">
     <div class="card-titulo">Unidades producidas (de primera) — producto filtrado</div>
     <div style="height:280px;position:relative"><canvas id="chart-prod-unidades-filtrado"></canvas></div>
@@ -2470,7 +2488,7 @@
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
 <script src="js/produccion-diaria.js?v=20260909b"></script>
 <script src="js/produccion-materia-prima.js?v=20260909a"></script>
-<script src="js/estadisticas-produccion.js?v=20260909g"></script>
+<script src="js/estadisticas-produccion.js?v=20260909h"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
 <script src="js/costeo-maquinaria.js?v=20260821a"></script>
