@@ -86,14 +86,18 @@ async function descargarPDF(numCot) {
     }
 
     const cot = COTIZACIONES.find(c => c.numero === numCot);
-    const fecha = (cot?.fecha || document.getElementById('fecha-cot').value || new Date().toISOString().split('T')[0]).replace(/-/g, '_');
+    // La fecha y la versión se leen del campo de la vista previa, NO de `cot` — `cot` se busca
+    // solo por número (`numero === numCot`) y puede resolver a la primera versión guardada con
+    // ese número si hay varias, mientras que `fecha-cot`/`version-cot` siempre traen los datos de
+    // la versión que de verdad se está previsualizando/descargando (ver
+    // previsualizarCotizacionById(), cotizador.js) — así el nombre del archivo siempre corresponde
+    // a esa versión, no a la primera que existió con ese número (2026-09-10, corrige que una
+    // versión nueva se descargaba con la fecha de la versión inicial).
+    const fecha = (document.getElementById('fecha-cot')?.value || cot?.fecha || new Date().toISOString().split('T')[0]).replace(/-/g, '_');
     const nombreCliente = cot?.cliente?.nombre || document.getElementById('cliente-nombre').value || '';
     const cliente = nombreCliente.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '_');
-    // La versión se lee del campo de la vista previa (no de `cot`, que puede resolver a la
-    // primera versión guardada con este número si hay varias) — así el nombre del archivo
-    // siempre corresponde a la versión que se está descargando de verdad. V1 no se marca en el
-    // nombre (es la versión por defecto); V2, V3... sí, para no confundir versiones distintas
-    // que de otra forma solo se distinguirían por la fecha dentro del PDF.
+    // V1 no se marca en el nombre (es la versión por defecto); V2, V3... sí, para no confundir
+    // versiones distintas que de otra forma solo se distinguirían por la fecha dentro del PDF.
     const version = document.getElementById('version-cot')?.value || 'V1';
     const sufijoVersion = version !== 'V1' ? `_${version}` : '';
     pdf.save(`${numCot}${sufijoVersion}_${fecha}_${cliente}.pdf`);
