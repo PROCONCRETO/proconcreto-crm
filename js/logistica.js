@@ -170,7 +170,7 @@ const CAUSAS_REPROGRAMACION_CANCELACION = [
   'Hubo un error en la orden de producción o de despacho',
   'No se tiene inventario suficiente del producto a despachar',
   'El cliente canceló el pedido',
-  'Reprogramación de entrega desde el área técnico y/o comercial',
+  'Reprogramación de entrega desde el área técnica y/o comercial',
 ];
 
 // Cualquier fecha antes de hoy queda bloqueada para edición estructural del viaje
