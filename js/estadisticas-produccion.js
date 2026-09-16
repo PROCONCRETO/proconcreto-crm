@@ -95,6 +95,43 @@ function _colorDeficiencia(pct) {
   return 'var(--rojo)';
 }
 
+// Ciclos totales por DÍA (uno por cada fecha con producción con ciclo conocido) — la base para
+// el promedio, la desviación estándar y el promedio dentro de 3σ (2026-09-16, a pedido del
+// usuario). `conCiclo` ya viene filtrado a registros cuyo producto tiene "Unidades/Ciclo" — mismo
+// conjunto que ya alimenta "Ciclos de producción"/"Ciclos promedio / día".
+function _ciclosPorDia(conCiclo, mapaCiclo) {
+  const porDia = {};
+  conCiclo.forEach(p => {
+    const ciclos = (Number(p.cantidad) || 0) / mapaCiclo[p.producto];
+    porDia[p.fecha] = (porDia[p.fecha] || 0) + ciclos;
+  });
+  return porDia;
+}
+
+// Desviación estándar MUESTRAL (n-1, el criterio estándar de negocio — ej. STDEV.S de Excel) de
+// una serie de valores diarios — mide qué tan dispersa es la producción día a día alrededor del
+// promedio. `null` con menos de 2 días (no hay variabilidad que medir con un solo dato).
+function _desviacionEstandar(valores) {
+  const n = valores.length;
+  if (n < 2) return null;
+  const media = valores.reduce((s, v) => s + v, 0) / n;
+  const varianza = valores.reduce((s, v) => s + (v - media) ** 2, 0) / (n - 1);
+  return Math.sqrt(varianza);
+}
+
+// Promedio de ciclos/día EXCLUYENDO los días fuera de ±3 desviaciones estándar del promedio
+// (regla de las 3σ, 2026-09-16, a pedido del usuario) — un día atípico (una parada mayor, un
+// arranque de línea nueva, un pico excepcional) puede distorsionar el promedio simple; este
+// segundo promedio da una lectura del ritmo "normal" de producción, sin que esos días atípicos lo
+// arrastren. Sin desviación calculable (menos de 2 días), no hay con qué filtrar — devuelve el
+// promedio simple tal cual.
+function _promedioDentro3Sigma(valores, media, desviacion) {
+  if (desviacion === null) return media;
+  const limite = 3 * desviacion;
+  const dentro = valores.filter(v => Math.abs(v - media) <= limite);
+  return dentro.length ? dentro.reduce((s, v) => s + v, 0) / dentro.length : media;
+}
+
 function renderEstadisticasProduccion() {
   if (typeof Chart === 'undefined') return; // Chart.js aún no cargó (pantalla no visible todavía)
   const { vibrocompactados: todosVibro, sinClasificar } = _datosEstadisticasProduccion(_periodoProduccion);
@@ -128,6 +165,12 @@ function renderEstadisticasProduccion() {
   // de semana o un día sin producción no debería diluir el promedio.
   const diasConCiclos = new Set(conCiclo.map(p => p.fecha)).size;
   const promedioCiclosDia = diasConCiclos > 0 ? totalCiclos / diasConCiclos : null;
+  // Desviación estándar y promedio "dentro de 3σ" (2026-09-16, a pedido del usuario, como
+  // indicador de variabilidad y para no dejar que un día atípico distorsione el promedio) — sobre
+  // la misma serie de ciclos/día que ya arma promedioCiclosDia, no sobre el total agregado.
+  const ciclosPorDiaArr = Object.values(_ciclosPorDia(conCiclo, mapaCiclo));
+  const desviacionCiclosDia = _desviacionEstandar(ciclosPorDiaArr);
+  const promedioCiclos3Sigma = promedioCiclosDia !== null ? _promedioDentro3Sigma(ciclosPorDiaArr, promedioCiclosDia, desviacionCiclosDia) : null;
 
   const totalPrimera = vibrocompactados.reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
   const totalMerma = vibrocompactados.reduce((s, p) => s + (Number(p.merma) || 0), 0);
@@ -141,6 +184,8 @@ function renderEstadisticasProduccion() {
   if (tarjetas) {
     tarjetas.innerHTML = _tarjetaKPI(totalCiclos > 0 ? Math.round(totalCiclos).toLocaleString() : '—', 'Ciclos de producción')
       + _tarjetaKPI(promedioCiclosDia !== null ? promedioCiclosDia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Ciclos promedio / día')
+      + _tarjetaKPI(desviacionCiclosDia !== null ? desviacionCiclosDia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Desv. estándar (ciclos/día)')
+      + _tarjetaKPI(promedioCiclos3Sigma !== null ? promedioCiclos3Sigma.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Promedio ciclos/día (dentro de 3σ)')
       + _tarjetaKPI(totalPrimera.toLocaleString(), 'Unidades de primera')
       + _tarjetaKPI(totalMerma.toLocaleString(), 'Merma (ud)', totalMerma ? 'var(--rojo)' : null)
       + _tarjetaKPI(totalSegundas.toLocaleString(), 'Segundas (ud)', totalSegundas ? 'var(--naranja)' : null)
