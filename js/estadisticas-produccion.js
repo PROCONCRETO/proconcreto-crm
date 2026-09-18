@@ -148,7 +148,16 @@ function renderEstadisticasProduccion() {
     selProducto.value = productos.includes(prevValor) ? prevValor : '';
     productoFiltro = selProducto.value;
   }
-  const vibrocompactados = productoFiltro ? todosVibro.filter(p => p.producto === productoFiltro) : todosVibro;
+  // Días atípicos (2026-09-17, a pedido del usuario: "revisemos también los gráficos, para que
+  // los excluidos sean sacados de estos y así no nos contamine tanto la gráfica") — un registro
+  // 'excluido' queda fuera de TODO este dashboard (tarjetas, gráficas, rankings, tabla de hoy), no
+  // solo de la tabla de "Estándar de ciclos/día" de más abajo, que ya lo hacía. 'pendiente_revision'
+  // (todavía sin aprobar) SÍ sigue contando aquí — la exclusión real solo aplica una vez un
+  // aprobador la confirma, no mientras está en revisión. El Excel exportado
+  // (exportarEstadisticasProduccionExcel()) a propósito NO aplica este filtro — muestra el dato
+  // crudo completo, con su propia columna Estado, para poder auditar también lo excluido.
+  const vibrocompactados = (productoFiltro ? todosVibro.filter(p => p.producto === productoFiltro) : todosVibro)
+    .filter(p => (p.estado || 'incluido') !== 'excluido');
   _ultimoProductoFiltroProduccion = productoFiltro;
 
   // Ciclos: "la producción de productos de diferentes referencias no es comparable... la máquina
@@ -656,8 +665,13 @@ function exportarEstadisticasProduccionExcel() {
     ['Período:', etiquetaPeriodo],
     ['Producto filtrado:', productoFiltro || 'Todos los productos (vista general)'],
     ['Generado:', new Date().toLocaleString('es-CO')],
+    // Días atípicos (2026-09-17) — a diferencia de las tarjetas/gráficas de arriba (que desde este
+    // cambio ya NO cuentan los registros 'excluido'), esta hoja exporta TODOS los estados a
+    // propósito, para que se pueda auditar también lo que quedó fuera — nunca hay que borrar filas
+    // a mano para replicar un promedio, la columna Estado ya dice qué cuenta y qué no.
+    ['Nota:', 'esta hoja incluye TODOS los registros (Incluido / Pendiente de revisión / Excluido). Las tarjetas y gráficas del dashboard solo cuentan Incluido y Pendiente de revisión.'],
     [],
-    ['Fecha', 'Producto', 'Cantidad (primera)', 'Unidad', 'Merma', 'Segundas', '% Deficiencia', 'Consumo Cemento (kg)', 'Unidades/Ciclo (Costeo)', 'Ciclos'],
+    ['Fecha', 'Producto', 'Cantidad (primera)', 'Estado', 'Causa', 'Unidad', 'Merma', 'Segundas', '% Deficiencia', 'Consumo Cemento (kg)', 'Unidades/Ciclo (Costeo)', 'Ciclos'],
   ];
   filas.forEach(p => {
     const cantidad = Number(p.cantidad) || 0;
@@ -667,10 +681,16 @@ function exportarEstadisticasProduccionExcel() {
     const pctDeficiencia = intentado > 0 ? Math.round(((merma + segundas) / intentado) * 1000) / 10 : 0;
     const unidadesCiclo = mapaCiclo[p.producto] || '';
     const ciclos = mapaCiclo[p.producto] ? Math.round((cantidad / mapaCiclo[p.producto]) * 100) / 100 : '';
+    const estado = p.estado || 'incluido';
+    const claveTextoEstado = estado === 'pendiente_revision' ? 'pendiente' : estado;
+    const estadoTxt = (typeof TEXTOS_DIA_ATIPICO !== 'undefined' ? TEXTOS_DIA_ATIPICO.estados[claveTextoEstado] : null) || estado;
+    const causaTxt = p.causa ? (p.causa === 'otro' ? (p.causaOtro || 'Otra razón') : ((typeof ETIQUETA_CAUSA !== 'undefined' ? ETIQUETA_CAUSA[p.causa] : null) || p.causa)) : '';
     rows.push([
       p.fecha || '',
       p.producto || '',
       cantidad,
+      estadoTxt,
+      causaTxt,
       p.unidad || 'ud',
       merma,
       segundas,
