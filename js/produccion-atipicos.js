@@ -462,8 +462,8 @@ function _renderTablaEstandaresCiclos() {
         <td style="text-align:right">${est && est.desviacion !== null ? est.desviacion.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—'}</td>
         <td style="text-align:right">${est ? est.n : '—'}</td>
         <td>${fuenteHtml}</td>
-        <td style="text-align:right">${cem ? cem.media.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' kg' : '—'}</td>
-        <td style="text-align:right">${cem && cem.desviacion !== null ? cem.desviacion.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' kg' : '—'}</td>
+        <td style="text-align:right">${cem ? cem.media.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kg' : '—'}</td>
+        <td style="text-align:right">${cem && cem.desviacion !== null ? cem.desviacion.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kg' : '—'}</td>
         <td style="text-align:right">${cem ? cem.n : '—'}</td>
       </tr>`;
     }).join('');
