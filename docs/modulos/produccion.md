@@ -5,14 +5,16 @@
 - `js/ordenes-produccion.js` (288 líneas) — órdenes de servicio y pipeline de producción
 - `js/produccion-diaria.js` (277 líneas) — registro de producción del día, más Inventario de Producto Terminado
 - `js/produccion-materia-prima.js` — Materia Prima e Inventario de Cemento por Bodega (movida de Calidad, ver "Materia Prima" más abajo)
+- `js/estadisticas-produccion.js` — dashboard "Estadísticas de Producción" (Vibrocompactados)
+- `js/produccion-atipicos.js` — días atípicos: marcar/aprobar/rechazar la exclusión de un día del estándar de ciclos/día, y la bitácora de eventos especiales (ver sección propia más abajo)
 
 ## Datos
 
-- Tablas Supabase: `ordenes_servicio`, `producciones`, `materia_prima`
+- Tablas Supabase: `ordenes_servicio`, `producciones`, `materia_prima`, `eventos_especiales` (días atípicos aprobados, ver sección propia)
 
 ## Pantallas
 
-`pipeline-produccion`, `ordenes-servicio`, `produccion-diaria`, `inventario`, `materia-prima`
+`pipeline-produccion`, `ordenes-servicio`, `produccion-diaria`, `inventario`, `materia-prima`, `produccion-estadisticas`, `produccion-revision`
 
 ## Qué hace
 
@@ -188,3 +190,60 @@ Verificado ejecutando `calcularInventario()`/`_historialInventarioProducto()`/`v
 ### Presentación unificada — título/acción y filtros en renglones separados (2026-08-21)
 
 Con varios filtros nuevos, el `.acciones-row` (título + controles a la derecha, `justify-content: space-between; flex-wrap: wrap`) empezó a envolver a 2 renglones en las pantallas con más filtros pero se quedaba en 1 en las que tenían menos — inconsistente según el ancho disponible, a pedido del usuario se unificó con un solo criterio: **el título y el botón de acción principal ("+ Registrar...", "+ Nueva Orden") siempre van en su propio `.acciones-row`; los filtros van en un `.flex-gap` aparte, en su propio renglón, siempre debajo** — mismas 4 pantallas (Producción Diaria, Órdenes, Inventario, Materia Prima). Inventario no tiene botón de acción, así que su `.acciones-row` queda solo con el título — el layout de `.acciones-row` (`space-between`) lo deja igual de bien alineado a la izquierda sin necesitar un caso especial.
+
+## Días atípicos — exclusión curada del estándar de ciclos/día (2026-09-17)
+
+`js/produccion-atipicos.js`, más ajustes en `js/produccion-diaria.js`. A pedido del usuario: poder marcar un día de producción como "atípico" (una avería, falta de material, cambio de molde...) y sacarlo del cálculo del estándar de ciclos/día (media y desviación por producto, que más adelante se usará para costear mano de obra al fijar precios — esa conexión con Costeo de Producto queda fuera de esta vuelta), **sin borrar nunca el registro** y **sin que la exclusión sea automática ni arbitraria**. Reglas de negocio dadas textualmente por el usuario, todas cumplidas por diseño (ver "Auto-chequeo" en el plan de implementación):
+
+1. Nunca se borra un registro — la exclusión es un estado adicional sobre el mismo registro de `PRODUCCIONES`.
+2. Toda exclusión exige una causa de una lista cerrada (`CAUSAS_DIA_ATIPICO`, 7 opciones + "otra razón" que obliga a texto).
+3. Ningún registro se excluye automáticamente por estar fuera de rango estadístico — el sistema solo sugiere "revisar" (o "alta prioridad"); la exclusión real la hace una persona con causa registrada.
+4. Quien marca sin ser aprobador deja el registro en `pendiente_revision`; solo un aprobador puede pasarlo a `excluido` — o saltarse el paso intermedio si quien marca ya es aprobador.
+5. El estándar se calcula por producto (o agrupado por Unidades/Ciclo si el producto no tiene suficiente historial propio), solo con registros `incluido`, sobre una ventana configurable (90 días por defecto) — se **cachea**, nunca se recalcula solo porque llegó un dato nuevo.
+6. Cada registro se compara contra el estándar de su producto: fuera de ±2σ → "revisar"; fuera de ±3σ → prioridad alta. Estos avisos nunca excluyen nada por sí mismos.
+
+### Modelo de datos
+
+Sobre `producciones.datos` (JSONB existente, sin migración de columnas — mismo patrón de siempre), nuevos campos camelCase: `estado` (`'incluido' | 'pendiente_revision' | 'excluido'`, default `'incluido'`), `causa`, `causaOtro` (solo si `causa==='otro'`), `descripcion`, `marcadoPor`/`fechaMarcado`, `aprobadoPor`/`fechaAprobacion`, `rechazadoPor`/`fechaRechazo`.
+
+Tabla nueva `eventos_especiales` (`sql/2026-09-17_dias_atipicos_produccion.sql` — el usuario debe correrlo a mano en el SQL Editor de Supabase, como todos los scripts de `sql/`) — una fila por exclusión **aprobada**, generada automáticamente (nunca a mano en esta vuelta): `{ fecha, maquinaLinea: 'Vibrocompactadora', tipoEvento, tipoEventoOtro, descripcion, producto, ciclosPerdidos, produccionId, generadoPor: 'sistema', aprobadoPor }`. Alimenta el reporte "Ciclos perdidos por causa" — permite ver cuánto cuesta en ciclos cada avería o cada cambio de molde sin rehacer el análisis a mano.
+
+### Permiso de aprobador — reusa Centro de Costos, no una lista nueva
+
+**No existe ningún sistema de roles en la app** (confirmado explorando el código — `USUARIO_ACTUAL` es el objeto crudo de Supabase Auth, sin campo de rol). El único precedente de "permiso" es Centro de Costos (`_EMAILS_CENTRO_COSTOS`/`_esUsuarioCentroCostos()`, `js/config.js`, ver `docs/modulos/costeo.md`). A pedido del usuario, el aprobador de días atípicos **reusa exactamente esa misma lista** — ya incluye a `produccion@proconcreto.com.co` (Jefe de Producción), un aprobador natural para esto — vía `_esUsuarioAprobadorProduccion()` (`js/config.js`), un alias de dominio que delega en `_esUsuarioCentroCostos()` en vez de mantener una segunda lista sincronizada a mano.
+
+**Protección real, no solo de pantalla** (a pedido explícito del usuario, mismo criterio que Centro de Costos): `sql/2026-09-17_dias_atipicos_produccion.sql` habilita RLS en `producciones` (si no la tenía ya — el script no asume su estado previo) con una política base permisiva para todo el equipo, más **dos políticas `RESTRICTIVE`** (insert/update) que exigen `es_usuario_aprobador_produccion()` únicamente cuando `datos->>'estado' = 'excluido'` — al ser restrictivas se combinan con AND contra cualquier política permisiva existente, así que la protección aplica sin importar qué otra política tuviera la tabla. Efecto secundario aceptado y documentado en el propio SQL: una vez `excluido`, cualquier actualización posterior a esa fila (no solo un nuevo intento de exclusión) exige sesión de aprobador, porque `WITH CHECK` no distingue el valor viejo del nuevo sin un trigger — se mitiga en `editarProduccion()` (ver abajo), que ni siquiera intenta abrir el modal de edición para un no-aprobador sobre un registro excluido. Un trigger `_trg_autoria_dia_atipico` (misma técnica que el ya existente `_forzar_confirmado_por_cumplido()`, `sql/2026-08-04_rastro_auditoria_real.sql`) estampa `marcadoPor`/`aprobadoPor`/`rechazadoPor` desde `auth.jwt()->>'email'`, no desde lo que mande el navegador.
+
+### Bug real detectado y corregido de paso: `guardarProduccion()` no heredaba campos del registro existente
+
+Al diseñar este flujo se encontró que `guardarProduccion()` (`js/produccion-diaria.js`) armaba el objeto a guardar desde cero en cada edición, sin heredar ningún campo del registro existente — si alguien editaba (vía el modal normal "✏️ Editar Producción") un registro ya marcado o excluido, los campos nuevos de este cambio se habrían perdido en silencio, pisados por sus valores por defecto. Corregido: ahora busca el registro existente por `editId` y copia explícitamente `estado/causa/causaOtro/descripcion/marcadoPor/fechaMarcado/aprobadoPor/fechaAprobacion/rechazadoPor/fechaRechazo` hacia el nuevo objeto antes de guardar. Verificado con una prueba de regresión específica (editar un registro `excluido` y confirmar que su estado/causa sobreviven).
+
+### El estándar por producto — propio o agrupado por Unidades/Ciclo
+
+`_calcularEstandaresCiclosPorProducto(periodoDias)` reusa `_ciclosPorDia()`/`_desviacionEstandar()` (`js/estadisticas-produccion.js`, 2026-09-16) como bloques ya probados, no los reescribe:
+
+1. Solo registros con `estado === 'incluido'` (o sin el campo, para compatibilidad con datos previos a este cambio) dentro de la ventana (`_periodoEstandarCiclos`, propio del estándar — 90 días por defecto, **independiente** del período que esté filtrado en el dashboard general).
+2. Si un producto tiene ≥ `N_MIN_DIAS_ESTANDAR` (10) días propios con datos, el estándar es `fuente: 'producto'`.
+3. Si no, se agrupa con los demás productos que comparten su mismo Unidades/Ciclo (`mapaCiclo`, mismo cruce CATALOGO↔COSTEO_PRODUCTOS que ya usa el dashboard) — un proxy razonable de "mismo molde" — y si la serie combinada sí alcanza el mínimo, el estándar es `fuente: 'grupo_unidadesciclo'` (con `grupoProductos` listando quiénes lo componen). Los 10 días son el mínimo tanto para "propio" como para "grupo".
+4. Si ni el grupo alcanza el mínimo, el estándar es `null` — nunca se flaguea un registro sin una base mínimamente sólida.
+
+**Caché explícito, nunca automático** (regla 5): `_estandaresCiclosCache` se llena perezosamente la primera vez que se necesita en la sesión, y solo se refresca con `_recalcularEstandaresCiclos()` — el botón "🔄 Recalcular estándar" en Estadísticas de Producción, o internamente al abrir el diálogo de marcar atípico si el caché nunca se llenó. Insertar un registro nuevo en `PRODUCCIONES` y volver a renderizar **no** cambia el estándar ya calculado — verificado explícitamente con una prueba (`n` del estándar no cambia tras insertar, sí cambia tras llamar `_recalcularEstandaresCiclos()`).
+
+### Evaluación de un registro — "revisar" / "alta prioridad", nunca exclusión
+
+`_evaluarDesviacionRegistro(p, estandares)` solo clasifica, nunca decide nada (regla 3/6): `'sin_ciclo'` si el producto no tiene Unidades/Ciclo en su Costeo (no hay con qué medir ciclos/día); `'sin_datos'` si sí hay ciclos/día pero el estándar de ese producto/grupo es `null`; si no, compara contra la media/desviación del estándar — `nSigmas = |ciclosDia − media| / desviación`, `'alta_prioridad'` si ≥3σ, `'revisar'` si ≥2σ, `'normal'` si no. Alimenta dos cosas:
+
+- **En la tabla de Producción Diaria**: `_notaDesviacionProduccion()` — el aviso "Este día se aleja de lo normal para [producto]. Revisar." (ámbar para "revisar", rojo para "alta_prioridad"), **solo** sobre registros `incluido` (uno ya marcado/excluido no necesita el aviso, ya se está manejando).
+- **En el diálogo de marcar atípico**: el contexto (`context_template`, texto exacto pedido por el usuario) muestra ciclos del día, media/desviación del estándar de su producto (o del grupo, con una línea aparte explicando de qué grupo se trata) y a cuántas desviaciones está. Si el valor cae dentro de ±2σ ("normal"), `guardarMarcaDiaAtipico()` pide una confirmación extra (`confirm()` con el texto `advertencia_variacion_normal`) antes de continuar — para no dejar que se excluya sin razón clara un día que en realidad no se aleja de lo normal.
+
+### Flujo de marcar / aprobar / rechazar
+
+- **`abrirModalDiaAtipico(id)`** (botón "🚩 Atípico" en la tabla, solo visible sobre registros `incluido`): arma el contexto, puebla el `<select>` de causas, y cambia el texto/handler del botón principal según `_esUsuarioAprobadorProduccion()` — "Confirmar exclusión" para un aprobador, "Enviar para revisión" para el resto (con la nota fija `nota_pendiente_aprobacion` visible solo en ese caso). La nota "Este registro no se elimina..." (`nota_no_se_elimina`) es siempre visible, sin condición.
+- **`guardarMarcaDiaAtipico()`**: valida causa (+ texto obligatorio si es "otro"); arma el registro completo (spread del existente + los campos nuevos) igual que `guardarProduccion()`; `estado = 'excluido'` directo si quien marca ya es aprobador (con `aprobadoPor`/`fechaAprobacion` en el mismo momento), si no `'pendiente_revision'`. Si quedó `excluido` de una vez, genera el evento especial correspondiente.
+- **Pantalla "🔍 Días Atípicos"** (`ir('produccion-revision')`, `renderRevisionDiasAtipicos()`) — **visible para todo el equipo de Producción**, no restringida a Centro de Costos (transparencia: quien marcó un día debe poder ver su estado) — con dos bloques:
+  - **Pendientes de revisión**: fecha, producto, ciclos, causa, descripción, quién lo marcó, y los botones "✅ Aprobar exclusión"/"↩️ Rechazar" — **solo si quien mira es aprobador**; el resto ve un texto "Requiere un supervisor" en su lugar. `aprobarExclusion()`/`rechazarExclusion()` repiten la validación de permiso al inicio (defensa en profundidad, además de que los botones ni siquiera aparecen y de la política RESTRICTIVE de Supabase). Rechazar vuelve el registro a `'incluido'` y **conserva** la causa/descripción declaradas como rastro de la propuesta rechazada (no las borra).
+  - **Ciclos perdidos por causa**: `_datosReporteCiclosPerdidos(periodoDias)` agrupa `EVENTOS_ESPECIALES` por `tipoEvento`, con eventos/ciclos perdidos/% del total — selector de período propio (30/90/180/Todo).
+
+### Verificación
+
+Arnés real en Chrome headless (mismo patrón de toda la sesión) — 56 aserciones cubriendo: el estándar por producto propio vs. agrupado por Unidades/Ciclo vs. sin datos calculables; los límites de clasificación en 2σ/3σ (con un pequeño margen sobre el límite exacto para no depender de redondeo de punto flotante); que el caché del estándar no cambia con un dato nuevo y sí con recálculo explícito; el flujo completo de marcar (no-aprobador → pendiente, aprobador → excluido directo + evento especial generado con los `ciclosPerdidos` correctos); las validaciones de causa obligatoria; que `aprobarExclusion()`/`rechazarExclusion()` rechazan a un no-aprobador; el rechazo conservando la causa como rastro; la regresión de `guardarProduccion()` sobre un registro excluido; el bloqueo de `editarProduccion()` a un no-aprobador; los totales del reporte por causa; los badges y avisos de la tabla; y el texto exacto del diálogo en sus 4 variantes (estándar propio, agrupado, sin datos, sin Unidades/Ciclo) — sin errores de consola. Confirmado visualmente con capturas propias de la tabla con el modal abierto, la pantalla de revisión, y la nueva tabla de estándares en Estadísticas de Producción.

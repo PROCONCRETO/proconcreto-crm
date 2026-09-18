@@ -78,6 +78,17 @@ function _esUsuarioCentroCostos() {
   return !!USUARIO_ACTUAL && _EMAILS_CENTRO_COSTOS.includes(USUARIO_ACTUAL.email);
 }
 
+// Aprobador de exclusiones de "día atípico" en Producción (2026-09-17, a pedido del usuario) —
+// reusa EXACTAMENTE la misma lista de correos de Centro de Costos (confirmado con el usuario, ya
+// incluye a produccion@proconcreto.com.co, el Jefe de Producción) en vez de mantener una lista
+// nueva sincronizada a mano. Nombre propio para que el código de Producción no tenga que "saber"
+// que por debajo es la misma lista — mismo criterio ya aplicado en la protección real del lado de
+// Supabase (es_usuario_aprobador_produccion() delega en es_usuario_centro_costos(), ver
+// sql/2026-09-17_dias_atipicos_produccion.sql).
+function _esUsuarioAprobadorProduccion() {
+  return _esUsuarioCentroCostos();
+}
+
 // Consecutivo de cotización — se asigna solo, nunca se escribe a mano (antes era manual y
 // causaba typos, saltos y duplicados). Arranca en 100001; los números de antes de esa fecha
 // quedan intactos como referencia en cot.numeroAnterior tras la migración (ver docs).

@@ -78,14 +78,18 @@ function renderProduccionDiaria() {
     </div>`;
 
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">📅</div><div>No hay producciones registradas${hayFiltro ? ' para este filtro' : ''}.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">📅</div><div>No hay producciones registradas${hayFiltro ? ' para este filtro' : ''}.</div></td></tr>`;
     return;
   }
+  // Estándar de ciclos/día (días atípicos, 2026-09-17) — se lee UNA vez por render, no por fila
+  // (_obtenerEstandaresCiclos() ya cachea internamente, pero no hay razón para llamarlo N veces).
+  const _estandaresProd = _obtenerEstandaresCiclos();
   tbody.innerHTML = data.map(p => `
     <tr style="border-top:2px solid var(--azul-oscuro)">
       <td style="font-weight:600">${p.fecha ? new Date(p.fecha+'T12:00').toLocaleDateString('es-CO') : '—'}</td>
       <td style="font-weight:600;color:var(--azul)">${_esc(p.producto) || '—'}</td>
       <td style="font-weight:700">${(Number(p.cantidad)||0).toLocaleString()} <span style="font-size:11px;color:var(--gris-medio);font-weight:400">${_esc(p.unidad) || 'ud'}</span>${_subLineaVariacionUnidadesDia(p)}${_subLineaMermaSegundas(p)}</td>
+      <td>${_badgeEstadoProduccion(p)}${_notaDesviacionProduccion(p, _estandaresProd)}</td>
       ${_celdaCementoProduccion(p)}
       <td>${p.orden ? `<span style="font-size:11px;background:#E3F2FD;color:#1565C0;padding:2px 6px;border-radius:3px;font-weight:600">${_esc(p.orden)}</span>` : '—'}</td>
       <td>${_esc(p.responsable) || '—'}</td>
@@ -93,6 +97,7 @@ function renderProduccionDiaria() {
       <td>
         <div class="flex-gap">
           <button class="btn btn-primario btn-xs" onclick="editarProduccion('${p.id}')">✏️ Editar</button>
+          ${(p.estado || 'incluido') === 'incluido' ? `<button class="btn btn-secundario btn-xs" onclick="abrirModalDiaAtipico('${p.id}')">🚩 Atípico</button>` : ''}
           <button class="btn btn-rojo btn-xs" onclick="eliminarProduccion('${p.id}')">🗑️</button>
         </div>
       </td>
@@ -237,6 +242,13 @@ function abrirModalProduccion() {
 function editarProduccion(id) {
   const p = PRODUCCIONES.find(x => String(x.id) === String(id));
   if (!p) return;
+  // Un registro 'excluido' del estándar de ciclos/día solo lo puede tocar un aprobador — evita
+  // toparse con el rechazo de la política RESTRICTIVE de Supabase (ver
+  // sql/2026-09-17_dias_atipicos_produccion.sql) con un error confuso.
+  if ((p.estado || 'incluido') === 'excluido' && !_esUsuarioAprobadorProduccion()) {
+    alert('Este registro está excluido del estándar de ciclos/día. Solo un supervisor autorizado puede editarlo.');
+    return;
+  }
   document.getElementById('m-prod-id').value = p.id;
   document.getElementById('modal-produccion-titulo').textContent = '✏️ Editar Producción';
   poblarSelectOrdenesProd();
@@ -265,6 +277,7 @@ function guardarProduccion() {
   if (!fecha || !producto || !(cantidad > 0)) { alert('Completa los campos obligatorios: Fecha, Producto y Cantidad (mayor a 0).'); return; }
   const prodCat = PRODUCTOS.find(p => p.nombre === producto);
   const editId = document.getElementById('m-prod-id').value;
+  const existente = editId ? PRODUCCIONES.find(x => String(x.id) === String(editId)) : null;
   const reg = {
     id: editId || String(Date.now()),
     fecha,
@@ -280,7 +293,21 @@ function guardarProduccion() {
     consumoCemento: parseFloat(document.getElementById('m-prod-consumo-cemento').value) || 0,
     bodegaCemento: document.getElementById('m-prod-bodega-cemento').value || '',
     creadoPor: USUARIO_ACTUAL?.email,
-    creadoEn: editId ? (PRODUCCIONES.find(x => String(x.id) === String(editId))?.creadoEn || new Date().toISOString()) : new Date().toISOString(),
+    creadoEn: editId ? (existente?.creadoEn || new Date().toISOString()) : new Date().toISOString(),
+    // Días atípicos (2026-09-17) — este modal NO los edita, pero hay que conservarlos tal cual al
+    // guardar un registro existente; si no se heredan de `existente`, guardarProduccion() los
+    // pisaría en silencio con los valores por defecto en cada edición normal (bug real detectado
+    // al diseñar ese flujo — ver docs/modulos/produccion.md).
+    estado: existente?.estado || 'incluido',
+    causa: existente?.causa || '',
+    causaOtro: existente?.causaOtro || '',
+    descripcion: existente?.descripcion || '',
+    marcadoPor: existente?.marcadoPor || null,
+    fechaMarcado: existente?.fechaMarcado || null,
+    aprobadoPor: existente?.aprobadoPor || null,
+    fechaAprobacion: existente?.fechaAprobacion || null,
+    rechazadoPor: existente?.rechazadoPor || null,
+    fechaRechazo: existente?.fechaRechazo || null,
   };
   const idx = PRODUCCIONES.findIndex(x => String(x.id) === String(reg.id));
   if (idx >= 0) PRODUCCIONES[idx] = reg; else PRODUCCIONES.unshift(reg);

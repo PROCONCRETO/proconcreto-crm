@@ -1,5 +1,5 @@
 async function cargarDatosSupabase() {
-  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }, { data: prods, error: e4 }, { data: disenos, error: e5 }, { data: ensayos, error: e6 }, { data: mprima, error: e7 }, { data: ajustes, error: e9 }, { data: entregas, error: e10 }, { data: pmo, error: e11 }, { data: clasesMo, error: e12 }, { data: cuadrillas, error: e13 }, { data: maquinas, error: e14 }, { data: insumos, error: e15 }, { data: costeoProd, error: e16 }] = await Promise.all([
+  const [{ data: cots, error: e1 }, { data: clts, error: e2 }, { data: ords, error: e3 }, { data: prods, error: e4 }, { data: disenos, error: e5 }, { data: ensayos, error: e6 }, { data: mprima, error: e7 }, { data: ajustes, error: e9 }, { data: entregas, error: e10 }, { data: pmo, error: e11 }, { data: clasesMo, error: e12 }, { data: cuadrillas, error: e13 }, { data: maquinas, error: e14 }, { data: insumos, error: e15 }, { data: costeoProd, error: e16 }, { data: eventos, error: e17 }] = await Promise.all([
     sb.from('cotizaciones').select('datos, estado').order('creado', { ascending: true }),
     sb.from('clientes').select('datos').order('creado', { ascending: true }),
     sb.from('ordenes_servicio').select('datos').order('creado', { ascending: false }),
@@ -14,7 +14,8 @@ async function cargarDatosSupabase() {
     sb.from('cuadrillas_productivas').select('datos, modificado').order('creado', { ascending: true }),
     sb.from('maquinaria_equipos').select('datos, modificado').order('creado', { ascending: true }),
     sb.from('insumos_costos').select('datos, modificado').order('creado', { ascending: true }),
-    sb.from('costeo_productos').select('datos, modificado').order('creado', { ascending: true })
+    sb.from('costeo_productos').select('datos, modificado').order('creado', { ascending: true }),
+    sb.from('eventos_especiales').select('datos').order('creado', { ascending: false })
   ]);
   if (e3) console.warn('Tabla ordenes_servicio no disponible aún.');
   if (e4) console.warn('Tabla producciones no disponible aún.');
@@ -29,7 +30,9 @@ async function cargarDatosSupabase() {
   if (e14) console.warn('Tabla maquinaria_equipos no disponible aún — corre sql/2026-07-29_costeo_maquinaria.sql en Supabase.');
   if (e15) console.warn('Tabla insumos_costos no disponible aún — corre sql/2026-07-30_lista_referencia_costos.sql en Supabase.');
   if (e16) console.warn('Tabla costeo_productos no disponible aún — corre sql/2026-08-02_costeo_producto.sql en Supabase.');
+  if (e17) console.warn('Tabla eventos_especiales no disponible aún — corre sql/2026-09-17_dias_atipicos_produccion.sql en Supabase.');
   ORDENES = (ords || []).filter(r => r.datos).map(r => r.datos);
+  EVENTOS_ESPECIALES = (eventos || []).filter(r => r.datos).map(r => r.datos);
   PRODUCCIONES = (prods || []).filter(r => r.datos).map(r => r.datos);
   DISENOS_MEZCLA = _normalizarOrdenLista((disenos || []).filter(r => r.datos).map(r => _normalizarDiseno(r.datos)));
   ENSAYOS_CALIDAD = (ensayos || []).filter(r => r.datos).map(r => r.datos);
@@ -119,6 +122,7 @@ function rerenderPantallaActiva() {
     case 'pantalla-analisis-estadistico': renderAnalisisEstadistico(); break;
     case 'pantalla-materia-prima': renderMateriaPrima(); break;
     case 'pantalla-produccion-estadisticas': renderEstadisticasProduccion(); break;
+    case 'pantalla-produccion-revision': renderRevisionDiasAtipicos(); break;
     case 'pantalla-logistica': renderCalendarioLogistica(); break;
     case 'pantalla-ordenes-despacho': renderOrdenesDespacho(); break;
     case 'pantalla-logistica-estadisticas': renderEstadisticasLogistica(); break;
@@ -152,6 +156,11 @@ async function recargarOrdenesRT() {
 async function recargarProduccionesRT() {
   const { data } = await sb.from('producciones').select('datos').order('creado', { ascending: false });
   PRODUCCIONES = (data || []).filter(r => r.datos).map(r => r.datos);
+  rerenderPantallaActiva();
+}
+async function recargarEventosEspecialesRT() {
+  const { data } = await sb.from('eventos_especiales').select('datos').order('creado', { ascending: false });
+  EVENTOS_ESPECIALES = (data || []).filter(r => r.datos).map(r => r.datos);
   rerenderPantallaActiva();
 }
 async function recargarProductosRT() {
@@ -233,6 +242,7 @@ function suscribirRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'maquinaria_equipos' },      () => _rtDebounce('maquinaria', recargarMaquinariaRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'insumos_costos' },           () => _rtDebounce('insumoscostos', recargarInsumosCostosRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'costeo_productos' },          () => _rtDebounce('costeoproductos', recargarCosteoProductosRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'eventos_especiales' },         () => _rtDebounce('eventosespeciales', recargarEventosEspecialesRT))
     .subscribe((status) => {
       const ind = document.getElementById('rt-indicador');
       if (ind) {

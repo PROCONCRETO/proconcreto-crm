@@ -103,6 +103,7 @@
   <button class="nav-btn" onclick="ir('inventario')">📦 Inventario</button>
   <button class="nav-btn" onclick="ir('materia-prima')">🧱 Materia Prima</button>
   <button class="nav-btn" onclick="ir('produccion-estadisticas')">📊 Estadísticas</button>
+  <button class="nav-btn" onclick="ir('produccion-revision')">🔍 Días Atípicos</button>
 </nav>
 
 <nav class="nav" id="subnav-logistica" style="display:none">
@@ -658,6 +659,7 @@
           <th>FECHA</th>
           <th>PRODUCTO</th>
           <th>CANTIDAD</th>
+          <th>ESTADO</th>
           <th>CEMENTO</th>
           <th>ORDEN PROD.</th>
           <th>RESPONSABLE</th>
@@ -666,7 +668,7 @@
         </tr>
       </thead>
       <tbody id="produccion-body">
-        <tr><td colspan="8" class="empty-state"><div class="icono">📅</div><div>No hay producciones registradas.</div></td></tr>
+        <tr><td colspan="9" class="empty-state"><div class="icono">📅</div><div>No hay producciones registradas.</div></td></tr>
       </tbody>
     </table>
   </div>
@@ -815,6 +817,82 @@
   <div class="card">
     <div class="card-titulo">Consumo de cemento por unidad (de primera) — tendencia</div>
     <div style="height:260px;position:relative"><canvas id="chart-prod-cemento-unidad"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+      <div class="card-titulo" style="margin-bottom:0">Estándar de ciclos/día por producto (para costeo)</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="est-prod-estandares-caption" style="font-size:11px;color:var(--gris-medio)"></span>
+        <button class="btn btn-secundario btn-xs" onclick="_recalcularEstandaresCiclos()">🔄 Recalcular estándar</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tabla-cots">
+        <thead>
+          <tr>
+            <th>PRODUCTO</th>
+            <th style="text-align:right">MEDIA (CICLOS/DÍA)</th>
+            <th style="text-align:right">DESV. ESTÁNDAR</th>
+            <th style="text-align:right">N° DÍAS</th>
+            <th>FUENTE</th>
+          </tr>
+        </thead>
+        <tbody id="est-prod-estandares-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: DÍAS ATÍPICOS (revisión y aprobación)
+═══════════════════════════════════════ -->
+<div id="pantalla-produccion-revision" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Revisión de Días Atípicos</div>
+    <div style="display:flex;border:1px solid var(--gris-borde);border-radius:var(--radio);overflow:hidden">
+      <button id="rev-atip-btn-30" onclick="setPeriodoRevisionAtipicos(30)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">30 días</button>
+      <button id="rev-atip-btn-90" onclick="setPeriodoRevisionAtipicos(90)" style="padding:6px 14px;border:none;background:var(--azul);color:white;font-size:12px;font-weight:600;cursor:pointer">90 días</button>
+      <button id="rev-atip-btn-180" onclick="setPeriodoRevisionAtipicos(180)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">180 días</button>
+      <button id="rev-atip-btn-0" onclick="setPeriodoRevisionAtipicos(0)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">Todo</button>
+    </div>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px">
+    <div class="card-titulo" style="padding:14px 14px 0">Pendientes de revisión</div>
+    <div style="overflow-x:auto">
+      <table class="tabla-cots">
+        <thead>
+          <tr>
+            <th>FECHA</th>
+            <th>PRODUCTO</th>
+            <th style="text-align:right">CICLOS</th>
+            <th>CAUSA</th>
+            <th>DESCRIPCIÓN</th>
+            <th>MARCADO POR</th>
+            <th style="min-width:190px">ACCIONES</th>
+          </tr>
+        </thead>
+        <tbody id="rev-atip-pendientes-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="card-titulo" style="padding:14px 14px 0">Ciclos perdidos por causa</div>
+    <div style="overflow-x:auto">
+      <table class="tabla-cots">
+        <thead>
+          <tr>
+            <th>CAUSA</th>
+            <th style="text-align:right">EVENTOS</th>
+            <th style="text-align:right">CICLOS PERDIDOS</th>
+            <th style="text-align:right">% DEL TOTAL</th>
+          </tr>
+        </thead>
+        <tbody id="rev-atip-reporte-body"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -2263,6 +2341,36 @@
   </div>
 </div>
 
+<!-- Días atípicos (2026-09-17) — marcar un día de producción como atípico y excluirlo del
+     estándar de ciclos/día, con causa obligatoria y aprobación separada (ver
+     js/produccion-atipicos.js, docs/modulos/produccion.md). -->
+<div class="modal-overlay" id="modal-dia-atipico">
+  <div class="modal" style="width:520px;max-width:95vw">
+    <div class="modal-titulo">🚩 Marcar día como atípico</div>
+    <input type="hidden" id="mda-id">
+    <div id="mda-contexto" style="background:#F8F9FB;border-left:3px solid var(--azul);border-radius:4px;padding:10px 12px;font-size:12.5px;margin-bottom:14px"></div>
+    <div class="form-grupo" style="margin-bottom:10px">
+      <label>Causa</label>
+      <select id="mda-causa" onchange="_alCambiarCausaDiaAtipico()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <option value="">— Selecciona —</option>
+      </select>
+    </div>
+    <div class="form-grupo" id="mda-causa-otro-wrap" style="margin-bottom:10px;display:none">
+      <input type="text" id="mda-causa-otro" placeholder="Especifica la razón" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+    </div>
+    <div class="form-grupo" style="margin-bottom:12px">
+      <label>Descripción (opcional)</label>
+      <textarea id="mda-descripcion" rows="2" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical" placeholder="Agrega cualquier detalle que ayude a entender lo que pasó ese día"></textarea>
+    </div>
+    <div style="background:#F8F9FB;border-left:3px solid var(--azul);border-radius:4px;padding:8px 12px;font-size:11.5px;color:var(--gris-medio);margin-bottom:8px">Este registro no se elimina. Se conserva completo en el historial; solo se excluye del cálculo del estándar de ciclos/día, y queda registrado en la bitácora de eventos de la máquina.</div>
+    <div id="mda-nota-pendiente" style="background:#FFF3E0;color:#E65100;border-radius:4px;padding:8px 12px;font-size:11.5px;margin-bottom:14px">Un supervisor debe confirmar esta exclusión antes de que se aplique al cálculo del estándar.</div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-dia-atipico')">Cancelar</button>
+      <button class="btn btn-primario" id="mda-btn-accion" onclick="guardarMarcaDiaAtipico()">Confirmar exclusión</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-orden">
   <div class="modal" style="width:560px;max-width:95vw">
     <div class="modal-titulo" id="modal-orden-titulo">📝 Nueva Orden de Producción</div>
@@ -2482,14 +2590,15 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.0" integrity="sha384-De+l/Df7qym5QBDVocD3+gW1S7IjR3epf+6KbRDjB3FCCzM/LqVTwqckT6FhFar8" crossorigin="anonymous"></script>
-<script src="js/config.js?v=20260821a"></script>
+<script src="js/config.js?v=20260917a"></script>
 <script src="js/calculadora-inputs.js?v=20260825a"></script>
 <script src="js/catalogo.js?v=20260821a"></script>
-<script src="js/navegacion.js?v=20260909a"></script>
+<script src="js/navegacion.js?v=20260917a"></script>
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
-<script src="js/produccion-diaria.js?v=20260909c"></script>
+<script src="js/produccion-diaria.js?v=20260917a"></script>
 <script src="js/produccion-materia-prima.js?v=20260909a"></script>
-<script src="js/estadisticas-produccion.js?v=20260916a"></script>
+<script src="js/estadisticas-produccion.js?v=20260917a"></script>
+<script src="js/produccion-atipicos.js?v=20260917a"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
 <script src="js/costeo-maquinaria.js?v=20260821a"></script>
@@ -2501,7 +2610,7 @@
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260804c"></script>
 <script src="js/auth.js?v=20260804a"></script>
-<script src="js/datos-realtime.js?v=20260909a"></script>
+<script src="js/datos-realtime.js?v=20260917a"></script>
 <script src="js/cotizador.js?v=20260831a"></script>
 <script src="js/historico-clientes-stats.js?v=20260827a"></script>
 <script src="js/retenciones.js?v=20260809c"></script>

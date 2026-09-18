@@ -221,6 +221,11 @@ function renderEstadisticasProduccion() {
     _chartRankingVolumen(vibrocompactados, mapaCiclo);
     _chartRankingDeficiencia(vibrocompactados);
   }
+
+  // Estándar de ciclos/día por producto — días atípicos (2026-09-17, js/produccion-atipicos.js).
+  // Independiente del período/filtro de este dashboard (tiene su propia ventana de 90 días por
+  // defecto) — se pinta siempre igual sin importar qué producto esté filtrado arriba.
+  _renderTablaEstandaresCiclos();
 }
 
 // ── Tendencia de producción (ciclos) ──
