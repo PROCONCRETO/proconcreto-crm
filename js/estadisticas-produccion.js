@@ -583,6 +583,34 @@ function _chartCementoPorUnidad(vibrocompactados, periodoDias) {
   });
 }
 
+// ── Consumo de cemento por unidad — por referencia, con media y desviación (2026-09-18, a pedido
+// del usuario) ──
+// Mismo criterio de siempre ("kg de cemento / unidad de PRIMERA", nunca merma+segundas), pero acá
+// por PRODUCTO y por REGISTRO — cada registro con cantidad y consumo de cemento aporta un dato
+// (cemento del registro / cantidad del registro), y se calcula la media y la desviación estándar
+// de esos datos por producto — para ver qué tan consistente es la dosificación real entre lotes
+// de una misma referencia, no solo el promedio agregado que ya muestra la tarjeta "Cemento /
+// unidad (primera)" de arriba. Reusa _desviacionEstandar() (2026-09-16) tal cual. Consumida por
+// _renderTablaEstandaresCiclos() (js/produccion-atipicos.js) — el usuario pidió que este dato
+// viviera en la misma tabla "Estándar de ciclos/día por producto (para costeo)", no en una tabla
+// aparte, así que no tiene su propia función de render acá.
+function _calcularCementoPorReferencia(vibrocompactados) {
+  const porProducto = {};
+  vibrocompactados.forEach(p => {
+    const cantidad = Number(p.cantidad) || 0;
+    const cemento = Number(p.consumoCemento) || 0;
+    if (!(cantidad > 0) || !(cemento > 0)) return;
+    (porProducto[p.producto] = porProducto[p.producto] || []).push(cemento / cantidad);
+  });
+  const resultado = {};
+  Object.keys(porProducto).forEach(producto => {
+    const valores = porProducto[producto];
+    const media = valores.reduce((s, v) => s + v, 0) / valores.length;
+    resultado[producto] = { media, desviacion: _desviacionEstandar(valores), n: valores.length };
+  });
+  return resultado;
+}
+
 // ── Tabla "Producción de hoy — por producto" (2026-09-09, a pedido del usuario: "sácame una
 // tabla con el producto y los ciclos diarios de las producciones a hoy") ──
 // A diferencia de las gráficas de tendencia (que recorren la ventana de período elegida: 7/30/90/

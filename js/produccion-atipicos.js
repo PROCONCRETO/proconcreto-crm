@@ -93,23 +93,28 @@ function _calcularEstandaresCiclosPorProducto(periodoDias) {
   const porProducto = {};
   incluidos.forEach(p => { (porProducto[p.producto] = porProducto[p.producto] || []).push(p); });
 
-  const resultado = {};
-  Object.keys(porProducto).forEach(producto => {
-    const valores = Object.values(_ciclosPorDia(porProducto[producto], mapaCiclo));
-    if (valores.length >= N_MIN_DIAS_ESTANDAR) {
-      const media = valores.reduce((s, v) => s + v, 0) / valores.length;
-      resultado[producto] = { media, desviacion: _desviacionEstandar(valores), n: valores.length, fuente: 'producto' };
-    }
-  });
-
   const gruposPorCiclo = {};
   Object.keys(mapaCiclo).forEach(prod => { (gruposPorCiclo[mapaCiclo[prod]] = gruposPorCiclo[mapaCiclo[prod]] || []).push(prod); });
 
-  Object.keys(porProducto).filter(producto => !resultado[producto]).forEach(producto => {
+  // Se evalúan TODOS los productos vibrocompactados con Unidades/Ciclo registrado (2026-09-18,
+  // corrige que antes solo se evaluaban los que ya tenían al menos un registro propio en la
+  // ventana — un producto sin ninguna producción reciente, pero cuyo grupo de Unidades/Ciclo SÍ
+  // tiene historial suficiente, se quedaba fuera del resultado por completo, sin ni siquiera un
+  // `null` que explicara por qué). Así la tabla puede mostrar cada referencia con su estándar o
+  // con la razón por la que todavía no lo tiene, en vez de simplemente no aparecer.
+  const resultado = {};
+  Object.keys(mapaCiclo).forEach(producto => {
+    const propios = porProducto[producto] || [];
+    const valoresPropios = Object.values(_ciclosPorDia(propios, mapaCiclo));
+    if (valoresPropios.length >= N_MIN_DIAS_ESTANDAR) {
+      const media = valoresPropios.reduce((s, v) => s + v, 0) / valoresPropios.length;
+      resultado[producto] = { media, desviacion: _desviacionEstandar(valoresPropios), n: valoresPropios.length, fuente: 'producto' };
+      return;
+    }
     const grupo = gruposPorCiclo[mapaCiclo[producto]] || [producto];
-    const valores = Object.values(_ciclosPorDia(incluidos.filter(p => grupo.includes(p.producto)), mapaCiclo));
-    resultado[producto] = valores.length >= N_MIN_DIAS_ESTANDAR
-      ? { media: valores.reduce((s, v) => s + v, 0) / valores.length, desviacion: _desviacionEstandar(valores), n: valores.length, fuente: 'grupo_unidadesciclo', grupoProductos: grupo }
+    const valoresGrupo = Object.values(_ciclosPorDia(incluidos.filter(p => grupo.includes(p.producto)), mapaCiclo));
+    resultado[producto] = valoresGrupo.length >= N_MIN_DIAS_ESTANDAR
+      ? { media: valoresGrupo.reduce((s, v) => s + v, 0) / valoresGrupo.length, desviacion: _desviacionEstandar(valoresGrupo), n: valoresGrupo.length, fuente: 'grupo_unidadesciclo', grupoProductos: grupo }
       : null;
   });
   return resultado;
@@ -413,23 +418,53 @@ function _datosReporteCiclosPerdidos(periodoDias) {
 }
 
 // ── Tabla del estándar por producto, dentro de Estadísticas de Producción ──
-
+// Muestra TODAS las referencias vibrocompactadas con Unidades/Ciclo registrado (2026-09-18,
+// corrige que antes solo aparecían las que ya alcanzaban el mínimo — una referencia sin
+// suficiente historial simplemente no salía en la tabla, sin ninguna explicación, lo que hacía
+// parecer que "faltaban" productos en vez de que su estándar todavía no era calculable). Ahora
+// cada referencia sale siempre, con su estándar o con la razón de por qué no lo tiene todavía.
+//
+// También incluye el consumo de cemento por unidad — media y desviación (2026-09-18, a pedido
+// del usuario: "incluyamos un nuevo cuadro estadístico que nos muestre el consumo promedio de
+// cemento por unidad, por referencia, incluyendo la desviación" — y luego: "incluyamos dichos
+// datos... en este cuadro", fusionándolo con esta tabla en vez de una aparte). Usa la MISMA
+// ventana y el mismo filtro 'incluido' que el estándar de ciclos de esta tabla (no el período del
+// dashboard general de arriba) para que las dos mitades describan la misma foto — no se cachea
+// aparte porque es barata de recalcular y no alimenta ningún flujo de aprobación, a diferencia del
+// estándar de ciclos.
 function _renderTablaEstandaresCiclos() {
   const body = document.getElementById('est-prod-estandares-body');
   if (!body) return;
   const estandares = _obtenerEstandaresCiclos();
-  const productos = Object.keys(estandares).filter(p => estandares[p]).sort();
+
+  // Mismo alcance que el resto del dashboard (solo Vibrocompactados, ver _mapaTipoEstructuraPorProducto()
+  // en estadisticas-produccion.js) — sin este filtro, un producto Reforzado o Pretensado con
+  // consumo de cemento registrado se colaría en esta tabla, que es explícitamente de Vibrocompactados.
+  const mapaTipo = _mapaTipoEstructuraPorProducto();
+  const desde = _periodoEstandarCiclos > 0 ? _fmtISO(_sumarDias(new Date(), -_periodoEstandarCiclos)) : null;
+  const enVentanaIncluido = (typeof PRODUCCIONES !== 'undefined' ? PRODUCCIONES : []).filter(p =>
+    (p.estado || 'incluido') === 'incluido' && mapaTipo[p.producto] === 'vibrocompactado' && (!desde || (p.fecha || '') >= desde));
+  const cementoPorProducto = _calcularCementoPorReferencia(enVentanaIncluido);
+
+  const productos = [...new Set([...Object.keys(estandares), ...Object.keys(cementoPorProducto)])].sort();
   if (!productos.length) {
-    body.innerHTML = `<tr><td colspan="5" class="empty-state"><div class="icono">📏</div><div>Todavía no hay suficiente historial "incluido" para calcular un estándar (mínimo ${N_MIN_DIAS_ESTANDAR} días por producto o grupo).</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">📏</div><div>Todavía no hay ningún producto vibrocompactado con Unidades/Ciclo registrado.</div></td></tr>`;
   } else {
     body.innerHTML = productos.map(p => {
       const est = estandares[p];
+      const cem = cementoPorProducto[p];
+      const fuenteHtml = est
+        ? (est.fuente === 'grupo_unidadesciclo' ? 'Grupo (Unidades/Ciclo)' : 'Propio')
+        : `<span style="color:var(--gris-medio);font-size:11px">Historial insuficiente (mín. ${N_MIN_DIAS_ESTANDAR} días)</span>`;
       return `<tr>
         <td style="font-weight:600;color:var(--azul)">${_esc(p)}</td>
-        <td style="text-align:right">${est.media.toLocaleString('es-CO', { maximumFractionDigits: 1 })}</td>
-        <td style="text-align:right">${est.desviacion !== null ? est.desviacion.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—'}</td>
-        <td style="text-align:right">${est.n}</td>
-        <td>${est.fuente === 'grupo_unidadesciclo' ? 'Grupo (Unidades/Ciclo)' : 'Propio'}</td>
+        <td style="text-align:right">${est ? est.media.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—'}</td>
+        <td style="text-align:right">${est && est.desviacion !== null ? est.desviacion.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—'}</td>
+        <td style="text-align:right">${est ? est.n : '—'}</td>
+        <td>${fuenteHtml}</td>
+        <td style="text-align:right">${cem ? cem.media.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' kg' : '—'}</td>
+        <td style="text-align:right">${cem && cem.desviacion !== null ? cem.desviacion.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' kg' : '—'}</td>
+        <td style="text-align:right">${cem ? cem.n : '—'}</td>
       </tr>`;
     }).join('');
   }
