@@ -501,6 +501,20 @@ function _opcionesInsumoCosteo(seleccionado) {
   if (!INSUMOS_COSTOS.length) return '<option value="">Sin insumos registrados</option>';
   return '<option value="">— Selecciona —</option>' + INSUMOS_COSTOS.map(i => `<option value="${_escAttr(i.nombre)}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
 }
+// Desplegable ACOTADO solo a los ítems de acero de pretensionamiento (2026-09-19, a pedido del
+// usuario — hoy se trabaja con "Acero de Pretensionamiento 5mm" y "Acero de pretensionamiento
+// Torón 3/8", ambos ya registrados como materia prima en Costos de Referencia). A diferencia de
+// _opcionesInsumoCosteo() (usado en el resto de filas de Insumos/Otras Materias Primas), que
+// lista TODO el catálogo sin filtrar, acá eso mezclaría cemento/arena/aditivos con las 1-2
+// opciones reales que de verdad aplican a este campo. Coincide por nombre sin distinguir
+// mayúsculas y sin exigir además la palabra "Acero" — "pretensionamiento" solo ya es lo bastante
+// específico, y el nombre de respaldo legado 'Acero 5mm Pretensionamiento' trae las palabras en
+// otro orden que "Acero de Pretensionamiento 5mm".
+function _opcionesAceroPretensadoCosteo(seleccionado) {
+  const items = INSUMOS_COSTOS.filter(i => /pretensionamiento/i.test(i.nombre || ''));
+  if (!items.length) return '<option value="">Sin acero de pretensionamiento registrado en Costos de Referencia</option>';
+  return '<option value="">— Selecciona —</option>' + items.map(i => `<option value="${_escAttr(i.nombre)}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
+}
 // El reparto por defecto de una fila nueva depende del tipo: Vibrocompactado sí tiene
 // "Unidades/estiba" diligenciable (empaque real, se vende por estiba); Reforzado y Pretensado
 // no tienen ese campo en su cuestionario (se venden por unidad/ml, no por estiba) — dejarlas en
@@ -1342,7 +1356,7 @@ function abrirModalCosteoProducto() {
   document.getElementById('m-costeo-hilos-banco').value = '';
   document.getElementById('m-costeo-longitud-hilo').value = '';
   document.getElementById('m-costeo-bancos-dia').value = '';
-  document.getElementById('m-costeo-item-acero-pretensado').innerHTML = _opcionesInsumoCosteo('');
+  document.getElementById('m-costeo-item-acero-pretensado').innerHTML = _opcionesAceroPretensadoCosteo('');
   document.getElementById('m-costeo-pct-desperdicio').value = 4;
   document.getElementById('m-costeo-pct-herramienta').value = 2;
   document.getElementById('m-costeo-margen-lista').value = 30;
@@ -1385,7 +1399,7 @@ function editarCosteoProducto(codigo) {
   document.getElementById('m-costeo-hilos-banco').value = r.hilosBanco || '';
   document.getElementById('m-costeo-longitud-hilo').value = r.longitudBrutaHilo || '';
   document.getElementById('m-costeo-bancos-dia').value = _diasBancoTexto(r.bancosDiaLinea);
-  document.getElementById('m-costeo-item-acero-pretensado').innerHTML = _opcionesInsumoCosteo(r.itemAceroPretensado || '');
+  document.getElementById('m-costeo-item-acero-pretensado').innerHTML = _opcionesAceroPretensadoCosteo(r.itemAceroPretensado || '');
   document.getElementById('m-costeo-pct-desperdicio').value = c.pctDesperdicio || 0;
   document.getElementById('m-costeo-pct-herramienta').value = c.pctHerramientaMenor || 0;
   document.getElementById('m-costeo-margen-lista').value = c.margenLista ?? 30;
