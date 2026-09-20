@@ -222,6 +222,15 @@ function _elegirTipoEstructuraCosteo(tipo) {
     const th = document.getElementById(id);
     if (th) th.style.display = esPretensado ? '' : 'none';
   });
+  // "Unidades/día"/"Min/unidad" de Máquinas (2026-09-20) — a diferencia de las de Mano de Obra
+  // (compartidas por Vibrocompactado y Reforzado), estas son SOLO para Reforzado, que es donde
+  // el usuario reportó el problema ("la maquinaria está asumiendo como si se usara todo el día") —
+  // Vibrocompactado sigue repartiendo sus máquinas 'día' contra el Unidades/día de línea sin
+  // anular por fila, no se ha pedido cambiar eso.
+  ['costeo-maq-th-unidades-dia', 'costeo-maq-th-minutos-unidad'].forEach(id => {
+    const th = document.getElementById(id);
+    if (th) th.style.display = esReforzado ? '' : 'none';
+  });
   const thUnidadesDia = document.getElementById('costeo-mo-th-unidades-dia');
   if (thUnidadesDia) thUnidadesDia.style.display = esPretensado ? 'none' : '';
   const thMinutosUnidad = document.getElementById('costeo-mo-th-minutos-unidad');
@@ -418,8 +427,9 @@ function renderMaquinasCosteo() {
   const tbody = document.getElementById('costeo-maquinas-body');
   if (!tbody) return;
   const esPretensado = document.getElementById('m-costeo-tipo')?.value === 'pretensado';
+  const esReforzado = document.getElementById('m-costeo-tipo')?.value === 'reforzado';
   if (!_maquinasCosteoActual.length) {
-    tbody.innerHTML = `<tr><td colspan="${esPretensado ? 6 : 4}" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las máquinas de la línea de producción</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${(esPretensado || esReforzado) ? 6 : 4}" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las máquinas de la línea de producción</td></tr>`;
     return;
   }
   tbody.innerHTML = _maquinasCosteoActual.map((row, i) => {
@@ -435,10 +445,20 @@ function renderMaquinasCosteo() {
     const celdasPretensado = esPretensado ? `
       <td><input type="number" min="0" step="0.01" value="${_diasBancoTexto(row.bancosDiaFila)}" placeholder="de línea" title="Días que le toma a esta máquina completar un banco" style="width:90px" oninput="_maquinasCosteoActual[${i}].bancosDiaFila=_bancosDiaDesdeDias(this.value);_actualizarResumenCosteo()"></td>
       <td><input type="number" min="0" step="1" value="${row.numeroHilos || ''}" placeholder="—" title="N° de hilos de ESTE elemento (no del banco completo) — con valor, se usa una vez por cada hilo" style="width:70px" oninput="_maquinasCosteoActual[${i}].numeroHilos=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
+    // "Unidades/día" y "Min/unidad" — Reforzado (2026-09-20, a pedido del usuario: "la maquinaria
+    // está asumiendo como si se usara todo el día para la producción... podamos asignar de
+    // acuerdo al uso real que se le da"). Solo tienen efecto en máquinas con unidad de uso "día"
+    // (grúa, montacargas...) — en las demás (m³, ciclo) no cambia nada aunque se llenen. Mismo
+    // patrón que ya tiene Mano de Obra en este tipo: si se llena "Min/unidad", manda sobre
+    // "Unidades/día" de esa misma fila.
+    const celdasReforzado = esReforzado ? `
+      <td><input type="number" min="0" step="0.01" value="${row.unidadesDiaFila || ''}" placeholder="de línea" title="Unidades que esta máquina completa en un día (solo aplica a máquinas que se reparten 'por día'). Si además llenas 'Min/unidad', ese dato manda sobre este." style="width:90px" oninput="_maquinasCosteoActual[${i}].unidadesDiaFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>
+      <td><input type="number" min="0" step="1" value="${row.minutosUnidadFila || ''}" placeholder="—" title="Minutos que le toma a esta máquina intervenir en UNA unidad — para usos puntuales cortos (solo aplica a máquinas 'por día'). Si se llena, reemplaza 'Unidades/día' de esta fila." style="width:75px" oninput="_maquinasCosteoActual[${i}].minutosUnidadFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
     return `<tr>
       <td><select onchange="_maquinasCosteoActual[${i}].nombre=this.value;_actualizarResumenCosteo()">${_opcionesMaquinariaCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio)">${info}</td>
       ${celdasPretensado}
+      ${celdasReforzado}
       <td><button class="btn btn-secundario btn-xs" title="Asignar operario en Mano de Obra" onclick="_asignarOperarioMaquina(${i})">👷</button></td>
       <td><button class="btn btn-rojo btn-xs" onclick="_maquinasCosteoActual.splice(${i},1);renderMaquinasCosteo();_actualizarResumenCosteo()">✕</button></td>
     </tr>`;
@@ -446,20 +466,26 @@ function renderMaquinasCosteo() {
 }
 // Botón "👷" por fila de máquina — agrega de una vez, en Mano de Obra, la cuadrilla
 // "Operario de maquinaria" (a pedido del usuario: cada máquina real la opera alguien, y hoy
-// tocaba acordarse de agregarla a mano en la sección de abajo). Solo Pretensado tiene una
-// cantidad "por fila" que copiar (Bancos/día, misma columna en Máquinas y Mano de Obra — ver
-// docs/modulos/costeo.md, "su ritmo real coincide con el de su operario"), y solo tiene sentido
+// tocaba acordarse de agregarla a mano en la sección de abajo). Pretensado y Reforzado (2026-09-20)
+// tienen una cantidad "por fila" que copiar — mismas columnas en Máquinas y Mano de Obra (ver
+// docs/modulos/costeo.md, "su ritmo real coincide con el de su operario") — y solo tiene sentido
 // copiarla cuando la unidad de uso de la máquina es 'dia' (rendimiento propio por fila); las
 // demás unidades ('m3'/'banco'/'ciclo'/'m2') no tienen ritmo por fila, así que el campo queda
-// en blanco para asignarlo a mano. Vibrocompactado y Reforzado no tienen columna de cantidad
-// por fila en ninguna de las dos secciones, así que ahí el botón solo agrega el rol.
+// en blanco para asignarlo a mano. Vibrocompactado no tiene columna de cantidad por fila en
+// ninguna de las dos secciones, así que ahí el botón solo agrega el rol.
 function _asignarOperarioMaquina(i) {
   const row = _maquinasCosteoActual[i];
   if (!row) return;
-  const esPretensado = document.getElementById('m-costeo-tipo')?.value === 'pretensado';
+  const tipo = document.getElementById('m-costeo-tipo')?.value;
+  const esPretensado = tipo === 'pretensado';
+  const esReforzado = tipo === 'reforzado';
   const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
   const nuevaFila = { nombre: 'Operario de maquinaria', nota: row.nombre ? `Operario de ${row.nombre}` : '' };
   if (esPretensado && maq && maq.unidadUso === 'dia') nuevaFila.bancosDiaFila = row.bancosDiaFila;
+  if (esReforzado && maq && maq.unidadUso === 'dia') {
+    nuevaFila.unidadesDiaFila = row.unidadesDiaFila;
+    nuevaFila.minutosUnidadFila = row.minutosUnidadFila;
+  }
   _manoObraCosteoActual.push(nuevaFila);
   renderManoObraCosteo();
   _actualizarResumenCosteo();
@@ -921,7 +947,12 @@ function _calcularCosteoReforzado(c) {
   // montacargas, minicargador — igual criterio que Vibrocompactado); "m³" × volumen de la pieza
   // (mezcladora, vibrador de aguja — máquinas que se cobran por m³ de concreto, no por día ni
   // por ciclo); "ciclo" directo, sin dividir (moldes: 1 uso del molde = 1 pieza producida —
-  // Reforzado no tiene "unidades/ciclo" como Vibrocompactado).
+  // Reforzado no tiene "unidades/ciclo" como Vibrocompactado). Las máquinas "día" son anulables
+  // fila por fila con "Unidades/día" o "Minutos/unidad" (2026-09-20, a pedido del usuario: "la
+  // maquinaria está asumiendo como si se usara todo el día para la producción... podamos asignar
+  // de acuerdo al uso real que se le da" — corrige que ANTES toda máquina 'día' repartía siempre
+  // contra el Unidades/día de la línea completa, sin poder anularlo; mismo criterio que ya tenía
+  // Mano de Obra en este mismo tipo, y que Máquinas ya tenía en Pretensado con "Días/banco").
   let maquinaria = 0;
   const maquinariaDetalle = [];
   (c.maquinas || []).forEach(row => {
@@ -929,7 +960,10 @@ function _calcularCosteoReforzado(c) {
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
     const costoUnidad = calcularCostoMaquina(maq).costoUnidad;
     let costo = 0;
-    if (maq.unidadUso === 'dia' && unidadesDia > 0) costo = costoUnidad / unidadesDia;
+    if (maq.unidadUso === 'dia') {
+      const unidadesDiaFila = _unidadesDiaDesdeMinutos(row.minutosUnidadFila) || row.unidadesDiaFila || unidadesDia;
+      costo = unidadesDiaFila > 0 ? costoUnidad / unidadesDiaFila : 0;
+    }
     else if (maq.unidadUso === 'm3' && volumenUnidadM3 > 0) costo = costoUnidad * volumenUnidadM3;
     else if (maq.unidadUso === 'ciclo') costo = costoUnidad;
     maquinaria += costo;
