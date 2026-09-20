@@ -1803,7 +1803,7 @@
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo"><span class="num">4</span> Máquinas involucradas</div>
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Máquina</th><th style="width:140px">Costo</th><th id="costeo-maq-th-banco" style="width:110px;display:none">Días/banco</th><th id="costeo-maq-th-hilo" style="width:80px;display:none">N° hilos</th><th id="costeo-maq-th-unidades-dia" style="width:110px;display:none" title="Unidades que esta máquina completa en un día — solo aplica a máquinas que se reparten 'por día'.">Unidades/día</th><th id="costeo-maq-th-minutos-unidad" style="width:95px;display:none" title="Minutos que le toma a esta máquina intervenir en UNA unidad. Si se llena, reemplaza Unidades/día.">Min/unidad</th><th style="width:36px"></th><th style="width:36px"></th></tr></thead>
+        <thead><tr><th>Máquina</th><th style="width:140px">Costo</th><th style="width:100px" title="Solo aplica a máquinas 'Ciclo' (moldes). Si se llena, reemplaza SOLO para este costeo la vida útil en usos configurada en Maquinaria y Equipos — útil para un molde compartido entre varios productos, cada uno con su propia base de amortización.">Amortizar en (uds)</th><th id="costeo-maq-th-banco" style="width:110px;display:none">Días/banco</th><th id="costeo-maq-th-hilo" style="width:80px;display:none">N° hilos</th><th id="costeo-maq-th-unidades-dia" style="width:110px;display:none" title="Unidades que esta máquina completa en un día — solo aplica a máquinas que se reparten 'por día'.">Unidades/día</th><th id="costeo-maq-th-minutos-unidad" style="width:95px;display:none" title="Minutos que le toma a esta máquina intervenir en UNA unidad. Si se llena, reemplaza Unidades/día.">Min/unidad</th><th style="width:36px"></th><th style="width:36px"></th></tr></thead>
         <tbody id="costeo-maquinas-body"></tbody>
       </table>
       <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarMaquinaCosteo()">+ Agregar máquina</button>
@@ -2606,7 +2606,7 @@
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
 <script src="js/costeo-maquinaria.js?v=20260821a"></script>
 <script src="js/costeo-referencia.js?v=20260821a"></script>
-<script src="js/costeo-producto.js?v=20260920e"></script>
+<script src="js/costeo-producto.js?v=20260920f"></script>
 <script src="js/calidad-mezclas.js?v=20260827b"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
 <script src="js/logistica.js?v=20260910b"></script>

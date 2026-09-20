@@ -443,6 +443,24 @@ function _tieneAcpmManualCosteo(c) {
   return (c.insumos || []).some(row => /acpm/i.test(row.nombre || ''));
 }
 
+// "Amortizar en (uds)" por fila — para moldes (máquinas con unidad de uso "Ciclo": 1 uso del
+// molde = 1 pieza producida) compartidos entre varios productos, ej. "Molde Tipo 2" usado tanto
+// en tubos como en cajas (2026-09-20, a pedido del usuario: "lo que tenía en mi anterior
+// estructura era unos moldes tipo... arrastraba el valor del molde, y en cada costeo determinaba
+// las unidades a amortizarlo... eso me facilitaba no tener que cargar un molde para cada
+// producto"). La vida útil en usos de Maquinaria y Equipos (`usosTotal`) queda como el dato de
+// catálogo, compartido por todos los costeos que usan ese molde — pero cada costeo puede pedir
+// una base de amortización propia (ej. "este molde en particular lo amortizo en 5.000 piezas
+// para este producto") sin tocar el catálogo ni afectar a los demás productos que comparten el
+// mismo molde. Se reutiliza `calcularCostoMaquina()` tal cual (mismo valor de compra, % de
+// rescate y % de mantenimiento del molde) solo sustituyendo su capacidad total de vida útil por
+// la de esta fila — así la fórmula de depreciación/mantenimiento nunca se duplica ni se
+// desincroniza de la de Maquinaria y Equipos.
+function _costoUnidadMaquinaPorUsosFila(maq, usosFila) {
+  if (!(usosFila > 0)) return null;
+  return calcularCostoMaquina({ ...maq, baseVidaUtil: 'usos', usosTotal: usosFila }).costoUnidad;
+}
+
 // ── Máquinas involucradas (filas dinámicas) ──
 let _maquinasCosteoActual = [];
 function renderMaquinasCosteo() {
@@ -451,12 +469,18 @@ function renderMaquinasCosteo() {
   const esPretensado = document.getElementById('m-costeo-tipo')?.value === 'pretensado';
   const esReforzado = document.getElementById('m-costeo-tipo')?.value === 'reforzado';
   if (!_maquinasCosteoActual.length) {
-    tbody.innerHTML = `<tr><td colspan="${(esPretensado || esReforzado) ? 6 : 4}" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las máquinas de la línea de producción</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${(esPretensado || esReforzado) ? 7 : 5}" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las máquinas de la línea de producción</td></tr>`;
     return;
   }
   tbody.innerHTML = _maquinasCosteoActual.map((row, i) => {
     const m = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     const info = m ? `${_fmtMaq(calcularCostoMaquina(m).costoUnidad)}/${_labelUnidadUso(m.unidadUso)}` : '—';
+    // "Amortizar en (uds)" — solo tiene efecto en máquinas 'Ciclo' (moldes); se muestra en
+    // cualquier tipo de estructura porque un mismo molde compartido puede usarse en Vibrocompactado,
+    // Reforzado o Pretensado (ver _costoUnidadMaquinaPorUsosFila()). Vacío = usa la vida útil en
+    // usos ya configurada para ese molde en Maquinaria y Equipos, sin cambios.
+    const celdaAmortizarUsos = `
+      <td><input type="number" min="0" step="1" value="${row.usosAmortizarFila || ''}" placeholder="de catálogo" title="Solo aplica a máquinas 'Ciclo' (moldes). Si se llena, reemplaza SOLO para este costeo la vida útil en usos configurada en Maquinaria y Equipos — útil para un molde compartido entre varios productos, cada uno con su propia base de amortización. Vacío = usa la vida útil del catálogo." style="width:95px" oninput="_maquinasCosteoActual[${i}].usosAmortizarFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>`;
     // "Días/banco" y "N° de hilos" solo aplican a Pretensado. "N° de hilos" reemplaza al
     // checkbox "× hilo" que había antes (2026-08-25, a pedido del usuario: "no le veo mucho
     // sentido" — el checkbox usaba SIEMPRE los hilos totales del banco, sin poder distinguir
@@ -479,6 +503,7 @@ function renderMaquinasCosteo() {
     return `<tr>
       <td><select onchange="_maquinasCosteoActual[${i}].nombre=this.value;_actualizarResumenCosteo()">${_opcionesMaquinariaCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio)">${info}</td>
+      ${celdaAmortizarUsos}
       ${celdasPretensado}
       ${celdasReforzado}
       <td><button class="btn btn-secundario btn-xs" title="Asignar operario en Mano de Obra" onclick="_asignarOperarioMaquina(${i})">👷</button></td>
@@ -806,7 +831,10 @@ function calcularCosteoProducto(c) {
   (c.maquinas || []).forEach(row => {
     const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
-    const costoUnidad = calcularCostoMaquina(maq).costoUnidad;
+    // "Amortizar en (uds)" por fila — solo para moldes ('ciclo'); ver _costoUnidadMaquinaPorUsosFila().
+    const costoUnidad = (maq.unidadUso === 'ciclo' && row.usosAmortizarFila > 0)
+      ? _costoUnidadMaquinaPorUsosFila(maq, row.usosAmortizarFila)
+      : calcularCostoMaquina(maq).costoUnidad;
     let costo = 0;
     if (maq.unidadUso === 'ciclo' && r.unidadesCiclo > 0) costo = costoUnidad / r.unidadesCiclo;
     else if (maq.unidadUso === 'dia' && unidadesDia > 0) costo = costoUnidad / unidadesDia;
@@ -989,7 +1017,10 @@ function _calcularCosteoReforzado(c) {
   (c.maquinas || []).forEach(row => {
     const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
-    const costoUnidad = calcularCostoMaquina(maq).costoUnidad;
+    // "Amortizar en (uds)" por fila — solo para moldes ('ciclo'); ver _costoUnidadMaquinaPorUsosFila().
+    const costoUnidad = (maq.unidadUso === 'ciclo' && row.usosAmortizarFila > 0)
+      ? _costoUnidadMaquinaPorUsosFila(maq, row.usosAmortizarFila)
+      : calcularCostoMaquina(maq).costoUnidad;
     let costo = 0;
     let unidadesDiaFila = 0;
     if (maq.unidadUso === 'dia') {
@@ -1183,7 +1214,10 @@ function _calcularCosteoPretensado(c) {
   (c.maquinas || []).forEach(row => {
     const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
-    const costoUnidad = calcularCostoMaquina(maq).costoUnidad;
+    // "Amortizar en (uds)" por fila — solo para moldes ('ciclo'); ver _costoUnidadMaquinaPorUsosFila().
+    const costoUnidad = (maq.unidadUso === 'ciclo' && row.usosAmortizarFila > 0)
+      ? _costoUnidadMaquinaPorUsosFila(maq, row.usosAmortizarFila)
+      : calcularCostoMaquina(maq).costoUnidad;
     let costo = 0;
     let unidadesDiaFila = 0;
     if (row.numeroHilos > 0) costo = metrosLinealesBanco > 0 ? (costoUnidad * row.numeroHilos) / metrosLinealesBanco : 0;
