@@ -750,6 +750,12 @@
      PANTALLA: PRODUCCIÓN — ESTADÍSTICAS
 ═══════════════════════════════════════ -->
 <div id="pantalla-produccion-estadisticas" class="pantalla">
+  <div id="est-prod-tipo-chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+    <div class="tipo-chip activo" data-vista="vibrocompactado" onclick="_mostrarVistaEstadisticasProduccion('vibrocompactado')">🧱 Vibrocompactados</div>
+    <div class="tipo-chip" data-vista="pretensado" onclick="_mostrarVistaEstadisticasProduccion('pretensado')">➰ Pretensados</div>
+  </div>
+
+  <div id="est-prod-vista-vibrocompactado">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
     <div style="font-size:18px;font-weight:700;color:var(--azul)">Estadísticas de Producción — Vibrocompactados</div>
     <div style="display:flex;border:1px solid var(--gris-borde);border-radius:var(--radio);overflow:hidden">
@@ -844,6 +850,78 @@
         <tbody id="est-prod-estandares-body"></tbody>
       </table>
     </div>
+  </div>
+  </div>
+
+  <div id="est-prod-vista-pretensado" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">Estadísticas de Producción — Pretensados</div>
+    <div style="display:flex;border:1px solid var(--gris-borde);border-radius:var(--radio);overflow:hidden">
+      <button id="est-preten-btn-7" onclick="setPeriodoProduccionPretensado(7)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">7 días</button>
+      <button id="est-preten-btn-30" onclick="setPeriodoProduccionPretensado(30)" style="padding:6px 14px;border:none;background:var(--azul);color:white;font-size:12px;font-weight:600;cursor:pointer">30 días</button>
+      <button id="est-preten-btn-90" onclick="setPeriodoProduccionPretensado(90)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">90 días</button>
+      <button id="est-preten-btn-0" onclick="setPeriodoProduccionPretensado(0)" style="padding:6px 14px;border:none;background:white;color:var(--gris-medio);font-size:12px;font-weight:600;cursor:pointer">Todo</button>
+    </div>
+    <button class="btn btn-secundario" onclick="exportarEstadisticasProduccionPretensadoExcel()">⬇️ Exportar Excel</button>
+  </div>
+  <div style="margin-bottom:16px">
+    <select id="est-preten-filtro-producto" class="buscador-input" style="width:auto;min-width:260px" onchange="renderEstadisticasProduccionPretensado()">
+      <option value="">Todos los productos (vista general)</option>
+    </select>
+  </div>
+
+  <div class="stats-grid" id="est-preten-tarjetas"></div>
+  <div id="est-preten-nota-sin-clasificar"></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card">
+      <div class="card-titulo">Tendencia de producción (bancos)</div>
+      <div style="height:280px;position:relative"><canvas id="chart-preten-tendencia"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-titulo">Tendencia de merma y segundas (% de primera)</div>
+      <div style="height:280px;position:relative"><canvas id="chart-preten-tendencia-deficiencia"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-titulo">Producción de hoy — por producto</div>
+    <div style="overflow-x:auto">
+      <table class="tabla-cots" id="tabla-preten-hoy">
+        <thead>
+          <tr>
+            <th>PRODUCTO</th>
+            <th style="text-align:right">BANCOS</th>
+            <th style="text-align:right">ML (PRIMERA)</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-preten-hoy-body">
+          <tr><td colspan="3" class="empty-state"><div class="icono">📅</div><div>Todavía no hay producción registrada hoy.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="card-preten-ml-filtrado" class="card" style="display:none">
+    <div class="card-titulo">Metros lineales producidos (de primera) — producto filtrado</div>
+    <div style="height:280px;position:relative"><canvas id="chart-preten-ml-filtrado"></canvas></div>
+  </div>
+
+  <div id="est-preten-cards-ranking" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card">
+      <div class="card-titulo">Productos con más bancos de producción</div>
+      <div style="height:280px;position:relative"><canvas id="chart-preten-ranking-volumen"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-titulo">Productos con mayor % de deficiencia</div>
+      <div style="height:280px;position:relative"><canvas id="chart-preten-ranking-deficiencia"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-titulo">Consumo de cemento por metro lineal (de primera) — tendencia</div>
+    <div style="height:260px;position:relative"><canvas id="chart-preten-cemento-ml"></canvas></div>
+  </div>
   </div>
 </div>
 
@@ -2606,7 +2684,8 @@
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
 <script src="js/produccion-diaria.js?v=20260917a"></script>
 <script src="js/produccion-materia-prima.js?v=20260909a"></script>
-<script src="js/estadisticas-produccion.js?v=20260918b"></script>
+<script src="js/estadisticas-produccion.js?v=20260921a"></script>
+<script src="js/estadisticas-produccion-pretensado.js?v=20260921a"></script>
 <script src="js/produccion-atipicos.js?v=20260918b"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>

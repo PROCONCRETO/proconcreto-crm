@@ -55,6 +55,32 @@ function _unidadesCicloPorProducto() {
   return mapa;
 }
 
+// ── Selector de vista (por tipo de estructura) — 2026-09-21, a pedido del usuario: "incluyamos
+// dos botones (incluiremos más, más adelante) uno para abrir el módulo de estadísticas para
+// vibrocompactados, y otro para abrir el módulo de estadísticas para pretensados". Cada vista es
+// un dashboard completo e independiente (su propio período, su propio filtro de producto, sus
+// propias gráficas) — SOLO se alternan qué contenedor está visible; los datos de la vista que no
+// se ve no se pierden ni se recalculan de más (Chart.js no reinicia sus instancias al ocultar un
+// canvas). `_renderEstadisticasProduccionActiva()` es el único punto que sabe cuál de las dos
+// hay que refrescar — lo usan los 3 sitios que antes llamaban a renderEstadisticasProduccion() a
+// ciegas al recargar datos en tiempo real (ver datos-realtime.js/navegacion.js).
+let _vistaEstadisticasProduccion = 'vibrocompactado';
+function _mostrarVistaEstadisticasProduccion(vista) {
+  _vistaEstadisticasProduccion = vista;
+  document.querySelectorAll('#est-prod-tipo-chips .tipo-chip').forEach(el => {
+    el.classList.toggle('activo', el.dataset.vista === vista);
+  });
+  const vVibro = document.getElementById('est-prod-vista-vibrocompactado');
+  const vPreten = document.getElementById('est-prod-vista-pretensado');
+  if (vVibro) vVibro.style.display = vista === 'vibrocompactado' ? '' : 'none';
+  if (vPreten) vPreten.style.display = vista === 'pretensado' ? '' : 'none';
+  _renderEstadisticasProduccionActiva();
+}
+function _renderEstadisticasProduccionActiva() {
+  if (_vistaEstadisticasProduccion === 'pretensado' && typeof renderEstadisticasProduccionPretensado === 'function') renderEstadisticasProduccionPretensado();
+  else renderEstadisticasProduccion();
+}
+
 // Ventana rodante — mismo patrón que _periodoLogistica/setPeriodoLogistica() en
 // estadisticas-logistica.js (7/30/90 días o todo, dias=0 = todo).
 let _periodoProduccion = 30;

@@ -121,7 +121,7 @@ function rerenderPantallaActiva() {
     case 'pantalla-control-ensayos': renderEnsayosCalidad(); break;
     case 'pantalla-analisis-estadistico': renderAnalisisEstadistico(); break;
     case 'pantalla-materia-prima': renderMateriaPrima(); break;
-    case 'pantalla-produccion-estadisticas': renderEstadisticasProduccion(); break;
+    case 'pantalla-produccion-estadisticas': _renderEstadisticasProduccionActiva(); break;
     case 'pantalla-produccion-revision': renderRevisionDiasAtipicos(); break;
     case 'pantalla-logistica': renderCalendarioLogistica(); break;
     case 'pantalla-ordenes-despacho': renderOrdenesDespacho(); break;
