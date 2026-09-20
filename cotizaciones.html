@@ -1745,27 +1745,9 @@
     <div id="costeo-tipo-placeholder" class="caja-costeo caja-costeo-punteada"></div>
     <div id="costeo-secciones-tipo" style="display:none">
 
-    <!-- 2. Diseño de Mezcla -->
+    <!-- 2. Rendimiento -->
     <div class="seccion-costeo">
-      <div class="seccion-costeo-titulo"><span class="num">2</span> Diseño de Mezcla</div>
-      <div class="form-grupo" style="margin-bottom:10px">
-        <label>Diseño *</label>
-        <select id="m-costeo-diseno" onchange="_actualizarResumenCosteo()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
-      </div>
-      <div id="costeo-diseno-preview" class="caja-costeo caja-costeo-punteada"></div>
-      <div id="costeo-mp-extra-wrap" style="display:none;margin-top:12px">
-        <label style="font-size:12px;font-weight:600;color:var(--gris-medio)">Otras materias primas <span style="font-weight:400;text-transform:none">(no vienen del Diseño de Mezcla — insertos, placas de anclaje, espuma de vacíos...)</span></label>
-        <table class="tabla-items" style="width:100%;margin-top:6px">
-          <thead><tr><th>Materia prima</th><th style="width:140px">Precio</th><th style="width:110px">Cantidad/unidad</th><th style="width:36px"></th></tr></thead>
-          <tbody id="costeo-mp-extra-body"></tbody>
-        </table>
-        <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarMateriaPrimaExtraCosteo()">+ Agregar materia prima</button>
-      </div>
-    </div>
-
-    <!-- 3. Rendimiento -->
-    <div class="seccion-costeo">
-      <div class="seccion-costeo-titulo"><span class="num">3</span> Rendimiento de producción <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(propio del producto/molde — no del Diseño de Mezcla)</span></div>
+      <div class="seccion-costeo-titulo"><span class="num">2</span> Rendimiento de producción <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(propio del producto/molde — no del Diseño de Mezcla)</span></div>
       <div class="form-grid-3">
         <div id="rendimiento-campos-vibrocompactado" style="display:contents">
           <div class="form-grupo"><label>Peso / unidad (kg) <span class="hint">(informativo)</span></label><input type="number" id="m-costeo-peso-unidad" min="0" step="0.01" oninput="_actualizarResumenCosteo()"></div>
@@ -1788,15 +1770,33 @@
         <div class="form-grupo"><label>Unidades / Bache <span class="hint">(rendimiento real de una mezclada completa)</span></label><input type="number" id="m-costeo-unidades-bache" min="0" step="1" oninput="_actualizarResumenCosteo()"></div>
         <div class="form-grupo"><label>Unidades / estiba</label><input type="number" id="m-costeo-unidades-estiba" min="0" step="1" oninput="_actualizarResumenCosteo()"></div>
       </div>
-      <div id="rendimiento-refuerzo-reforzado" class="form-grid" style="margin-top:10px;display:none">
-        <div class="form-grupo"><label>Acero Figurado (kg / unidad) <span class="hint">(según diseño de refuerzo de esta pieza)</span></label><input type="number" id="m-costeo-acero-kg" min="0" step="0.01" oninput="_actualizarResumenCosteo()"></div>
-        <div class="form-grupo"><label>% Alambre Dulce <span class="hint">(sobre el peso del Acero)</span></label><input type="number" id="m-costeo-pct-alambre" min="0" step="0.1" value="2" oninput="_actualizarResumenCosteo()"></div>
-      </div>
       <div id="rendimiento-banco-pretensado" class="form-grid" style="margin-top:10px;display:none">
         <div class="form-grupo"><label>Días / banco <span class="hint">(cuántos días le toma a la línea completar un banco — rendimiento por defecto, cada cuadrilla o máquina lo puede anular)</span></label><input type="number" id="m-costeo-bancos-dia" min="0" step="0.01" oninput="_actualizarResumenCosteo()"></div>
       </div>
       <div id="costeo-calculo-vivo" class="caja-costeo"></div>
       <div id="costeo-hint-rendimiento" style="font-size:11px;color:var(--gris-medio);margin-top:6px">Unidades / Bache es un dato real de planta (cuántas unidades rinde una mezclada completa de la mezcladora) — no se calcula desde el peso, se digita directo. La Materia Prima se reparte con este número, no con Peso/unidad.</div>
+    </div>
+
+    <!-- 3. Materias Primas -->
+    <div class="seccion-costeo">
+      <div class="seccion-costeo-titulo"><span class="num">3</span> Materias Primas</div>
+      <div class="form-grupo" style="margin-bottom:10px">
+        <label>Diseño *</label>
+        <select id="m-costeo-diseno" onchange="_actualizarResumenCosteo()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      </div>
+      <div id="costeo-diseno-preview" class="caja-costeo caja-costeo-punteada"></div>
+      <div id="rendimiento-refuerzo-reforzado" class="form-grid" style="margin-top:12px;display:none">
+        <div class="form-grupo"><label>Acero Figurado (kg / unidad) <span class="hint">(según diseño de refuerzo de esta pieza)</span></label><input type="number" id="m-costeo-acero-kg" min="0" step="0.01" oninput="_actualizarResumenCosteo()"></div>
+        <div class="form-grupo"><label>% Alambre Dulce <span class="hint">(sobre el peso del Acero)</span></label><input type="number" id="m-costeo-pct-alambre" min="0" step="0.1" value="2" oninput="_actualizarResumenCosteo()"></div>
+      </div>
+      <div id="costeo-mp-extra-wrap" style="display:none;margin-top:12px">
+        <label style="font-size:12px;font-weight:600;color:var(--gris-medio)">Otras materias primas <span style="font-weight:400;text-transform:none">(no vienen del Diseño de Mezcla — insertos, placas de anclaje, espuma de vacíos...)</span></label>
+        <table class="tabla-items" style="width:100%;margin-top:6px">
+          <thead><tr><th>Materia prima</th><th style="width:140px">Precio</th><th style="width:110px">Cantidad/unidad</th><th style="width:36px"></th></tr></thead>
+          <tbody id="costeo-mp-extra-body"></tbody>
+        </table>
+        <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarMateriaPrimaExtraCosteo()">+ Agregar materia prima</button>
+      </div>
     </div>
 
     <!-- 4. Máquinas -->
@@ -1813,7 +1813,7 @@
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo"><span class="num">5</span> Mano de obra involucrada</div>
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Cuadrilla</th><th style="width:140px">Costo</th><th>Función específica</th><th id="costeo-mo-th-banco" style="width:110px;display:none">Días/banco</th><th id="costeo-mo-th-unidades-dia" style="width:110px">Unidades/día</th><th style="width:36px"></th></tr></thead>
+        <thead><tr><th>Cuadrilla</th><th style="width:140px">Costo</th><th>Función específica</th><th id="costeo-mo-th-banco" style="width:110px;display:none">Días/banco</th><th id="costeo-mo-th-minutos-banco" style="width:95px;display:none" title="Minutos que le toma a la cuadrilla en una tarea puntual por CADA banco. Si se llena, reemplaza Días/banco.">Min/banco</th><th id="costeo-mo-th-unidades-dia" style="width:110px">Unidades/día</th><th id="costeo-mo-th-minutos-unidad" style="width:95px" title="Minutos que le toma a la cuadrilla producir UNA unidad — para tareas puntuales cortas. Si se llena, reemplaza Unidades/día.">Min/unidad</th><th style="width:36px"></th></tr></thead>
         <tbody id="costeo-mano-obra-body"></tbody>
       </table>
       <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarManoObraCosteo()">+ Agregar cuadrilla</button>
@@ -2606,7 +2606,7 @@
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
 <script src="js/costeo-maquinaria.js?v=20260821a"></script>
 <script src="js/costeo-referencia.js?v=20260821a"></script>
-<script src="js/costeo-producto.js?v=20260919a"></script>
+<script src="js/costeo-producto.js?v=20260920c"></script>
 <script src="js/calidad-mezclas.js?v=20260827b"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
 <script src="js/logistica.js?v=20260910b"></script>

@@ -36,6 +36,19 @@ function _productoDesdeTextoCosteo(texto) {
   return PRODUCTOS.find(p => _textoProductoCosteo(p) === t) || null;
 }
 
+// Si el producto elegido en el formulario en curso (antes de guardar) genera IVA — para el
+// precio EN VIVO que se muestra junto a cada fila de Insumos/Otras Materias Primas mientras se
+// arma el costeo (2026-09-19, corrige que esas dos vistas previas siempre mostraban el precio
+// CON IVA sin importar si el producto lo genera o no — el usuario lo detectó comparando contra
+// el resumen final, que sí lo calculaba bien). Mismo criterio que `productoGeneraIva` dentro de
+// calcularCosteoProducto()/_calcularCosteoReforzado()/_calcularCosteoPretensado(), pero leído del
+// campo de texto del formulario en vez de `c.productoCodigo` (todavía no hay `c` mientras se está
+// armando un costeo nuevo).
+function _productoGeneraIvaCosteoActual() {
+  const p = _productoDesdeTextoCosteo(document.getElementById('m-costeo-producto')?.value);
+  return p?.iva === 'SI';
+}
+
 let _sugerenciasProductoCosteo = [];
 let _indiceSugerenciaCosteo = -1;
 let _sugerenciasOcultasPorCosteo = false;
@@ -192,22 +205,27 @@ function _elegirTipoEstructuraCosteo(tipo) {
   if (refuerzoReforzado) refuerzoReforzado.style.display = esReforzado ? '' : 'none';
   const bancoPretensado = document.getElementById('rendimiento-banco-pretensado');
   if (bancoPretensado) bancoPretensado.style.display = esPretensado ? '' : 'none';
-  // Otras materias primas (fuera del Diseño de Mezcla) — solo tiene sentido en Pretensado, a
-  // pedido del usuario (2026-08-25); los demás tipos no la muestran.
+  // Otras materias primas (fuera del Diseño de Mezcla) — Pretensado (2026-08-25) y Reforzado
+  // (2026-09-20, a pedido del usuario: "incluyamos la opción que tenemos en pretensados... para
+  // poder escoger materias primas adicionales utilizadas en el elemento" — insertos, placas de
+  // anclaje, etc. son igual de reales en un elemento Reforzado). Vibrocompactado no la muestra —
+  // no se ha pedido para ese tipo.
   const mpExtraWrap = document.getElementById('costeo-mp-extra-wrap');
-  if (mpExtraWrap) mpExtraWrap.style.display = esPretensado ? '' : 'none';
+  if (mpExtraWrap) mpExtraWrap.style.display = (esPretensado || esReforzado) ? '' : 'none';
   // Columnas "Bancos/día" (Máquinas y Mano de Obra) y "N° hilos" (Máquinas) solo tienen sentido
   // para Pretensado, que reparte por banco. Vibrocompactado/Reforzado tienen su propia columna
   // por fila equivalente en Mano de Obra, "Unidades/día" (2026-08-25, a pedido del usuario: "hay
   // mano de obra que se pone adicional para procesos complementarios que debemos darles un
   // rendimiento diario [propio]" — antes TODA la mano de obra de la línea repartía contra el
   // mismo "unidades/día" de línea, sin poder anularlo fila por fila, ver más abajo).
-  ['costeo-maq-th-banco', 'costeo-maq-th-hilo', 'costeo-mo-th-banco'].forEach(id => {
+  ['costeo-maq-th-banco', 'costeo-maq-th-hilo', 'costeo-mo-th-banco', 'costeo-mo-th-minutos-banco'].forEach(id => {
     const th = document.getElementById(id);
     if (th) th.style.display = esPretensado ? '' : 'none';
   });
   const thUnidadesDia = document.getElementById('costeo-mo-th-unidades-dia');
   if (thUnidadesDia) thUnidadesDia.style.display = esPretensado ? 'none' : '';
+  const thMinutosUnidad = document.getElementById('costeo-mo-th-minutos-unidad');
+  if (thMinutosUnidad) thMinutosUnidad.style.display = esPretensado ? 'none' : '';
   if (hintRendimiento) hintRendimiento.textContent = esPretensado
     ? 'Metros lineales/banco, Hilos/banco y Longitud bruta del hilo son datos reales de la colada — con ellos se calcula solo el Acero de Pretensionamiento. Días/banco (cuántos días le toma a la línea completar un banco) es el rendimiento por defecto de toda la línea; cada cuadrilla o máquina lo puede anular más abajo si tiene un ritmo real distinto.'
     : esReforzado
@@ -335,9 +353,10 @@ function renderMateriaPrimaExtraCosteo() {
     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Sin materias primas adicionales</td></tr>`;
     return;
   }
+  const _generaIva = _productoGeneraIvaCosteoActual();
   tbody.innerHTML = _materiaPrimaExtraCosteoActual.map((row, i) => {
     const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
-    const precio = ins ? `${_fmtRef(calcularCostoInsumo(ins).valorFinal)}/${_labelUnidadInsumo(ins.unidad)}` : '—';
+    const precio = ins ? `${_fmtRef(_precioInsumoPorNombre(row.nombre, _generaIva))}/${_labelUnidadInsumo(ins.unidad)}` : '—';
     return `<tr>
       <td><select onchange="_materiaPrimaExtraCosteoActual[${i}].nombre=this.value;renderMateriaPrimaExtraCosteo();_actualizarResumenCosteo()">${_opcionesInsumoCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio);white-space:nowrap">${precio}</td>
@@ -362,6 +381,35 @@ function _diasBancoTexto(bancosDia) {
 function _bancosDiaDesdeDias(valorDias) {
   const v = parseFloat(valorDias);
   return (v > 0) ? 1 / v : 0;
+}
+
+// "Minutos/unidad" por fila de Mano de Obra — alternativa a "Unidades/día" para Vibrocompactado
+// y Reforzado (2026-09-20, a pedido del usuario: "hay actividades puntuales de cuadrillas donde
+// intervienen un tiempo parcial del día para una unidad, como... la cuadrilla de preparación de
+// concreto, donde se demoran media hora para la preparación de concreto de una unidad producida"
+// — pensar en "Unidades/día" para una tarea de minutos exige convertir mentalmente cuántas
+// unidades cabrían en un día completo, un paso innecesario e intuitivo al revés). Se digita en
+// minutos (más natural que horas para una tarea corta) y se convierte a "unidades/día
+// equivalentes" con las MISMAS horas laboradas por día que ya usa costeo-mano-obra.js para sacar
+// el valor/hora de una cuadrilla (`PARAMETROS_MO.horasSemanales ÷ 5`, ver _totalCuadrilla()) —
+// mismo criterio, no una suposición nueva. Si se diligencia, manda sobre "Unidades/día" de la
+// misma fila (más específico); si no, esa fila sigue funcionando exactamente igual que antes.
+function _unidadesDiaDesdeMinutos(minutosPorUnidad) {
+  if (!(minutosPorUnidad > 0)) return 0;
+  const horasPorDiaLaborado = (PARAMETROS_MO.horasSemanales || 42) / 5;
+  return (horasPorDiaLaborado * 60) / minutosPorUnidad;
+}
+
+// Mismo alivio que _unidadesDiaDesdeMinutos(), pero para Pretensado — que en vez de "Unidades/día"
+// reparte por "Días/banco" (2026-09-20, a pedido del usuario: "revisa cómo lo estamos haciendo con
+// pretensados para que quede algo coherente en todas las estructuras"). Un banco es el equivalente
+// pretensado de "una unidad de esfuerzo" — la tarea corta de este tipo (ej. preparación de
+// concreto para UN banco) se piensa igual de natural en minutos/banco, no en bancos/día. Si se
+// diligencia, manda sobre "Días/banco" de la misma fila.
+function _bancosDiaDesdeMinutos(minutosPorBanco) {
+  if (!(minutosPorBanco > 0)) return 0;
+  const horasPorDiaLaborado = (PARAMETROS_MO.horasSemanales || 42) / 5;
+  return (horasPorDiaLaborado * 60) / minutosPorBanco;
 }
 
 // ── Máquinas involucradas (filas dinámicas) ──
@@ -429,7 +477,7 @@ function renderManoObraCosteo() {
   if (!tbody) return;
   const esPretensado = document.getElementById('m-costeo-tipo')?.value === 'pretensado';
   if (!_manoObraCosteoActual.length) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las cuadrillas de la línea de producción</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las cuadrillas de la línea de producción</td></tr>`;
     return;
   }
   tbody.innerHTML = _manoObraCosteoActual.map((row, i) => {
@@ -438,20 +486,35 @@ function renderManoObraCosteo() {
     // "Días/banco" solo aplica a Pretensado — cada cuadrilla real (Bobcat, Montacargas, Puente
     // Grúa, oficial+ayudantes) tiene su propio ritmo de producción; vacío = usa el de la línea.
     const celdaPretensado = esPretensado
-      ? `<td><input type="number" min="0" step="0.01" value="${_diasBancoTexto(row.bancosDiaFila)}" placeholder="de línea" title="Días que le toma a esta cuadrilla completar un banco" style="width:90px" oninput="_manoObraCosteoActual[${i}].bancosDiaFila=_bancosDiaDesdeDias(this.value);_actualizarResumenCosteo()"></td>` : '';
+      ? `<td><input type="number" min="0" step="0.01" value="${_diasBancoTexto(row.bancosDiaFila)}" placeholder="de línea" title="Días que le toma a esta cuadrilla completar un banco. Si además llenas 'Min/banco', ese dato manda sobre este." style="width:90px" oninput="_manoObraCosteoActual[${i}].bancosDiaFila=_bancosDiaDesdeDias(this.value);_actualizarResumenCosteo()"></td>` : '';
+    // "Minutos/banco" por fila — Pretensado (2026-09-20, a pedido del usuario: "revisa cómo lo
+    // estamos haciendo con pretensados para que quede algo coherente en todas las estructuras")
+    // — mismo alivio que "Minutos/unidad" en Vibrocompactado/Reforzado, para una tarea puntual
+    // corta (ej. preparación de concreto para UN banco). Si se llena, tiene prioridad sobre
+    // "Días/banco" de la misma fila — ver _bancosDiaDesdeMinutos().
+    const celdaMinutosBanco = esPretensado
+      ? `<td><input type="number" min="0" step="1" value="${row.minutosBancoFila || ''}" placeholder="—" title="Minutos que le toma a esta cuadrilla en una tarea puntual por CADA banco (ej. preparación de concreto). Si se llena, reemplaza 'Días/banco' de esta fila." style="width:75px" oninput="_manoObraCosteoActual[${i}].minutosBancoFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
     // "Unidades/día" por fila — Vibrocompactado/Reforzado (2026-08-25, a pedido del usuario):
     // antes toda la mano de obra de la línea repartía siempre contra el mismo Unidades/día de
     // línea (Sección 3); mano de obra adicional para un proceso complementario (con su propio
     // ritmo real, distinto al de la línea) no tenía forma de anularlo. Vacío = hereda el de la
     // línea, mismo criterio que "de línea" en Pretensado/Maquinaria.
     const celdaUnidadesDia = !esPretensado
-      ? `<td><input type="number" min="0" step="0.01" value="${row.unidadesDiaFila || ''}" placeholder="de línea" style="width:90px" oninput="_manoObraCosteoActual[${i}].unidadesDiaFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
+      ? `<td><input type="number" min="0" step="0.01" value="${row.unidadesDiaFila || ''}" placeholder="de línea" title="Unidades que esta cuadrilla completa en un día. Si además llenas 'Min/unidad', ese dato manda sobre este." style="width:90px" oninput="_manoObraCosteoActual[${i}].unidadesDiaFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
+    // "Minutos/unidad" por fila (2026-09-20, a pedido del usuario) — alternativa a "Unidades/día"
+    // para actividades puntuales rápidas donde la cuadrilla solo interviene una fracción del día
+    // por unidad (ej. preparación de concreto, media hora = 30). Si se llena, tiene prioridad
+    // sobre "Unidades/día" de la misma fila — ver _unidadesDiaDesdeMinutos().
+    const celdaMinutosUnidad = !esPretensado
+      ? `<td><input type="number" min="0" step="1" value="${row.minutosUnidadFila || ''}" placeholder="—" title="Minutos que le toma a esta cuadrilla producir UNA unidad — para tareas puntuales cortas (ej. preparación de concreto, media hora = 30). Si se llena, reemplaza 'Unidades/día' de esta fila." style="width:75px" oninput="_manoObraCosteoActual[${i}].minutosUnidadFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
     return `<tr>
       <td><select onchange="_manoObraCosteoActual[${i}].nombre=this.value;_actualizarResumenCosteo()">${_opcionesCuadrillaCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio)">${info}</td>
       <td><input type="text" value="${_escAttr(row.nota || '')}" placeholder="ej: armado de molde, vaciado..." style="width:100%" oninput="_manoObraCosteoActual[${i}].nota=this.value;_actualizarResumenCosteo()"></td>
       ${celdaPretensado}
+      ${celdaMinutosBanco}
       ${celdaUnidadesDia}
+      ${celdaMinutosUnidad}
       <td><button class="btn btn-rojo btn-xs" onclick="_manoObraCosteoActual.splice(${i},1);renderManoObraCosteo();_actualizarResumenCosteo()">✕</button></td>
     </tr>`;
   }).join('');
@@ -482,9 +545,10 @@ function renderInsumosCosteo() {
   // usuario). Se avisa en el propio desplegable y con un aviso en la fila.
   const tipo = document.getElementById('m-costeo-tipo')?.value;
   const estibaAplica = tipo === 'vibrocompactado' || !tipo;
+  const _generaIva = _productoGeneraIvaCosteoActual();
   tbody.innerHTML = _insumosCosteoActual.map((row, i) => {
     const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
-    const precio = ins ? _fmtRef(calcularCostoInsumo(ins).valorFinal) + '/' + _labelUnidadInsumo(ins.unidad) : '—';
+    const precio = ins ? _fmtRef(_precioInsumoPorNombre(row.nombre, _generaIva)) + '/' + _labelUnidadInsumo(ins.unidad) : '—';
     return `<tr>
       <td><select onchange="_insumosCosteoActual[${i}].nombre=this.value;renderInsumosCosteo();_actualizarResumenCosteo()">${_opcionesInsumoCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio);white-space:nowrap">${precio}</td>
@@ -672,12 +736,14 @@ function calcularCosteoProducto(c) {
   // de línea (arriba); "Unidades/día" por fila (2026-08-25, a pedido del usuario) la anula
   // cuando esa cuadrilla es un proceso complementario con su propio ritmo real (ej. una mano de
   // obra adicional que no avanza al ritmo de la línea principal) — vacío = hereda la de línea.
+  // "Minutos/unidad" por fila (2026-09-20) tiene prioridad sobre "Unidades/día" cuando se
+  // diligencia — ver _unidadesDiaDesdeMinutos().
   let manoObra = 0;
   const manoObraDetalle = [];
   (c.manoObra || []).forEach(row => {
     const cu = CUADRILLAS_PRODUCTIVAS.find(x => x.nombre === row.nombre);
     const costoDia = cu ? _totalCuadrilla(cu).diario : 0;
-    const unidadesDiaFila = row.unidadesDiaFila || unidadesDia;
+    const unidadesDiaFila = _unidadesDiaDesdeMinutos(row.minutosUnidadFila) || row.unidadesDiaFila || unidadesDia;
     const costo = (cu && unidadesDiaFila > 0) ? costoDia / unidadesDiaFila : 0;
     manoObra += costo;
     manoObraDetalle.push({ nombre: row.nota ? `${row.nombre} — ${row.nota}` : row.nombre, costoDia, costo, noEncontrado: !cu });
@@ -800,6 +866,20 @@ function _calcularCosteoReforzado(c) {
   }
   const desperdicio = materiaPrima * ((c.pctDesperdicio || 0) / 100);
 
+  // Otras materias primas fuera del Diseño de Mezcla (insertos, placas de anclaje, espuma de
+  // vacíos...) — mismo bloque que ya tenía Pretensado (2026-08-25), extendido a Reforzado
+  // (2026-09-20, a pedido del usuario: "incluyamos la opción que tenemos en pretensados... para
+  // poder escoger materias primas adicionales utilizadas en el elemento"). Se suman a Materia
+  // Prima DESPUÉS de `desperdicio`, para no aplicarles el % de desperdicio de la mezcla — mismo
+  // criterio que Pretensado, un inserto no es parte de la mezcla de concreto.
+  (c.materiaPrimaExtra || []).forEach(row => {
+    const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
+    const precio = _precioInsumoPorNombre(row.nombre, productoGeneraIva);
+    const costo = (row.cantidad || 0) * precio;
+    materiaPrima += costo;
+    materiaPrimaDetalle.push({ nombre: row.nombre, unidad: ins ? _labelUnidadInsumo(ins.unidad) : '', cantidad: row.cantidad, precio, costo, noEncontrado: !ins });
+  });
+
   // Refuerzo — Acero Figurado es una cantidad manual (depende de la geometría/complejidad real
   // de cada pieza, no se puede derivar de una fórmula genérica). Alambre Dulce sí se deriva: un
   // % del peso del Acero (editable, 2% por defecto) — a pedido del usuario, 2026-08-14. Los
@@ -822,13 +902,15 @@ function _calcularCosteoReforzado(c) {
 
   // Mano de Obra — mismo patrón que Vibrocompactado: costo/día de cada cuadrilla ÷ unidades/día,
   // anulable fila por fila con "Unidades/día" (2026-08-25, a pedido del usuario) para mano de
-  // obra de un proceso complementario con ritmo propio, distinto al de la línea.
+  // obra de un proceso complementario con ritmo propio, distinto al de la línea. "Minutos/unidad"
+  // por fila (2026-09-20) tiene prioridad sobre "Unidades/día" cuando se diligencia — ver
+  // _unidadesDiaDesdeMinutos().
   let manoObra = 0;
   const manoObraDetalle = [];
   (c.manoObra || []).forEach(row => {
     const cu = CUADRILLAS_PRODUCTIVAS.find(x => x.nombre === row.nombre);
     const costoDia = cu ? _totalCuadrilla(cu).diario : 0;
-    const unidadesDiaFila = row.unidadesDiaFila || unidadesDia;
+    const unidadesDiaFila = _unidadesDiaDesdeMinutos(row.minutosUnidadFila) || row.unidadesDiaFila || unidadesDia;
     const costo = (cu && unidadesDiaFila > 0) ? costoDia / unidadesDiaFila : 0;
     manoObra += costo;
     manoObraDetalle.push({ nombre: row.nota ? `${row.nombre} — ${row.nota}` : row.nombre, costoDia, costo, noEncontrado: !cu });
@@ -997,13 +1079,14 @@ function _calcularCosteoPretensado(c) {
   // Mano de Obra — cada cuadrilla real tiene su propio ritmo (Bobcat, Montacargas, Puente Grúa y
   // las cuadrillas de oficial+ayudantes NO avanzan igual de rápido; confirmado contra el Excel
   // que hasta cambia entre vigueta y prelosa para la misma cuadrilla) — por fila, "Bancos/día"
-  // propio si se indica, si no hereda el de la línea.
+  // propio si se indica, si no hereda el de la línea. "Minutos/banco" por fila (2026-09-20) tiene
+  // prioridad sobre "Días/banco" cuando se diligencia — ver _bancosDiaDesdeMinutos().
   let manoObra = 0;
   const manoObraDetalle = [];
   (c.manoObra || []).forEach(row => {
     const cu = CUADRILLAS_PRODUCTIVAS.find(x => x.nombre === row.nombre);
     const costoDia = cu ? _totalCuadrilla(cu).diario : 0;
-    const bancosDiaFila = row.bancosDiaFila || bancosDiaLinea;
+    const bancosDiaFila = _bancosDiaDesdeMinutos(row.minutosBancoFila) || row.bancosDiaFila || bancosDiaLinea;
     const unidadesDiaFila = bancosDiaFila * metrosLinealesBanco;
     const costo = (cu && unidadesDiaFila > 0) ? costoDia / unidadesDiaFila : 0;
     manoObra += costo;
