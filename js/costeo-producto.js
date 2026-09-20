@@ -19,6 +19,7 @@ const TIPOS_ESTRUCTURA_COSTEO = {
   pretensado:            { label: '➰ Pretensado',            bg: '#E3F2FD', fg: '#1565C0' },
   pretensado_moldeado:   { label: '🏗️ Pretensado Moldeado',  bg: '#FFF3E0', fg: '#E65100' },
   reforzado:             { label: '🔩 Reforzado',             bg: '#F3E5F5', fg: '#6A1B9A' },
+  elemento_simple:       { label: '⬛ Elemento Simple',        bg: '#ECEFF1', fg: '#455A64' },
 };
 
 function _fmtCosteoProd(n) {
@@ -164,17 +165,19 @@ const _INSUMOS_DEFECTO_VIBROCOMPACTADO = [
 // La estructura completa del cuestionario (Diseño de Mezcla, Rendimiento, Máquinas...) depende
 // del tipo elegido aquí — un Vibrocompactado se arma distinto a un Reforzado (ver BD MEZCLA
 // VIBROCOMPACTADOS del Excel, la fuente real de esa estructura) — por eso las secciones 2-8
-// quedan ocultas hasta que se elige un tipo (2026-08-02, a pedido del usuario). Hoy Vibrocompactado
-// y Reforzado tienen su cuestionario construido; Pretensado y Pretensado Moldeado siguen pendientes.
+// quedan ocultas hasta que se elige un tipo (2026-08-02, a pedido del usuario). Hoy Vibrocompactado,
+// Reforzado, Pretensado y Elemento Simple (2026-09-20) tienen su cuestionario construido;
+// Pretensado Moldeado sigue pendiente.
 function _elegirTipoEstructuraCosteo(tipo) {
   document.getElementById('m-costeo-tipo').value = tipo;
   document.querySelectorAll('#costeo-tipo-chips .tipo-chip').forEach(el => {
     el.classList.toggle('activo', el.dataset.tipo === tipo);
   });
-  const disponible = tipo === 'vibrocompactado' || tipo === 'reforzado' || tipo === 'pretensado';
+  const disponible = tipo === 'vibrocompactado' || tipo === 'reforzado' || tipo === 'pretensado' || tipo === 'elemento_simple';
   const esReforzado = tipo === 'reforzado';
   const esPretensado = tipo === 'pretensado';
   const esVibrocompactado = tipo === 'vibrocompactado';
+  const esElementoSimple = tipo === 'elemento_simple';
   const wrapper = document.getElementById('costeo-secciones-tipo');
   const placeholder = document.getElementById('costeo-tipo-placeholder');
   if (wrapper) wrapper.style.display = disponible ? '' : 'none';
@@ -182,7 +185,7 @@ function _elegirTipoEstructuraCosteo(tipo) {
     placeholder.style.display = disponible ? 'none' : '';
     if (!disponible) {
       placeholder.innerHTML = tipo
-        ? `El cuestionario de <b>${(TIPOS_ESTRUCTURA_COSTEO[tipo] || {}).label || tipo}</b> todavía no está construido — por ahora solo están disponibles Vibrocompactado, Reforzado y Pretensado.`
+        ? `El cuestionario de <b>${(TIPOS_ESTRUCTURA_COSTEO[tipo] || {}).label || tipo}</b> todavía no está construido — por ahora solo están disponibles Vibrocompactado, Reforzado, Pretensado y Elemento Simple.`
         : 'Elige un tipo de estructura arriba para continuar — cada tipo tiene su propio cuestionario (la receta y las máquinas de un Vibrocompactado no son las de un Reforzado).';
     }
   }
@@ -195,23 +198,29 @@ function _elegirTipoEstructuraCosteo(tipo) {
   const camposVibro = document.getElementById('rendimiento-campos-vibrocompactado');
   const camposReforzado = document.getElementById('rendimiento-campos-reforzado');
   const camposPretensado = document.getElementById('rendimiento-campos-pretensado');
+  const camposElementoSimple = document.getElementById('rendimiento-campos-elemento-simple');
   const bacheVibro = document.getElementById('rendimiento-bache-vibrocompactado');
   const refuerzoReforzado = document.getElementById('rendimiento-refuerzo-reforzado');
   const hintRendimiento = document.getElementById('costeo-hint-rendimiento');
   if (camposVibro) camposVibro.style.display = esVibrocompactado ? 'contents' : 'none';
   if (camposReforzado) camposReforzado.style.display = esReforzado ? 'contents' : 'none';
   if (camposPretensado) camposPretensado.style.display = esPretensado ? 'contents' : 'none';
+  if (camposElementoSimple) camposElementoSimple.style.display = esElementoSimple ? 'contents' : 'none';
   if (bacheVibro) bacheVibro.style.display = esVibrocompactado ? '' : 'none';
+  // El bloque de Refuerzo (Acero Figurado/Alambre Dulce) es EXCLUSIVO de Reforzado — Elemento
+  // Simple (2026-09-20) no lo trae aunque comparta el resto del motor: "puede ser reforzado...
+  // pero el refuerzo lo incluiríamos como una materia prima más" (ver _calcularCosteoElementoSimple()).
   if (refuerzoReforzado) refuerzoReforzado.style.display = esReforzado ? '' : 'none';
   const bancoPretensado = document.getElementById('rendimiento-banco-pretensado');
   if (bancoPretensado) bancoPretensado.style.display = esPretensado ? '' : 'none';
-  // Otras materias primas (fuera del Diseño de Mezcla) — Pretensado (2026-08-25) y Reforzado
+  // Otras materias primas (fuera del Diseño de Mezcla) — Pretensado (2026-08-25), Reforzado
   // (2026-09-20, a pedido del usuario: "incluyamos la opción que tenemos en pretensados... para
   // poder escoger materias primas adicionales utilizadas en el elemento" — insertos, placas de
-  // anclaje, etc. son igual de reales en un elemento Reforzado). Vibrocompactado no la muestra —
+  // anclaje, etc.) y Elemento Simple (2026-09-20, mismo motor que Reforzado — y además es donde
+  // entra cualquier acero puntual de un elemento de este tipo). Vibrocompactado no la muestra —
   // no se ha pedido para ese tipo.
   const mpExtraWrap = document.getElementById('costeo-mp-extra-wrap');
-  if (mpExtraWrap) mpExtraWrap.style.display = (esPretensado || esReforzado) ? '' : 'none';
+  if (mpExtraWrap) mpExtraWrap.style.display = (esPretensado || esReforzado || esElementoSimple) ? '' : 'none';
   // Columnas "Bancos/día" (Máquinas y Mano de Obra) y "N° hilos" (Máquinas) solo tienen sentido
   // para Pretensado, que reparte por banco. Vibrocompactado/Reforzado tienen su propia columna
   // por fila equivalente en Mano de Obra, "Unidades/día" (2026-08-25, a pedido del usuario: "hay
@@ -223,13 +232,13 @@ function _elegirTipoEstructuraCosteo(tipo) {
     if (th) th.style.display = esPretensado ? '' : 'none';
   });
   // "Unidades/día"/"Min/unidad" de Máquinas (2026-09-20) — a diferencia de las de Mano de Obra
-  // (compartidas por Vibrocompactado y Reforzado), estas son SOLO para Reforzado, que es donde
-  // el usuario reportó el problema ("la maquinaria está asumiendo como si se usara todo el día") —
-  // Vibrocompactado sigue repartiendo sus máquinas 'día' contra el Unidades/día de línea sin
-  // anular por fila, no se ha pedido cambiar eso.
+  // (compartidas por Vibrocompactado y Reforzado), estas son para Reforzado y Elemento Simple
+  // (mismo motor de Máquinas), que es donde el usuario reportó el problema ("la maquinaria está
+  // asumiendo como si se usara todo el día") — Vibrocompactado sigue repartiendo sus máquinas
+  // 'día' contra el Unidades/día de línea sin anular por fila, no se ha pedido cambiar eso.
   ['costeo-maq-th-unidades-dia', 'costeo-maq-th-minutos-unidad'].forEach(id => {
     const th = document.getElementById(id);
-    if (th) th.style.display = esReforzado ? '' : 'none';
+    if (th) th.style.display = (esReforzado || esElementoSimple) ? '' : 'none';
   });
   const thUnidadesDia = document.getElementById('costeo-mo-th-unidades-dia');
   if (thUnidadesDia) thUnidadesDia.style.display = esPretensado ? 'none' : '';
@@ -237,7 +246,7 @@ function _elegirTipoEstructuraCosteo(tipo) {
   if (thMinutosUnidad) thMinutosUnidad.style.display = esPretensado ? 'none' : '';
   if (hintRendimiento) hintRendimiento.textContent = esPretensado
     ? 'Metros lineales/banco, Hilos/banco y Longitud bruta del hilo son datos reales de la colada — con ellos se calcula solo el Acero de Pretensionamiento. Días/banco (cuántos días le toma a la línea completar un banco) es el rendimiento por defecto de toda la línea; cada cuadrilla o máquina lo puede anular más abajo si tiene un ritmo real distinto.'
-    : esReforzado
+    : (esReforzado || esElementoSimple)
     ? 'El Volumen de concreto por unidad es un dato real de la pieza (viene de su diseño/geometría) — se digita directo. El peso equivalente se muestra abajo, derivado con una densidad de 2450 kg/m³, solo de referencia.'
     : 'Unidades / Bache es un dato real de planta (cuántas unidades rinde una mezclada completa de la mezcladora) — no se calcula desde el peso, se digita directo. La Materia Prima se reparte con este número, no con Peso/unidad.';
   // A diferencia de Vibrocompactado, ni Reforzado ni Pretensado traen máquinas/insumos por
@@ -478,8 +487,9 @@ function renderMaquinasCosteo() {
   if (!tbody) return;
   const esPretensado = document.getElementById('m-costeo-tipo')?.value === 'pretensado';
   const esReforzado = document.getElementById('m-costeo-tipo')?.value === 'reforzado';
+  const esElementoSimple = document.getElementById('m-costeo-tipo')?.value === 'elemento_simple';
   if (!_maquinasCosteoActual.length) {
-    tbody.innerHTML = `<tr><td colspan="${(esPretensado || esReforzado) ? 7 : 5}" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las máquinas de la línea de producción</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${(esPretensado || esReforzado || esElementoSimple) ? 7 : 5}" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las máquinas de la línea de producción</td></tr>`;
     return;
   }
   tbody.innerHTML = _maquinasCosteoActual.map((row, i) => {
@@ -503,13 +513,14 @@ function renderMaquinasCosteo() {
     const celdasPretensado = esPretensado ? `
       <td><input type="number" min="0" step="0.01" value="${_diasBancoTexto(row.bancosDiaFila)}" placeholder="de línea" title="Días que le toma a esta máquina completar un banco" style="width:90px" oninput="_maquinasCosteoActual[${i}].bancosDiaFila=_bancosDiaDesdeDias(this.value);_actualizarResumenCosteo()"></td>
       <td><input type="number" min="0" step="1" value="${row.numeroHilos || ''}" placeholder="—" title="N° de hilos de ESTE elemento (no del banco completo) — con valor, se usa una vez por cada hilo" style="width:70px" oninput="_maquinasCosteoActual[${i}].numeroHilos=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
-    // "Unidades/día" y "Min/unidad" — Reforzado (2026-09-20, a pedido del usuario: "la maquinaria
-    // está asumiendo como si se usara todo el día para la producción... podamos asignar de
-    // acuerdo al uso real que se le da"). Solo tienen efecto en máquinas con unidad de uso "día"
+    // "Unidades/día" y "Min/unidad" — Reforzado y Elemento Simple (2026-09-20, a pedido del
+    // usuario: "la maquinaria está asumiendo como si se usara todo el día para la producción...
+    // podamos asignar de acuerdo al uso real que se le da"; Elemento Simple comparte el mismo
+    // motor de Máquinas que Reforzado). Solo tienen efecto en máquinas con unidad de uso "día"
     // (grúa, montacargas...) — en las demás (m³, ciclo) no cambia nada aunque se llenen. Mismo
     // patrón que ya tiene Mano de Obra en este tipo: si se llena "Min/unidad", manda sobre
     // "Unidades/día" de esa misma fila.
-    const celdasReforzado = esReforzado ? `
+    const celdasReforzado = (esReforzado || esElementoSimple) ? `
       <td><input type="number" min="0" step="0.01" value="${row.unidadesDiaFila || ''}" placeholder="de línea" title="Unidades que esta máquina completa en un día (solo aplica a máquinas que se reparten 'por día'). Si además llenas 'Min/unidad', ese dato manda sobre este." style="width:90px" oninput="_maquinasCosteoActual[${i}].unidadesDiaFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>
       <td><input type="number" min="0" step="1" value="${row.minutosUnidadFila || ''}" placeholder="—" title="Minutos que le toma a esta máquina intervenir en UNA unidad — para usos puntuales cortos (solo aplica a máquinas 'por día'). Si se llena, reemplaza 'Unidades/día' de esta fila." style="width:75px" oninput="_maquinasCosteoActual[${i}].minutosUnidadFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
     return `<tr>
@@ -538,10 +549,11 @@ function _asignarOperarioMaquina(i) {
   const tipo = document.getElementById('m-costeo-tipo')?.value;
   const esPretensado = tipo === 'pretensado';
   const esReforzado = tipo === 'reforzado';
+  const esElementoSimple = tipo === 'elemento_simple';
   const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
   const nuevaFila = { nombre: 'Operario de maquinaria', nota: row.nombre ? `Operario de ${row.nombre}` : '' };
   if (esPretensado && maq && maq.unidadUso === 'dia') nuevaFila.bancosDiaFila = row.bancosDiaFila;
-  if (esReforzado && maq && maq.unidadUso === 'dia') {
+  if ((esReforzado || esElementoSimple) && maq && maq.unidadUso === 'dia') {
     nuevaFila.unidadesDiaFila = row.unidadesDiaFila;
     nuevaFila.minutosUnidadFila = row.minutosUnidadFila;
   }
@@ -676,13 +688,14 @@ function _opcionesAceroPretensadoCosteo(seleccionado) {
   return '<option value="">— Selecciona —</option>' + items.map(i => `<option value="${_escAttr(i.nombre)}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
 }
 // El reparto por defecto de una fila nueva depende del tipo: Vibrocompactado sí tiene
-// "Unidades/estiba" diligenciable (empaque real, se vende por estiba); Reforzado y Pretensado
-// no tienen ese campo en su cuestionario (se venden por unidad/ml, no por estiba) — dejarlas en
-// "Por estiba" por defecto ahí es exactamente el bug de coherencia que reportó el usuario (fila
-// que no suma costo sin ningún aviso). "Por día" es el reparto que sí tienen los tres tipos.
+// "Unidades/estiba" diligenciable (empaque real, se vende por estiba); Reforzado, Pretensado y
+// Elemento Simple (2026-09-20) no tienen ese campo en su cuestionario (se venden por unidad/ml,
+// no por estiba) — dejarlas en "Por estiba" por defecto ahí es exactamente el bug de coherencia
+// que reportó el usuario (fila que no suma costo sin ningún aviso). "Por día" es el reparto que
+// sí tienen los cuatro tipos.
 function agregarInsumoCosteo() {
   const tipo = document.getElementById('m-costeo-tipo')?.value;
-  const repartoDefecto = (tipo === 'reforzado' || tipo === 'pretensado') ? 'dia' : 'estiba';
+  const repartoDefecto = (tipo === 'reforzado' || tipo === 'pretensado' || tipo === 'elemento_simple') ? 'dia' : 'estiba';
   _insumosCosteoActual.push({ nombre: '', cantidad: 0, reparto: repartoDefecto });
   renderInsumosCosteo();
 }
@@ -714,11 +727,16 @@ function _leerFormularioCosteo() {
       unidadesBache: parseFloat(document.getElementById('m-costeo-unidades-bache').value) || 0,
       unidadesEstiba: parseFloat(document.getElementById('m-costeo-unidades-estiba').value) || 0,
       // Propios de Reforzado — inofensivos para Vibrocompactado (quedan en 0/sin uso ahí).
-      // "Volumen de concreto/unidad" es el mismo concepto para Reforzado y Pretensado (volumen
-      // real de la pieza), pero vive en dos <input> distintos porque solo uno está visible a la
-      // vez — se lee del que corresponda al tipo elegido.
-      volumenUnidadM3: parseFloat(document.getElementById(tipoEstructura === 'pretensado' ? 'm-costeo-volumen-unidad-pretensado' : 'm-costeo-volumen-unidad').value) || 0,
-      unidadesDia: parseFloat(document.getElementById('m-costeo-unidades-dia-reforzado').value) || 0,
+      // "Volumen de concreto/unidad" y "Unidades/día" son el mismo concepto para Reforzado,
+      // Pretensado y Elemento Simple (2026-09-20 — mismo motor que Reforzado, ver
+      // _calcularCosteoElementoSimple()), pero cada uno vive en su propio <input> porque solo
+      // uno está visible a la vez — se lee del que corresponda al tipo elegido.
+      volumenUnidadM3: parseFloat(document.getElementById(
+        tipoEstructura === 'pretensado' ? 'm-costeo-volumen-unidad-pretensado' :
+        tipoEstructura === 'elemento_simple' ? 'm-costeo-volumen-unidad-simple' :
+        'm-costeo-volumen-unidad'
+      ).value) || 0,
+      unidadesDia: parseFloat(document.getElementById(tipoEstructura === 'elemento_simple' ? 'm-costeo-unidades-dia-simple' : 'm-costeo-unidades-dia-reforzado').value) || 0,
       aceroKgUnidad: parseFloat(document.getElementById('m-costeo-acero-kg').value) || 0,
       pctAlambre: document.getElementById('m-costeo-pct-alambre').value === '' ? 2 : (parseFloat(document.getElementById('m-costeo-pct-alambre').value) || 0),
       // Propios de Pretensado — inofensivos para los demás tipos (quedan en 0/sin uso ahí).
@@ -763,6 +781,7 @@ function _precioPorMargenSobreVenta(costo, margenPct) {
 function calcularCosteoProducto(c) {
   if (c.tipoEstructura === 'reforzado') return _calcularCosteoReforzado(c);
   if (c.tipoEstructura === 'pretensado') return _calcularCosteoPretensado(c);
+  if (c.tipoEstructura === 'elemento_simple') return _calcularCosteoElementoSimple(c);
   const diseno = DISENOS_MEZCLA.find(d => d.codigo === c.disenoMezclaCodigo);
   const r = c.rendimiento || {};
   const capacidadCochadaM3 = _capacidadCochadaDeLinea(c);
@@ -1098,6 +1117,155 @@ function _calcularCosteoReforzado(c) {
   };
 }
 
+// ── Elemento Simple (piezas de concreto sin acero de refuerzo estructural) ──
+// Mismo motor que Reforzado — Diseño de Mezcla × volumen real de la pieza, Mano de Obra/Máquinas
+// con rendimiento por fila anulable (Unidades/día, Min/unidad), Otras materias primas, Insumos
+// por día/directo/estiba — la única diferencia real es que NO trae la sección de "🔩 Refuerzo"
+// (Acero Figurado + % Alambre Dulce automático). Nace a pedido del usuario (2026-09-20): "hagamos
+// una nueva estructura de costeo, para elementos no reforzados". Al preguntarle si equivalía a
+// "Reforzado sin Refuerzo", confirmó que sí, pero aclaró un matiz importante: "puede ser
+// reforzado... pero el refuerzo lo incluiríamos como una materia prima más" — por eso el nombre
+// final es "Elemento Simple" (no "No Reforzado": si un elemento puntual de este tipo sí necesita
+// algo de acero, se agrega como una fila más de "Otras materias primas", con cantidad digitada a
+// mano, igual que un inserto — sin la derivación automática de Alambre Dulce que sí tiene
+// Reforzado, porque ese % no aplicaría a un uso ocasional de acero).
+function _calcularCosteoElementoSimple(c) {
+  const diseno = DISENOS_MEZCLA.find(d => d.codigo === c.disenoMezclaCodigo);
+  const r = c.rendimiento || {};
+  const volumenUnidadM3 = r.volumenUnidadM3 || 0;
+  const pesoEstimadoKg = volumenUnidadM3 * DENSIDAD_CONCRETO_KG_M3;
+  const unidadesDia = r.unidadesDia || 0;
+
+  const productoCosteo = CATALOGO.find(p => p.codigo === c.productoCodigo);
+  const productoGeneraIva = productoCosteo?.iva === 'SI';
+
+  // Materia Prima — idéntico a Reforzado: cantidad por unidad = cantidad por m³ del Diseño ×
+  // volumen real de la pieza.
+  let materiaPrima = 0;
+  const materiaPrimaDetalle = [];
+  const m = diseno?.materiales || {};
+  if (volumenUnidadM3 > 0) {
+    _MATERIALES_COSTEO_PESO.forEach(k => {
+      if (!((m[k] || 0) > 0)) return;
+      const cantidad = (m[k] || 0) * volumenUnidadM3;
+      const precio = _precioInsumoPorNombre(m[`${k}Producto`], productoGeneraIva, _UNIDAD_RECETA_MATERIAL[k]);
+      const costo = cantidad * precio;
+      materiaPrima += costo;
+      materiaPrimaDetalle.push({ nombre: m[`${k}Producto`] || _LABEL_MAT_COSTEO[k], unidad: k === 'agua' ? 'L' : 'kg', cantidad, precio, costo, esCemento: k === 'cemento', noEncontrado: !INSUMOS_COSTOS.some(x => x.nombre === m[`${k}Producto`]) });
+    });
+    (m.agregados || []).forEach(a => {
+      if (!((Number(a.volumen) || 0) > 0)) return;
+      const cantidad = (Number(a.volumen) || 0) * volumenUnidadM3;
+      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
+      const costo = cantidad * precio;
+      materiaPrima += costo;
+      materiaPrimaDetalle.push({ nombre: a.producto || _LABEL_ROL_AGREGADO_COSTEO[a.rolBase] || a.rolBase, unidad: 'm³', cantidad, precio, costo, noEncontrado: !INSUMOS_COSTOS.some(x => x.nombre === a.producto) });
+    });
+    (m.adiciones || []).forEach(a => {
+      if (!((Number(a.cantidad) || 0) > 0)) return;
+      const cantidad = (Number(a.cantidad) || 0) * volumenUnidadM3;
+      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva);
+      const costo = cantidad * precio;
+      materiaPrima += costo;
+      materiaPrimaDetalle.push({ nombre: a.producto || 'Adición', unidad: 'kg', cantidad, precio, costo, noEncontrado: !INSUMOS_COSTOS.some(x => x.nombre === a.producto) });
+    });
+    (m.aditivos || []).forEach(a => {
+      if (!((Number(a.dosis) || 0) > 0)) return;
+      const cantidad = (Number(a.dosis) || 0) * volumenUnidadM3;
+      const precio = _precioInsumoPorNombre(a.producto, productoGeneraIva, 'g');
+      const costo = cantidad * precio;
+      materiaPrima += costo;
+      materiaPrimaDetalle.push({ nombre: a.producto || a.tipo, unidad: 'g', cantidad, precio, costo });
+    });
+  }
+  const desperdicio = materiaPrima * ((c.pctDesperdicio || 0) / 100);
+
+  // Otras materias primas — mismo bloque que Reforzado/Pretensado. Acá también entra cualquier
+  // acero/alambre puntual que necesite un elemento de este tipo (ver comentario de arriba).
+  (c.materiaPrimaExtra || []).forEach(row => {
+    const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
+    const precio = _precioInsumoPorNombre(row.nombre, productoGeneraIva);
+    const costo = (row.cantidad || 0) * precio;
+    materiaPrima += costo;
+    materiaPrimaDetalle.push({ nombre: row.nombre, unidad: ins ? _labelUnidadInsumo(ins.unidad) : '', cantidad: row.cantidad, precio, costo, noEncontrado: !ins });
+  });
+
+  // Mano de Obra — idéntico a Reforzado (Unidades/día ÷ Min/unidad por fila).
+  let manoObra = 0;
+  const manoObraDetalle = [];
+  (c.manoObra || []).forEach(row => {
+    const cu = CUADRILLAS_PRODUCTIVAS.find(x => x.nombre === row.nombre);
+    const costoDia = cu ? _totalCuadrilla(cu).diario : 0;
+    const unidadesDiaFila = _unidadesDiaDesdeMinutos(row.minutosUnidadFila) || row.unidadesDiaFila || unidadesDia;
+    const costo = (cu && unidadesDiaFila > 0) ? costoDia / unidadesDiaFila : 0;
+    manoObra += costo;
+    manoObraDetalle.push({ nombre: row.nota ? `${row.nombre} — ${row.nota}` : row.nombre, costoDia, costo, noEncontrado: !cu });
+  });
+  const herramientaMenor = manoObra * ((c.pctHerramientaMenor || 0) / 100);
+
+  // Maquinaria — idéntico a Reforzado: incluye "Amortizar en (uds)" para moldes y el Combustible
+  // ACPM automático para Montacargas/Minicargador.
+  let maquinaria = 0;
+  const maquinariaDetalle = [];
+  const _acpmManualCosteo = _tieneAcpmManualCosteo(c);
+  (c.maquinas || []).forEach(row => {
+    const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
+    if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
+    const costoUnidad = (_esMaquinaMolde(maq) && row.usosAmortizarFila > 0)
+      ? _costoUnidadMaquinaPorUsosFila(maq, row.usosAmortizarFila)
+      : calcularCostoMaquina(maq).costoUnidad;
+    let costo = 0;
+    let unidadesDiaFila = 0;
+    if (maq.unidadUso === 'dia') {
+      unidadesDiaFila = _unidadesDiaDesdeMinutos(row.minutosUnidadFila) || row.unidadesDiaFila || unidadesDia;
+      costo = unidadesDiaFila > 0 ? costoUnidad / unidadesDiaFila : 0;
+    }
+    else if (maq.unidadUso === 'm3' && volumenUnidadM3 > 0) costo = costoUnidad * volumenUnidadM3;
+    else if (maq.unidadUso === 'ciclo') costo = costoUnidad;
+    maquinaria += costo;
+    maquinariaDetalle.push({ nombre: row.nombre, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad, costo });
+    const costoAcpmDia = _costoAcpmDiaMaquinaAutomatico(maq, productoGeneraIva, _acpmManualCosteo);
+    if (costoAcpmDia > 0) {
+      const costoAcpmUnidad = unidadesDiaFila > 0 ? costoAcpmDia / unidadesDiaFila : 0;
+      maquinaria += costoAcpmUnidad;
+      maquinariaDetalle.push({ nombre: `Combustible ACPM (${row.nombre})`, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad: costoAcpmDia, costo: costoAcpmUnidad, automatico: true });
+    }
+  });
+
+  // Insumos — idéntico a Reforzado (por día → Consumos, directo → Otros, por estiba → Empaque).
+  let empaque = 0, consumos = 0, otros = 0;
+  const empaqueDetalle = [], consumosDetalle = [], otrosDetalle = [];
+  (c.insumos || []).forEach(row => {
+    const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
+    if (!ins) return;
+    const costoIns = calcularCostoInsumo(ins);
+    const precio = productoGeneraIva ? costoIns.costoSinIva : costoIns.valorFinal;
+    if (row.reparto === 'dia') {
+      if (unidadesDia > 0) { const costo = (row.cantidad * precio) / unidadesDia; consumos += costo; consumosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, unidad: _labelUnidadInsumo(ins.unidad), precio, costo }); }
+    } else if (row.reparto === 'directo') {
+      const costo = row.cantidad * precio;
+      otros += costo;
+      otrosDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, unidad: _labelUnidadInsumo(ins.unidad), precio, costo });
+    } else {
+      if (r.unidadesEstiba > 0) { const costo = (row.cantidad * precio) / r.unidadesEstiba; empaque += costo; empaqueDetalle.push({ nombre: row.nombre, cantidad: row.cantidad, unidad: _labelUnidadInsumo(ins.unidad), precio, costo }); }
+    }
+  });
+
+  const totalUnidad = materiaPrima + desperdicio + manoObra + herramientaMenor + maquinaria + empaque + consumos + otros;
+  const precioSugeridoLista = _precioPorMargenSobreVenta(totalUnidad, c.margenLista);
+  const precioSugeridoMinimo = _precioPorMargenSobreVenta(totalUnidad, c.margenMinimo);
+
+  return {
+    volumenUnidadM3, pesoEstimadoKg, unidadesDia,
+    materiaPrima, desperdicio, manoObra, herramientaMenor, maquinaria, empaque, consumos, otros, totalUnidad,
+    precioSugeridoLista, precioSugeridoMinimo,
+    materiaPrimaDetalle, manoObraDetalle, maquinariaDetalle, empaqueDetalle, consumosDetalle, otrosDetalle,
+    // Sin Refuerzo — un Elemento Simple no lleva el cálculo automático de acero de refuerzo; si
+    // necesita algo puntual, entra por "Otras materias primas" (ver arriba).
+    refuerzo: 0, refuerzoDetalle: [],
+  };
+}
+
 // ── Pretensado (viguetas, prelosas) ──
 // Se produce por "Banco de Pretensado": una cama de tensionado de largo fijo (metros lineales/
 // banco) donde se tensan varios hilos de acero, se vacía concreto una sola vez, se cura, se corta
@@ -1308,17 +1476,18 @@ function _actualizarResumenCosteo() {
   const producto = _productoDesdeTextoCosteo(document.getElementById('m-costeo-producto').value);
   const esReforzado = c.tipoEstructura === 'reforzado';
   const esPretensado = c.tipoEstructura === 'pretensado';
+  const esElementoSimple = c.tipoEstructura === 'elemento_simple';
   document.getElementById('costeo-calculo-vivo').innerHTML = esPretensado
     ? `<div class="fila"><span>Volumen de concreto / ml</span><span>${(k.volumenUnidadM3 || 0).toLocaleString('es-CO', { maximumFractionDigits: 4 })} m³</span></div>
        <div class="fila"><span>Metros lineales / banco</span><span>${(k.metrosLinealesBanco || 0).toLocaleString('es-CO')} ml</span></div>
        <div class="fila"><span>Hilos de pretensado / banco</span><span>${(k.hilosBanco || 0).toLocaleString('es-CO')}</span></div>
        <div class="fila"><span>Días / banco (línea)</span><span>${_diasBancoTexto(k.bancosDiaLinea) || 0}</span></div>`
-    : esReforzado
+    : (esReforzado || esElementoSimple)
     ? `<div class="fila"><span>Volumen de concreto por unidad</span><span>${(k.volumenUnidadM3 || 0).toLocaleString('es-CO', { maximumFractionDigits: 4 })} m³</span></div>
        <div class="fila sub"><span>≈ Peso equivalente (× 2450 kg/m³, solo de referencia)</span><span>${(k.pesoEstimadoKg || 0).toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg</span></div>
-       <div class="fila"><span>Unidades / día</span><span>${k.unidadesDia.toLocaleString('es-CO')} unidades</span></div>`
-    : `<div class="fila"><span>Capacidad de bache (de la mezcladora de la línea)</span><span>${k.capacidadCochadaM3.toLocaleString('es-CO')} m³</span></div>
-       <div class="fila"><span>Unidades / día (ciclos/día × unidades/ciclo)</span><span>${k.unidadesDia.toLocaleString('es-CO')} unidades</span></div>`;
+       <div class="fila"><span>Unidades / día</span><span>${(k.unidadesDia || 0).toLocaleString('es-CO')} unidades</span></div>`
+    : `<div class="fila"><span>Capacidad de bache (de la mezcladora de la línea)</span><span>${(k.capacidadCochadaM3 || 0).toLocaleString('es-CO')} m³</span></div>
+       <div class="fila"><span>Unidades / día (ciclos/día × unidades/ciclo)</span><span>${(k.unidadesDia || 0).toLocaleString('es-CO')} unidades</span></div>`;
   // El régimen de IVA del PRODUCTO (ya definido en el catálogo) decide si los insumos se
   // costean con o sin IVA — ver calcularCosteoProducto()/_precioInsumoPorNombre(). Se muestra
   // aquí explícito para que no sea una regla invisible.
@@ -1574,6 +1743,8 @@ function abrirModalCosteoProducto() {
   document.getElementById('m-costeo-unidades-estiba').value = '';
   document.getElementById('m-costeo-volumen-unidad').value = '';
   document.getElementById('m-costeo-unidades-dia-reforzado').value = '';
+  document.getElementById('m-costeo-volumen-unidad-simple').value = '';
+  document.getElementById('m-costeo-unidades-dia-simple').value = '';
   document.getElementById('m-costeo-acero-kg').value = '';
   document.getElementById('m-costeo-pct-alambre').value = 2;
   document.getElementById('m-costeo-volumen-unidad-pretensado').value = '';
@@ -1617,6 +1788,8 @@ function editarCosteoProducto(codigo) {
   document.getElementById('m-costeo-unidades-estiba').value = r.unidadesEstiba || '';
   document.getElementById('m-costeo-volumen-unidad').value = r.volumenUnidadM3 || '';
   document.getElementById('m-costeo-unidades-dia-reforzado').value = r.unidadesDia || '';
+  document.getElementById('m-costeo-volumen-unidad-simple').value = r.volumenUnidadM3 || '';
+  document.getElementById('m-costeo-unidades-dia-simple').value = r.unidadesDia || '';
   document.getElementById('m-costeo-acero-kg').value = r.aceroKgUnidad || '';
   document.getElementById('m-costeo-pct-alambre').value = r.pctAlambre ?? 2;
   document.getElementById('m-costeo-volumen-unidad-pretensado').value = r.volumenUnidadM3 || '';
@@ -1807,6 +1980,7 @@ function abrirDetalleCosteoProducto(codigo) {
 
   const esReforzado = c.tipoEstructura === 'reforzado';
   const esPretensado = c.tipoEstructura === 'pretensado';
+  const esElementoSimple = c.tipoEstructura === 'elemento_simple';
 
   document.getElementById('modal-detalle-costeo-titulo').textContent = `Consolidado — ${c.productoNombre}`;
   document.getElementById('detalle-costeo-resumen').innerHTML = esPretensado
@@ -1814,15 +1988,15 @@ function abrirDetalleCosteoProducto(codigo) {
        <span><strong>Diseño:</strong> ${diseno ? `${_esc(diseno.codigo)} — ${_esc(diseno.nombre)}` : (_esc(c.disenoMezclaCodigo) || '—')}</span>
        <span><strong>Metros lineales/banco:</strong> ${(r.metrosLinealesBanco || 0).toLocaleString('es-CO')}</span>
        <span><strong>Días/banco:</strong> ${_diasBancoTexto(r.bancosDiaLinea) || 0}</span>`
-    : esReforzado
+    : (esReforzado || esElementoSimple)
     ? `<span>${tipo.label}</span>
        <span><strong>Diseño:</strong> ${diseno ? `${_esc(diseno.codigo)} — ${_esc(diseno.nombre)}` : (_esc(c.disenoMezclaCodigo) || '—')}</span>
        <span><strong>Volumen/unidad:</strong> ${(k.volumenUnidadM3 || 0).toLocaleString('es-CO', { maximumFractionDigits: 4 })} m³</span>
-       <span><strong>Unidades/día:</strong> ${k.unidadesDia.toLocaleString('es-CO')}</span>`
+       <span><strong>Unidades/día:</strong> ${(k.unidadesDia || 0).toLocaleString('es-CO')}</span>`
     : `<span>${tipo.label}</span>
        <span><strong>Diseño:</strong> ${diseno ? `${_esc(diseno.codigo)} — ${_esc(diseno.nombre)}` : (_esc(c.disenoMezclaCodigo) || '—')}</span>
        <span><strong>Unidades/Bache:</strong> ${(r.unidadesBache || 0).toLocaleString('es-CO')}</span>
-       <span><strong>Unidades/día:</strong> ${k.unidadesDia.toLocaleString('es-CO')}</span>`;
+       <span><strong>Unidades/día:</strong> ${(k.unidadesDia || 0).toLocaleString('es-CO')}</span>`;
 
   const seccionRendimiento = `
     <div class="seccion-costeo">
@@ -1838,7 +2012,10 @@ function abrirDetalleCosteoProducto(codigo) {
         <div class="fila sub"><span>≈ Peso equivalente (× 2450 kg/m³, solo de referencia)</span><span>${(k.pesoEstimadoKg || 0).toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg</span></div>
         <div class="fila"><span>Unidades / día</span><span>${(r.unidadesDia || 0).toLocaleString('es-CO')}</span></div>
         <div class="fila"><span>Acero Figurado / unidad</span><span>${(r.aceroKgUnidad || 0).toLocaleString('es-CO')} kg</span></div>
-        <div class="fila"><span>% Alambre Dulce</span><span>${(r.pctAlambre ?? 2).toLocaleString('es-CO')}%</span></div>` : `
+        <div class="fila"><span>% Alambre Dulce</span><span>${(r.pctAlambre ?? 2).toLocaleString('es-CO')}%</span></div>` : esElementoSimple ? `
+        <div class="fila"><span>Volumen de concreto / unidad <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(del diseño de la pieza)</span></span><span>${(r.volumenUnidadM3 || 0).toLocaleString('es-CO', { maximumFractionDigits: 4 })} m³</span></div>
+        <div class="fila sub"><span>≈ Peso equivalente (× 2450 kg/m³, solo de referencia)</span><span>${(k.pesoEstimadoKg || 0).toLocaleString('es-CO', { maximumFractionDigits: 1 })} kg</span></div>
+        <div class="fila"><span>Unidades / día</span><span>${(r.unidadesDia || 0).toLocaleString('es-CO')}</span></div>` : `
         <div class="fila"><span>Peso / unidad <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(informativo)</span></span><span>${(r.pesoUnidadKg || 0).toLocaleString('es-CO')} kg</span></div>
         <div class="fila"><span>Ciclos / día</span><span>${(r.ciclosDia || 0).toLocaleString('es-CO')}</span></div>
         <div class="fila"><span>Unidades / Ciclo</span><span>${(r.unidadesCiclo || 0).toLocaleString('es-CO')}</span></div>
