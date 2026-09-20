@@ -443,19 +443,29 @@ function _tieneAcpmManualCosteo(c) {
   return (c.insumos || []).some(row => /acpm/i.test(row.nombre || ''));
 }
 
-// "Amortizar en (uds)" por fila — para moldes (máquinas con unidad de uso "Ciclo": 1 uso del
-// molde = 1 pieza producida) compartidos entre varios productos, ej. "Molde Tipo 2" usado tanto
-// en tubos como en cajas (2026-09-20, a pedido del usuario: "lo que tenía en mi anterior
-// estructura era unos moldes tipo... arrastraba el valor del molde, y en cada costeo determinaba
-// las unidades a amortizarlo... eso me facilitaba no tener que cargar un molde para cada
-// producto"). La vida útil en usos de Maquinaria y Equipos (`usosTotal`) queda como el dato de
-// catálogo, compartido por todos los costeos que usan ese molde — pero cada costeo puede pedir
-// una base de amortización propia (ej. "este molde en particular lo amortizo en 5.000 piezas
-// para este producto") sin tocar el catálogo ni afectar a los demás productos que comparten el
-// mismo molde. Se reutiliza `calcularCostoMaquina()` tal cual (mismo valor de compra, % de
-// rescate y % de mantenimiento del molde) solo sustituyendo su capacidad total de vida útil por
-// la de esta fila — así la fórmula de depreciación/mantenimiento nunca se duplica ni se
-// desincroniza de la de Maquinaria y Equipos.
+// "Amortizar en (uds)" por fila — para moldes compartidos entre varios productos, ej. "Molde
+// Tipo 2" usado tanto en tubos como en cajas (2026-09-20, a pedido del usuario: "lo que tenía en
+// mi anterior estructura era unos moldes tipo... arrastraba el valor del molde, y en cada costeo
+// determinaba las unidades a amortizarlo... eso me facilitaba no tener que cargar un molde para
+// cada producto"). La vida útil en usos de Maquinaria y Equipos (`usosTotal`) queda como el dato
+// de catálogo, compartido por todos los costeos que usan ese molde — pero cada costeo puede pedir
+// una base de amortización propia (ej. "este molde en particular lo amortizo en 5.000 piezas para
+// este producto") sin tocar el catálogo ni afectar a los demás productos que comparten el mismo
+// molde. Se reutiliza `calcularCostoMaquina()` tal cual (mismo valor de compra, % de rescate y %
+// de mantenimiento del molde) solo sustituyendo su capacidad total de vida útil por la de esta
+// fila — así la fórmula de depreciación/mantenimiento nunca se duplica ni se desincroniza de la
+// de Maquinaria y Equipos.
+// Se identifica un molde por el NOMBRE de la máquina — debe EMPEZAR con "Molde Tipo" (la
+// convención real de nombres del usuario: "Molde Tipo 1", "Molde Tipo 2"...), no por su unidad de
+// uso — mismo criterio que ya se usa para acotar el desplegable de Acero de Pretensionamiento
+// (`_opcionesAceroPretensadoCosteo()`, `/pretensionamiento/i`); corregido 2026-09-20 después de
+// que la primera versión (basada en `unidadUso === 'ciclo'`) mostrara la columna en toda fila sin
+// distinguir si esa máquina era o no un molde real — y acotado aún más, a pedido explícito del
+// usuario ("incluso... solo los que digan 'Molde tipo...'"), para no atrapar por accidente algo
+// como "Repuesto para Molde Tipo 2" u otro nombre que solo mencione la palabra "molde" de paso.
+function _esMaquinaMolde(maq) {
+  return !!maq && /^molde\s+tipo/i.test((maq.nombre || '').trim());
+}
 function _costoUnidadMaquinaPorUsosFila(maq, usosFila) {
   if (!(usosFila > 0)) return null;
   return calcularCostoMaquina({ ...maq, baseVidaUtil: 'usos', usosTotal: usosFila }).costoUnidad;
@@ -475,12 +485,14 @@ function renderMaquinasCosteo() {
   tbody.innerHTML = _maquinasCosteoActual.map((row, i) => {
     const m = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     const info = m ? `${_fmtMaq(calcularCostoMaquina(m).costoUnidad)}/${_labelUnidadUso(m.unidadUso)}` : '—';
-    // "Amortizar en (uds)" — solo tiene efecto en máquinas 'Ciclo' (moldes); se muestra en
-    // cualquier tipo de estructura porque un mismo molde compartido puede usarse en Vibrocompactado,
-    // Reforzado o Pretensado (ver _costoUnidadMaquinaPorUsosFila()). Vacío = usa la vida útil en
-    // usos ya configurada para ese molde en Maquinaria y Equipos, sin cambios.
-    const celdaAmortizarUsos = `
-      <td><input type="number" min="0" step="1" value="${row.usosAmortizarFila || ''}" placeholder="de catálogo" title="Solo aplica a máquinas 'Ciclo' (moldes). Si se llena, reemplaza SOLO para este costeo la vida útil en usos configurada en Maquinaria y Equipos — útil para un molde compartido entre varios productos, cada uno con su propia base de amortización. Vacío = usa la vida útil del catálogo." style="width:95px" oninput="_maquinasCosteoActual[${i}].usosAmortizarFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>`;
+    // "Amortizar en (uds)" — solo se ofrece cuando el NOMBRE de la máquina de esta fila contiene
+    // "molde" (ver _esMaquinaMolde()); para el resto de filas la celda queda en blanco, no un
+    // input inerte. Se muestra en cualquier tipo de estructura porque un mismo molde compartido
+    // puede usarse en Vibrocompactado, Reforzado o Pretensado. Vacío = usa la vida útil en usos
+    // ya configurada para ese molde en Maquinaria y Equipos, sin cambios.
+    const celdaAmortizarUsos = _esMaquinaMolde(m)
+      ? `<td><input type="number" min="0" step="1" value="${row.usosAmortizarFila || ''}" placeholder="de catálogo" title="Si se llena, reemplaza SOLO para este costeo la vida útil en usos configurada en Maquinaria y Equipos — útil para un molde compartido entre varios productos, cada uno con su propia base de amortización. Vacío = usa la vida útil del catálogo." style="width:95px" oninput="_maquinasCosteoActual[${i}].usosAmortizarFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>`
+      : `<td style="text-align:center;color:var(--gris-medio)">—</td>`;
     // "Días/banco" y "N° de hilos" solo aplican a Pretensado. "N° de hilos" reemplaza al
     // checkbox "× hilo" que había antes (2026-08-25, a pedido del usuario: "no le veo mucho
     // sentido" — el checkbox usaba SIEMPRE los hilos totales del banco, sin poder distinguir
@@ -831,8 +843,9 @@ function calcularCosteoProducto(c) {
   (c.maquinas || []).forEach(row => {
     const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
-    // "Amortizar en (uds)" por fila — solo para moldes ('ciclo'); ver _costoUnidadMaquinaPorUsosFila().
-    const costoUnidad = (maq.unidadUso === 'ciclo' && row.usosAmortizarFila > 0)
+    // "Amortizar en (uds)" por fila — solo para máquinas cuyo nombre contiene "molde"; ver
+    // _esMaquinaMolde() y _costoUnidadMaquinaPorUsosFila().
+    const costoUnidad = (_esMaquinaMolde(maq) && row.usosAmortizarFila > 0)
       ? _costoUnidadMaquinaPorUsosFila(maq, row.usosAmortizarFila)
       : calcularCostoMaquina(maq).costoUnidad;
     let costo = 0;
@@ -1017,8 +1030,9 @@ function _calcularCosteoReforzado(c) {
   (c.maquinas || []).forEach(row => {
     const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
-    // "Amortizar en (uds)" por fila — solo para moldes ('ciclo'); ver _costoUnidadMaquinaPorUsosFila().
-    const costoUnidad = (maq.unidadUso === 'ciclo' && row.usosAmortizarFila > 0)
+    // "Amortizar en (uds)" por fila — solo para máquinas cuyo nombre contiene "molde"; ver
+    // _esMaquinaMolde() y _costoUnidadMaquinaPorUsosFila().
+    const costoUnidad = (_esMaquinaMolde(maq) && row.usosAmortizarFila > 0)
       ? _costoUnidadMaquinaPorUsosFila(maq, row.usosAmortizarFila)
       : calcularCostoMaquina(maq).costoUnidad;
     let costo = 0;
@@ -1214,8 +1228,9 @@ function _calcularCosteoPretensado(c) {
   (c.maquinas || []).forEach(row => {
     const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
-    // "Amortizar en (uds)" por fila — solo para moldes ('ciclo'); ver _costoUnidadMaquinaPorUsosFila().
-    const costoUnidad = (maq.unidadUso === 'ciclo' && row.usosAmortizarFila > 0)
+    // "Amortizar en (uds)" por fila — solo para máquinas cuyo nombre contiene "molde"; ver
+    // _esMaquinaMolde() y _costoUnidadMaquinaPorUsosFila().
+    const costoUnidad = (_esMaquinaMolde(maq) && row.usosAmortizarFila > 0)
       ? _costoUnidadMaquinaPorUsosFila(maq, row.usosAmortizarFila)
       : calcularCostoMaquina(maq).costoUnidad;
     let costo = 0;
