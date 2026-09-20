@@ -513,7 +513,7 @@ function renderMaquinasCosteo() {
       <td><input type="number" min="0" step="0.01" value="${row.unidadesDiaFila || ''}" placeholder="de línea" title="Unidades que esta máquina completa en un día (solo aplica a máquinas que se reparten 'por día'). Si además llenas 'Min/unidad', ese dato manda sobre este." style="width:90px" oninput="_maquinasCosteoActual[${i}].unidadesDiaFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>
       <td><input type="number" min="0" step="1" value="${row.minutosUnidadFila || ''}" placeholder="—" title="Minutos que le toma a esta máquina intervenir en UNA unidad — para usos puntuales cortos (solo aplica a máquinas 'por día'). Si se llena, reemplaza 'Unidades/día' de esta fila." style="width:75px" oninput="_maquinasCosteoActual[${i}].minutosUnidadFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
     return `<tr>
-      <td><select onchange="_maquinasCosteoActual[${i}].nombre=this.value;_actualizarResumenCosteo()">${_opcionesMaquinariaCosteo(row.nombre)}</select></td>
+      <td><select onchange="_maquinasCosteoActual[${i}].nombre=this.value;renderMaquinasCosteo();_actualizarResumenCosteo()">${_opcionesMaquinariaCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio)">${info}</td>
       ${celdaAmortizarUsos}
       ${celdasPretensado}

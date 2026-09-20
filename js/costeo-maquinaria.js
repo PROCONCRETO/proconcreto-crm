@@ -77,7 +77,7 @@ function renderCosteoMaquinaria() {
   const body = document.getElementById('maquinaria-body');
   if (!body) return;
   if (!MAQUINARIA_EQUIPOS.length) {
-    body.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="icono">🔧</div><div>No hay máquinas ni equipos registrados.</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">🔧</div><div>No hay máquinas ni equipos registrados.</div></td></tr>`;
     return;
   }
   // MAQUINARIA_EQUIPOS ya llega ordenado por `orden` (_normalizarOrdenLista(), ver
@@ -92,6 +92,7 @@ function renderCosteoMaquinaria() {
     <tr ondragover="permitirSoltarMaquina(event)" ondragleave="quitarResaltadoSoltarMaquina(event)" ondrop="soltarMaquinaSobreMaquina(event,'${nombreEsc}')">
       <td style="text-align:center"><span class="drag-handle" draggable="true" ondragstart="iniciarArrastreMaquina(event,'${nombreEsc}')" ondragend="terminarArrastreMaquina(event)" title="Arrastra para reordenar">☰</span></td>
       <td style="font-weight:600">${_esc(m.nombre)}</td>
+      <td style="text-align:right;color:var(--gris-medio)">${_fmt(m.valorCompra)}</td>
       <td><span style="display:inline-block;background:var(--gris-claro);color:var(--gris-medio);font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">${_labelUnidadUso(m.unidadUso)}</span></td>
       <td style="font-size:12px;color:var(--gris-medio)">${vidaTexto}</td>
       <td style="text-align:right;font-weight:700;color:var(--azul)">${_fmtMaq(c.costoUnidad)}</td>
