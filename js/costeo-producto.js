@@ -367,7 +367,7 @@ function renderMateriaPrimaExtraCosteo() {
     const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
     const precio = ins ? `${_fmtRef(_precioInsumoPorNombre(row.nombre, _generaIva))}/${_labelUnidadInsumo(ins.unidad)}` : '—';
     return `<tr>
-      <td><select onchange="_materiaPrimaExtraCosteoActual[${i}].nombre=this.value;renderMateriaPrimaExtraCosteo();_actualizarResumenCosteo()">${_opcionesInsumoCosteo(row.nombre)}</select></td>
+      <td><select onchange="_materiaPrimaExtraCosteoActual[${i}].nombre=this.value;renderMateriaPrimaExtraCosteo();_actualizarResumenCosteo()">${_opcionesMateriaPrimaExtraCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio);white-space:nowrap">${precio}</td>
       <td><input type="number" value="${row.cantidad}" min="0" step="0.001" oninput="_materiaPrimaExtraCosteoActual[${i}].cantidad=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>
       <td><button class="btn btn-rojo btn-xs" onclick="_materiaPrimaExtraCosteoActual.splice(${i},1);renderMateriaPrimaExtraCosteo();_actualizarResumenCosteo()">✕</button></td>
@@ -635,7 +635,7 @@ function renderInsumosCosteo() {
     const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
     const precio = ins ? _fmtRef(_precioInsumoPorNombre(row.nombre, _generaIva)) + '/' + _labelUnidadInsumo(ins.unidad) : '—';
     return `<tr>
-      <td><select onchange="_insumosCosteoActual[${i}].nombre=this.value;renderInsumosCosteo();_actualizarResumenCosteo()">${_opcionesInsumoCosteo(row.nombre)}</select></td>
+      <td><select onchange="_insumosCosteoActual[${i}].nombre=this.value;renderInsumosCosteo();_actualizarResumenCosteo()">${_opcionesConsumoCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio);white-space:nowrap">${precio}</td>
       <td><input type="number" value="${row.cantidad}" min="0" step="0.001" oninput="_insumosCosteoActual[${i}].cantidad=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>
       <td>
@@ -646,16 +646,27 @@ function renderInsumosCosteo() {
     </tr>`;
   }).join('');
 }
-function _opcionesInsumoCosteo(seleccionado) {
-  if (!INSUMOS_COSTOS.length) return '<option value="">Sin insumos registrados</option>';
-  return '<option value="">— Selecciona —</option>' + INSUMOS_COSTOS.map(i => `<option value="${_escAttr(i.nombre)}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
+// Los desplegables de "Otras materias primas" e "Insumos" ANTES compartían la misma lista sin
+// filtrar (INSUMOS_COSTOS completo) — mezclando cemento/arena/aditivos con energía/agua/ACPM en
+// los dos lados, a pedido del usuario ("en materias primas el desplegable me muestra tanto
+// materias primas como insumos, y en insumos me muestra también materias primas"). Costos de
+// Referencia ya clasifica cada ítem con `categoria` ('materia_prima' o 'insumo_cif', ver
+// CATEGORIAS_REFERENCIA en costeo-referencia.js) al darlo de alta — se reutiliza ese mismo dato
+// para acotar cada desplegable a lo que en verdad le corresponde (2026-09-20).
+function _opcionesInsumoPorCategoria(seleccionado, categoria) {
+  const items = INSUMOS_COSTOS.filter(i => i.categoria === categoria);
+  const vacioLabel = categoria === 'materia_prima' ? 'Sin materias primas registradas en Costos de Referencia' : 'Sin insumos/CIF registrados en Costos de Referencia';
+  if (!items.length) return `<option value="">${vacioLabel}</option>`;
+  return '<option value="">— Selecciona —</option>' + items.map(i => `<option value="${_escAttr(i.nombre)}" ${i.nombre === seleccionado ? 'selected' : ''}>${i.nombre}</option>`).join('');
 }
+function _opcionesMateriaPrimaExtraCosteo(seleccionado) { return _opcionesInsumoPorCategoria(seleccionado, 'materia_prima'); }
+function _opcionesConsumoCosteo(seleccionado) { return _opcionesInsumoPorCategoria(seleccionado, 'insumo_cif'); }
 // Desplegable ACOTADO solo a los ítems de acero de pretensionamiento (2026-09-19, a pedido del
 // usuario — hoy se trabaja con "Acero de Pretensionamiento 5mm" y "Acero de pretensionamiento
 // Torón 3/8", ambos ya registrados como materia prima en Costos de Referencia). A diferencia de
-// _opcionesInsumoCosteo() (usado en el resto de filas de Insumos/Otras Materias Primas), que
-// lista TODO el catálogo sin filtrar, acá eso mezclaría cemento/arena/aditivos con las 1-2
-// opciones reales que de verdad aplican a este campo. Coincide por nombre sin distinguir
+// _opcionesInsumoPorCategoria() (que acota por categoría), acá eso todavía mezclaría cemento,
+// arena y aditivos (todos "materia_prima") con las 1-2 opciones reales que de verdad aplican a
+// este campo — hace falta un filtro más específico, por nombre. Coincide sin distinguir
 // mayúsculas y sin exigir además la palabra "Acero" — "pretensionamiento" solo ya es lo bastante
 // específico, y el nombre de respaldo legado 'Acero 5mm Pretensionamiento' trae las palabras en
 // otro orden que "Acero de Pretensionamiento 5mm".
