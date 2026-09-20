@@ -421,6 +421,28 @@ function _bancosDiaDesdeMinutos(minutosPorBanco) {
   return (horasPorDiaLaborado * 60) / minutosPorBanco;
 }
 
+// Combustible ACPM automático para Montacargas/Minicargador — 1 galón/hora por equipo (2026-09-20,
+// a pedido del usuario: "para los equipos de montacargas y minicargador, agrega siempre por
+// defecto la asignación de 1 galón de acpm por hora, por equipo"). Se asume que el equipo está
+// ocupado la jornada laboral estándar completa (misma `horasPorDiaLaborado` que ya usan
+// `_unidadesDiaDesdeMinutos()`/`_bancosDiaDesdeMinutos()`) — es el mismo supuesto detrás de
+// cualquier fila "por día", solo que a distinto ritmo; por eso el galonaje diario NO cambia según
+// "Unidades/día"/"Días/banco" de la fila, solo el reparto entre unidades sí (se divide igual que
+// el propio `costoUnidad` de la máquina, ver los 3 bloques de Maquinaria que la llaman).
+// `acpmManual` corta la asignación por completo cuando el propio costeo YA trae "Combustible
+// ACPM" cargado a mano en Insumos (la costumbre en Vibrocompactado, y también posible en
+// Reforzado/Pretensado) — para no duplicar el consumo, a pedido explícito del usuario ("revisa
+// que no se duplique el consumo de acpm con esta nueva condición").
+function _costoAcpmDiaMaquinaAutomatico(maq, productoGeneraIva, acpmManual) {
+  if (acpmManual || !maq || maq.unidadUso !== 'dia' || !/montacargas|minicargador/i.test(maq.nombre || '')) return 0;
+  const horasPorDiaLaborado = (PARAMETROS_MO.horasSemanales || 42) / 5;
+  const precioGalon = _precioInsumoPorNombre('Combustible ACPM', productoGeneraIva);
+  return horasPorDiaLaborado * precioGalon;
+}
+function _tieneAcpmManualCosteo(c) {
+  return (c.insumos || []).some(row => /acpm/i.test(row.nombre || ''));
+}
+
 // ── Máquinas involucradas (filas dinámicas) ──
 let _maquinasCosteoActual = [];
 function renderMaquinasCosteo() {
@@ -780,6 +802,7 @@ function calcularCosteoProducto(c) {
   // unidades/ciclo (un ciclo produce esas unidades), "día" ÷ unidades/día.
   let maquinaria = 0;
   const maquinariaDetalle = [];
+  const _acpmManualCosteo = _tieneAcpmManualCosteo(c);
   (c.maquinas || []).forEach(row => {
     const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
@@ -789,6 +812,13 @@ function calcularCosteoProducto(c) {
     else if (maq.unidadUso === 'dia' && unidadesDia > 0) costo = costoUnidad / unidadesDia;
     maquinaria += costo;
     maquinariaDetalle.push({ nombre: row.nombre, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad, costo });
+    // Combustible ACPM automático (Montacargas/Minicargador) — ver _costoAcpmDiaMaquinaAutomatico().
+    const costoAcpmDia = _costoAcpmDiaMaquinaAutomatico(maq, productoGeneraIva, _acpmManualCosteo);
+    if (costoAcpmDia > 0) {
+      const costoAcpmUnidad = unidadesDia > 0 ? costoAcpmDia / unidadesDia : 0;
+      maquinaria += costoAcpmUnidad;
+      maquinariaDetalle.push({ nombre: `Combustible ACPM (${row.nombre})`, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad: costoAcpmDia, costo: costoAcpmUnidad, automatico: true });
+    }
   });
 
   // Insumos y consumos — "por estiba" (empaque) ÷ unidades/estiba, "por día" (consumos) ÷ unidades/día.
@@ -955,19 +985,28 @@ function _calcularCosteoReforzado(c) {
   // Mano de Obra en este mismo tipo, y que Máquinas ya tenía en Pretensado con "Días/banco").
   let maquinaria = 0;
   const maquinariaDetalle = [];
+  const _acpmManualCosteo = _tieneAcpmManualCosteo(c);
   (c.maquinas || []).forEach(row => {
     const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
     const costoUnidad = calcularCostoMaquina(maq).costoUnidad;
     let costo = 0;
+    let unidadesDiaFila = 0;
     if (maq.unidadUso === 'dia') {
-      const unidadesDiaFila = _unidadesDiaDesdeMinutos(row.minutosUnidadFila) || row.unidadesDiaFila || unidadesDia;
+      unidadesDiaFila = _unidadesDiaDesdeMinutos(row.minutosUnidadFila) || row.unidadesDiaFila || unidadesDia;
       costo = unidadesDiaFila > 0 ? costoUnidad / unidadesDiaFila : 0;
     }
     else if (maq.unidadUso === 'm3' && volumenUnidadM3 > 0) costo = costoUnidad * volumenUnidadM3;
     else if (maq.unidadUso === 'ciclo') costo = costoUnidad;
     maquinaria += costo;
     maquinariaDetalle.push({ nombre: row.nombre, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad, costo });
+    // Combustible ACPM automático (Montacargas/Minicargador) — ver _costoAcpmDiaMaquinaAutomatico().
+    const costoAcpmDia = _costoAcpmDiaMaquinaAutomatico(maq, productoGeneraIva, _acpmManualCosteo);
+    if (costoAcpmDia > 0) {
+      const costoAcpmUnidad = unidadesDiaFila > 0 ? costoAcpmDia / unidadesDiaFila : 0;
+      maquinaria += costoAcpmUnidad;
+      maquinariaDetalle.push({ nombre: `Combustible ACPM (${row.nombre})`, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad: costoAcpmDia, costo: costoAcpmUnidad, automatico: true });
+    }
   });
 
   // Insumos — "por día" (consumos: ensayos, combustible...) o "directo" (Desmoldante y
@@ -1140,20 +1179,29 @@ function _calcularCosteoPretensado(c) {
   // elemento ÷ Metros lineales/banco).
   let maquinaria = 0;
   const maquinariaDetalle = [];
+  const _acpmManualCosteo = _tieneAcpmManualCosteo(c);
   (c.maquinas || []).forEach(row => {
     const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
     const costoUnidad = calcularCostoMaquina(maq).costoUnidad;
     let costo = 0;
+    let unidadesDiaFila = 0;
     if (row.numeroHilos > 0) costo = metrosLinealesBanco > 0 ? (costoUnidad * row.numeroHilos) / metrosLinealesBanco : 0;
     else if (maq.unidadUso === 'm3') costo = costoUnidad * volumenUnidadM3;
     else if (maq.unidadUso === 'dia') {
       const bancosDiaFila = row.bancosDiaFila || bancosDiaLinea;
-      const unidadesDiaFila = bancosDiaFila * metrosLinealesBanco;
+      unidadesDiaFila = bancosDiaFila * metrosLinealesBanco;
       costo = unidadesDiaFila > 0 ? costoUnidad / unidadesDiaFila : 0;
     } else costo = metrosLinealesBanco > 0 ? costoUnidad / metrosLinealesBanco : 0;
     maquinaria += costo;
     maquinariaDetalle.push({ nombre: row.nombre, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad, costo });
+    // Combustible ACPM automático (Montacargas/Minicargador) — ver _costoAcpmDiaMaquinaAutomatico().
+    const costoAcpmDia = _costoAcpmDiaMaquinaAutomatico(maq, productoGeneraIva, _acpmManualCosteo);
+    if (costoAcpmDia > 0) {
+      const costoAcpmUnidad = unidadesDiaFila > 0 ? costoAcpmDia / unidadesDiaFila : 0;
+      maquinaria += costoAcpmUnidad;
+      maquinariaDetalle.push({ nombre: `Combustible ACPM (${row.nombre})`, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad: costoAcpmDia, costo: costoAcpmUnidad, automatico: true });
+    }
   });
 
   // Insumos — mismo mecanismo ya existente (sección 6, compartida con los demás tipos):
