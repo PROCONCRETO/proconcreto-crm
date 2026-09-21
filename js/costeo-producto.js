@@ -480,6 +480,26 @@ function _costoUnidadMaquinaPorUsosFila(maq, usosFila) {
   return calcularCostoMaquina({ ...maq, baseVidaUtil: 'usos', usosTotal: usosFila }).costoUnidad;
 }
 
+// Mantiene sincronizada la fila de Mano de Obra "Operario de maquinaria" que crea el botón "👷
+// Asignar operario" (ver _asignarOperarioMaquina() más abajo) — 2026-09-21, a pedido del usuario:
+// "al ingresar el valor de min/unidad, no se actualiza automáticamente al valor de la mano de
+// obra del operario asociado". Antes el botón solo copiaba el ritmo de la máquina UNA VEZ, al
+// momento de crear la fila — si después se corregía "Unidades/día"/"Min/unidad"/"Días/banco" en
+// la máquina, el operario ya creado se quedaba con el valor viejo. Se identifica la fila
+// vinculada por su `nota` ("Operario de <nombre de la máquina>", el mismo texto exacto que pone
+// _asignarOperarioMaquina() al crearla) — si el usuario nunca usó el botón para esa máquina, no
+// hay ninguna fila que coincida y no pasa nada. Es de una sola vía (máquina → operario): el
+// ritmo real es el de la máquina, el operario la sigue, no al revés.
+function _sincronizarOperarioMaquina(nombreMaquina, campo, valor) {
+  if (!nombreMaquina) return;
+  const nota = `Operario de ${nombreMaquina}`;
+  let cambio = false;
+  _manoObraCosteoActual.forEach(row => {
+    if (row.nota === nota) { row[campo] = valor; cambio = true; }
+  });
+  if (cambio) renderManoObraCosteo();
+}
+
 // ── Máquinas involucradas (filas dinámicas) ──
 let _maquinasCosteoActual = [];
 function renderMaquinasCosteo() {
@@ -511,7 +531,7 @@ function renderMaquinasCosteo() {
     // ESE ELEMENTO (no del banco) — caso real: Prensa de Tensionamiento. Vacío = se reparte
     // igual que las demás máquinas de su unidad de uso (una vez por banco, por m³, etc.).
     const celdasPretensado = esPretensado ? `
-      <td><input type="number" min="0" step="0.01" value="${_diasBancoTexto(row.bancosDiaFila)}" placeholder="de línea" title="Días que le toma a esta máquina completar un banco" style="width:90px" oninput="_maquinasCosteoActual[${i}].bancosDiaFila=_bancosDiaDesdeDias(this.value);_actualizarResumenCosteo()"></td>
+      <td><input type="number" min="0" step="0.01" value="${_diasBancoTexto(row.bancosDiaFila)}" placeholder="de línea" title="Días que le toma a esta máquina completar un banco" style="width:90px" oninput="_maquinasCosteoActual[${i}].bancosDiaFila=_bancosDiaDesdeDias(this.value);_sincronizarOperarioMaquina('${_escNombreOnclick(row.nombre)}','bancosDiaFila',_maquinasCosteoActual[${i}].bancosDiaFila);_actualizarResumenCosteo()"></td>
       <td><input type="number" min="0" step="1" value="${row.numeroHilos || ''}" placeholder="—" title="N° de hilos de ESTE elemento (no del banco completo) — con valor, se usa una vez por cada hilo" style="width:70px" oninput="_maquinasCosteoActual[${i}].numeroHilos=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
     // "Unidades/día" y "Min/unidad" — Reforzado y Elemento Simple (2026-09-20, a pedido del
     // usuario: "la maquinaria está asumiendo como si se usara todo el día para la producción...
@@ -521,8 +541,8 @@ function renderMaquinasCosteo() {
     // patrón que ya tiene Mano de Obra en este tipo: si se llena "Min/unidad", manda sobre
     // "Unidades/día" de esa misma fila.
     const celdasReforzado = (esReforzado || esElementoSimple) ? `
-      <td><input type="number" min="0" step="0.01" value="${row.unidadesDiaFila || ''}" placeholder="de línea" title="Unidades que esta máquina completa en un día (solo aplica a máquinas que se reparten 'por día'). Si además llenas 'Min/unidad', ese dato manda sobre este." style="width:90px" oninput="_maquinasCosteoActual[${i}].unidadesDiaFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>
-      <td><input type="number" min="0" step="1" value="${row.minutosUnidadFila || ''}" placeholder="—" title="Minutos que le toma a esta máquina intervenir en UNA unidad — para usos puntuales cortos (solo aplica a máquinas 'por día'). Si se llena, reemplaza 'Unidades/día' de esta fila." style="width:75px" oninput="_maquinasCosteoActual[${i}].minutosUnidadFila=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>` : '';
+      <td><input type="number" min="0" step="0.01" value="${row.unidadesDiaFila || ''}" placeholder="de línea" title="Unidades que esta máquina completa en un día (solo aplica a máquinas que se reparten 'por día'). Si además llenas 'Min/unidad', ese dato manda sobre este." style="width:90px" oninput="_maquinasCosteoActual[${i}].unidadesDiaFila=parseFloat(this.value)||0;_sincronizarOperarioMaquina('${_escNombreOnclick(row.nombre)}','unidadesDiaFila',_maquinasCosteoActual[${i}].unidadesDiaFila);_actualizarResumenCosteo()"></td>
+      <td><input type="number" min="0" step="1" value="${row.minutosUnidadFila || ''}" placeholder="—" title="Minutos que le toma a esta máquina intervenir en UNA unidad — para usos puntuales cortos (solo aplica a máquinas 'por día'). Si se llena, reemplaza 'Unidades/día' de esta fila." style="width:75px" oninput="_maquinasCosteoActual[${i}].minutosUnidadFila=parseFloat(this.value)||0;_sincronizarOperarioMaquina('${_escNombreOnclick(row.nombre)}','minutosUnidadFila',_maquinasCosteoActual[${i}].minutosUnidadFila);_actualizarResumenCosteo()"></td>` : '';
     return `<tr>
       <td><select onchange="_maquinasCosteoActual[${i}].nombre=this.value;renderMaquinasCosteo();_actualizarResumenCosteo()">${_opcionesMaquinariaCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio)">${info}</td>
