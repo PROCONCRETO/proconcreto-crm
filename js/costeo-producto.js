@@ -1516,16 +1516,33 @@ function _actualizarResumenCosteo() {
   _pintarPrecioSugerido('costeo-precio-sugerido', c, k, producto);
 }
 
+// Volumen de concreto de la pieza (m³) — para el indicador "$/m³" de abajo. Reforzado,
+// Pretensado y Elemento Simple ya lo tienen como dato directo del formulario (`k.volumenUnidadM3`
+// — en Pretensado es "por ml", pero como su precio también se sugiere por ml, la razón
+// precio÷volumen sigue dando $/m³ real, el "ml" se cancela). Vibrocompactado no tiene ese campo
+// — se deriva de la capacidad de la cochada de la mezcladora (m³) ÷ Unidades/Bache (cuántas
+// unidades rinde una mezclada completa), el mismo criterio con el que ya se costea su Materia
+// Prima (2026-09-21, a pedido del usuario: "un indicador de precio por metro cúbico, que no es
+// más que dividir el precio de venta entre el volumen de concreto de la pieza").
+function _volumenUnidadM3Costeo(c, k) {
+  if (c.tipoEstructura === 'reforzado' || c.tipoEstructura === 'pretensado' || c.tipoEstructura === 'elemento_simple') return k.volumenUnidadM3 || 0;
+  return (k.unidadesBache > 0) ? (k.capacidadCochadaM3 || 0) / k.unidadesBache : 0;
+}
+
 // Precio sugerido (costo + margen) vs. precio actual del catálogo — mismo bloque se
 // reutiliza en el modal de edición y en el consolidado de solo lectura.
 function _pintarPrecioSugerido(divId, c, k, producto) {
   const div = document.getElementById(divId);
   if (!div) return;
+  const volumenM3 = _volumenUnidadM3Costeo(c, k);
+  const porM3 = (valor) => (volumenM3 > 0 && valor) ? _fmt(valor / volumenM3) : '—';
   div.innerHTML = `
     <div class="fila"><span>Precio sugerido — Lista (margen ${c.margenLista}%)</span><span>${_fmt(k.precioSugeridoLista)}</span></div>
     <div class="fila sub"><span>Precio actual en catálogo — Lista</span><span>${producto ? _fmt(producto.lista) : '—'}</span></div>
     <div class="fila" style="border-top:1px dashed var(--gris-borde);margin-top:6px;padding-top:8px"><span>Precio sugerido — Mínimo (margen ${c.margenMinimo}%)</span><span>${_fmt(k.precioSugeridoMinimo)}</span></div>
-    <div class="fila sub"><span>Precio actual en catálogo — Mínimo</span><span>${producto ? _fmt(producto.minimo) : '—'}</span></div>`;
+    <div class="fila sub"><span>Precio actual en catálogo — Mínimo</span><span>${producto ? _fmt(producto.minimo) : '—'}</span></div>
+    <div class="fila" style="border-top:1px dashed var(--gris-borde);margin-top:6px;padding-top:8px"><span>💧 $/m³ — Lista sugerido</span><span>${porM3(k.precioSugeridoLista)}</span></div>
+    <div class="fila sub"><span>$/m³ — Mínimo sugerido</span><span>${porM3(k.precioSugeridoMinimo)}</span></div>`;
 }
 
 // Único punto que escribe en el catálogo — siempre con confirmación explícita mostrando
@@ -1840,7 +1857,7 @@ function guardarCosteoProducto() {
   const producto = _productoDesdeTextoCosteo(document.getElementById('m-costeo-producto').value);
   if (!producto) { alert('Selecciona un producto válido del catálogo (busca por código o nombre).'); return; }
   const tipoElegido = document.getElementById('m-costeo-tipo').value;
-  if (tipoElegido !== 'vibrocompactado' && tipoElegido !== 'reforzado' && tipoElegido !== 'pretensado') { alert('Elige el tipo de estructura (por ahora solo Vibrocompactado, Reforzado y Pretensado están disponibles).'); return; }
+  if (!['vibrocompactado', 'reforzado', 'pretensado', 'elemento_simple'].includes(tipoElegido)) { alert('Elige el tipo de estructura (por ahora solo Vibrocompactado, Reforzado, Pretensado y Elemento Simple están disponibles).'); return; }
   if (!document.getElementById('m-costeo-diseno').value) { alert('Selecciona un Diseño de Mezcla.'); return; }
   const c = _leerFormularioCosteo();
   c.productoCodigo = producto.codigo;
