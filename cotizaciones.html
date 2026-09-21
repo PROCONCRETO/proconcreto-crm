@@ -952,7 +952,7 @@
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div class="card">
-      <div class="card-titulo">Tendencia de producción (m³)</div>
+      <div class="card-titulo" id="titulo-chart-vol-reforzado-tendencia">Tendencia de producción (m³)</div>
       <div style="height:280px;position:relative"><canvas id="chart-vol-reforzado-tendencia"></canvas></div>
     </div>
     <div class="card">
@@ -977,11 +977,6 @@
         </tbody>
       </table>
     </div>
-  </div>
-
-  <div id="card-vol-reforzado-unidades-filtrado" class="card" style="display:none">
-    <div class="card-titulo">Unidades producidas (de primera) — producto filtrado</div>
-    <div style="height:280px;position:relative"><canvas id="chart-vol-reforzado-unidades-filtrado"></canvas></div>
   </div>
 
   <div id="est-vol-reforzado-cards-ranking" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
@@ -1023,7 +1018,7 @@
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div class="card">
-      <div class="card-titulo">Tendencia de producción (m³)</div>
+      <div class="card-titulo" id="titulo-chart-vol-elemento-simple-tendencia">Tendencia de producción (m³)</div>
       <div style="height:280px;position:relative"><canvas id="chart-vol-elemento-simple-tendencia"></canvas></div>
     </div>
     <div class="card">
@@ -1048,11 +1043,6 @@
         </tbody>
       </table>
     </div>
-  </div>
-
-  <div id="card-vol-elemento-simple-unidades-filtrado" class="card" style="display:none">
-    <div class="card-titulo">Unidades producidas (de primera) — producto filtrado</div>
-    <div style="height:280px;position:relative"><canvas id="chart-vol-elemento-simple-unidades-filtrado"></canvas></div>
   </div>
 
   <div id="est-vol-elemento-simple-cards-ranking" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
@@ -2846,7 +2836,7 @@
 <script src="js/produccion-materia-prima.js?v=20260909a"></script>
 <script src="js/estadisticas-produccion.js?v=20260921b"></script>
 <script src="js/estadisticas-produccion-pretensado.js?v=20260921a"></script>
-<script src="js/estadisticas-produccion-volumen.js?v=20260921a"></script>
+<script src="js/estadisticas-produccion-volumen.js?v=20260921b"></script>
 <script src="js/produccion-atipicos.js?v=20260918b"></script>
 <script src="js/calidad-ajuste-mezcla.js?v=20260804b"></script>
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>

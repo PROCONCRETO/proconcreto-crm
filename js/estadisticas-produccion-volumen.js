@@ -44,8 +44,8 @@ let _ultimoProductoFiltroVolumen = { reforzado: '', elemento_simple: '' };
 // (una sola vista cada uno, una variable de módulo basta), acá el MISMO canvas-id-base se repite
 // dos veces (una por tipo, con sufijo distinto), así que hace falta una instancia por tipo.
 const _chartsVolumen = {
-  reforzado: { tendencia: null, deficiencia: null, mFiltrado: null, rankingVolumen: null, rankingDeficiencia: null, cemento: null },
-  elemento_simple: { tendencia: null, deficiencia: null, mFiltrado: null, rankingVolumen: null, rankingDeficiencia: null, cemento: null },
+  reforzado: { tendencia: null, deficiencia: null, rankingVolumen: null, rankingDeficiencia: null, cemento: null },
+  elemento_simple: { tendencia: null, deficiencia: null, rankingVolumen: null, rankingDeficiencia: null, cemento: null },
 };
 
 function setPeriodoProduccionVolumen(tipo, dias) {
@@ -115,56 +115,123 @@ function renderEstadisticasProduccionVolumen(tipo) {
   const totalCemento = registros.reduce((s, p) => s + (Number(p.consumoCemento) || 0), 0);
   const cementoPorUnidad = totalPrimera > 0 && totalCemento > 0 ? totalCemento / totalPrimera : null;
 
+  // Con un producto filtrado, m³ y unidades son directamente proporcionales entre sí (m³ =
+  // unidades × Volumen/unidad, una constante para ESE producto) — mostrar unidades es más
+  // directo, y ya no hace falta convertir a m³ para comparar contra otras referencias, porque no
+  // hay ninguna otra en pantalla (2026-09-21, a pedido del usuario: "cuando se filtra un producto
+  // en particular, muestra los indicadores en función de unidades fabricadas, no de m³... cuando
+  // se muestran todos los productos, sí déjalo por m³ pues no son comparables las unidades con
+  // los volúmenes para las múltiples referencias"). Sin filtro, se queda en m³ como siempre.
   const tarjetas = document.getElementById(`est-vol-${id}-tarjetas`);
   if (tarjetas) {
-    tarjetas.innerHTML = _tarjetaKPI(totalM3 > 0 ? totalM3.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'm³ de producción')
-      + _tarjetaKPI(promedioM3Dia !== null ? promedioM3Dia.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : '—', 'm³ promedio / día')
-      + _tarjetaKPI(desviacionM3Dia !== null ? desviacionM3Dia.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : '—', 'Desv. estándar (m³/día)')
-      + _tarjetaKPI(promedioM3_3Sigma !== null ? promedioM3_3Sigma.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : '—', 'Promedio m³/día (dentro de 3σ)')
-      + _tarjetaKPI(totalPrimera.toLocaleString(), 'Unidades de primera')
-      + _tarjetaKPI(totalMerma.toLocaleString(), 'Merma (ud)', totalMerma ? 'var(--rojo)' : null)
-      + _tarjetaKPI(totalSegundas.toLocaleString(), 'Segundas (ud)', totalSegundas ? 'var(--naranja)' : null)
-      + _tarjetaKPI(pctDeficiencia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + '%', '% Deficiencia', totalIntentado ? _colorDeficiencia(pctDeficiencia) : null)
-      + _tarjetaKPI(cementoPorUnidad !== null ? cementoPorUnidad.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' kg' : '—', 'Cemento / unidad (primera)');
+    if (productoFiltro) {
+      const diasConProduccion = new Set(registros.map(p => p.fecha)).size;
+      const promedioUnidadesDia = diasConProduccion > 0 ? totalPrimera / diasConProduccion : null;
+      const unidadesPorDiaArr = Object.values(_unidadesPorDia(registros));
+      const desviacionUnidadesDia = _desviacionEstandar(unidadesPorDiaArr);
+      const promedioUnidades3Sigma = promedioUnidadesDia !== null ? _promedioDentro3Sigma(unidadesPorDiaArr, promedioUnidadesDia, desviacionUnidadesDia) : null;
+      tarjetas.innerHTML = _tarjetaKPI(totalPrimera > 0 ? totalPrimera.toLocaleString() : '—', 'Unidades de producción')
+        + _tarjetaKPI(promedioUnidadesDia !== null ? promedioUnidadesDia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Unidades promedio / día')
+        + _tarjetaKPI(desviacionUnidadesDia !== null ? desviacionUnidadesDia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Desv. estándar (unidades/día)')
+        + _tarjetaKPI(promedioUnidades3Sigma !== null ? promedioUnidades3Sigma.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Promedio unidades/día (dentro de 3σ)')
+        + _tarjetaKPI(totalMerma.toLocaleString(), 'Merma (ud)', totalMerma ? 'var(--rojo)' : null)
+        + _tarjetaKPI(totalSegundas.toLocaleString(), 'Segundas (ud)', totalSegundas ? 'var(--naranja)' : null)
+        + _tarjetaKPI(pctDeficiencia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + '%', '% Deficiencia', totalIntentado ? _colorDeficiencia(pctDeficiencia) : null)
+        + _tarjetaKPI(cementoPorUnidad !== null ? cementoPorUnidad.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' kg' : '—', 'Cemento / unidad (primera)');
+    } else {
+      tarjetas.innerHTML = _tarjetaKPI(totalM3 > 0 ? totalM3.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'm³ de producción')
+        + _tarjetaKPI(promedioM3Dia !== null ? promedioM3Dia.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : '—', 'm³ promedio / día')
+        + _tarjetaKPI(desviacionM3Dia !== null ? desviacionM3Dia.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : '—', 'Desv. estándar (m³/día)')
+        + _tarjetaKPI(promedioM3_3Sigma !== null ? promedioM3_3Sigma.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : '—', 'Promedio m³/día (dentro de 3σ)')
+        + _tarjetaKPI(totalPrimera.toLocaleString(), 'Unidades de primera')
+        + _tarjetaKPI(totalMerma.toLocaleString(), 'Merma (ud)', totalMerma ? 'var(--rojo)' : null)
+        + _tarjetaKPI(totalSegundas.toLocaleString(), 'Segundas (ud)', totalSegundas ? 'var(--naranja)' : null)
+        + _tarjetaKPI(pctDeficiencia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + '%', '% Deficiencia', totalIntentado ? _colorDeficiencia(pctDeficiencia) : null)
+        + _tarjetaKPI(cementoPorUnidad !== null ? cementoPorUnidad.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' kg' : '—', 'Cemento / unidad (primera)');
+    }
   }
 
   const nota = document.getElementById(`est-vol-${id}-nota-sin-clasificar`);
   if (nota) {
     const notas = [];
     if (sinClasificar.length) notas.push(`⚠️ ${sinClasificar.length} registro${sinClasificar.length === 1 ? '' : 's'} sin Costeo de Producto guardado no se incluye${sinClasificar.length === 1 ? '' : 'n'} en estas estadísticas. Regístralo en Centro de Costos → Costeo de Producto, tipo "${_LABEL_VOL_TIPO[tipo]}".`);
-    if (sinVolumen.length) notas.push(`⚠️ ${sinVolumen.length} registro${sinVolumen.length === 1 ? '' : 's'} de producto${sinVolumen.length === 1 ? '' : 's'} ${_LABEL_VOL_TIPO[tipo]} con Costeo pero sin "Volumen de concreto/unidad" registrado no cuenta${sinVolumen.length === 1 ? '' : 'n'} en m³ de producción (sí sigue contando en unidades, merma, segundas y cemento). Completa ese dato en su Costeo → Rendimiento.`);
+    // Con un producto filtrado, las tarjetas ya no usan m³ para nada (ver arriba) — este aviso
+    // dejaría de tener sentido ahí, así que solo se muestra en la vista general.
+    if (!productoFiltro && sinVolumen.length) notas.push(`⚠️ ${sinVolumen.length} registro${sinVolumen.length === 1 ? '' : 's'} de producto${sinVolumen.length === 1 ? '' : 's'} ${_LABEL_VOL_TIPO[tipo]} con Costeo pero sin "Volumen de concreto/unidad" registrado no cuenta${sinVolumen.length === 1 ? '' : 'n'} en m³ de producción (sí sigue contando en unidades, merma, segundas y cemento). Completa ese dato en su Costeo → Rendimiento.`);
     nota.innerHTML = notas.map(t => `<div style="background:#FFF3E0;color:#E65100;border-radius:var(--radio);padding:8px 14px;font-size:12px;margin-bottom:8px">${t}</div>`).join('');
   }
 
-  _chartTendenciaProduccionVolumen(tipo, registros, _periodoProduccionVolumen[tipo], mapaVolumen);
+  _chartTendenciaProduccionVolumen(tipo, registros, _periodoProduccionVolumen[tipo], mapaVolumen, productoFiltro);
   _chartTendenciaDeficienciaVolumen(tipo, registros, _periodoProduccionVolumen[tipo]);
   _chartCementoPorUnidadVolumen(tipo, registros, _periodoProduccionVolumen[tipo]);
   _tablaProduccionHoyVolumen(tipo, registros, mapaVolumen);
 
   const cardsRanking = document.getElementById(`est-vol-${id}-cards-ranking`);
-  const cardUnidadesFiltro = document.getElementById(`card-vol-${id}-unidades-filtrado`);
   if (productoFiltro) {
     if (cardsRanking) cardsRanking.style.display = 'none';
-    if (cardUnidadesFiltro) cardUnidadesFiltro.style.display = '';
-    _chartUnidadesFiltradoVolumen(tipo, registros, _periodoProduccionVolumen[tipo]);
   } else {
     if (cardsRanking) cardsRanking.style.display = '';
-    if (cardUnidadesFiltro) cardUnidadesFiltro.style.display = 'none';
     _chartRankingVolumenM3(tipo, registros, mapaVolumen);
     _chartRankingDeficienciaVolumen(tipo, registros);
   }
 }
 
-// ── Tendencia de producción (m³) ──
-function _chartTendenciaProduccionVolumen(tipo, registros, periodoDias, mapaVolumen) {
-  const ctx = document.getElementById(`chart-vol-${_idVol(tipo)}-tendencia`);
+// m³/unidades totales por DÍA — mismo criterio que _m3PorDia(), sin multiplicar por el volumen
+// (para el modo "producto filtrado", donde el indicador ya es en unidades directas).
+function _unidadesPorDia(registros) {
+  const porDia = {};
+  registros.forEach(p => {
+    porDia[p.fecha] = (porDia[p.fecha] || 0) + (Number(p.cantidad) || 0);
+  });
+  return porDia;
+}
+
+// ── Tendencia de producción — m³ en vista general, unidades con un producto filtrado (ver
+// renderEstadisticasProduccionVolumen() para el porqué) ──
+function _chartTendenciaProduccionVolumen(tipo, registros, periodoDias, mapaVolumen, productoFiltro) {
+  const id = _idVol(tipo);
+  const ctx = document.getElementById(`chart-vol-${id}-tendencia`);
   if (!ctx) return;
+  const tituloDiv = document.getElementById(`titulo-chart-vol-${id}-tendencia`);
   const hoy = new Date();
   let dias = periodoDias;
   if (!dias) {
     const fechas = registros.map(p => p.fecha).sort();
     dias = fechas.length ? Math.max(1, Math.round((hoy - new Date(fechas[0] + 'T12:00')) / 86400000) + 1) : 30;
   }
+  const inst = _chartsVolumen[tipo];
+  if (inst.tendencia) inst.tendencia.destroy();
+
+  if (productoFiltro) {
+    if (tituloDiv) tituloDiv.textContent = 'Tendencia de producción (unidades)';
+    const labels = [], unidadesD = [];
+    for (let i = dias - 1; i >= 0; i--) {
+      const f = _fmtISO(_sumarDias(hoy, -i));
+      const primera = registros.filter(p => p.fecha === f).reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
+      if (!primera) continue;
+      labels.push(new Date(f + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }));
+      unidadesD.push(primera);
+    }
+    inst.tendencia = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets: [{ label: 'Unidades', data: unidadesD, borderColor: '#2a78d6', backgroundColor: 'rgba(42,120,214,0.1)', fill: true, borderWidth: 2, pointRadius: labels.length > 31 ? 0 : 3, tension: 0.2 }] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (c) => ` ${c.parsed.y.toLocaleString()} ud de primera` } },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#898781', maxRotation: 0, autoSkip: true, maxTicksLimit: 10, font: { size: 10 } } },
+          y: { beginAtZero: true, grid: { color: '#e1e0d9' }, ticks: { color: '#898781', precision: 0 } },
+        },
+      },
+    });
+    return;
+  }
+
+  if (tituloDiv) tituloDiv.textContent = 'Tendencia de producción (m³)';
   const labels = [], m3D = [], detalleD = [];
   for (let i = dias - 1; i >= 0; i--) {
     const f = _fmtISO(_sumarDias(hoy, -i));
@@ -182,8 +249,6 @@ function _chartTendenciaProduccionVolumen(tipo, registros, periodoDias, mapaVolu
     m3D.push(Math.round(m3 * 100) / 100);
     detalleD.push(Object.entries(porProducto).sort((a, b) => b[1].m3 - a[1].m3));
   }
-  const inst = _chartsVolumen[tipo];
-  if (inst.tendencia) inst.tendencia.destroy();
   inst.tendencia = new Chart(ctx, {
     type: 'line',
     data: { labels, datasets: [{ label: 'm³', data: m3D, borderColor: '#0ca30c', backgroundColor: 'rgba(12,163,12,0.1)', fill: true, borderWidth: 2, pointRadius: labels.length > 31 ? 0 : 3, tension: 0.2 }] },
@@ -206,45 +271,6 @@ function _chartTendenciaProduccionVolumen(tipo, registros, periodoDias, mapaVolu
       scales: {
         x: { grid: { display: false }, ticks: { color: '#898781', maxRotation: 0, autoSkip: true, maxTicksLimit: 10, font: { size: 10 } } },
         y: { beginAtZero: true, grid: { color: '#e1e0d9' }, ticks: { color: '#898781' } },
-      },
-    },
-  });
-}
-
-// ── Unidades producidas — SOLO cuando hay un producto filtrado (dentro de un mismo producto,
-// unidades y m³ son directamente proporcionales) ──
-function _chartUnidadesFiltradoVolumen(tipo, registros, periodoDias) {
-  const ctx = document.getElementById(`chart-vol-${_idVol(tipo)}-unidades-filtrado`);
-  if (!ctx) return;
-  const hoy = new Date();
-  let dias = periodoDias;
-  if (!dias) {
-    const fechas = registros.map(p => p.fecha).sort();
-    dias = fechas.length ? Math.max(1, Math.round((hoy - new Date(fechas[0] + 'T12:00')) / 86400000) + 1) : 30;
-  }
-  const labels = [], unidadesD = [];
-  for (let i = dias - 1; i >= 0; i--) {
-    const f = _fmtISO(_sumarDias(hoy, -i));
-    const primera = registros.filter(p => p.fecha === f).reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
-    if (!primera) continue;
-    labels.push(new Date(f + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }));
-    unidadesD.push(primera);
-  }
-  const inst = _chartsVolumen[tipo];
-  if (inst.mFiltrado) inst.mFiltrado.destroy();
-  inst.mFiltrado = new Chart(ctx, {
-    type: 'line',
-    data: { labels, datasets: [{ label: 'Unidades', data: unidadesD, borderColor: '#2a78d6', backgroundColor: 'rgba(42,120,214,0.1)', fill: true, borderWidth: 2, pointRadius: labels.length > 31 ? 0 : 3, tension: 0.2 }] },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: (c) => ` ${c.parsed.y.toLocaleString()} ud de primera` } },
-      },
-      scales: {
-        x: { grid: { display: false }, ticks: { color: '#898781', maxRotation: 0, autoSkip: true, maxTicksLimit: 10, font: { size: 10 } } },
-        y: { beginAtZero: true, grid: { color: '#e1e0d9' }, ticks: { color: '#898781', precision: 0 } },
       },
     },
   });
