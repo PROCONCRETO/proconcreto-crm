@@ -131,11 +131,29 @@ function _datosEstadisticasLogistica(periodoDias) {
 }
 
 // ── Tarjetas KPI (.stat-card, mismo componente que Cotizaciones→Estadísticas) ──
-function _tarjetaKPI(valor, etiqueta, color) {
+// `subHtml` (opcional, 2026-09-21): una línea extra de detalle debajo de la etiqueta — usada
+// por los dashboards de Producción para mostrar, con un producto filtrado, la variación del
+// promedio real contra el estándar de rendimiento digitado en su Costeo (ver
+// _tarjetaSubVsEstandar() en cada dashboard). Ya viene como HTML armado (colores incluidos), no
+// se escapa acá — mismo criterio que `valor`/`etiqueta`, que tampoco se escapan.
+function _tarjetaKPI(valor, etiqueta, color, subHtml) {
   return `<div class="stat-card"${color ? ` style="border-color:${color}"` : ''}>
     <div class="valor"${color ? ` style="color:${color}"` : ''}>${valor}</div>
     <div class="etiqueta">${etiqueta}</div>
+    ${subHtml ? `<div class="etiqueta-sub">${subHtml}</div>` : ''}
   </div>`;
+}
+// Variación del promedio real de rendimiento (ciclos/bancos/unidades por día) frente al estándar
+// que se digitó al costear ESE producto — solo tiene sentido con un producto filtrado (ver cada
+// dashboard). `null` si no hay estándar guardado (Costeo sin ese campo) o no hay promedio que
+// comparar — sin línea extra, no un "—" que no aporta nada.
+function _tarjetaSubVsEstandar(promedioReal, estandar, unidadLabel) {
+  if (promedioReal === null || !(estandar > 0)) return '';
+  const diferencia = promedioReal - estandar;
+  const pct = (diferencia / estandar) * 100;
+  const signo = diferencia >= 0 ? '+' : '';
+  const color = diferencia >= 0 ? 'var(--verde)' : 'var(--rojo)';
+  return `<span style="color:${color};font-weight:600">${signo}${diferencia.toLocaleString('es-CO', { maximumFractionDigits: 1 })} ${unidadLabel} (${signo}${pct.toLocaleString('es-CO', { maximumFractionDigits: 1 })}%)</span> vs. estándar del Costeo (${estandar.toLocaleString('es-CO', { maximumFractionDigits: 1 })})`;
 }
 
 // Semáforo genérico: verde si ya alcanzó la meta, ámbar a medias, rojo si va mal.

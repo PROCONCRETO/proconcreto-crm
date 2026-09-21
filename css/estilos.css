@@ -202,6 +202,7 @@
   .stat-card { background: white; border-radius: var(--radio); padding: 18px; box-shadow: var(--sombra); border-left: 4px solid var(--azul); }
   .stat-card .valor { font-size: 36px; font-weight: 700; color: var(--azul); }
   .stat-card .etiqueta { font-size: 12px; color: var(--gris-medio); margin-top: 2px; }
+  .stat-card .etiqueta-sub { font-size: 11px; color: var(--gris-medio); margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--gris-borde); }
 
   /* ── CLIENTES ── */
   .clientes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }

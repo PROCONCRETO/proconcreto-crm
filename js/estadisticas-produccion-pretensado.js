@@ -77,6 +77,19 @@ function _bancosPorDia(conBanco, mapaBanco) {
   return porDia;
 }
 
+// "Días/banco" del Costeo de ESE producto, ya convertido a bancos/día — el estándar contra el
+// que se compara el promedio real cuando hay un producto filtrado (2026-09-21, mismo criterio
+// que _ciclosDiaEstandarPorProducto() en Vibrocompactado). `bancosDiaLinea` ya se guarda en
+// bancos/día — "Días/banco" es solo el recíproco que se muestra en el formulario, ver
+// docs/modulos/costeo.md.
+function _bancosDiaEstandarPorProducto(nombreProducto) {
+  const prod = (typeof CATALOGO !== 'undefined' ? CATALOGO : []).find(p => p.nombre === nombreProducto);
+  if (!prod) return null;
+  const costeo = (typeof COSTEO_PRODUCTOS !== 'undefined' ? COSTEO_PRODUCTOS : []).find(c => c.productoCodigo === prod.codigo && c.tipoEstructura === 'pretensado');
+  const v = costeo?.rendimiento?.bancosDiaLinea;
+  return v > 0 ? v : null;
+}
+
 function renderEstadisticasProduccionPretensado() {
   if (typeof Chart === 'undefined') return;
   const { pretensados: todosPreten, sinClasificar } = _datosEstadisticasProduccionPretensado(_periodoProduccionPretensado);
@@ -114,10 +127,13 @@ function renderEstadisticasProduccionPretensado() {
   const totalCemento = pretensados.reduce((s, p) => s + (Number(p.consumoCemento) || 0), 0);
   const cementoPorMl = totalPrimera > 0 && totalCemento > 0 ? totalCemento / totalPrimera : null;
 
+  const bancosDiaEstandar = productoFiltro ? _bancosDiaEstandarPorProducto(productoFiltro) : null;
+  const subBancosPromedio = productoFiltro ? _tarjetaSubVsEstandar(promedioBancosDia, bancosDiaEstandar, 'bancos') : '';
+
   const tarjetas = document.getElementById('est-preten-tarjetas');
   if (tarjetas) {
     tarjetas.innerHTML = _tarjetaKPI(totalBancos > 0 ? Math.round(totalBancos).toLocaleString() : '—', 'Bancos de producción')
-      + _tarjetaKPI(promedioBancosDia !== null ? promedioBancosDia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Bancos promedio / día')
+      + _tarjetaKPI(promedioBancosDia !== null ? promedioBancosDia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Bancos promedio / día', null, subBancosPromedio)
       + _tarjetaKPI(desviacionBancosDia !== null ? desviacionBancosDia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Desv. estándar (bancos/día)')
       + _tarjetaKPI(promedioBancos3Sigma !== null ? promedioBancos3Sigma.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Promedio bancos/día (dentro de 3σ)')
       + _tarjetaKPI(totalPrimera.toLocaleString('es-CO', { maximumFractionDigits: 1 }), 'ML de primera')

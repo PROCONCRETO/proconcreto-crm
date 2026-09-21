@@ -22,6 +22,17 @@ const _LABEL_VOL_TIPO = { reforzado: 'Reforzado', elemento_simple: 'Elemento Sim
 // Los ids en el HTML usan guion (más legible/estándar en HTML) donde `tipo` usa guion bajo.
 function _idVol(tipo) { return tipo.replace(/_/g, '-'); }
 
+// "Unidades/día" digitado en el Costeo de ESE producto — el estándar contra el que se compara el
+// promedio real cuando hay un producto filtrado (2026-09-21, mismo criterio que
+// _ciclosDiaEstandarPorProducto()/_bancosDiaEstandarPorProducto() en Vibrocompactado/Pretensado).
+function _unidadesDiaEstandarPorProducto(tipo, nombreProducto) {
+  const prod = (typeof CATALOGO !== 'undefined' ? CATALOGO : []).find(p => p.nombre === nombreProducto);
+  if (!prod) return null;
+  const costeo = (typeof COSTEO_PRODUCTOS !== 'undefined' ? COSTEO_PRODUCTOS : []).find(c => c.productoCodigo === prod.codigo && c.tipoEstructura === tipo);
+  const v = costeo?.rendimiento?.unidadesDia;
+  return v > 0 ? v : null;
+}
+
 function _volumenUnidadM3PorProducto(tipo) {
   const codigoPorNombre = {};
   (typeof CATALOGO !== 'undefined' ? CATALOGO : []).forEach(p => { codigoPorNombre[p.nombre] = p.codigo; });
@@ -130,8 +141,10 @@ function renderEstadisticasProduccionVolumen(tipo) {
       const unidadesPorDiaArr = Object.values(_unidadesPorDia(registros));
       const desviacionUnidadesDia = _desviacionEstandar(unidadesPorDiaArr);
       const promedioUnidades3Sigma = promedioUnidadesDia !== null ? _promedioDentro3Sigma(unidadesPorDiaArr, promedioUnidadesDia, desviacionUnidadesDia) : null;
+      const unidadesDiaEstandar = _unidadesDiaEstandarPorProducto(tipo, productoFiltro);
+      const subUnidadesPromedio = _tarjetaSubVsEstandar(promedioUnidadesDia, unidadesDiaEstandar, 'unidades');
       tarjetas.innerHTML = _tarjetaKPI(totalPrimera > 0 ? totalPrimera.toLocaleString() : '—', 'Unidades de producción')
-        + _tarjetaKPI(promedioUnidadesDia !== null ? promedioUnidadesDia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Unidades promedio / día')
+        + _tarjetaKPI(promedioUnidadesDia !== null ? promedioUnidadesDia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Unidades promedio / día', null, subUnidadesPromedio)
         + _tarjetaKPI(desviacionUnidadesDia !== null ? desviacionUnidadesDia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Desv. estándar (unidades/día)')
         + _tarjetaKPI(promedioUnidades3Sigma !== null ? promedioUnidades3Sigma.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Promedio unidades/día (dentro de 3σ)')
         + _tarjetaKPI(totalMerma.toLocaleString(), 'Merma (ud)', totalMerma ? 'var(--rojo)' : null)

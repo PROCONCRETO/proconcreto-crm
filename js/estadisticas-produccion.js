@@ -168,6 +168,20 @@ function _promedioDentro3Sigma(valores, media, desviacion) {
   return dentro.length ? dentro.reduce((s, v) => s + v, 0) / dentro.length : media;
 }
 
+// "Ciclos/día" digitado en el Costeo de ESE producto — el estándar de rendimiento contra el que
+// se compara el promedio real cuando hay un producto filtrado (2026-09-21, a pedido del usuario:
+// "cuando filtramos un producto en específico... mostremos debajo del valor promedio la
+// variación porcentual y numérica frente al estándar dado por el costeo" — porque la vista
+// general no tiene un único estándar contra el cual comparar, cada producto tiene el suyo). `null`
+// si el producto no tiene Costeo guardado o no tiene ese campo digitado.
+function _ciclosDiaEstandarPorProducto(nombreProducto) {
+  const prod = (typeof CATALOGO !== 'undefined' ? CATALOGO : []).find(p => p.nombre === nombreProducto);
+  if (!prod) return null;
+  const costeo = (typeof COSTEO_PRODUCTOS !== 'undefined' ? COSTEO_PRODUCTOS : []).find(c => c.productoCodigo === prod.codigo && c.tipoEstructura === 'vibrocompactado');
+  const v = costeo?.rendimiento?.ciclosDia;
+  return v > 0 ? v : null;
+}
+
 function renderEstadisticasProduccion() {
   if (typeof Chart === 'undefined') return; // Chart.js aún no cargó (pantalla no visible todavía)
   const { vibrocompactados: todosVibro, sinClasificar } = _datosEstadisticasProduccion(_periodoProduccion);
@@ -225,10 +239,16 @@ function renderEstadisticasProduccion() {
   const totalCemento = vibrocompactados.reduce((s, p) => s + (Number(p.consumoCemento) || 0), 0);
   const cementoPorUnidad = totalPrimera > 0 && totalCemento > 0 ? totalCemento / totalPrimera : null;
 
+  // Variación del promedio real vs. el estándar de "Ciclos/día" del Costeo — solo con un producto
+  // filtrado (ver _ciclosDiaEstandarPorProducto()); en la vista general no hay un único estándar
+  // contra el cual comparar (cada producto mezclado tiene el suyo).
+  const ciclosDiaEstandar = productoFiltro ? _ciclosDiaEstandarPorProducto(productoFiltro) : null;
+  const subCiclosPromedio = productoFiltro ? _tarjetaSubVsEstandar(promedioCiclosDia, ciclosDiaEstandar, 'ciclos') : '';
+
   const tarjetas = document.getElementById('est-prod-tarjetas');
   if (tarjetas) {
     tarjetas.innerHTML = _tarjetaKPI(totalCiclos > 0 ? Math.round(totalCiclos).toLocaleString() : '—', 'Ciclos de producción')
-      + _tarjetaKPI(promedioCiclosDia !== null ? promedioCiclosDia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Ciclos promedio / día')
+      + _tarjetaKPI(promedioCiclosDia !== null ? promedioCiclosDia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Ciclos promedio / día', null, subCiclosPromedio)
       + _tarjetaKPI(desviacionCiclosDia !== null ? desviacionCiclosDia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Desv. estándar (ciclos/día)')
       + _tarjetaKPI(promedioCiclos3Sigma !== null ? promedioCiclos3Sigma.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'Promedio ciclos/día (dentro de 3σ)')
       + _tarjetaKPI(totalPrimera.toLocaleString(), 'Unidades de primera')
