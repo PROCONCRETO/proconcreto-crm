@@ -143,16 +143,22 @@ function _tarjetaKPI(valor, etiqueta, color, subHtml) {
     ${subHtml ? `<div class="etiqueta-sub">${subHtml}</div>` : ''}
   </div>`;
 }
-// Variación del promedio real de rendimiento (ciclos/bancos/unidades por día) frente al estándar
-// que se digitó al costear ESE producto — solo tiene sentido con un producto filtrado (ver cada
-// dashboard). `null` si no hay estándar guardado (Costeo sin ese campo) o no hay promedio que
-// comparar — sin línea extra, no un "—" que no aporta nada.
-function _tarjetaSubVsEstandar(promedioReal, estandar, unidadLabel) {
+// Variación del promedio real (rendimiento: ciclos/bancos/unidades por día; o consumo: cemento
+// por pieza) frente al estándar que se digitó/derivó al costear ESE producto — solo tiene
+// sentido con un producto filtrado (ver cada dashboard). `null` si no hay estándar guardado o
+// calculable (Costeo sin ese campo, o sin Diseño de Mezcla para el cemento) o no hay promedio
+// que comparar — sin línea extra, no un "—" que no aporta nada. `masEsMejor` (2026-09-21,
+// a pedido del usuario, para extender esto también a "Cemento / unidad"): en rendimiento (ciclos,
+// bancos, unidades/día) MÁS que el estándar es bueno (verde); en consumo (cemento/pieza) es al
+// revés — MENOS que el estándar es lo bueno, mismo criterio que ya distingue _colorDeficiencia()
+// de _colorSemaforo() en este mismo archivo.
+function _tarjetaSubVsEstandar(promedioReal, estandar, unidadLabel, masEsMejor = true) {
   if (promedioReal === null || !(estandar > 0)) return '';
   const diferencia = promedioReal - estandar;
   const pct = (diferencia / estandar) * 100;
   const signo = diferencia >= 0 ? '+' : '';
-  const color = diferencia >= 0 ? 'var(--verde)' : 'var(--rojo)';
+  const favorable = masEsMejor ? diferencia >= 0 : diferencia <= 0;
+  const color = favorable ? 'var(--verde)' : 'var(--rojo)';
   return `<span style="color:${color};font-weight:600">${signo}${diferencia.toLocaleString('es-CO', { maximumFractionDigits: 1 })} ${unidadLabel} (${signo}${pct.toLocaleString('es-CO', { maximumFractionDigits: 1 })}%)</span> vs. estándar del Costeo (${estandar.toLocaleString('es-CO', { maximumFractionDigits: 1 })})`;
 }
 

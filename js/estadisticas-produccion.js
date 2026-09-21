@@ -244,6 +244,14 @@ function renderEstadisticasProduccion() {
   // contra el cual comparar (cada producto mezclado tiene el suyo).
   const ciclosDiaEstandar = productoFiltro ? _ciclosDiaEstandarPorProducto(productoFiltro) : null;
   const subCiclosPromedio = productoFiltro ? _tarjetaSubVsEstandar(promedioCiclosDia, ciclosDiaEstandar, 'ciclos') : '';
+  // Consumo de cemento — el "estándar" acá no es un dato digitado en Rendimiento (como
+  // Ciclos/día), sino el consumo TEÓRICO que ya deriva el propio Costeo de su Diseño de Mezcla ×
+  // volumen (2026-09-21, a pedido del usuario: "hagamos lo último que hicimos, también para el
+  // consumo de cemento por pieza" — reutiliza _cementoTeoricoPorUnidad(), ya existente en
+  // costeo-producto.js, sin tocarla). Menos que el estándar es lo bueno acá (`masEsMejor=false`),
+  // al revés que el rendimiento — más cemento del que pide la receta es sobreconsumo, no un logro.
+  const cementoEstandar = productoFiltro ? _cementoTeoricoPorUnidad(productoFiltro) : null;
+  const subCementoPromedio = productoFiltro ? _tarjetaSubVsEstandar(cementoPorUnidad, cementoEstandar, 'kg', false) : '';
 
   const tarjetas = document.getElementById('est-prod-tarjetas');
   if (tarjetas) {
@@ -255,7 +263,7 @@ function renderEstadisticasProduccion() {
       + _tarjetaKPI(totalMerma.toLocaleString(), 'Merma (ud)', totalMerma ? 'var(--rojo)' : null)
       + _tarjetaKPI(totalSegundas.toLocaleString(), 'Segundas (ud)', totalSegundas ? 'var(--naranja)' : null)
       + _tarjetaKPI(pctDeficiencia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + '%', '% Deficiencia', totalIntentado ? _colorDeficiencia(pctDeficiencia) : null)
-      + _tarjetaKPI(cementoPorUnidad !== null ? cementoPorUnidad.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' kg' : '—', 'Cemento / unidad (primera)');
+      + _tarjetaKPI(cementoPorUnidad !== null ? cementoPorUnidad.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' kg' : '—', 'Cemento / unidad (primera)', null, subCementoPromedio);
   }
 
   const nota = document.getElementById('est-prod-nota-sin-clasificar');

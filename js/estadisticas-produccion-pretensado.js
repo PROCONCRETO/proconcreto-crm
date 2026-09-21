@@ -129,6 +129,11 @@ function renderEstadisticasProduccionPretensado() {
 
   const bancosDiaEstandar = productoFiltro ? _bancosDiaEstandarPorProducto(productoFiltro) : null;
   const subBancosPromedio = productoFiltro ? _tarjetaSubVsEstandar(promedioBancosDia, bancosDiaEstandar, 'bancos') : '';
+  // Consumo de cemento — el estándar es el consumo TEÓRICO que ya deriva el Costeo de su Diseño
+  // de Mezcla × volumen/ml (2026-09-21, a pedido del usuario, mismo criterio que Vibrocompactado
+  // — ver estadisticas-produccion.js). Menos que el estándar es lo bueno (`masEsMejor=false`).
+  const cementoEstandar = productoFiltro ? _cementoTeoricoPorUnidad(productoFiltro) : null;
+  const subCementoPromedio = productoFiltro ? _tarjetaSubVsEstandar(cementoPorMl, cementoEstandar, 'kg', false) : '';
 
   const tarjetas = document.getElementById('est-preten-tarjetas');
   if (tarjetas) {
@@ -140,7 +145,7 @@ function renderEstadisticasProduccionPretensado() {
       + _tarjetaKPI(totalMerma.toLocaleString('es-CO', { maximumFractionDigits: 1 }), 'Merma (ml)', totalMerma ? 'var(--rojo)' : null)
       + _tarjetaKPI(totalSegundas.toLocaleString('es-CO', { maximumFractionDigits: 1 }), 'Segundas (ml)', totalSegundas ? 'var(--naranja)' : null)
       + _tarjetaKPI(pctDeficiencia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + '%', '% Deficiencia', totalIntentado ? _colorDeficiencia(pctDeficiencia) : null)
-      + _tarjetaKPI(cementoPorMl !== null ? cementoPorMl.toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' kg' : '—', 'Cemento / ml (primera)');
+      + _tarjetaKPI(cementoPorMl !== null ? cementoPorMl.toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' kg' : '—', 'Cemento / ml (primera)', null, subCementoPromedio);
   }
 
   const nota = document.getElementById('est-preten-nota-sin-clasificar');

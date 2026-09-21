@@ -133,6 +133,12 @@ function renderEstadisticasProduccionVolumen(tipo) {
   // en particular, muestra los indicadores en función de unidades fabricadas, no de m³... cuando
   // se muestran todos los productos, sí déjalo por m³ pues no son comparables las unidades con
   // los volúmenes para las múltiples referencias"). Sin filtro, se queda en m³ como siempre.
+  // Consumo de cemento — el estándar es el teórico que ya deriva el Costeo de su Diseño de
+  // Mezcla × volumen (2026-09-21, a pedido del usuario, mismo criterio que Vibrocompactado/
+  // Pretensado). Menos que el estándar es lo bueno (`masEsMejor=false`).
+  const cementoEstandar = productoFiltro ? _cementoTeoricoPorUnidad(productoFiltro) : null;
+  const subCementoPromedio = productoFiltro ? _tarjetaSubVsEstandar(cementoPorUnidad, cementoEstandar, 'kg', false) : '';
+
   const tarjetas = document.getElementById(`est-vol-${id}-tarjetas`);
   if (tarjetas) {
     if (productoFiltro) {
@@ -150,7 +156,7 @@ function renderEstadisticasProduccionVolumen(tipo) {
         + _tarjetaKPI(totalMerma.toLocaleString(), 'Merma (ud)', totalMerma ? 'var(--rojo)' : null)
         + _tarjetaKPI(totalSegundas.toLocaleString(), 'Segundas (ud)', totalSegundas ? 'var(--naranja)' : null)
         + _tarjetaKPI(pctDeficiencia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + '%', '% Deficiencia', totalIntentado ? _colorDeficiencia(pctDeficiencia) : null)
-        + _tarjetaKPI(cementoPorUnidad !== null ? cementoPorUnidad.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' kg' : '—', 'Cemento / unidad (primera)');
+        + _tarjetaKPI(cementoPorUnidad !== null ? cementoPorUnidad.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' kg' : '—', 'Cemento / unidad (primera)', null, subCementoPromedio);
     } else {
       tarjetas.innerHTML = _tarjetaKPI(totalM3 > 0 ? totalM3.toLocaleString('es-CO', { maximumFractionDigits: 1 }) : '—', 'm³ de producción')
         + _tarjetaKPI(promedioM3Dia !== null ? promedioM3Dia.toLocaleString('es-CO', { maximumFractionDigits: 2 }) : '—', 'm³ promedio / día')
