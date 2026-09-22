@@ -453,6 +453,15 @@ Guardar un insumo, una máquina, una cuadrilla, un nivel salarial o un Diseño d
   - **Nivel salarial** (`js/costeo-mano-obra.js`): no se referencia directo desde el costeo — primero se buscan las cuadrillas que usan esa clase en algún rol (`CUADRILLAS_PRODUCTIVAS`, mismo criterio que ya usa `eliminarClaseSalarial()` para avisar si está en uso), y de ahí los costeos que usan esas cuadrillas.
   - **Insumo** (`js/costeo-referencia.js`): `_costeoUsaInsumo(c, nombres)` (`js/costeo-producto.js`) — cubre uso directo (tabla de Insumos del costeo) e indirecto vía el Diseño de Mezcla asignado (Cemento/Agua/Agregados/Adiciones/Aditivos) y vía los insumos hardcodeados de Refuerzo ("Acero Figurado"/"Alambre Dulce" en Reforzado, "Acero 5mm Pretensionamiento" en Pretensado).
 
+## Nota de contexto por fila — ícono "📝" (2026-09-22)
+
+A pedido del usuario ("al lado derecho de la (x), pongamos... un icono también pequeño de agregar un post-it, para agregar notas que den contexto a cantidades o datos que se ingresan"), las 4 tablas de filas dinámicas del formulario de Costeo — **Otras materias primas**, **Máquinas involucradas**, **Mano de obra involucrada** e **Insumos de empaque, consumos y recargos** — tienen ahora un botón "📝" al final de cada fila, a la derecha del botón de eliminar ("✕").
+
+- Al hacer clic, `_editarNotaFila(arr, i, renderFn)` (`js/costeo-producto.js`) pide el texto con `prompt()` (precargado con la nota existente si ya había una) y lo guarda en `row.notaContexto` — campo nuevo, separado de `row.nota` (que en Mano de Obra ya se usa para "Función específica" y es una columna visible de la tabla, no una anotación aparte).
+- El botón se pinta con fondo amarillo claro (estilo post-it, `#FFF3CD`) cuando la fila ya tiene una nota, y el texto completo se ve en el `title` (tooltip) al pasar el mouse — sin nota, el botón queda con el estilo normal y el tooltip invita a agregar una.
+- `notaContexto` se guarda igual que el resto de la fila (`JSON.parse(JSON.stringify(...))` en `guardarCosteoProducto()`, el mismo patrón que ya usan `maquinas`, `manoObra`, `insumos` y `materiaPrimaExtra`) — no participa en ningún cálculo del costeo, es puramente informativo.
+- Bug menor pre-existente encontrado de paso: el colspan del mensaje "Agrega insumos..." en la tabla de Insumos estaba en `4` cuando la fila real ya tenía 5 columnas desde que se agregó "Se reparte" — corregido junto con el ajuste por la columna nueva (ahora `6`, con el botón de nota incluido).
+
 ## Reordenamiento manual — Costos de Referencia, Maquinaria, Costeo de Producto (2026-08-21)
 
 A pedido del usuario ("darle un orden de acuerdo al avance"), estas 3 pantallas ganaron un

@@ -207,16 +207,16 @@ function recalcular() {
   if (notaViaje) {
     notaViaje.style.display = modoTransporte === 'viaje' ? 'block' : 'none';
     if (modoTransporte === 'viaje' && destino) {
-      const { numeroViajes, capacidadCamion } = _transportePorViaje(destino, tarifaManual, pesoTotal);
+      const { numeroViajes, capacidadCamion } = _transportePorViaje(destino, tarifaManual, itemsActuales);
       const nViajes = pesoTotal > 0 ? numeroViajes : 0;
       notaViaje.textContent = esOtroViaje
-        ? `Se cobra la tarifa manual como valor plano por viaje (no $/kg) — ${nViajes || '—'} viaje${nViajes === 1 ? '' : 's'} de ${capacidadCamion.toLocaleString()} kg c/u, redondeando siempre hacia arriba el peso total del pedido.`
-        : `Se cobra por viajes completos de ${capacidadCamion.toLocaleString()} kg (capacidad de un camión) — ${nViajes || '—'} viaje${nViajes === 1 ? '' : 's'} para este pedido, sin importar el peso real que sobre en el último — para sitios apartados donde no se consolida carga con otras entregas.`;
+        ? `Se cobra la tarifa manual como valor plano por viaje (no $/kg) — ${nViajes || '—'} viaje${nViajes === 1 ? '' : 's'} de ${capacidadCamion.toLocaleString()} kg c/u, sin fraccionar piezas entre camiones (cada producto cuenta sus propias piezas completas por viaje).`
+        : `Se cobra por viajes completos de ${capacidadCamion.toLocaleString()} kg (capacidad de un camión) — ${nViajes || '—'} viaje${nViajes === 1 ? '' : 's'} para este pedido, sin fraccionar piezas entre camiones (cada producto cuenta sus propias piezas completas por viaje) ni consolidar con otras entregas — para sitios apartados.`;
     }
   }
   if (destino && pesoTotal > 0) {
     const tarifaBase = modoTransporte === 'viaje'
-      ? _transportePorViaje(destino, tarifaManual, pesoTotal).tarifaBase
+      ? _transportePorViaje(destino, tarifaManual, itemsActuales).tarifaBase
       : Math.round(pesoTotal * tarifaKgDe(destino, tarifaManual));
     transporte = Math.round(tarifaBase * (1 - descTrans / 100)); // base
     if (tieneIva) iva += Math.round(transporte * 0.19); // transporte grabado solo si el producto tiene IVA
@@ -280,22 +280,41 @@ function nombreDestino(destino, destinoNombre) {
 const PESO_VIAJE_OTRO = 10000;
 
 // Transporte en modo "por viaje completo (no se consolida)", para cualquier destino — el
-// número de viajes SIEMPRE sale de redondear hacia arriba el peso total entre la capacidad
-// asumida por camión (2026-08-14, a pedido del usuario: un pedido de 45.560 kg a un destino ya
-// tarifado no cabe en un solo camión de 11.000 kg, así que no basta con cobrar "1 viaje" fijo
-// como se hacía antes — se necesitan varios). Dos casos según el destino:
+// número de viajes sale de cuántas piezas COMPLETAS de cada producto caben por camión, nunca de
+// dividir el peso total del pedido entre la capacidad del camión (2026-09-22, a pedido del
+// usuario: una pieza de 4 ton en un camión de 11 ton permite 2 piezas por viaje, no 2,75 — un
+// pedido de 5 piezas así necesita 3 viajes, no los 2 que salían antes de redondear 20 ton /
+// 11 ton hacia arriba, porque una pieza no se puede fraccionar entre dos camiones). Antes de
+// esto (2026-08-14) ya se había corregido que un pedido que no cabe en un solo camión necesita
+// varios viajes completos, no uno fijo — ver _numeroViajesPorPiezas(). Dos casos según el
+// destino:
 //   - Destino "Otro" (manual): la tarifa manual es un valor plano por viaje (no $/kg) — ver
 //     también el caso previo que corrigió esto mismo para un solo viaje ("me pide un peso por
 //     kg que me distorsiona el cálculo... debemos poner el precio manual pero por viaje").
 //   - Destino ya tarifado: el precio por viaje sigue saliendo de la tarifa/kg de ese destino ×
 //     la capacidad estándar de camión (11.000 kg) — igual que un solo viaje, solo que ahora
 //     multiplicado por cuántos viajes hacen falta.
-function _transportePorViaje(destino, tarifaManual, pesoTotal) {
+function _transportePorViaje(destino, tarifaManual, items) {
   const esOtro = destino === 'Otro';
   const capacidadCamion = esOtro ? PESO_VIAJE_OTRO : PESO_VIAJE_COMPLETO;
-  const numeroViajes = Math.max(1, Math.ceil(pesoTotal / capacidadCamion));
+  const numeroViajes = _numeroViajesPorPiezas(items, capacidadCamion);
   const precioPorViaje = esOtro ? (parseFloat(tarifaManual) || 0) : Math.round(capacidadCamion * tarifaKgDe(destino, tarifaManual));
   return { numeroViajes, precioPorViaje, capacidadCamion, tarifaBase: Math.round(precioPorViaje * numeroViajes) };
+}
+
+// Viajes necesarios sin fraccionar piezas entre camiones: cada producto calcula sus propias
+// piezas completas por viaje (floor(capacidad camión / peso de la pieza), mínimo 1) y sus
+// viajes se cuentan por separado y se suman entre productos — conservador (no combina el
+// espacio sobrante de un producto con el de otro en el mismo camión), pero nunca subestima un
+// viaje como sí pasaba al sumar todo el peso del pedido y dividir entre la capacidad.
+function _numeroViajesPorPiezas(items, capacidadCamion) {
+  let viajes = 0;
+  (items || []).forEach(it => {
+    if (!it.peso || !it.cantidad) return;
+    const piezasPorViaje = Math.max(1, Math.floor(capacidadCamion / it.peso));
+    viajes += Math.ceil(it.cantidad / piezasPorViaje);
+  });
+  return Math.max(1, viajes);
 }
 
 // ═══════════════════════════════
@@ -327,7 +346,7 @@ function calcOpcion(op) {
   let transporte = 0; // base sin IVA
   if (op.destino && pesoTotal > 0) {
     const tarifaBase = op.modoTransporte === 'viaje'
-      ? _transportePorViaje(op.destino, op.tarifaManual, pesoTotal).tarifaBase
+      ? _transportePorViaje(op.destino, op.tarifaManual, op.items).tarifaBase
       : Math.round(pesoTotal * tarifaKgDe(op.destino, op.tarifaManual));
     transporte = Math.round(tarifaBase * (1 - (op.descTrans || 0) / 100));
     if (tieneIva) iva += Math.round(transporte * 0.19);
@@ -609,20 +628,19 @@ function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCarg
     const modoLabel = esViaje ? ' — viaje completo' : '';
 
     if (esViaje) {
-      // Por viaje completo (cualquier destino): el número de viajes sale de redondear hacia
-      // arriba el peso total entre la capacidad asumida por camión — un pedido que no cabe en
-      // un solo camión necesita varios viajes completos, no uno solo fijo (ver
-      // _transportePorViaje()). Para destino "Otro" la tarifa manual es un valor plano por
-      // viaje (no $/kg); para un destino ya tarifado, el precio por viaje sale de su tarifa/kg
-      // × la capacidad del camión, igual que antes cuando siempre era exactamente 1 viaje.
-      const { numeroViajes, precioPorViaje, capacidadCamion, tarifaBase } = _transportePorViaje(destino, tarifaManual, pesoTotal);
+      // Por viaje completo (cualquier destino): el número de viajes sale de cuántas piezas
+      // completas de cada producto caben por camión, no de dividir el peso total del pedido
+      // entre la capacidad — una pieza no se fracciona entre dos camiones (ver
+      // _transportePorViaje()/_numeroViajesPorPiezas()). Para destino "Otro" la tarifa manual
+      // es un valor plano por viaje (no $/kg); para un destino ya tarifado, el precio por viaje
+      // sale de su tarifa/kg × la capacidad del camión.
+      const { numeroViajes, precioPorViaje, tarifaBase } = _transportePorViaje(destino, tarifaManual, items);
       transporte = Math.round(tarifaBase * (1 - descTrans / 100));
       if (transIva) ivaTotal += Math.round(transporte * 0.19);
       const precioPorViajeAjustado = precioPorViaje * (1 - descTrans / 100);
-      const detalleCantidad = destino === 'Otro' ? ` (${Math.round(pesoTotal).toLocaleString()} kg ÷ ${capacidadCamion.toLocaleString()} kg/viaje)` : '';
       filasTabla += `<tr>
         <td>${numeroViajes}</td><td>viaje${numeroViajes === 1 ? '' : 's'}</td>
-        <td>Transporte${descLabel}${modoLabel}:<br><span style="font-size:10px;color:#666">Chinchiná – ${destLabelNombre}${detalleCantidad}</span></td>
+        <td>Transporte${descLabel}${modoLabel}:<br><span style="font-size:10px;color:#666">Chinchiná – ${destLabelNombre}</span></td>
         <td style="text-align:center">${transIva ? 'SI' : 'NO'}</td>
         <td style="text-align:right">$ ${precioPorViaje.toLocaleString()}</td>
         <td style="text-align:center">${descTrans > 0 ? descTrans + '%' : '0%'}</td>
@@ -742,7 +760,7 @@ async function guardarCotizacion() {
   let transporte = 0;
   if (destino && pesoTotal > 0) {
     const tarifaBase = modoTransporte === 'viaje'
-      ? _transportePorViaje(destino, tarifaManual, pesoTotal).tarifaBase
+      ? _transportePorViaje(destino, tarifaManual, itemsActuales).tarifaBase
       : Math.round(pesoTotal * tarifaKgDe(destino, tarifaManual));
     transporte = Math.round(tarifaBase * (1 - descTrans / 100));
   }

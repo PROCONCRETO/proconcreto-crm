@@ -95,7 +95,7 @@ function _pintarSugerenciasProductoCosteo() {
   }
   box.innerHTML = _sugerenciasProductoCosteo.map((p, i) => `
     <div onmousedown="_elegirProductoCosteo(${i})" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--gris-borde);${i === _indiceSugerenciaCosteo ? 'background:var(--azul-suave)' : 'background:white'}">
-      <div style="font-weight:600;font-size:13px">${_esc(p.nombre)}${p.especial ? ' <span style="font-size:10px;font-weight:700;color:#6A1B9A;background:#F3E5F5;padding:1px 6px;border-radius:8px;vertical-align:middle" title="Producto especial/borrador — no aparece todavía en Cotizaciones">🔬 Especial</span>' : ''}</div>
+      <div style="font-weight:600;font-size:13px">${_esc(p.nombre)}${p.especial ? ' <span style="font-size:10px;font-weight:700;color:#6A1B9A;background:#F3E5F5;padding:1px 6px;border-radius:8px;vertical-align:middle" title="Producto oculto (no de línea) — especial/borrador, no aparece todavía en Cotizaciones">🔬 Oculto (No de línea)</span>' : ''}</div>
       <div style="font-size:11px;color:var(--gris-medio)">${_esc(p.codigo)} · ${_esc(p.grupo)}${p.medidas ? ' · ' + _esc(p.medidas) : ''}</div>
     </div>`).join('');
   box.style.display = 'block';
@@ -373,11 +373,30 @@ function _actualizarPreviewDiseno() {
 // no de materia prima). "Cantidad" ya es la cantidad por unidad de producto (mismo criterio
 // que el reparto "Directo" de Insumos), porque no hay una fórmula que la derive.
 let _materiaPrimaExtraCosteoActual = [];
+// Ícono "📝" por fila (Materias Primas, Máquinas, Mano de Obra, Insumos) — nota de contexto
+// libre para explicar una cantidad o un dato ingresado (2026-09-22, a pedido del usuario: dar
+// contexto a valores que de otra forma quedan "sueltos" en el costeo). Campo `notaContexto` en
+// la fila — separado de `nota` (Mano de Obra), que ya se usa para "Función específica" y es un
+// campo visible de la tabla, no una anotación aparte. Se guarda igual que el resto de la fila
+// (JSON.parse(JSON.stringify(...)) en guardarCosteoProducto()), sin tocar el cálculo del costeo.
+function _editarNotaFila(arr, i, renderFn) {
+  const row = arr[i];
+  if (!row) return;
+  const nueva = prompt('Nota de contexto para esta fila (opcional) — qué explica la cantidad o el dato ingresado:', row.notaContexto || '');
+  if (nueva === null) return;
+  row.notaContexto = nueva.trim();
+  renderFn();
+}
+function _botonNotaFila(row, arrNombre, i, renderFnNombre) {
+  const tiene = !!(row.notaContexto && row.notaContexto.trim());
+  const titulo = tiene ? row.notaContexto : 'Agregar nota de contexto';
+  return `<button class="btn btn-secundario btn-xs" style="${tiene ? 'background:#FFF3CD;border-color:#FFE69C' : ''}" title="${_escAttr(titulo)}" onclick="_editarNotaFila(${arrNombre},${i},${renderFnNombre})">📝</button>`;
+}
 function renderMateriaPrimaExtraCosteo() {
   const tbody = document.getElementById('costeo-mp-extra-body');
   if (!tbody) return;
   if (!_materiaPrimaExtraCosteoActual.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Sin materias primas adicionales</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Sin materias primas adicionales</td></tr>`;
     return;
   }
   const _generaIva = _productoGeneraIvaCosteoActual();
@@ -389,6 +408,7 @@ function renderMateriaPrimaExtraCosteo() {
       <td style="color:var(--gris-medio);white-space:nowrap">${precio}</td>
       <td><input type="number" value="${row.cantidad}" min="0" step="0.001" oninput="_materiaPrimaExtraCosteoActual[${i}].cantidad=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>
       <td><button class="btn btn-rojo btn-xs" onclick="_materiaPrimaExtraCosteoActual.splice(${i},1);renderMateriaPrimaExtraCosteo();_actualizarResumenCosteo()">✕</button></td>
+      <td>${_botonNotaFila(row, '_materiaPrimaExtraCosteoActual', i, 'renderMateriaPrimaExtraCosteo')}</td>
     </tr>`;
   }).join('');
 }
@@ -518,7 +538,7 @@ function renderMaquinasCosteo() {
   const esReforzado = document.getElementById('m-costeo-tipo')?.value === 'reforzado';
   const esElementoSimple = document.getElementById('m-costeo-tipo')?.value === 'elemento_simple';
   if (!_maquinasCosteoActual.length) {
-    tbody.innerHTML = `<tr><td colspan="${(esPretensado || esReforzado || esElementoSimple) ? 7 : 5}" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las máquinas de la línea de producción</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${(esPretensado || esReforzado || esElementoSimple) ? 8 : 6}" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las máquinas de la línea de producción</td></tr>`;
     return;
   }
   tbody.innerHTML = _maquinasCosteoActual.map((row, i) => {
@@ -560,6 +580,7 @@ function renderMaquinasCosteo() {
       ${celdasReforzado}
       <td><button class="btn btn-secundario btn-xs" title="Asignar operario en Mano de Obra" onclick="_asignarOperarioMaquina(${i})">👷</button></td>
       <td><button class="btn btn-rojo btn-xs" onclick="_maquinasCosteoActual.splice(${i},1);renderMaquinasCosteo();_actualizarResumenCosteo()">✕</button></td>
+      <td>${_botonNotaFila(row, '_maquinasCosteoActual', i, 'renderMaquinasCosteo')}</td>
     </tr>`;
   }).join('');
 }
@@ -603,7 +624,7 @@ function renderManoObraCosteo() {
   if (!tbody) return;
   const esPretensado = document.getElementById('m-costeo-tipo')?.value === 'pretensado';
   if (!_manoObraCosteoActual.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las cuadrillas de la línea de producción</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las cuadrillas de la línea de producción</td></tr>`;
     return;
   }
   tbody.innerHTML = _manoObraCosteoActual.map((row, i) => {
@@ -642,6 +663,7 @@ function renderManoObraCosteo() {
       ${celdaUnidadesDia}
       ${celdaMinutosUnidad}
       <td><button class="btn btn-rojo btn-xs" onclick="_manoObraCosteoActual.splice(${i},1);renderManoObraCosteo();_actualizarResumenCosteo()">✕</button></td>
+      <td>${_botonNotaFila(row, '_manoObraCosteoActual', i, 'renderManoObraCosteo')}</td>
     </tr>`;
   }).join('');
 }
@@ -660,7 +682,7 @@ function renderInsumosCosteo() {
   const tbody = document.getElementById('costeo-insumos-body');
   if (!tbody) return;
   if (!_insumosCosteoActual.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega insumos de empaque (estiba, zuncho...) o consumos (energía, agua, ACPM...)</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega insumos de empaque (estiba, zuncho...) o consumos (energía, agua, ACPM...)</td></tr>`;
     return;
   }
   // "Por estiba" reparte ÷ Unidades/estiba (sección 3, Rendimiento) — ese campo solo existe en
@@ -684,6 +706,7 @@ function renderInsumosCosteo() {
         ${(!estibaAplica && row.reparto === 'estiba') ? '<div style="color:var(--rojo);font-size:10px;margin-top:2px">⚠️ No aplica a este tipo — no suma costo</div>' : ''}
       </td>
       <td><button class="btn btn-rojo btn-xs" onclick="_insumosCosteoActual.splice(${i},1);renderInsumosCosteo();_actualizarResumenCosteo()">✕</button></td>
+      <td>${_botonNotaFila(row, '_insumosCosteoActual', i, 'renderInsumosCosteo')}</td>
     </tr>`;
   }).join('');
 }

@@ -35,13 +35,21 @@ Dos bugs reales reportados seguidos, los dos en el modo **"Por viaje completo (n
 
 `_transportePorViaje()` resuelve los dos a la vez:
 
-- **Número de viajes, siempre**: `Math.ceil(pesoTotal / capacidadCamion)` — redondeado hacia arriba (un viaje empezado se cobra completo). `capacidadCamion` es `PESO_VIAJE_OTRO` (**10.000** kg) para destino "Otro", o `PESO_VIAJE_COMPLETO` (**11.000** kg) para un destino ya tarifado — distintos a propósito, a pedido explícito del usuario: un destino manual suele ser una vía/acceso que todavía no se conoce bien, así que se asume más conservador (camión más liviano).
 - **Precio por viaje**: para "Otro", la tarifa manual tal cual (deja de leerse como $/kg — el label del campo cambia solo a "Tarifa manual ($/viaje)" cuando aplica este combo, `label-tarifa-manual` en `cotizaciones.html`). Para un destino ya tarifado, `capacidadCamion × tarifa/kg del destino` — igual cuenta que antes para un solo viaje, ahora multiplicada por cuántos viajes hacen falta.
 - `transporte = precioPorViaje × numeroViajes × (1 − descuento/100)`.
-- En el PDF, la fila de transporte muestra el número real de viajes (ya no fijo en "1") — para "Otro" además detalla la cuenta: `(peso total kg ÷ 10.000 kg/viaje)`.
 - La nota bajo el selector (`#nota-viaje-completo`) también se recalcula en vivo con el número de viajes real de cada combo.
 
 El modo "Por peso" (consolidado, sin importar el destino) no cambió.
+
+### Número de viajes: por piezas completas, no por peso total (2026-09-22)
+
+El usuario detectó que `numeroViajes` salía de `Math.ceil(pesoTotal / capacidadCamion)` — sumar el peso de TODOS los ítems del pedido y dividir entre la capacidad del camión. Eso funciona bien para ítems livianos (bloques, adoquines), pero para piezas pesadas (pretensados/prefabricados grandes) asume que se pueden fraccionar entre camiones: con una pieza de 4 ton y un camión de 11 ton, un pedido de 5 piezas (20 ton) daba `ceil(20.000/11.000) = 2 viajes`, como si cupieran 2,5 piezas por viaje — en la realidad solo caben 2 piezas por camión (8 ton; la 3ra pasaría de la capacidad), así que hacen falta 3 viajes, no 2.
+
+`_numeroViajesPorPiezas(items, capacidadCamion)` corrige esto calculando, por cada producto del pedido, cuántas piezas COMPLETAS caben por viaje (`Math.max(1, Math.floor(capacidadCamion / pesoUnitario))`) y de ahí los viajes que hacen falta para su cantidad (`Math.ceil(cantidad / piezasPorViaje)`) — los viajes de cada producto se cuentan por separado y se suman entre productos. Es conservador (no combina el espacio sobrante de un producto con el de otro en el mismo camión, así que puede sobrestimar cuando se mezclan varios productos livianos), pero nunca subestima un viaje como sí pasaba antes.
+
+Para ítems livianos donde muchas piezas caben por camión, el resultado coincide con el cálculo anterior por peso total — el cambio solo se nota cuando el peso de una pieza es una fracción significativa de la capacidad del camión.
+
+`_transportePorViaje()` ahora recibe la lista de ítems (`itemsActuales`, `op.items`, etc.) en vez de `pesoTotal` — se usa en los mismos 4 lugares de siempre: `recalcular()`, `calcOpcion()`, `construirTablaCotizacion()`, `guardarCotizacion()`. Se quitó del PDF el detalle `(peso total kg ÷ capacidad kg/viaje)` para destino "Otro" porque ya no describe cómo se calculó el número de viajes (ahora es por pieza, no una simple división).
 
 ## Pantallas (`ir()` en `navegacion.js`)
 

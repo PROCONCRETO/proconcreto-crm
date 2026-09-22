@@ -1136,13 +1136,13 @@
     <div class="flex-gap">
       <select id="filtro-grupo-prod-adm" class="buscador-input" style="width:auto" onchange="renderProductosAdmin()"><option value="">Todos los grupos</option></select>
       <input type="text" id="buscar-prod-adm" class="buscador-input" placeholder="🔍 Buscar producto o código..." oninput="renderProductosAdmin()">
-      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="ver-ocultos-prod" onchange="renderProductosAdmin()"> Ver ocultos</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="solo-ocultos-prod" onchange="renderProductosAdmin()"> Solo ocultos</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="ver-ocultos-prod" onchange="renderProductosAdmin()"> Ver inactivos</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="solo-ocultos-prod" onchange="renderProductosAdmin()"> Solo inactivos</label>
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="ver-duplicados-prod" onchange="renderProductosAdmin()"> Solo duplicados</label>
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="solo-costeados-prod" onchange="if(this.checked)document.getElementById('solo-sin-costear-prod').checked=false;renderProductosAdmin()"> Solo costeados</label>
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="solo-sin-costear-prod" onchange="if(this.checked)document.getElementById('solo-costeados-prod').checked=false;renderProductosAdmin()"> Solo sin costear</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="ver-especiales-prod" onchange="renderProductosAdmin()"> Ver especiales</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="solo-especiales-prod" onchange="renderProductosAdmin()"> Solo especiales</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="ver-especiales-prod" onchange="renderProductosAdmin()"> Ver ocultos (no de línea)</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="solo-especiales-prod" onchange="renderProductosAdmin()"> Solo ocultos (no de línea)</label>
       <button class="btn btn-secundario" onclick="abrirModalResolverDuplicados()">🔗 Resolver duplicados</button>
       <button class="btn btn-secundario" onclick="exportarCatalogoExcel()">⬇️ Exportar Excel</button>
       <button class="btn btn-secundario" onclick="abrirModalImportar()">⬆️ Importar Excel</button>
@@ -2028,7 +2028,7 @@
       <div id="costeo-mp-extra-wrap" style="display:none;margin-top:12px">
         <label style="font-size:12px;font-weight:600;color:var(--gris-medio)">Otras materias primas <span style="font-weight:400;text-transform:none">(no vienen del Diseño de Mezcla — insertos, placas de anclaje, espuma de vacíos...)</span></label>
         <table class="tabla-items" style="width:100%;margin-top:6px">
-          <thead><tr><th>Materia prima</th><th style="width:140px">Precio</th><th style="width:110px">Cantidad/unidad</th><th style="width:36px"></th></tr></thead>
+          <thead><tr><th>Materia prima</th><th style="width:140px">Precio</th><th style="width:110px">Cantidad/unidad</th><th style="width:36px"></th><th style="width:36px"></th></tr></thead>
           <tbody id="costeo-mp-extra-body"></tbody>
         </table>
         <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarMateriaPrimaExtraCosteo()">+ Agregar materia prima</button>
@@ -2039,7 +2039,7 @@
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo"><span class="num">4</span> Máquinas involucradas</div>
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Máquina</th><th style="width:140px">Costo</th><th style="width:100px" title="Solo aplica a máquinas cuyo nombre empieza con &quot;Molde Tipo...&quot;. Si se llena, reemplaza SOLO para este costeo la vida útil en usos configurada en Maquinaria y Equipos — útil para un molde compartido entre varios productos, cada uno con su propia base de amortización.">Amortizar en (uds)</th><th id="costeo-maq-th-banco" style="width:110px;display:none">Días/banco</th><th id="costeo-maq-th-hilo" style="width:80px;display:none">N° hilos</th><th id="costeo-maq-th-unidades-dia" style="width:110px;display:none" title="Unidades que esta máquina completa en un día — solo aplica a máquinas que se reparten 'por día'.">Unidades/día</th><th id="costeo-maq-th-minutos-unidad" style="width:95px;display:none" title="Minutos que le toma a esta máquina intervenir en UNA unidad. Si se llena, reemplaza Unidades/día.">Min/unidad</th><th style="width:36px"></th><th style="width:36px"></th></tr></thead>
+        <thead><tr><th>Máquina</th><th style="width:140px">Costo</th><th style="width:100px" title="Solo aplica a máquinas cuyo nombre empieza con &quot;Molde Tipo...&quot;. Si se llena, reemplaza SOLO para este costeo la vida útil en usos configurada en Maquinaria y Equipos — útil para un molde compartido entre varios productos, cada uno con su propia base de amortización.">Amortizar en (uds)</th><th id="costeo-maq-th-banco" style="width:110px;display:none">Días/banco</th><th id="costeo-maq-th-hilo" style="width:80px;display:none">N° hilos</th><th id="costeo-maq-th-unidades-dia" style="width:110px;display:none" title="Unidades que esta máquina completa en un día — solo aplica a máquinas que se reparten 'por día'.">Unidades/día</th><th id="costeo-maq-th-minutos-unidad" style="width:95px;display:none" title="Minutos que le toma a esta máquina intervenir en UNA unidad. Si se llena, reemplaza Unidades/día.">Min/unidad</th><th style="width:36px"></th><th style="width:36px"></th><th style="width:36px"></th></tr></thead>
         <tbody id="costeo-maquinas-body"></tbody>
       </table>
       <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarMaquinaCosteo()">+ Agregar máquina</button>
@@ -2049,7 +2049,7 @@
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo"><span class="num">5</span> Mano de obra involucrada</div>
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Cuadrilla</th><th style="width:140px">Costo</th><th>Función específica</th><th id="costeo-mo-th-banco" style="width:110px;display:none">Días/banco</th><th id="costeo-mo-th-minutos-banco" style="width:95px;display:none" title="Minutos que le toma a la cuadrilla en una tarea puntual por CADA banco. Si se llena, reemplaza Días/banco.">Min/banco</th><th id="costeo-mo-th-unidades-dia" style="width:110px">Unidades/día</th><th id="costeo-mo-th-minutos-unidad" style="width:95px" title="Minutos que le toma a la cuadrilla producir UNA unidad — para tareas puntuales cortas. Si se llena, reemplaza Unidades/día.">Min/unidad</th><th style="width:36px"></th></tr></thead>
+        <thead><tr><th>Cuadrilla</th><th style="width:140px">Costo</th><th>Función específica</th><th id="costeo-mo-th-banco" style="width:110px;display:none">Días/banco</th><th id="costeo-mo-th-minutos-banco" style="width:95px;display:none" title="Minutos que le toma a la cuadrilla en una tarea puntual por CADA banco. Si se llena, reemplaza Días/banco.">Min/banco</th><th id="costeo-mo-th-unidades-dia" style="width:110px">Unidades/día</th><th id="costeo-mo-th-minutos-unidad" style="width:95px" title="Minutos que le toma a la cuadrilla producir UNA unidad — para tareas puntuales cortas. Si se llena, reemplaza Unidades/día.">Min/unidad</th><th style="width:36px"></th><th style="width:36px"></th></tr></thead>
         <tbody id="costeo-mano-obra-body"></tbody>
       </table>
       <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarManoObraCosteo()">+ Agregar cuadrilla</button>
@@ -2059,7 +2059,7 @@
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo"><span class="num">6</span> Insumos de empaque, consumos y recargos</div>
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Insumo</th><th style="width:120px">Precio</th><th style="width:100px">Cantidad</th><th style="width:110px">Se reparte</th><th style="width:36px"></th></tr></thead>
+        <thead><tr><th>Insumo</th><th style="width:120px">Precio</th><th style="width:100px">Cantidad</th><th style="width:110px">Se reparte</th><th style="width:36px"></th><th style="width:36px"></th></tr></thead>
         <tbody id="costeo-insumos-body"></tbody>
       </table>
       <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarInsumoCosteo()">+ Agregar insumo</button>
@@ -2444,10 +2444,10 @@
     <div class="modal-titulo" id="modal-producto-titulo">📦 Nuevo producto</div>
     <input type="hidden" id="mp-codigo-orig">
     <div class="form-grupo" id="mp-especial-wrap" style="margin-bottom:12px;background:#F3E5F5;border-radius:6px;padding:8px 10px">
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#6A1B9A;cursor:pointer"><input type="checkbox" id="mp-especial"> 🔬 Producto especial / borrador</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#6A1B9A;cursor:pointer"><input type="checkbox" id="mp-especial"> 🔬 Producto oculto (no de línea) — especial / borrador</label>
       <div style="font-size:11px;color:var(--gris-medio);margin-top:4px">No aparece en Cotizaciones ni cuenta como producto de línea hasta que se active manualmente desde la tabla ("⬆️ Activar a línea") — útil para costear un producto nuevo o puntual sin comprometerlo al catálogo todavía.</div>
     </div>
-    <div id="mp-especial-nota-editar" style="display:none;font-size:12px;background:#F3E5F5;color:#6A1B9A;border-radius:6px;padding:8px 10px;margin-bottom:12px">🔬 Este es un producto especial/borrador — usa el botón "⬆️ Activar a línea" en la tabla para convertirlo en producto de línea normal, no se cambia desde este formulario.</div>
+    <div id="mp-especial-nota-editar" style="display:none;font-size:12px;background:#F3E5F5;color:#6A1B9A;border-radius:6px;padding:8px 10px;margin-bottom:12px">🔬 Este es un producto oculto (no de línea) — especial/borrador. Usa el botón "⬆️ Activar a línea" en la tabla para convertirlo en producto de línea normal, no se cambia desde este formulario.</div>
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Código *</label><input type="text" id="mp-codigo" placeholder="Ej: PBCADCRV8G"></div>
       <div class="form-grupo"><label>Grupo *</label><input type="text" id="mp-grupo" list="lista-grupos-dl" placeholder="Ej: Adoquín"></div>
@@ -2836,7 +2836,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.0" integrity="sha384-De+l/Df7qym5QBDVocD3+gW1S7IjR3epf+6KbRDjB3FCCzM/LqVTwqckT6FhFar8" crossorigin="anonymous"></script>
 <script src="js/config.js?v=20260917a"></script>
 <script src="js/calculadora-inputs.js?v=20260825a"></script>
-<script src="js/catalogo.js?v=20260922a"></script>
+<script src="js/catalogo.js?v=20260922b"></script>
 <script src="js/navegacion.js?v=20260917a"></script>
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
 <script src="js/produccion-diaria.js?v=20260917a"></script>
@@ -2849,7 +2849,7 @@
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
 <script src="js/costeo-maquinaria.js?v=20260920a"></script>
 <script src="js/costeo-referencia.js?v=20260821a"></script>
-<script src="js/costeo-producto.js?v=20260922a"></script>
+<script src="js/costeo-producto.js?v=20260922c"></script>
 <script src="js/calidad-mezclas.js?v=20260827b"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
 <script src="js/logistica.js?v=20260910b"></script>
@@ -2857,7 +2857,7 @@
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20260917a"></script>
-<script src="js/cotizador.js?v=20260831a"></script>
+<script src="js/cotizador.js?v=20260922c"></script>
 <script src="js/historico-clientes-stats.js?v=20260827a"></script>
 <script src="js/retenciones.js?v=20260809c"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
