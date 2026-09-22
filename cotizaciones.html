@@ -1141,6 +1141,8 @@
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="ver-duplicados-prod" onchange="renderProductosAdmin()"> Solo duplicados</label>
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="solo-costeados-prod" onchange="if(this.checked)document.getElementById('solo-sin-costear-prod').checked=false;renderProductosAdmin()"> Solo costeados</label>
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="solo-sin-costear-prod" onchange="if(this.checked)document.getElementById('solo-costeados-prod').checked=false;renderProductosAdmin()"> Solo sin costear</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="ver-especiales-prod" onchange="renderProductosAdmin()"> Ver especiales</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris-medio);white-space:nowrap"><input type="checkbox" id="solo-especiales-prod" onchange="renderProductosAdmin()"> Solo especiales</label>
       <button class="btn btn-secundario" onclick="abrirModalResolverDuplicados()">🔗 Resolver duplicados</button>
       <button class="btn btn-secundario" onclick="exportarCatalogoExcel()">⬇️ Exportar Excel</button>
       <button class="btn btn-secundario" onclick="abrirModalImportar()">⬆️ Importar Excel</button>
@@ -2441,6 +2443,11 @@
   <div class="modal" style="width:560px;max-width:95vw">
     <div class="modal-titulo" id="modal-producto-titulo">📦 Nuevo producto</div>
     <input type="hidden" id="mp-codigo-orig">
+    <div class="form-grupo" id="mp-especial-wrap" style="margin-bottom:12px;background:#F3E5F5;border-radius:6px;padding:8px 10px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#6A1B9A;cursor:pointer"><input type="checkbox" id="mp-especial"> 🔬 Producto especial / borrador</label>
+      <div style="font-size:11px;color:var(--gris-medio);margin-top:4px">No aparece en Cotizaciones ni cuenta como producto de línea hasta que se active manualmente desde la tabla ("⬆️ Activar a línea") — útil para costear un producto nuevo o puntual sin comprometerlo al catálogo todavía.</div>
+    </div>
+    <div id="mp-especial-nota-editar" style="display:none;font-size:12px;background:#F3E5F5;color:#6A1B9A;border-radius:6px;padding:8px 10px;margin-bottom:12px">🔬 Este es un producto especial/borrador — usa el botón "⬆️ Activar a línea" en la tabla para convertirlo en producto de línea normal, no se cambia desde este formulario.</div>
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Código *</label><input type="text" id="mp-codigo" placeholder="Ej: PBCADCRV8G"></div>
       <div class="form-grupo"><label>Grupo *</label><input type="text" id="mp-grupo" list="lista-grupos-dl" placeholder="Ej: Adoquín"></div>
@@ -2829,7 +2836,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.0" integrity="sha384-De+l/Df7qym5QBDVocD3+gW1S7IjR3epf+6KbRDjB3FCCzM/LqVTwqckT6FhFar8" crossorigin="anonymous"></script>
 <script src="js/config.js?v=20260917a"></script>
 <script src="js/calculadora-inputs.js?v=20260825a"></script>
-<script src="js/catalogo.js?v=20260821a"></script>
+<script src="js/catalogo.js?v=20260922a"></script>
 <script src="js/navegacion.js?v=20260917a"></script>
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
 <script src="js/produccion-diaria.js?v=20260917a"></script>
@@ -2842,7 +2849,7 @@
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
 <script src="js/costeo-maquinaria.js?v=20260920a"></script>
 <script src="js/costeo-referencia.js?v=20260821a"></script>
-<script src="js/costeo-producto.js?v=20260921d"></script>
+<script src="js/costeo-producto.js?v=20260922a"></script>
 <script src="js/calidad-mezclas.js?v=20260827b"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
 <script src="js/logistica.js?v=20260910b"></script>

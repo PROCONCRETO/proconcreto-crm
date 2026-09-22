@@ -30,11 +30,20 @@ function _fmtCosteoProd(n) {
 // datalist del navegador recorta/trunca los nombres largos en la lista de sugerencias y su
 // ancho no se puede controlar por CSS (2026-08-04, a pedido del usuario: "permite que se vea
 // el nombre completo del producto en el desplegable que va filtrando").
+// `PRODUCTOS` (solo activos) NO alcanza acá: un producto "especial/borrador" (2026-09-22) nace
+// inactivo a propósito (no aparece en Cotizaciones hasta que alguien autorizado lo active), pero
+// SÍ se debe poder costear desde Centro de Costos — este módulo entero ya es de acceso
+// restringido a Centro de Costos (ver activarModulo()/ir() en navegacion.js), así que no hay
+// riesgo nuevo en dejarlo buscar productos inactivos-porque-son-especiales; solo se excluyen los
+// inactivos "genuinos" (descontinuados), que de verdad no tiene sentido seguir costeando.
+function _productosDisponiblesParaCostear() {
+  return CATALOGO.filter(p => p.activo !== false || p.especial === true);
+}
 function _textoProductoCosteo(p) { return `${p.codigo} — ${p.nombre}`; }
 function _productoDesdeTextoCosteo(texto) {
   const t = (texto || '').trim();
   if (!t) return null;
-  return PRODUCTOS.find(p => _textoProductoCosteo(p) === t) || null;
+  return _productosDisponiblesParaCostear().find(p => _textoProductoCosteo(p) === t) || null;
 }
 
 // Si el producto elegido en el formulario en curso (antes de guardar) genera IVA — para el
@@ -63,7 +72,7 @@ function _filtrarProductosCosteo() {
   if (!input) return;
   const q = input.value.trim().toLowerCase();
   const codigoEnEdicion = document.getElementById('m-costeo-producto-codigo-anterior')?.value || '';
-  const disponibles = PRODUCTOS.filter(p =>
+  const disponibles = _productosDisponiblesParaCostear().filter(p =>
     p.codigo === codigoEnEdicion || !COSTEO_PRODUCTOS.some(c => c.productoCodigo === p.codigo));
   const _matchTexto = p => (p.codigo + ' ' + p.nombre + ' ' + (p.medidas || '')).toLowerCase().includes(q);
   _sugerenciasProductoCosteo = (q ? disponibles.filter(_matchTexto) : disponibles)
@@ -86,7 +95,7 @@ function _pintarSugerenciasProductoCosteo() {
   }
   box.innerHTML = _sugerenciasProductoCosteo.map((p, i) => `
     <div onmousedown="_elegirProductoCosteo(${i})" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--gris-borde);${i === _indiceSugerenciaCosteo ? 'background:var(--azul-suave)' : 'background:white'}">
-      <div style="font-weight:600;font-size:13px">${_esc(p.nombre)}</div>
+      <div style="font-weight:600;font-size:13px">${_esc(p.nombre)}${p.especial ? ' <span style="font-size:10px;font-weight:700;color:#6A1B9A;background:#F3E5F5;padding:1px 6px;border-radius:8px;vertical-align:middle" title="Producto especial/borrador — no aparece todavía en Cotizaciones">🔬 Especial</span>' : ''}</div>
       <div style="font-size:11px;color:var(--gris-medio)">${_esc(p.codigo)} · ${_esc(p.grupo)}${p.medidas ? ' · ' + _esc(p.medidas) : ''}</div>
     </div>`).join('');
   box.style.display = 'block';

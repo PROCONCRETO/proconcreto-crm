@@ -255,7 +255,7 @@ function refrescarCatalogo(rows) {
     peso: (p.peso === null || p.peso === undefined) ? null : Number(p.peso), iva: p.iva || 'NO',
     lista: Number(p.lista) || 0, minimo: Number(p.minimo) || 0, grupo: p.grupo || 'Otros',
     disenoMezcla: p.diseno_mezcla || '',
-    activo: p.activo !== false
+    activo: p.activo !== false, especial: p.especial === true
   }));
   PRODUCTOS = CATALOGO.filter(p => p.activo !== false);
 }
@@ -409,6 +409,8 @@ function _filtroProdAdmActivos() {
   document.getElementById('ver-duplicados-prod').checked = false;
   document.getElementById('solo-costeados-prod').checked = false;
   document.getElementById('solo-sin-costear-prod').checked = false;
+  document.getElementById('solo-especiales-prod').checked = false;
+  document.getElementById('ver-especiales-prod').checked = false;
   renderProductosAdmin();
 }
 function _filtroProdAdmOcultos() {
@@ -416,6 +418,16 @@ function _filtroProdAdmOcultos() {
   document.getElementById('ver-duplicados-prod').checked = false;
   document.getElementById('solo-costeados-prod').checked = false;
   document.getElementById('solo-sin-costear-prod').checked = false;
+  document.getElementById('solo-especiales-prod').checked = false;
+  renderProductosAdmin();
+}
+// "Especiales" (2026-09-22, mismo patrón de atajo que las demás tarjetas del resumen).
+function _filtroProdAdmEspeciales() {
+  document.getElementById('solo-ocultos-prod').checked = false;
+  document.getElementById('ver-duplicados-prod').checked = false;
+  document.getElementById('solo-costeados-prod').checked = false;
+  document.getElementById('solo-sin-costear-prod').checked = false;
+  document.getElementById('solo-especiales-prod').checked = true;
   renderProductosAdmin();
 }
 function _filtroProdAdmDuplicados() {
@@ -423,6 +435,7 @@ function _filtroProdAdmDuplicados() {
   document.getElementById('ver-duplicados-prod').checked = true;
   document.getElementById('solo-costeados-prod').checked = false;
   document.getElementById('solo-sin-costear-prod').checked = false;
+  document.getElementById('solo-especiales-prod').checked = false;
   renderProductosAdmin();
 }
 // Costeados/Sin costear (2026-08-21, a pedido del usuario) — mismo patrón de atajo que las
@@ -432,6 +445,7 @@ function _filtroProdAdmCosteados() {
   document.getElementById('ver-duplicados-prod').checked = false;
   document.getElementById('solo-costeados-prod').checked = true;
   document.getElementById('solo-sin-costear-prod').checked = false;
+  document.getElementById('solo-especiales-prod').checked = false;
   renderProductosAdmin();
 }
 function _filtroProdAdmSinCostear() {
@@ -439,6 +453,7 @@ function _filtroProdAdmSinCostear() {
   document.getElementById('ver-duplicados-prod').checked = false;
   document.getElementById('solo-costeados-prod').checked = false;
   document.getElementById('solo-sin-costear-prod').checked = true;
+  document.getElementById('solo-especiales-prod').checked = false;
   renderProductosAdmin();
 }
 function _filtroProdAdmTodos() {
@@ -449,6 +464,8 @@ function _filtroProdAdmTodos() {
   document.getElementById('ver-duplicados-prod').checked = false;
   document.getElementById('solo-costeados-prod').checked = false;
   document.getElementById('solo-sin-costear-prod').checked = false;
+  document.getElementById('solo-especiales-prod').checked = false;
+  document.getElementById('ver-especiales-prod').checked = true;
   renderProductosAdmin();
 }
 
@@ -472,6 +489,8 @@ function renderProductosAdmin() {
   const soloDuplicados = document.getElementById('ver-duplicados-prod')?.checked;
   const soloCosteados = document.getElementById('solo-costeados-prod')?.checked;
   const soloSinCostear = document.getElementById('solo-sin-costear-prod')?.checked;
+  const verEspeciales = document.getElementById('ver-especiales-prod')?.checked;
+  const soloEspeciales = document.getElementById('solo-especiales-prod')?.checked;
 
   // Nombres duplicados — se cuentan sobre TODO el catálogo (activos + ocultos), normalizando
   // may/min y espacios sobrantes, para detectar productos cargados dos veces con distinto
@@ -490,11 +509,24 @@ function renderProductosAdmin() {
   const tieneCosteo = p => _ordenCosteo.has(p.codigo);
 
   let data = [...CATALOGO];
-  // "Solo ocultos" manda sobre "Ver ocultos" — muestra únicamente los inactivos en vez de
-  // mezclarlos con los activos (2026-08-04, a pedido del usuario, para poder filtrarlos desde
-  // la tarjeta-resumen "Ocultos" igual que ya funcionaba con "Nombres duplicados").
-  if (soloOcultos) data = data.filter(p => p.activo === false);
-  else if (!verOcultos) data = data.filter(p => p.activo !== false);
+  // "Solo especiales" (2026-09-22) es un filtro aparte, no una variante de "ocultos" — un
+  // producto especial SIEMPRE está oculto (activo=false) mientras lo sea, pero mezclarlo sin
+  // distinción con los ocultos "de siempre" (descontinuados) no dejaría encontrarlos por su
+  // cuenta. "Solo especiales" manda sobre todo lo demás de este bloque (igual que "Solo ocultos"
+  // ya mandaba sobre "Ver ocultos") — muestra los especiales sin importar si "Ver ocultos" está
+  // marcado o no. Sin "Solo especiales", el default es ESCONDER los especiales del listado
+  // general (aunque "Ver ocultos" esté marcado) — hace falta marcar "Ver especiales" a propósito
+  // para que se mezclen con lo demás.
+  if (soloEspeciales) {
+    data = data.filter(p => p.especial === true);
+  } else {
+    if (!verEspeciales) data = data.filter(p => p.especial !== true);
+    // "Solo ocultos" manda sobre "Ver ocultos" — muestra únicamente los inactivos en vez de
+    // mezclarlos con los activos (2026-08-04, a pedido del usuario, para poder filtrarlos desde
+    // la tarjeta-resumen "Ocultos" igual que ya funcionaba con "Nombres duplicados").
+    if (soloOcultos) data = data.filter(p => p.activo === false);
+    else if (!verOcultos) data = data.filter(p => p.activo !== false);
+  }
   if (grupo) data = data.filter(p => p.grupo === grupo);
   if (q) data = data.filter(p => (p.nombre + ' ' + p.codigo + ' ' + (p.medidas||'')).toLowerCase().includes(q));
   if (soloDuplicados) data = data.filter(esDuplicado);
@@ -511,13 +543,19 @@ function renderProductosAdmin() {
   });
   _productosAdmVisibleActual = data; // para "Exportar Excel" — exporta lo que se ve, con los mismos filtros aplicados
 
+  const especiales = CATALOGO.filter(p => p.especial === true).length;
   const activos = CATALOGO.filter(p => p.activo !== false).length;
-  const ocultos = CATALOGO.length - activos;
+  // "Ocultos" (2026-09-22, redefinido): ya NO incluye los especiales — un especial siempre está
+  // activo=false mientras lo es, pero mezclarlo con los descontinuados "de siempre" hacía que
+  // esta tarjeta no dijera nada claro. Bajo el invariante de que un especial nunca está
+  // activo=true a la vez, esta resta da exactamente los ocultos "genuinos" (descontinuados).
+  const ocultos = CATALOGO.length - activos - especiales;
   const totalCosteados = CATALOGO.filter(tieneCosteo).length;
   const totalSinCostear = CATALOGO.length - totalCosteados;
   resumen.innerHTML = `
     <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--verde);min-width:130px;cursor:pointer" onclick="_filtroProdAdmActivos()" title="Clic para ver solo los productos activos"><div style="font-size:10px;font-weight:700;color:var(--verde);text-transform:uppercase">Productos activos</div><div style="font-size:18px;font-weight:800">${activos}</div></div>
     <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid #C62828;min-width:130px;cursor:pointer" onclick="_filtroProdAdmOcultos()" title="Clic para ver solo los ocultos"><div style="font-size:10px;font-weight:700;color:#C62828;text-transform:uppercase">Ocultos</div><div style="font-size:18px;font-weight:800">${ocultos}</div></div>
+    <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid #6A1B9A;min-width:130px;cursor:pointer" onclick="_filtroProdAdmEspeciales()" title="Clic para ver solo los productos especiales/borrador"><div style="font-size:10px;font-weight:700;color:#6A1B9A;text-transform:uppercase">Especiales</div><div style="font-size:18px;font-weight:800">${especiales}</div></div>
     <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid ${totalDuplicados ? '#E65100' : 'var(--gris-borde)'};min-width:130px;cursor:pointer" onclick="_filtroProdAdmDuplicados()" title="Clic para filtrar solo los duplicados"><div style="font-size:10px;font-weight:700;color:${totalDuplicados ? '#E65100' : 'var(--gris-medio)'};text-transform:uppercase">Nombres duplicados</div><div style="font-size:18px;font-weight:800">${totalDuplicados}</div></div>
     <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid #6A1B9A;min-width:130px;cursor:pointer" onclick="_filtroProdAdmCosteados()" title="Clic para ver solo los productos costeados"><div style="font-size:10px;font-weight:700;color:#6A1B9A;text-transform:uppercase">Costeados</div><div style="font-size:18px;font-weight:800">${totalCosteados}</div></div>
     <div style="background:white;border-radius:6px;padding:8px 14px;box-shadow:var(--sombra);border-top:3px solid var(--gris-medio);min-width:130px;cursor:pointer" onclick="_filtroProdAdmSinCostear()" title="Clic para ver solo los que faltan por costear"><div style="font-size:10px;font-weight:700;color:var(--gris-medio);text-transform:uppercase">Sin costear</div><div style="font-size:18px;font-weight:800">${totalSinCostear}</div></div>
@@ -526,11 +564,12 @@ function renderProductosAdmin() {
   if (!data.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icono">📦</div><div>${soloDuplicados ? 'No hay productos con nombre duplicado.' : 'Sin productos para este filtro.'}</div></td></tr>`; return; }
   tbody.innerHTML = data.map(p => {
     const inactivo = p.activo === false;
+    const especial = p.especial === true;
     const dup = esDuplicado(p);
     const costeo = tieneCosteo(p);
     return `<tr style="border-top:1px solid var(--gris-borde);${inactivo?'opacity:.55':''}${dup ? ';background:#FFF8E1' : ''}${costeo ? ';border-left:4px solid var(--azul)' : ';border-left:4px solid transparent'}">
       <td style="font-weight:600;color:var(--azul);font-size:12px">${_esc(p.codigo)}</td>
-      <td><div style="font-weight:600;font-size:13px">${_esc(p.nombre)}${costeo ? ' <span style="font-size:10px;font-weight:700;color:var(--azul);background:#E3F2FD;padding:1px 6px;border-radius:8px;vertical-align:middle" title="El precio de este producto se calcula desde un Costeo de Producto guardado (Centro de Costos)">🏗️ Desde Costeo</span>' : ''}${dup ? ' <span style="font-size:10px;font-weight:700;color:#E65100;background:#FFF3E0;padding:1px 6px;border-radius:8px;vertical-align:middle" title="Otro producto activo/oculto tiene este mismo nombre">⚠️ Duplicado</span>' : ''}</div><div style="font-size:11px;color:var(--gris-medio)">${_esc(p.medidas)}</div></td>
+      <td><div style="font-weight:600;font-size:13px">${_esc(p.nombre)}${especial ? ' <span style="font-size:10px;font-weight:700;color:#6A1B9A;background:#F3E5F5;padding:1px 6px;border-radius:8px;vertical-align:middle" title="Producto especial/borrador — no aparece en Cotizaciones ni en la lista de precios general hasta que se active">🔬 Especial</span>' : ''}${costeo ? ' <span style="font-size:10px;font-weight:700;color:var(--azul);background:#E3F2FD;padding:1px 6px;border-radius:8px;vertical-align:middle" title="El precio de este producto se calcula desde un Costeo de Producto guardado (Centro de Costos)">🏗️ Desde Costeo</span>' : ''}${dup ? ' <span style="font-size:10px;font-weight:700;color:#E65100;background:#FFF3E0;padding:1px 6px;border-radius:8px;vertical-align:middle" title="Otro producto activo/oculto tiene este mismo nombre">⚠️ Duplicado</span>' : ''}</div><div style="font-size:11px;color:var(--gris-medio)">${_esc(p.medidas)}</div></td>
       <td style="color:var(--gris-medio)">${_esc(p.grupo)}</td>
       <td style="text-align:center">${_esc(p.unidad)}</td>
       <td style="text-align:center"><span style="color:${p.iva==='SI'?'var(--rojo)':'var(--verde)'};font-weight:700;font-size:12px">${_esc(p.iva)}</span></td>
@@ -540,12 +579,16 @@ function renderProductosAdmin() {
       <td style="text-align:right">${costeo
         ? `<input type="number" value="${p.minimo}" disabled title="Se calcula desde el Costeo de Producto — edítalo en Centro de Costos › Costeo de Producto" style="width:100px;text-align:right;padding:4px 6px;border:1px solid var(--gris-borde);border-radius:4px;background:#F5F5F5;color:var(--gris-medio);cursor:not-allowed">`
         : `<input type="number" value="${p.minimo}" onchange="actualizarPrecioProducto('${p.codigo}','minimo',this.value)" style="width:100px;text-align:right;padding:4px 6px;border:1px solid var(--gris-borde);border-radius:4px">`}</td>
-      <td><span class="badge" style="background:${inactivo?'#FFEBEE':'#E8F5E9'};color:${inactivo?'#C62828':'#2E7D32'}">${inactivo?'Oculto':'Activo'}</span></td>
+      <td>${especial
+        ? `<span class="badge" style="background:#F3E5F5;color:#6A1B9A">Especial</span>`
+        : `<span class="badge" style="background:${inactivo?'#FFEBEE':'#E8F5E9'};color:${inactivo?'#C62828':'#2E7D32'}">${inactivo?'Oculto':'Activo'}</span>`}</td>
       <td><div class="flex-gap">
         <button class="btn btn-primario btn-xs" onclick="abrirModalProducto('${_escNombreOnclick(p.codigo)}')">✏️ Editar</button>
-        ${inactivo
-          ? `<button class="btn btn-verde btn-xs" onclick="toggleOcultarProducto('${_escNombreOnclick(p.codigo)}',false)">↩️ Reactivar</button>`
-          : `<button class="btn btn-secundario btn-xs" onclick="toggleOcultarProducto('${_escNombreOnclick(p.codigo)}',true)">🚫 Ocultar</button>`}
+        ${especial
+          ? `<button class="btn btn-verde btn-xs" onclick="_activarProductoEspecial('${_escNombreOnclick(p.codigo)}')" title="Convertirlo en producto de línea, cotizable normalmente">⬆️ Activar a línea</button>`
+          : (inactivo
+            ? `<button class="btn btn-verde btn-xs" onclick="toggleOcultarProducto('${_escNombreOnclick(p.codigo)}',false)">↩️ Reactivar</button>`
+            : `<button class="btn btn-secundario btn-xs" onclick="toggleOcultarProducto('${_escNombreOnclick(p.codigo)}',true)">🚫 Ocultar</button>`)}
         ${inactivo && !costeo
           ? `<button class="btn btn-rojo btn-xs" onclick="eliminarProductoDefinitivo('${_escNombreOnclick(p.codigo)}')" title="Solo disponible para productos ocultos y sin Costeo de Producto">🗑️ Eliminar</button>`
           : ''}
@@ -559,7 +602,7 @@ function _upsertProducto(p) {
     codigo: p.codigo, nombre: p.nombre, medidas: p.medidas, unidad: p.unidad,
     peso: p.peso, iva: p.iva, lista: p.lista, minimo: p.minimo, grupo: p.grupo,
     diseno_mezcla: p.disenoMezcla || null,
-    activo: p.activo !== false, modificado: new Date().toISOString()
+    activo: p.activo !== false, especial: p.especial === true, modificado: new Date().toISOString()
   }, { onConflict: 'codigo' });
 }
 
@@ -576,6 +619,31 @@ function toggleOcultarProducto(codigo, ocultar) {
   if (!p) return;
   if (ocultar && !confirm(`¿Ocultar "${p.nombre}"? Dejará de aparecer en cotizaciones nuevas (no se borra).`)) return;
   p.activo = !ocultar;
+  PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
+  _upsertProducto(p).then(({ error }) => { if (error) alert('Error: ' + error.message); });
+  renderProductosAdmin();
+}
+
+// "⬆️ Activar a línea" — convierte un producto especial/borrador en un producto de línea normal
+// (2026-09-22, a pedido del usuario: "podríamos hacer una ventana en borrador... donde los
+// podamos ir incluyendo, sin que pasen a ser producto de línea"; y al preguntarle si debían
+// poder cotizarse mientras siguen especiales, contestó: "que solo lo puedan hacer quienes están
+// autorizados para hacerlo... que no lo pueda cotizar cualquiera pues se corre el riesgo de que
+// vaya sin revisión profunda"). Quién puede hacerlo ya está resuelto en dos capas por fuera de
+// esta función — ni siquiera llega alguien no autorizado hasta acá: la pantalla de Productos
+// completa exige ser de Centro de Costos para entrar (activarModulo()/ir(), navegacion.js), y la
+// tabla `productos` en Supabase exige lo mismo para poder escribir (política "actualizar solo
+// centro de costos", sql/2026-08-04_rls_productos_centro_costos.sql) — no hizo falta ninguna
+// tabla ni política nueva para la autorización en sí. Lo que SÍ es nuevo es la confirmación
+// explícita y más enfática que un simple "Ocultar/Reactivar", para que quien lo active lo haga a
+// propósito, no de pasada.
+function _activarProductoEspecial(codigo) {
+  const p = CATALOGO.find(x => x.codigo === codigo);
+  if (!p) return;
+  const ok = confirm(`⚠️ Vas a activar "${p.nombre}" como producto de línea.\n\nDejará de ser un producto especial/borrador: aparecerá en Cotizaciones y en la lista de precios general para todo el equipo, a partir de ahora.\n\n¿Ya completaste la revisión de precio y costeo de este producto? ¿Continuar?`);
+  if (!ok) return;
+  p.especial = false;
+  p.activo = true;
   PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
   _upsertProducto(p).then(({ error }) => { if (error) alert('Error: ' + error.message); });
   renderProductosAdmin();
@@ -622,6 +690,16 @@ function abrirModalProducto(codigo) {
   if (avisoCosteo) avisoCosteo.style.display = bloqueadoPorCosteo ? 'block' : 'none';
   if (typeof poblarSelectDisenos === 'function') poblarSelectDisenos('mp-diseno-mezcla');
   document.getElementById('mp-diseno-mezcla').value = p?.disenoMezcla || '';
+  // "Producto especial/borrador" (2026-09-22, a pedido del usuario) — solo se marca al CREAR;
+  // ya creado, no se puede desmarcar desde este modal (evita que una edición cualquiera lo
+  // reactive de contrabando) — se convierte a producto de línea con el botón "⬆️ Activar a línea"
+  // de la tabla, que sí exige una confirmación explícita. Ver guardarProducto().
+  const yaEsEspecial = esEdit && p?.especial === true;
+  const wrapEspecial = document.getElementById('mp-especial-wrap');
+  const notaEspecial = document.getElementById('mp-especial-nota-editar');
+  document.getElementById('mp-especial').checked = yaEsEspecial;
+  if (wrapEspecial) wrapEspecial.style.display = yaEsEspecial ? 'none' : '';
+  if (notaEspecial) notaEspecial.style.display = yaEsEspecial ? 'block' : 'none';
   document.getElementById('modal-producto').classList.add('abierto');
 }
 
@@ -639,13 +717,24 @@ function guardarProducto() {
   if (!codigo || !nombre || !grupo || !(lista >= 0) || !(minimo >= 0)) { alert('Completa: Código, Nombre, Grupo, Precio Lista y Precio Mínimo.'); return; }
   if (!orig && CATALOGO.find(x => x.codigo === codigo)) { alert('Ya existe un producto con ese código.'); return; }
   const pesoVal = document.getElementById('mp-peso').value;
+  // "Especial/borrador" (2026-09-22) — el checkbox solo se lee para un producto NUEVO; si ya
+  // existe, se preserva su marca actual sin importar lo que diga el checkbox (queda oculto/
+  // deshabilitado en ese caso, ver abrirModalProducto(), pero esto es un cinturón de seguridad
+  // extra: nunca se cambia "especial" desde acá, solo desde _activarProductoEspecial()).
+  const especial = existente ? existente.especial === true : document.getElementById('mp-especial').checked;
+  // `activo` — CORREGIDO (2026-09-22): antes esta línea forzaba `activo:true` en CADA guardado,
+  // sin importar el estado previo — así que editar cualquier campo de un producto ya OCULTO (o
+  // especial, recién agregado) lo reactivaba/cotizable de contrabando sin que nadie lo pidiera.
+  // Ahora se preserva el estado existente al editar; un producto NUEVO nace activo, salvo que se
+  // marque especial (nace oculto hasta que alguien autorizado lo active a propósito).
+  const activo = existente ? (existente.activo !== false) : !especial;
   const prod = {
     codigo, nombre, grupo,
     medidas: document.getElementById('mp-medidas').value.trim(),
     unidad: document.getElementById('mp-unidad').value.trim() || 'UD',
     peso: pesoVal === '' ? null : parseFloat(pesoVal),
     iva: document.getElementById('mp-iva').value,
-    lista, minimo, activo: true,
+    lista, minimo, activo, especial,
     disenoMezcla: document.getElementById('mp-diseno-mezcla').value || ''
   };
   const idx = CATALOGO.findIndex(x => x.codigo === codigo);

@@ -1,0 +1,31 @@
+-- Columna "especial" en `productos` — productos especiales/borrador (2026-09-22, a pedido del
+-- usuario). Correr una sola vez en el SQL Editor de Supabase (Dashboard > SQL Editor > New query).
+--
+-- Motivo: "en muchas ocasiones, resultan productos especiales o nuevos que debemos costear...
+-- estos no son productos de línea desde un principio, por lo que ponerlos en lista de precios no
+-- lo veo muy conveniente. podríamos hacer una ventana en borrador... sin que pasen a ser producto
+-- de línea y sin tener que crear el producto como tal" — se resolvió agregando una marca
+-- "especial" al producto (en vez de un módulo/tabla aparte, `js/catalogo.js` ya tenía toda la
+-- infraestructura de "producto oculto" para reutilizar) y reutilizando activo=false como el
+-- mecanismo que ya existe para sacarlo de Cotizaciones, hasta que se "active" a propósito.
+--
+-- La app ya lo interpreta así (ver renderProductosAdmin()/guardarProducto() en catalogo.js): un
+-- producto especial nace con activo=false (fuera de cotizaciones y de la lista de precios
+-- general, aunque SÍ se puede costear desde Centro de Costos → Costeo de Producto) y solo pasa a
+-- ser un producto de línea normal cuando alguien lo activa explícitamente con el botón
+-- "⬆️ Activar a línea" — nunca automáticamente al guardar una edición cualquiera.
+--
+-- Sin migración de datos: los productos existentes no tienen esta columna, `default false` los
+-- deja exactamente como estaban (ningún producto existente se vuelve "especial" por accidente).
+
+alter table public.productos add column if not exists especial boolean not null default false;
+
+-- Autorización de quién puede "activar a línea" un producto especial: la pantalla de Productos
+-- (Centro de Costos) YA está restringida a los mismos 3 correos de es_usuario_centro_costos()
+-- tanto en la interfaz (activarModulo()/ir(), js/navegacion.js) como en las políticas RLS de
+-- `productos` ya existentes (sql/2026-08-04_rls_productos_centro_costos.sql, "actualizar solo
+-- centro de costos") — no hace falta ninguna política ni tabla nueva para eso, ya está cerrado en
+-- ambos niveles. Lo que la app SÍ agrega de nuevo es un paso de confirmación explícito y más
+-- enfático que el "Ocultar/Reactivar" normal, para que la persona autorizada confirme
+-- deliberadamente que el producto ya pasó su revisión antes de dejarlo cotizable — ver
+-- _activarProductoEspecial() en js/catalogo.js.
