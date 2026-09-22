@@ -815,14 +815,23 @@ function renderEntregasViaje() {
   }
 
   const _opcionesOrdenes = (typeof ORDENES !== 'undefined' ? ORDENES : []).filter(o => o.estado !== 'Cancelado');
-  wrap.innerHTML = _entregasViajeActual.map((e, ei) => `
+  wrap.innerHTML = _entregasViajeActual.map((e, ei) => {
+    // El label del buscador se arma buscando en TODAS las órdenes (no solo _opcionesOrdenes, que
+    // excluye Canceladas) para que una orden ya vinculada siga mostrándose completa aunque después
+    // se haya cancelado — si ni así aparece, se cae al número guardado (e.ordenNumero).
+    const ordenSel = e.ordenId ? (typeof ORDENES !== 'undefined' ? ORDENES : []).find(o => String(o.id) === String(e.ordenId)) : null;
+    const ordenLabel = ordenSel ? `${ordenSel.numero} — ${ordenSel.cliente} — ${(ordenSel.descripcion || '').slice(0, 40)}` : (e.ordenNumero || '');
+    return `
     <div class="card" style="padding:12px;margin-bottom:10px;background:#FAFBFC;box-shadow:none;border:1px solid var(--gris-borde)">
       <div class="form-grupo" style="margin-bottom:8px">
         <label>Orden de Producción asociada</label>
-        <select onchange="aplicarOrdenAEntrega(${ei},this.value)" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
-          <option value="">N/A — sin orden asociada</option>
-          ${_opcionesOrdenes.map(o => `<option value="${_esc(o.id)}" ${String(e.ordenId || '') === String(o.id) ? 'selected' : ''}>${_esc(o.numero)} — ${_esc(o.cliente)} — ${_esc((o.descripcion || '').slice(0, 40))}</option>`).join('')}
-        </select>
+        <div class="entrega-orden-buscador" style="position:relative;display:flex;gap:6px;align-items:flex-start">
+          <div style="position:relative;flex:1">
+            <input type="text" id="entrega-orden-input-${ei}" value="${_esc(ordenLabel)}" title="${_esc(ordenLabel)}" oninput="filtrarOrdenEntrega(${ei})" placeholder="Busca por número, cliente o descripción... (vacío = N/A)" style="width:100%;border:1px solid var(--gris-borde);border-radius:4px;padding:8px;font-size:13px">
+            <div id="entrega-orden-resultados-${ei}" style="display:none;position:absolute;z-index:60;left:0;right:0;margin-top:2px;border:1.5px solid #93C5FD;border-radius:8px;background:#fff;max-height:220px;overflow-y:auto;box-shadow:var(--sombra-md)"></div>
+          </div>
+          ${e.ordenId ? `<button type="button" class="btn btn-secundario btn-xs" title="Quitar orden asociada" onclick="aplicarOrdenAEntrega(${ei},'')">✕</button>` : ''}
+        </div>
       </div>
       <div class="form-grid" style="margin-bottom:8px">
         <div class="form-grupo"><label>Cliente</label>
@@ -858,7 +867,8 @@ function renderEntregasViaje() {
         <button type="button" class="btn btn-secundario btn-xs" onclick="agregarProductoEntrega(${ei})">+ Agregar producto</button>
         <button type="button" class="btn btn-rojo btn-xs" onclick="eliminarEntregaViaje(${ei})">🗑️ Quitar entrega</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   _entregasViajeActual.forEach((e, ei) => {
     if (typeof poblarSelectProyectosDeCliente === 'function') poblarSelectProyectosDeCliente(`entrega-proyecto-${ei}`, e.cliente);
     const sel = document.getElementById(`entrega-proyecto-${ei}`);
@@ -956,6 +966,35 @@ function _alElegirProyectoEntrega(ei, nombreProyecto) {
   if (elTel) elTel.value = e.contactoObraTelefono;
 }
 
+// Buscador de Orden de Producción asociada — mismo patrón que el buscador de cliente/producto de
+// abajo, en vez del <select> plano que tenía antes (2026-09-22, a pedido del usuario: "incluyamos
+// buscador en el campo de ORDEN ASOCIADA para que la podamos encontrar más fácilmente" — la lista
+// de órdenes activas puede ser larga). Solo filtra el resultado que se muestra; la asociación real
+// (`e.ordenId`) no cambia con cada tecla, solo al elegir un resultado o al quitar con "✕" — así
+// escribir sin seleccionar todavía no desvincula la orden actual.
+function filtrarOrdenEntrega(ei) {
+  const inputEl = document.getElementById(`entrega-orden-input-${ei}`);
+  const div = document.getElementById(`entrega-orden-resultados-${ei}`);
+  if (!inputEl || !div) return;
+  inputEl.title = inputEl.value;
+  const q = inputEl.value.toLowerCase().trim();
+  if (!q) { div.style.display = 'none'; return; }
+  const opciones = (typeof ORDENES !== 'undefined' ? ORDENES : []).filter(o => o.estado !== 'Cancelado');
+  const res = opciones.filter(o =>
+    (o.numero || '').toLowerCase().includes(q) ||
+    (o.cliente || '').toLowerCase().includes(q) ||
+    (o.descripcion || '').toLowerCase().includes(q)
+  ).slice(0, 18);
+  div.innerHTML = res.length
+    ? res.map(o => `
+      <div data-orden-id="${_esc(o.id)}" onclick="aplicarOrdenAEntrega(${ei},this.dataset.ordenId)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
+        <div style="font-weight:600;font-size:13px;color:#1e293b">${_esc(o.numero)} — ${_esc(o.cliente)}</div>
+        <div style="font-size:11px;color:#888">${_esc((o.descripcion || '').slice(0, 60)) || '&nbsp;'}</div>
+      </div>`).join('')
+    : '<div style="padding:10px 14px;color:#888;font-size:12px">Sin resultados para esta búsqueda.</div>';
+  div.style.display = 'block';
+}
+
 // Buscador de cliente propio, en vez del <datalist> nativo del navegador — el datalist nativo
 // filtra distinto según el navegador y en muchos casos solo busca desde el INICIO del nombre,
 // no por cualquier fragmento (bug real reportado: escribir un fragmento del nombre no filtraba
@@ -1027,6 +1066,9 @@ document.addEventListener('click', (e) => {
   }
   if (!e.target.closest('.entrega-prod-buscador')) {
     document.querySelectorAll('[id^="viaje-prod-resultados-"]').forEach(d => { d.style.display = 'none'; });
+  }
+  if (!e.target.closest('.entrega-orden-buscador')) {
+    document.querySelectorAll('[id^="entrega-orden-resultados-"]').forEach(d => { d.style.display = 'none'; });
   }
 });
 

@@ -305,11 +305,19 @@ function _elegirVersionAprobada(cot) {
 // estado es el que se sincroniza ahí); `cotAprobada` es la versión que el cliente realmente
 // aprobó (puede ser una anterior, ver _elegirVersionAprobada()) y de la que sale la Orden de
 // Servicio. Con una sola versión, son el mismo objeto.
+//
+// EXCEPCIÓN (2026-09-22, a pedido del usuario): "cuando las cotizaciones no incluyen transporte,
+// es porque el cliente recoge en planta... por tanto no es necesario asignarle un proyecto como
+// mandatorio". Si la OPCIÓN que el cliente aprobó (`cotAprobada.opcionAceptada`, ya elegida por
+// el llamador antes de esta función) no tiene destino de transporte, no hay entrega que programar
+// — el proyecto/obra deja de ser indispensable para aceptar.
 let _cotAceptandoPendienteProyecto = null; // { latestId, aprobadaId } o null
 
 function _intentarAceptarCotizacion(cot, cotAprobada) {
   cotAprobada = cotAprobada || cot;
   if (cotAprobada.cliente?.proyecto) return true;
+  const opcionAprobada = obtenerOpcionesCot(cotAprobada)[cotAprobada.opcionAceptada || 0];
+  if (!opcionAprobada?.transporte?.destino) return true; // recoge en planta: no hace falta proyecto
   _cotAceptandoPendienteProyecto = { latestId: cot.id, aprobadaId: cotAprobada.id };
   alert(`🎉 ¡Felicitaciones por cerrar la venta ${cotAprobada.numero}!\n\nAntes de continuar, registra el proyecto/obra y su contacto en la ficha del cliente — es el dato que usarán Producción, Logística y Calidad para programar la entrega.`);
   const c = CLIENTES.find(cl => cl.nombre === cotAprobada.cliente?.nombre);
