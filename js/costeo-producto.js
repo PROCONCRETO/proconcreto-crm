@@ -407,8 +407,8 @@ function renderMateriaPrimaExtraCosteo() {
       <td><select onchange="_materiaPrimaExtraCosteoActual[${i}].nombre=this.value;renderMateriaPrimaExtraCosteo();_actualizarResumenCosteo()">${_opcionesMateriaPrimaExtraCosteo(row.nombre)}</select></td>
       <td style="color:var(--gris-medio);white-space:nowrap">${precio}</td>
       <td><input type="number" value="${row.cantidad}" min="0" step="0.001" oninput="_materiaPrimaExtraCosteoActual[${i}].cantidad=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>
-      <td><button class="btn btn-rojo btn-xs" onclick="_materiaPrimaExtraCosteoActual.splice(${i},1);renderMateriaPrimaExtraCosteo();_actualizarResumenCosteo()">✕</button></td>
       <td>${_botonNotaFila(row, '_materiaPrimaExtraCosteoActual', i, 'renderMateriaPrimaExtraCosteo')}</td>
+      <td><button class="btn btn-rojo btn-xs" onclick="_materiaPrimaExtraCosteoActual.splice(${i},1);renderMateriaPrimaExtraCosteo();_actualizarResumenCosteo()">✕</button></td>
     </tr>`;
   }).join('');
 }
@@ -579,8 +579,8 @@ function renderMaquinasCosteo() {
       ${celdasPretensado}
       ${celdasReforzado}
       <td><button class="btn btn-secundario btn-xs" title="Asignar operario en Mano de Obra" onclick="_asignarOperarioMaquina(${i})">👷</button></td>
-      <td><button class="btn btn-rojo btn-xs" onclick="_maquinasCosteoActual.splice(${i},1);renderMaquinasCosteo();_actualizarResumenCosteo()">✕</button></td>
       <td>${_botonNotaFila(row, '_maquinasCosteoActual', i, 'renderMaquinasCosteo')}</td>
+      <td><button class="btn btn-rojo btn-xs" onclick="_maquinasCosteoActual.splice(${i},1);renderMaquinasCosteo();_actualizarResumenCosteo()">✕</button></td>
     </tr>`;
   }).join('');
 }
@@ -662,8 +662,8 @@ function renderManoObraCosteo() {
       ${celdaMinutosBanco}
       ${celdaUnidadesDia}
       ${celdaMinutosUnidad}
-      <td><button class="btn btn-rojo btn-xs" onclick="_manoObraCosteoActual.splice(${i},1);renderManoObraCosteo();_actualizarResumenCosteo()">✕</button></td>
       <td>${_botonNotaFila(row, '_manoObraCosteoActual', i, 'renderManoObraCosteo')}</td>
+      <td><button class="btn btn-rojo btn-xs" onclick="_manoObraCosteoActual.splice(${i},1);renderManoObraCosteo();_actualizarResumenCosteo()">✕</button></td>
     </tr>`;
   }).join('');
 }
@@ -705,8 +705,8 @@ function renderInsumosCosteo() {
         <select onchange="_insumosCosteoActual[${i}].reparto=this.value;renderInsumosCosteo();_actualizarResumenCosteo()">${_opcionesRepartoInsumoCosteo(row.reparto, estibaAplica)}</select>
         ${(!estibaAplica && row.reparto === 'estiba') ? '<div style="color:var(--rojo);font-size:10px;margin-top:2px">⚠️ No aplica a este tipo — no suma costo</div>' : ''}
       </td>
-      <td><button class="btn btn-rojo btn-xs" onclick="_insumosCosteoActual.splice(${i},1);renderInsumosCosteo();_actualizarResumenCosteo()">✕</button></td>
       <td>${_botonNotaFila(row, '_insumosCosteoActual', i, 'renderInsumosCosteo')}</td>
+      <td><button class="btn btn-rojo btn-xs" onclick="_insumosCosteoActual.splice(${i},1);renderInsumosCosteo();_actualizarResumenCosteo()">✕</button></td>
     </tr>`;
   }).join('');
 }
