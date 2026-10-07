@@ -130,7 +130,7 @@ function renderItems() {
       </td>
       <td><span style="color:${it.iva==='SI'?'var(--rojo)':'var(--verde)'};font-weight:700;font-size:12px">${it.iva}</span></td>
       <td style="font-weight:600">$${it.precio.toLocaleString()}</td>
-      <td><input type="number" min="0" max="50" value="${it.descuento}" style="width:60px" onchange="actualizarItem(${i},'descuento',this.value)">%</td>
+      <td><input type="number" min="0" max="50" step="0.01" value="${it.descuento}" style="width:60px" onchange="actualizarItem(${i},'descuento',this.value)">%</td>
       <td style="font-weight:600;color:var(--azul)">$${adjUnit.toLocaleString()}${alerta}</td>
       <td style="font-weight:700">$${total.toLocaleString()}</td>
       <td><button class="btn btn-rojo btn-xs" onclick="eliminarItem(${i})">✕</button></td>
@@ -143,13 +143,22 @@ function renderItems() {
 // debajo de su mínimo — antes solo se avisaba "⚠️ Bajo mínimo" pero se dejaba guardar igual, a
 // pedido del usuario: "permite hacer cotizaciones por debajo del precio mínimo que no es debido...
 // configurémoslo para que no permita otorgar descuentos que den precios por debajo del mínimo"
-// (2026-08-31). Busca directamente el % más alto probando cada entero 50→0 contra el mismo cálculo
+// (2026-08-31). Busca directamente el % más alto probando cada candidato contra el mismo cálculo
 // que usa adjUnit en todos lados (Math.round) — nunca una fórmula de "despejar %", que con
 // aritmética de punto flotante puede quedar mal por un entero (ej. precio 1000/mínimo 800: el 20%
 // exacto se calculaba como 19.999999999999996 y redondeaba mal hacia abajo).
+// Precisión de 2 decimales (centésimas de punto porcentual, 2026-10-07 — a pedido del usuario:
+// "este descuento lo estamos aproximando al menor entero más cercano, quedando unos puntos en
+// decimales del porcentaje de descuento pendientes para llegar al precio mínimo"): antes se
+// probaba cada ENTERO 50→0, dejando hasta casi 1 punto completo de descuento sin usar frente al
+// mínimo real. Se sigue iterando en enteros (ahora centésimas: 5000→0, dividido entre 100 al
+// final) en vez de sumar un paso decimal, por la misma razón de precisión de punto flotante de la
+// nota de arriba — y Math.round() sobre el precio final sigue absorbiendo cualquier ruido mínimo
+// de los candidatos probados, así que no reintroduce ese problema.
 function _descuentoMaximoPermitido(precio, minimo) {
   if (!(precio > 0) || !(minimo > 0)) return 50;
-  for (let d = 50; d >= 0; d--) {
+  for (let c = 5000; c >= 0; c--) {
+    const d = c / 100;
     if (Math.round(precio * (1 - d / 100)) >= minimo) return d;
   }
   return 0;
@@ -460,7 +469,7 @@ function renderOpcionesExtra() {
         <td><div style="font-weight:600;font-size:13px">${_esc(it.nombre)}</div><div style="font-size:11px;color:var(--gris-medio)">${_esc(it.medidas)}</div></td>
         <td><span style="color:${it.iva === 'SI' ? 'var(--rojo)' : 'var(--verde)'};font-weight:700;font-size:12px">${it.iva}</span></td>
         <td style="font-weight:600">$${it.precio.toLocaleString()}</td>
-        <td><input type="number" min="0" max="50" value="${it.descuento}" style="width:54px" onchange="actualizarItemOpcion(${idx},${i},'descuento',this.value)">%</td>
+        <td><input type="number" min="0" max="50" step="0.01" value="${it.descuento}" style="width:54px" onchange="actualizarItemOpcion(${idx},${i},'descuento',this.value)">%</td>
         <td style="font-weight:600;color:var(--azul)">$${adj.toLocaleString()}${alerta}</td>
         <td style="font-weight:700">$${tot.toLocaleString()}</td>
         <td><button class="btn btn-rojo btn-xs" onclick="eliminarItemOpcion(${idx},${i})">✕</button></td>
