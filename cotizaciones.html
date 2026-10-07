@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ProSuite — Proconcreto</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect x='1' y='1' width='38' height='38' rx='10' fill='%23003F7F'/%3E%3Ctext x='9' y='29' font-family='Arial, sans-serif' font-weight='900' font-size='24' fill='%23FFFFFF'%3EP%3C/text%3E%3Crect x='21' y='21' width='15' height='15' rx='4' fill='%238BC53F'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="css/estilos.css?v=20260921a">
+<link rel="stylesheet" href="css/estilos.css?v=20261007a">
 </head>
 <body>
 
@@ -510,7 +510,7 @@
       <option value="">Todos los vendedores</option>
     </select>
   </div>
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <table class="tabla-cots" id="tabla-historico">
       <thead>
         <tr>
@@ -615,7 +615,7 @@
     </select>
     <input type="text" id="buscar-ordenes" class="buscador-input" placeholder="🔍 Buscar orden..." oninput="renderOrdenes()">
   </div>
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <table class="tabla-cots" id="tabla-ordenes">
       <thead>
         <tr>
@@ -652,7 +652,7 @@
     <input type="text" id="buscar-produccion" class="buscador-input" placeholder="🔍 Buscar producto o responsable..." oninput="renderProduccionDiaria()">
   </div>
   <div id="prod-diaria-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <table class="tabla-cots" id="tabla-produccion">
       <thead>
         <tr>
@@ -690,7 +690,7 @@
     <input type="text" id="buscar-inventario" class="buscador-input" placeholder="🔍 Buscar producto..." oninput="renderInventario()">
   </div>
   <div id="inv-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <table class="tabla-cots" id="tabla-inventario">
       <thead>
         <tr>
@@ -734,7 +734,7 @@
   </div>
   <div style="font-size:13px;font-weight:700;color:var(--gris-medio);margin-bottom:8px">🧱 Inventario de Cemento por Bodega</div>
   <div id="inventario-cemento-cards" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <table class="tabla-cots" id="tabla-materia-prima">
       <thead><tr>
         <th>TIPO</th><th>PROVEEDOR</th><th>LOTE</th><th>RECEPCIÓN</th><th>VENCIMIENTO</th><th>BODEGA</th><th style="text-align:right">CANTIDAD</th><th>ESTADO</th><th style="min-width:150px">ACCIONES</th>
@@ -1089,9 +1089,9 @@
     </div>
   </div>
 
-  <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px">
+  <div class="card" style="padding:0;margin-bottom:16px">
     <div class="card-titulo" style="padding:14px 14px 0">Pendientes de revisión</div>
-    <div style="overflow-x:auto">
+    <div style="overflow-x:auto;overflow-y:visible">
       <table class="tabla-cots">
         <thead>
           <tr>
@@ -1109,9 +1109,9 @@
     </div>
   </div>
 
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <div class="card-titulo" style="padding:14px 14px 0">Ciclos perdidos por causa</div>
-    <div style="overflow-x:auto">
+    <div style="overflow-x:auto;overflow-y:visible">
       <table class="tabla-cots">
         <thead>
           <tr>
@@ -1150,7 +1150,7 @@
     </div>
   </div>
   <div id="prod-adm-resumen" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap"></div>
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <table class="tabla-cots" id="tabla-productos-adm">
       <thead><tr>
         <th>CÓDIGO</th><th>PRODUCTO</th><th>GRUPO</th><th>UNID.</th><th>IVA</th>
@@ -1208,7 +1208,7 @@
       Mostrar completamente programadas
     </label>
   </div>
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <table class="tabla-cots" id="tabla-ordenes-despacho">
       <thead>
         <tr>
@@ -1300,7 +1300,7 @@
       <button class="btn btn-primario" onclick="abrirModalDiseno()">+ Nuevo Diseño</button>
     </div>
   </div>
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <table class="tabla-cots" id="tabla-disenos">
       <thead><tr>
         <th style="width:28px"></th><th>CÓDIGO</th><th>NOMBRE</th><th style="text-align:center">RESISTENCIA</th><th style="text-align:center">ASENTAMIENTO</th><th style="text-align:center">TAMAÑO MÁX.</th><th>ELABORÓ / MODIFICÓ</th><th>ESTADO</th><th style="min-width:150px">ACCIONES</th>
@@ -1369,7 +1369,7 @@
     <div style="font-size:16px;font-weight:700;color:var(--azul)">Niveles Salariales</div>
     <button class="btn btn-primario btn-sm" onclick="abrirModalClaseSalarial()">+ Nueva clase</button>
   </div>
-  <div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
+  <div class="card" style="padding:0;margin-bottom:14px">
     <table class="tabla-cots" id="tabla-clases-salariales">
       <thead><tr>
         <th style="width:28px"></th><th>ROLES</th><th style="text-align:center">MÚLT. SMMLV</th><th style="text-align:center">SUBS. TRANSPORTE</th>
@@ -1386,7 +1386,7 @@
     <div style="font-size:16px;font-weight:700;color:var(--azul)">Cuadrillas Productivas</div>
     <button class="btn btn-primario btn-sm" onclick="abrirModalCuadrilla()">+ Nueva cuadrilla</button>
   </div>
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <table class="tabla-cots" id="tabla-cuadrillas">
       <thead><tr>
         <th style="width:28px"></th><th style="width:400px">CUADRILLA</th><th style="text-align:right">VALOR/HORA</th><th style="text-align:right">VALOR/DÍA</th><th style="text-align:right">VALOR/SEMANA</th><th style="text-align:right">VALOR/MES</th><th style="text-align:right">VALOR/AÑO</th><th style="min-width:110px">ACCIONES</th>
@@ -1410,7 +1410,7 @@
     <div style="font-size:16px;font-weight:700;color:var(--azul)">Máquinas y Equipos</div>
     <button class="btn btn-primario btn-sm" onclick="abrirModalMaquina()">+ Nueva máquina</button>
   </div>
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <table class="tabla-cots" id="tabla-maquinaria" style="table-layout:fixed">
       <thead><tr>
         <th style="width:4%"></th>
@@ -1455,7 +1455,7 @@
     </div>
   </div>
 
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <table class="tabla-cots" style="table-layout:fixed">
       <thead><tr>
         <th style="width:4%"></th>
@@ -1496,7 +1496,7 @@
     <button class="btn btn-primario btn-sm" onclick="abrirModalCosteoProducto()">+ Nuevo Costeo</button>
   </div>
 
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <table class="tabla-cots" style="table-layout:fixed">
       <thead><tr>
         <th style="width:4%"></th>
@@ -1539,7 +1539,7 @@
       </div>
     </div>
   </div>
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <table class="tabla-cots" id="tabla-ajustes">
       <thead><tr>
         <th>CILINDRO N°</th><th>FECHA</th><th>DISEÑO</th><th>CLIENTE</th><th>ELABORADO POR</th><th style="text-align:center">RESISTENCIA</th><th>PRODUCTO</th><th>PROYECTO</th><th style="min-width:150px">ACCIONES</th>
@@ -1587,7 +1587,7 @@
     </div>
   </div>
   <div id="ensayos-resumen" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
-  <div class="card" style="padding:0;overflow:hidden">
+  <div class="card" style="padding:0">
     <table class="tabla-cots" id="tabla-ensayos">
       <thead><tr>
         <th>N° CILINDRO</th><th>FECHA</th><th>DISEÑO</th><th>ELEMENTO</th><th style="text-align:center">OBJETIVO</th><th style="text-align:center">ÚLTIMO RESULTADO</th><th>ESTADO</th><th>INGRESADO POR</th><th style="min-width:150px">ACCIONES</th>

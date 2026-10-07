@@ -124,12 +124,18 @@
   .btn-toggle-ver:hover { background: var(--gris-fondo); }
 
   /* ── TABLA ÍTEMS ── */
-  .tabla-items { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .tabla-items th { background: var(--azul); color: white; padding: 8px 10px; text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
+  /* border-collapse:separate (en vez de collapse) a propósito, igual que en .tabla-cots más abajo
+     — ver la nota de encabezados fijos junto a .tabla-cots para el motivo. */
+  .tabla-items { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  .tabla-items th { background: var(--azul); color: white; padding: 8px 10px; text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; position: sticky; top: 94px; z-index: 5; }
   .tabla-items td { padding: 8px 10px; border-bottom: 1px solid #EDF2F7; vertical-align: middle; }
   .tabla-items tr:hover td { background: var(--azul-suave); }
   .tabla-items input { border: 1px solid var(--gris-borde); border-radius: 4px; padding: 5px 7px; font-size: 13px; width: 100%; }
   .tabla-items select { border: 1px solid var(--gris-borde); border-radius: 4px; padding: 5px 7px; font-size: 12px; width: 100%; }
+  /* Dentro de un modal, "top" no es la página sino el propio scroll del modal (o el de una
+     mini-caja con su propio max-height/overflow-y:auto dentro del modal, si la hay — sticky
+     siempre se ancla al ancestro con scroll más cercano) — 0 en vez de 94px. */
+  .modal .tabla-items th, .modal .tabla-cots th { top: 0; }
 
   /* ── TOTALES ── */
   .totales-box { background: var(--azul-suave); border: 1px solid #90CAF9; border-radius: var(--radio); padding: 14px 18px; min-width: 300px; }
@@ -156,10 +162,33 @@
   .buscador-item .detalle { font-size: 11px; color: var(--gris-medio); }
 
   /* ── LISTA COTIZACIONES ── */
-  .tabla-cots { width: 100%; border-collapse: collapse; }
-  .tabla-cots th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 700; color: var(--gris-medio); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid var(--gris-borde); }
+  /* Encabezados de columna fijos al bajar (2026-10-07, a pedido del usuario: "bloqueemos estas
+     filas hacia arriba para poder bajar y que sepamos qué información es. hazlo en todas las
+     ventanas") — aplica a TODAS las tablas de la app por igual, vía estas dos clases genéricas
+     (.tabla-cots: listados; .tabla-items: filas editables de formularios), sin tocar cada
+     pantalla una por una. "top" por defecto es 94px (50px de .nav-top + 44px de .nav, las dos
+     barras fijas de arriba) para que el encabezado quede pegado justo debajo de ellas al hacer
+     scroll en la página; dentro de un modal es 0 en vez de eso, ver la regla junto a .tabla-items.
+     border-collapse:separate (en vez de collapse, sin ningún cambio visual porque esta tabla
+     nunca dependió de fusionar bordes entre celdas — cada borde ya era un border-bottom propio
+     de th/td) porque position:sticky en un <th> no es fiable con border-collapse:collapse en
+     algunos navegadores — se evita ese problema conocido por completo en vez de arriesgarse. */
+  .tabla-cots { width: 100%; border-collapse: separate; border-spacing: 0; }
+  .tabla-cots th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 700; color: var(--gris-medio); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid var(--gris-borde); background: white; position: sticky; top: 94px; z-index: 5; }
   .tabla-cots td { padding: 11px 12px; border-bottom: 1px solid #EDF2F7; font-size: 13px; }
   .tabla-cots tr:hover td { background: var(--azul-suave); }
+  /* Las tablas que viven en una tarjeta "padding:0;overflow:hidden" (la mayoría de los listados)
+     dejaron de tener ese overflow:hidden (ver cotizaciones.html) porque rompe position:sticky —
+     cualquier ancestro con overflow distinto de "visible" se vuelve el límite de scroll del
+     sticky, y esa tarjeta nunca scrollea por sí sola (solo scrollea la página), así que el
+     encabezado se quedaría fijo en su sitio en vez de pegarse arriba. El overflow:hidden existía
+     solo para recortar las esquinas cuadradas de la tabla a las esquinas redondeadas de la
+     tarjeta — se reemplaza por redondear directamente las esquinas de la tabla, mismo resultado
+     visual sin depender de overflow:hidden. */
+  .tabla-cots thead tr:first-child th:first-child { border-top-left-radius: var(--radio); }
+  .tabla-cots thead tr:first-child th:last-child { border-top-right-radius: var(--radio); }
+  .tabla-cots tbody tr:last-child td:first-child { border-bottom-left-radius: var(--radio); }
+  .tabla-cots tbody tr:last-child td:last-child { border-bottom-right-radius: var(--radio); }
 
   /* ── REORDENAMIENTO MANUAL (arrastrar y soltar) — Costos de Referencia, Maquinaria y
      Equipos, Costeo de Producto (2026-08-21). Mismo lenguaje visual que .log-cal-dragover
