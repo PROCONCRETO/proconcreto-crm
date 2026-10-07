@@ -125,17 +125,25 @@
 
   /* ── TABLA ÍTEMS ── */
   /* border-collapse:separate (en vez de collapse) a propósito, igual que en .tabla-cots más abajo
-     — ver la nota de encabezados fijos junto a .tabla-cots para el motivo. */
+     — ver la nota de encabezados fijos junto a .tabla-cots para el motivo. SIN encabezado fijo
+     (a diferencia de .tabla-cots) — 2026-10-07, bug real reportado por el usuario: la tabla de
+     "Productos cotizados" (la única .tabla-items fuera de un modal) es solo UNA sección de un
+     formulario largo (Cliente, Vendedor, Productos, Logística, Condiciones...) — al bajar por el
+     formulario para llegar a las secciones de abajo, el encabezado se "pegaba" aunque el usuario
+     no estuviera scrolleando la tabla en sí, y como la tabla normalmente tiene pocas filas (unos
+     pocos productos), el encabezado pegado terminaba tapando la única fila de producto en vez de
+     dejarla pasar por debajo (captura real: "BLOQUE BASE EN CEMENTO ESTRUCTURAL..." parcialmente
+     tapado por el encabezado azul). .tabla-cots SÍ se queda fija porque ahí la tabla ES el
+     contenido principal de la pantalla (listados largos, nada debajo que lleve a "pasar de
+     largo" por la tabla) — ver la nota junto a .tabla-cots. Las .tabla-items DENTRO de un modal
+     (Costeo de Producto) tienen el mismo riesgo (son también una sección más de un formulario
+     largo) por lo que tampoco quedan fijas ahí. */
   .tabla-items { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
-  .tabla-items th { background: var(--azul); color: white; padding: 8px 10px; text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; position: sticky; top: 94px; z-index: 5; }
+  .tabla-items th { background: var(--azul); color: white; padding: 8px 10px; text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
   .tabla-items td { padding: 8px 10px; border-bottom: 1px solid #EDF2F7; vertical-align: middle; }
   .tabla-items tr:hover td { background: var(--azul-suave); }
   .tabla-items input { border: 1px solid var(--gris-borde); border-radius: 4px; padding: 5px 7px; font-size: 13px; width: 100%; }
   .tabla-items select { border: 1px solid var(--gris-borde); border-radius: 4px; padding: 5px 7px; font-size: 12px; width: 100%; }
-  /* Dentro de un modal, "top" no es la página sino el propio scroll del modal (o el de una
-     mini-caja con su propio max-height/overflow-y:auto dentro del modal, si la hay — sticky
-     siempre se ancla al ancestro con scroll más cercano) — 0 en vez de 94px. */
-  .modal .tabla-items th, .modal .tabla-cots th { top: 0; }
 
   /* ── TOTALES ── */
   .totales-box { background: var(--azul-suave); border: 1px solid #90CAF9; border-radius: var(--radio); padding: 14px 18px; min-width: 300px; }
@@ -164,11 +172,11 @@
   /* ── LISTA COTIZACIONES ── */
   /* Encabezados de columna fijos al bajar (2026-10-07, a pedido del usuario: "bloqueemos estas
      filas hacia arriba para poder bajar y que sepamos qué información es. hazlo en todas las
-     ventanas") — aplica a TODAS las tablas de la app por igual, vía estas dos clases genéricas
-     (.tabla-cots: listados; .tabla-items: filas editables de formularios), sin tocar cada
-     pantalla una por una. "top" por defecto es 94px (50px de .nav-top + 44px de .nav, las dos
-     barras fijas de arriba) para que el encabezado quede pegado justo debajo de ellas al hacer
-     scroll en la página; dentro de un modal es 0 en vez de eso, ver la regla junto a .tabla-items.
+     ventanas") — vía esta clase genérica, sin tocar cada pantalla una por una. Solo .tabla-cots
+     queda fija (.tabla-items NO — ver la nota junto a .tabla-items y por qué ahí sí causaba un
+     problema real). "top" por defecto es 94px (50px de .nav-top + 44px de .nav, las dos barras
+     fijas de arriba) para que el encabezado quede pegado justo debajo de ellas al hacer scroll en
+     la página; dentro de un modal es 0 en vez de eso (`.modal .tabla-cots th` más abajo).
      border-collapse:separate (en vez de collapse, sin ningún cambio visual porque esta tabla
      nunca dependió de fusionar bordes entre celdas — cada borde ya era un border-bottom propio
      de th/td) porque position:sticky en un <th> no es fiable con border-collapse:collapse en
@@ -189,6 +197,13 @@
   .tabla-cots thead tr:first-child th:last-child { border-top-right-radius: var(--radio); }
   .tabla-cots tbody tr:last-child td:first-child { border-bottom-left-radius: var(--radio); }
   .tabla-cots tbody tr:last-child td:last-child { border-bottom-right-radius: var(--radio); }
+  /* Dentro de un modal, "top" no es la página sino el propio scroll del modal (o el de una
+     mini-caja con su propio max-height/overflow-y:auto dentro del modal, si la hay — sticky
+     siempre se ancla al ancestro con scroll más cercano) — 0 en vez de 94px. Las .tabla-cots
+     dentro de un modal (ej. el detalle de saldo de una Orden, el historial de un producto en
+     Inventario) son listas acotadas y enfocadas en un solo tema, no una sección más de un
+     formulario largo — el mismo riesgo de .tabla-items no aplica igual aquí. */
+  .modal .tabla-cots th { top: 0; }
 
   /* ── REORDENAMIENTO MANUAL (arrastrar y soltar) — Costos de Referencia, Maquinaria y
      Equipos, Costeo de Producto (2026-08-21). Mismo lenguaje visual que .log-cal-dragover
