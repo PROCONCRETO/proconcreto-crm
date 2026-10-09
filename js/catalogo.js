@@ -640,6 +640,21 @@ function toggleOcultarProducto(codigo, ocultar) {
 function _activarProductoEspecial(codigo) {
   const p = CATALOGO.find(x => x.codigo === codigo);
   if (!p) return;
+  // Al crear el producto oculto, Código/Grupo/Precio Lista/Precio Mínimo pudieron quedar en
+  // blanco (ver guardarProducto()) — al pasarlo a línea SÍ se exigen, porque de acá en adelante
+  // se comporta como cualquier producto normal del catálogo (2026-10-09, a pedido del usuario:
+  // "si se pasase a producto de línea, ahí sí hagamos los campos obligatorios"). Un código que
+  // empieza por "ESP-" es el provisional que se generó solo — también hay que reemplazarlo por
+  // uno real antes de activar.
+  const faltantes = [];
+  if (!p.grupo) faltantes.push('Grupo');
+  if (!(p.lista > 0)) faltantes.push('Precio Lista');
+  if (!(p.minimo > 0)) faltantes.push('Precio Mínimo');
+  if (/^ESP-/.test(p.codigo || '')) faltantes.push('Código (todavía tiene el provisional "' + p.codigo + '")');
+  if (faltantes.length) {
+    alert(`Antes de activar "${p.nombre}" como producto de línea completa: ${faltantes.join(', ')}.\n\nEdítalo con "✏️ Editar" y guarda esos datos, luego vuelve a intentar "⬆️ Activar a línea".`);
+    return;
+  }
   const ok = confirm(`⚠️ Vas a activar "${p.nombre}" como producto de línea.\n\nDejará de ser un producto oculto (no de línea): aparecerá en Cotizaciones y en la lista de precios general para todo el equipo, a partir de ahora.\n\n¿Ya completaste la revisión de precio y costeo de este producto? ¿Continuar?`);
   if (!ok) return;
   p.especial = false;
@@ -674,7 +689,11 @@ function abrirModalProducto(codigo) {
   document.getElementById('mp-codigo-orig').value = codigo || '';
   const p = esEdit ? CATALOGO.find(x => x.codigo === codigo) : null;
   document.getElementById('mp-codigo').value = p?.codigo || '';
-  document.getElementById('mp-codigo').readOnly = esEdit;
+  // El código queda bloqueado al editar, salvo en un producto oculto (no de línea) — ahí puede
+  // haber nacido con un código provisional autogenerado (ver _generarCodigoEspecial()) que
+  // todavía hay que reemplazar por uno real antes de poder activarlo a línea (ver
+  // _activarProductoEspecial()); si no se pudiera editar acá, no habría forma de corregirlo.
+  document.getElementById('mp-codigo').readOnly = esEdit && !(p?.especial === true);
   document.getElementById('mp-grupo').value = p?.grupo || '';
   document.getElementById('mp-nombre').value = p?.nombre || '';
   document.getElementById('mp-medidas').value = p?.medidas || '';
@@ -700,11 +719,41 @@ function abrirModalProducto(codigo) {
   document.getElementById('mp-especial').checked = yaEsEspecial;
   if (wrapEspecial) wrapEspecial.style.display = yaEsEspecial ? 'none' : '';
   if (notaEspecial) notaEspecial.style.display = yaEsEspecial ? 'block' : 'none';
+  _alCambiarEspecialProducto();
   document.getElementById('modal-producto').classList.add('abierto');
 }
 
+// Mientras el producto va a quedar oculto (no de línea), Código/Grupo/Precio Lista/Precio
+// Mínimo dejan de ser obligatorios (ver guardarProducto()) — esta función solo refleja eso en
+// las etiquetas del formulario, para que el "*" no siga prometiendo una validación que ya no
+// aplica. Se llama al abrir el modal (nuevo o editando un especial ya existente, con el
+// checkbox oculto) y cada vez que se marca/desmarca el checkbox en un producto nuevo.
+function _alCambiarEspecialProducto() {
+  const especial = document.getElementById('mp-especial').checked;
+  const sufijo = especial ? ' (opcional mientras esté oculto)' : ' *';
+  const lbl = (id, base) => { const el = document.getElementById(id); if (el) el.textContent = base + sufijo; };
+  lbl('mp-lbl-codigo', 'Código');
+  lbl('mp-lbl-grupo', 'Grupo');
+  lbl('mp-lbl-lista', 'Precio Lista');
+  lbl('mp-lbl-minimo', 'Precio Mínimo');
+}
+
+// Código provisional para un producto oculto guardado sin Código — nunca se le pide al usuario
+// (2026-10-09, a pedido del usuario: "no hagamos obligatorio ningún campo a excepción del
+// nombre"), pero el catálogo SÍ necesita uno único internamente (es la llave con la que se
+// guarda en Supabase — ver _upsertProducto(), onConflict:'codigo'). El prefijo "ESP-" lo deja
+// reconocible a simple vista como un código provisional, pendiente de reemplazar por uno real
+// antes de activar el producto a línea (ver _activarProductoEspecial()).
+function _generarCodigoEspecial() {
+  let codigo;
+  do {
+    codigo = 'ESP-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 5).toUpperCase();
+  } while (CATALOGO.find(x => x.codigo === codigo));
+  return codigo;
+}
+
 function guardarProducto() {
-  const codigo = document.getElementById('mp-codigo').value.trim();
+  let codigo = document.getElementById('mp-codigo').value.trim();
   const nombre = document.getElementById('mp-nombre').value.trim();
   const grupo = document.getElementById('mp-grupo').value.trim();
   const orig = document.getElementById('mp-codigo-orig').value;
@@ -712,16 +761,34 @@ function guardarProducto() {
   // Si el producto tiene Costeo, el precio no se toca desde este modal aunque el campo se
   // vuelva a habilitar por algún medio — el catálogo se mantiene igual al valor ya guardado.
   const bloqueadoPorCosteo = !!existente && _productoTieneCosteo(orig);
-  const lista = bloqueadoPorCosteo ? existente.lista : parseFloat(document.getElementById('mp-lista').value);
-  const minimo = bloqueadoPorCosteo ? existente.minimo : parseFloat(document.getElementById('mp-minimo').value);
-  if (!codigo || !nombre || !grupo || !(lista >= 0) || !(minimo >= 0)) { alert('Completa: Código, Nombre, Grupo, Precio Lista y Precio Mínimo.'); return; }
-  if (!orig && CATALOGO.find(x => x.codigo === codigo)) { alert('Ya existe un producto con ese código.'); return; }
-  const pesoVal = document.getElementById('mp-peso').value;
+  const listaInput = parseFloat(document.getElementById('mp-lista').value);
+  const minimoInput = parseFloat(document.getElementById('mp-minimo').value);
   // "Especial/borrador" (2026-09-22) — el checkbox solo se lee para un producto NUEVO; si ya
   // existe, se preserva su marca actual sin importar lo que diga el checkbox (queda oculto/
   // deshabilitado en ese caso, ver abrirModalProducto(), pero esto es un cinturón de seguridad
   // extra: nunca se cambia "especial" desde acá, solo desde _activarProductoEspecial()).
   const especial = existente ? existente.especial === true : document.getElementById('mp-especial').checked;
+  // Mientras el producto siga oculto (no de línea), SOLO el Nombre es obligatorio (2026-10-09,
+  // a pedido del usuario: "no hagamos obligatorio ningún campo a excepción del nombre... si se
+  // pasase a producto de línea, ahí sí hagamos los campos obligatorios" — ver la validación
+  // real al pasarlo a línea en _activarProductoEspecial()). Código y precios se completan solos
+  // cuando se dejan en blanco; el usuario los puede volver a editar después sin problema.
+  if (!nombre) { alert('Completa el Nombre.'); return; }
+  if (!especial && (!codigo || !grupo || !(listaInput >= 0) || !(minimoInput >= 0))) {
+    alert('Completa: Código, Nombre, Grupo, Precio Lista y Precio Mínimo.');
+    return;
+  }
+  if (!codigo) codigo = _generarCodigoEspecial();
+  const lista = bloqueadoPorCosteo ? existente.lista : ((listaInput >= 0) ? listaInput : 0);
+  const minimo = bloqueadoPorCosteo ? existente.minimo : ((minimoInput >= 0) ? minimoInput : 0);
+  // "Renombrado" = se está editando un producto que ya existía (hay `orig`) y el código cambió
+  // — el único caso real es reemplazar el código provisional "ESP-..." de un producto oculto
+  // por uno de verdad (ver abrirModalProducto(), el código solo se puede editar ahí mientras
+  // sigue oculto). Normalmente el código queda bloqueado al editar, así que esto no aplicaba
+  // antes de la excepción para productos ocultos.
+  const renombrado = !!orig && orig !== codigo;
+  if ((!orig || renombrado) && CATALOGO.find(x => x.codigo === codigo)) { alert('Ya existe un producto con ese código.'); return; }
+  const pesoVal = document.getElementById('mp-peso').value;
   // `activo` — CORREGIDO (2026-09-22): antes esta línea forzaba `activo:true` en CADA guardado,
   // sin importar el estado previo — así que editar cualquier campo de un producto ya OCULTO (o
   // especial, recién agregado) lo reactivaba/cotizable de contrabando sin que nadie lo pidiera.
@@ -737,16 +804,31 @@ function guardarProducto() {
     lista, minimo, activo, especial,
     disenoMezcla: document.getElementById('mp-diseno-mezcla').value || ''
   };
-  const idx = CATALOGO.findIndex(x => x.codigo === codigo);
-  const esNuevo = idx < 0;
-  const anterior = esNuevo ? null : { ...CATALOGO[idx] };
-  if (idx >= 0) CATALOGO[idx] = { ...CATALOGO[idx], ...prod }; else CATALOGO.push(prod);
+  let anterior;
+  if (renombrado) {
+    // Cambiar de código no es un upsert normal sobre la misma fila — hay que quitar la fila
+    // vieja (código `orig`) y dejar una nueva con el código `codigo`, tanto acá como en
+    // Supabase, para no dejar un registro huérfano con el código provisional.
+    anterior = CATALOGO.find(x => x.codigo === orig);
+    CATALOGO = CATALOGO.filter(x => x.codigo !== orig);
+    CATALOGO.push(prod);
+  } else {
+    const idx = CATALOGO.findIndex(x => x.codigo === codigo);
+    anterior = idx < 0 ? null : { ...CATALOGO[idx] };
+    if (idx >= 0) CATALOGO[idx] = { ...CATALOGO[idx], ...prod }; else CATALOGO.push(prod);
+  }
+  const esNuevo = !anterior;
   PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
-  _upsertProducto(prod).then(({ error }) => {
+  Promise.all([
+    _upsertProducto(prod),
+    renombrado ? sb.from('productos').delete().eq('codigo', orig) : Promise.resolve({ error: null }),
+  ]).then(([{ error: errorUpsert }, { error: errorDelete }]) => {
+    const error = errorUpsert || errorDelete;
     if (error) {
       // Si el guardado falla, se revierte el cambio local para no dejar un producto
       // "fantasma" (o un edit fantasma) que bloquee futuros intentos con ese código.
       if (esNuevo) CATALOGO = CATALOGO.filter(x => x.codigo !== codigo);
+      else if (renombrado) { CATALOGO = CATALOGO.filter(x => x.codigo !== codigo); CATALOGO.push(anterior); }
       else { const i2 = CATALOGO.findIndex(x => x.codigo === codigo); if (i2 >= 0) CATALOGO[i2] = anterior; }
       PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
       renderProductosAdmin();

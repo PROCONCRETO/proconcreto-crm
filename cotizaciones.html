@@ -2444,13 +2444,13 @@
     <div class="modal-titulo" id="modal-producto-titulo">📦 Nuevo producto</div>
     <input type="hidden" id="mp-codigo-orig">
     <div class="form-grupo" id="mp-especial-wrap" style="margin-bottom:12px;background:#F3E5F5;border-radius:6px;padding:8px 10px">
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#6A1B9A;cursor:pointer"><input type="checkbox" id="mp-especial"> 🔬 Producto oculto (no de línea) — especial / borrador</label>
-      <div style="font-size:11px;color:var(--gris-medio);margin-top:4px">No aparece en Cotizaciones ni cuenta como producto de línea hasta que se active manualmente desde la tabla ("⬆️ Activar a línea") — útil para costear un producto nuevo o puntual sin comprometerlo al catálogo todavía.</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#6A1B9A;cursor:pointer"><input type="checkbox" id="mp-especial" onchange="_alCambiarEspecialProducto()"> 🔬 Producto oculto (no de línea) — especial / borrador</label>
+      <div style="font-size:11px;color:var(--gris-medio);margin-top:4px">No aparece en Cotizaciones ni cuenta como producto de línea hasta que se active manualmente desde la tabla ("⬆️ Activar a línea") — útil para costear un producto nuevo o puntual sin comprometerlo al catálogo todavía. Mientras esté oculto, solo el Nombre es obligatorio — el resto se puede completar después.</div>
     </div>
-    <div id="mp-especial-nota-editar" style="display:none;font-size:12px;background:#F3E5F5;color:#6A1B9A;border-radius:6px;padding:8px 10px;margin-bottom:12px">🔬 Este es un producto oculto (no de línea) — especial/borrador. Usa el botón "⬆️ Activar a línea" en la tabla para convertirlo en producto de línea normal, no se cambia desde este formulario.</div>
+    <div id="mp-especial-nota-editar" style="display:none;font-size:12px;background:#F3E5F5;color:#6A1B9A;border-radius:6px;padding:8px 10px;margin-bottom:12px">🔬 Este es un producto oculto (no de línea) — especial/borrador. Solo el Nombre es obligatorio mientras siga oculto. Usa el botón "⬆️ Activar a línea" en la tabla para convertirlo en producto de línea normal (ahí sí se exigen los demás datos) — no se cambia desde este formulario.</div>
     <div class="form-grid" style="margin-bottom:10px">
-      <div class="form-grupo"><label>Código *</label><input type="text" id="mp-codigo" placeholder="Ej: PBCADCRV8G"></div>
-      <div class="form-grupo"><label>Grupo *</label><input type="text" id="mp-grupo" list="lista-grupos-dl" placeholder="Ej: Adoquín"></div>
+      <div class="form-grupo"><label id="mp-lbl-codigo">Código *</label><input type="text" id="mp-codigo" placeholder="Ej: PBCADCRV8G"></div>
+      <div class="form-grupo"><label id="mp-lbl-grupo">Grupo *</label><input type="text" id="mp-grupo" list="lista-grupos-dl" placeholder="Ej: Adoquín"></div>
     </div>
     <datalist id="lista-grupos-dl"></datalist>
     <div class="form-grupo" style="margin-bottom:10px"><label>Nombre *</label><input type="text" id="mp-nombre"></div>
@@ -2464,8 +2464,8 @@
     </div>
     <div id="mp-aviso-costeo" style="display:none;font-size:12px;background:#E3F2FD;color:var(--azul);border-radius:6px;padding:8px 10px;margin-bottom:10px">🏗️ Este producto tiene un Costeo de Producto guardado — el precio se calcula desde ahí y no se puede editar aquí. Ve a Centro de Costos › Costeo de Producto.</div>
     <div class="form-grid" style="margin-bottom:10px">
-      <div class="form-grupo"><label>Precio Lista *</label><input type="number" id="mp-lista" min="0"></div>
-      <div class="form-grupo"><label>Precio Mínimo *</label><input type="number" id="mp-minimo" min="0"></div>
+      <div class="form-grupo"><label id="mp-lbl-lista">Precio Lista *</label><input type="number" id="mp-lista" min="0"></div>
+      <div class="form-grupo"><label id="mp-lbl-minimo">Precio Mínimo *</label><input type="number" id="mp-minimo" min="0"></div>
     </div>
     <div class="form-grupo" style="margin-bottom:16px"><label>Diseño de Mezcla</label>
       <select id="mp-diseno-mezcla" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"><option value="">— Sin asignar —</option></select>
@@ -2836,7 +2836,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.0" integrity="sha384-De+l/Df7qym5QBDVocD3+gW1S7IjR3epf+6KbRDjB3FCCzM/LqVTwqckT6FhFar8" crossorigin="anonymous"></script>
 <script src="js/config.js?v=20260917a"></script>
 <script src="js/calculadora-inputs.js?v=20260825a"></script>
-<script src="js/catalogo.js?v=20260922b"></script>
+<script src="js/catalogo.js?v=20261009a"></script>
 <script src="js/navegacion.js?v=20260917a"></script>
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
 <script src="js/produccion-diaria.js?v=20260917a"></script>
