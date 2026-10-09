@@ -313,8 +313,17 @@ const _LABEL_ROL_AGREGADO_COSTEO = { arena: 'Arena', grava: 'Triturado Grueso' }
 // agua, 'g' para aditivos — ver más abajo); si no se pasa, o si el insumo ya está en esa
 // unidad, no se convierte nada.
 const _CONVERSION_UNIDAD = { 'm3->L': 1000, 'L->m3': 0.001, 'kg->g': 1000, 'g->kg': 0.001 };
+// Comparación de nombre insensible a mayúsculas/espacios — un insumo de referencia con nombre
+// hardcodeado en el costeo (ej. "Acero Figurado"/"Alambre Dulce" en Reforzado, más abajo) tiene
+// que coincidir letra por letra tal como lo escribió quien lo registró en Costos de Referencia;
+// una diferencia de mayúscula o un espacio de más/menos ahí hacía que el precio saliera en $0
+// en silencio, sin ningún aviso (bug real reportado 2026-10-09: "no está arrastrando el precio
+// del acero figurado" — Acero Figurado y Alambre Dulce ambos en $0,00/kg).
+function _mismoNombreInsumo(a, b) {
+  return (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+}
 function _precioInsumoPorNombre(nombre, productoGeneraIva, unidadReceta) {
-  const i = INSUMOS_COSTOS.find(x => x.nombre === nombre);
+  const i = INSUMOS_COSTOS.find(x => _mismoNombreInsumo(x.nombre, nombre));
   if (!i) return 0;
   const costo = calcularCostoInsumo(i);
   let precio = productoGeneraIva ? costo.costoSinIva : costo.valorFinal;
@@ -1064,8 +1073,9 @@ function _calcularCosteoReforzado(c) {
   // % del peso del Acero (editable, 2% por defecto) — a pedido del usuario, 2026-08-14. Los
   // precios salen del mismo "Acero Figurado"/"Alambre Dulce" de Costos de Referencia que ya
   // alimenta las varillas de acero calculadas (js/costeo-referencia.js); si el ítem no existe
-  // ahí, el precio sale en 0 (mismo comportamiento que _precioInsumoPorNombre en cualquier otro
-  // insumo no encontrado, sin alerta nueva).
+  // ahí (o está registrado con otro nombre, mayúscula o espacio — ver _mismoNombreInsumo()), se
+  // marca `noEncontrado` igual que cualquier otro insumo del costeo, para que se vea el aviso
+  // "(ya no existe)" en vez de un $0,00 silencioso sin explicación.
   const cantidadAcero = r.aceroKgUnidad || 0;
   const precioAcero = _precioInsumoPorNombre('Acero Figurado', productoGeneraIva);
   const costoAcero = cantidadAcero * precioAcero;
@@ -1075,8 +1085,8 @@ function _calcularCosteoReforzado(c) {
   const costoAlambre = cantidadAlambre * precioAlambre;
   const refuerzo = costoAcero + costoAlambre;
   const refuerzoDetalle = [
-    { nombre: 'Acero Figurado', unidad: 'kg', cantidad: cantidadAcero, precio: precioAcero, costo: costoAcero },
-    { nombre: `Alambre Dulce (${pctAlambre}% del Acero)`, unidad: 'kg', cantidad: cantidadAlambre, precio: precioAlambre, costo: costoAlambre },
+    { nombre: 'Acero Figurado', unidad: 'kg', cantidad: cantidadAcero, precio: precioAcero, costo: costoAcero, noEncontrado: !INSUMOS_COSTOS.some(x => _mismoNombreInsumo(x.nombre, 'Acero Figurado')) },
+    { nombre: `Alambre Dulce (${pctAlambre}% del Acero)`, unidad: 'kg', cantidad: cantidadAlambre, precio: precioAlambre, costo: costoAlambre, noEncontrado: !INSUMOS_COSTOS.some(x => _mismoNombreInsumo(x.nombre, 'Alambre Dulce')) },
   ];
 
   // Mano de Obra — mismo patrón que Vibrocompactado: costo/día de cada cuadrilla ÷ unidades/día,
@@ -2003,7 +2013,7 @@ function _seccionesDetalleCosteo(c, k) {
   // Refuerzo — solo Reforzado/Pretensado (Vibrocompactado siempre trae refuerzoDetalle vacío).
   const seccionRef = k.refuerzoDetalle.length
     ? _seccionDetalleCosteo(`🔩 Refuerzo <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(${c.tipoEstructura === 'pretensado' ? 'Acero de Pretensionamiento' : 'Acero Figurado + Alambre Dulce'})</span>`,
-        k.refuerzoDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, f.unidad, f.precio, f.costo, false, k.totalUnidad)).join('')
+        k.refuerzoDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, f.unidad, f.precio, f.costo, f.noEncontrado, k.totalUnidad)).join('')
         + `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Refuerzo</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.refuerzo)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.refuerzo, k.totalUnidad)}</td></tr>`,
         'Sin refuerzo agregado.')
     : '';
