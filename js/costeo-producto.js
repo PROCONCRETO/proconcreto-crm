@@ -435,9 +435,15 @@ function agregarMateriaPrimaExtraCosteo() { _materiaPrimaExtraCosteoActual.push(
 // Acero Figurado/Alambre Dulce (nombre que no coincide letra por letra con lo registrado).
 let _despieceAceroActual = [];
 
-function _pesoBarraDespieceAcero(row) {
+// Peso unitario (UNA barra, sin multiplicar por cantidad) y peso total de la fila (unitario ×
+// cantidad) — columnas separadas en el modal (2026-10-09, a pedido del usuario), para poder ver
+// a simple vista cuánto pesa cada barra individual antes de multiplicarla por cuántas hay.
+function _pesoUnitarioBarraDespieceAcero(row) {
   const v = VARILLAS_ACERO.find(x => x.designacion === row.diametro);
-  return (v ? v.pesoKgM : 0) * (Number(row.longitud) || 0) * (Number(row.cantidad) || 0);
+  return (v ? v.pesoKgM : 0) * (Number(row.longitud) || 0);
+}
+function _pesoBarraDespieceAcero(row) {
+  return _pesoUnitarioBarraDespieceAcero(row) * (Number(row.cantidad) || 0);
 }
 function _pesoTotalDespieceAcero(despiece) {
   return (despiece || []).reduce((sum, row) => sum + _pesoBarraDespieceAcero(row), 0);
@@ -477,7 +483,7 @@ function renderDespieceAcero() {
   const tbody = document.getElementById('despiece-acero-body');
   if (!tbody) return;
   if (!_despieceAceroActual.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las barras de la pieza</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las barras de la pieza</td></tr>`;
   } else {
     tbody.innerHTML = _despieceAceroActual.map((row, i) => `<tr>
       <td><input type="text" value="${_escAttr(row.codigo || '')}" placeholder="Ej: N1" oninput="_despieceAceroActual[${i}].codigo=this.value"></td>
@@ -485,7 +491,8 @@ function renderDespieceAcero() {
       <td><select onchange="_despieceAceroActual[${i}].diametro=this.value;renderDespieceAcero()">${_opcionesDiametroDespieceAcero(row.diametro)}</select></td>
       <td><input type="number" min="0" step="0.01" value="${row.longitud || ''}" oninput="_despieceAceroActual[${i}].longitud=parseFloat(this.value)||0;renderDespieceAcero()"></td>
       <td><input type="number" min="0" step="1" value="${row.cantidad || ''}" oninput="_despieceAceroActual[${i}].cantidad=parseFloat(this.value)||0;renderDespieceAcero()"></td>
-      <td style="text-align:right;color:var(--gris-medio)">${_pesoBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 })}</td>
+      <td style="text-align:right;color:var(--gris-medio)">${_pesoUnitarioBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 })}</td>
+      <td style="text-align:right;font-weight:600">${_pesoBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 })}</td>
       <td><button class="btn btn-rojo btn-xs" onclick="_despieceAceroActual.splice(${i},1);renderDespieceAcero()">✕</button></td>
     </tr>`).join('');
   }

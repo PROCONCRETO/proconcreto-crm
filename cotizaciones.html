@@ -2109,13 +2109,13 @@
      Costos de Referencia para calcular las varillas de acero, VARILLAS_ACERO en
      js/costeo-referencia.js) — se abre encima del modal de Costeo, sin cerrarlo. -->
 <div class="modal-overlay" id="modal-despiece-acero">
-  <div class="modal" style="width:760px;max-width:95vw">
+  <div class="modal" style="width:1020px;max-width:95vw">
     <div class="modal-titulo">📐 Despiece de Acero Figurado</div>
-    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:10px">El peso total de Acero Figurado se calcula solo a partir de esta tabla — ya no se digita a mano mientras haya barras acá: Cantidad × Longitud × peso/metro según el diámetro de cada barra.</div>
+    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:10px">El peso total de Acero Figurado se calcula solo a partir de esta tabla — ya no se digita a mano mientras haya barras acá: Peso unitario (Longitud × peso/metro según el diámetro) × Cantidad.</div>
     <div style="overflow-x:auto">
-      <table class="tabla-items" style="width:100%">
+      <table class="tabla-items" style="width:100%;min-width:900px">
         <thead><tr>
-          <th>Código/Nombre</th><th>Ubicación</th><th style="width:130px">Diámetro</th><th style="width:100px">Longitud (m)</th><th style="width:90px">Cantidad</th><th style="width:100px">Peso (kg)</th><th style="width:36px"></th>
+          <th style="width:140px">Código/Nombre</th><th style="width:230px">Ubicación</th><th style="width:130px">Diámetro</th><th style="width:100px">Longitud (m)</th><th style="width:90px">Cantidad</th><th style="width:110px">Peso unitario (kg)</th><th style="width:100px">Peso total (kg)</th><th style="width:36px"></th>
         </tr></thead>
         <tbody id="despiece-acero-body"></tbody>
       </table>
@@ -2884,7 +2884,7 @@
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
 <script src="js/costeo-maquinaria.js?v=20260920a"></script>
 <script src="js/costeo-referencia.js?v=20260821a"></script>
-<script src="js/costeo-producto.js?v=20261009d"></script>
+<script src="js/costeo-producto.js?v=20261009e"></script>
 <script src="js/calidad-mezclas.js?v=20260827b"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
 <script src="js/logistica.js?v=20260922a"></script>
