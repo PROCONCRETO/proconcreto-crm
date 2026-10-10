@@ -423,6 +423,91 @@ function renderMateriaPrimaExtraCosteo() {
 }
 function agregarMateriaPrimaExtraCosteo() { _materiaPrimaExtraCosteoActual.push({ nombre: '', cantidad: 0 }); renderMateriaPrimaExtraCosteo(); }
 
+// ── Despiece de Acero Figurado (solo Reforzado, 2026-10-09) ──
+// A pedido del usuario: "pongamos un (+) Incluir despiece... donde podamos de acuerdo a la
+// cantidad, diametro y peso por metro... calcular el peso total del figurado, que deberá ser el
+// resultante de esta tabla y no un valor digitado". Cada fila es una barra/grupo de barras
+// reales de la pieza (código/nombre y ubicación son solo de referencia, no participan en el
+// cálculo); el peso sale de Cantidad × Longitud × peso/metro de su diámetro, usando la MISMA
+// tabla estándar de pesos (VARILLAS_ACERO, N°2 a N°8) que ya usa Costos de Referencia para
+// calcular las varillas de acero — el diámetro se elige de un desplegable con esos mismos
+// valores, nunca se escribe a mano, para no repetir el mismo tipo de bug recién corregido en
+// Acero Figurado/Alambre Dulce (nombre que no coincide letra por letra con lo registrado).
+let _despieceAceroActual = [];
+
+function _pesoBarraDespieceAcero(row) {
+  const v = VARILLAS_ACERO.find(x => x.designacion === row.diametro);
+  return (v ? v.pesoKgM : 0) * (Number(row.longitud) || 0) * (Number(row.cantidad) || 0);
+}
+function _pesoTotalDespieceAcero(despiece) {
+  return (despiece || []).reduce((sum, row) => sum + _pesoBarraDespieceAcero(row), 0);
+}
+
+// Mientras haya filas de despiece, el campo "Acero Figurado (kg/unidad)" deja de ser editable a
+// mano y muestra el total calculado — se llama al abrir/editar un costeo y cada vez que cambia
+// algo en el despiece, para que el campo nunca se desincronice de la tabla que lo origina.
+function _sincronizarCampoAceroDespiece() {
+  const input = document.getElementById('m-costeo-acero-kg');
+  const btn = document.getElementById('btn-despiece-acero');
+  if (!input || !btn) return;
+  const tiene = _despieceAceroActual.length > 0;
+  if (tiene) {
+    const total = _pesoTotalDespieceAcero(_despieceAceroActual);
+    input.value = Math.round(total * 100) / 100;
+    input.readOnly = true;
+    input.title = 'Calculado a partir del despiece — usa el botón para editarlo';
+    input.style.background = 'var(--gris-claro)';
+    btn.textContent = `✏️ Editar despiece (${_despieceAceroActual.length})`;
+  } else {
+    input.readOnly = false;
+    input.title = '';
+    input.style.background = '';
+    btn.textContent = '➕ Incluir despiece';
+  }
+}
+
+function abrirModalDespieceAcero() {
+  renderDespieceAcero();
+  document.getElementById('modal-despiece-acero').classList.add('abierto');
+}
+function _opcionesDiametroDespieceAcero(seleccionado) {
+  return '<option value="">— Diámetro —</option>' + VARILLAS_ACERO.map(v => `<option value="${_escAttr(v.designacion)}" ${v.designacion === seleccionado ? 'selected' : ''}>${v.designacion} (${v.pulgadas})</option>`).join('');
+}
+function renderDespieceAcero() {
+  const tbody = document.getElementById('despiece-acero-body');
+  if (!tbody) return;
+  if (!_despieceAceroActual.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las barras de la pieza</td></tr>`;
+  } else {
+    tbody.innerHTML = _despieceAceroActual.map((row, i) => `<tr>
+      <td><input type="text" value="${_escAttr(row.codigo || '')}" placeholder="Ej: N1" oninput="_despieceAceroActual[${i}].codigo=this.value"></td>
+      <td><input type="text" value="${_escAttr(row.ubicacion || '')}" placeholder="Ej: Parrilla superior" oninput="_despieceAceroActual[${i}].ubicacion=this.value"></td>
+      <td><select onchange="_despieceAceroActual[${i}].diametro=this.value;renderDespieceAcero()">${_opcionesDiametroDespieceAcero(row.diametro)}</select></td>
+      <td><input type="number" min="0" step="0.01" value="${row.longitud || ''}" oninput="_despieceAceroActual[${i}].longitud=parseFloat(this.value)||0;renderDespieceAcero()"></td>
+      <td><input type="number" min="0" step="1" value="${row.cantidad || ''}" oninput="_despieceAceroActual[${i}].cantidad=parseFloat(this.value)||0;renderDespieceAcero()"></td>
+      <td style="text-align:right;color:var(--gris-medio)">${_pesoBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 })}</td>
+      <td><button class="btn btn-rojo btn-xs" onclick="_despieceAceroActual.splice(${i},1);renderDespieceAcero()">✕</button></td>
+    </tr>`).join('');
+  }
+  document.getElementById('despiece-acero-total').textContent = _pesoTotalDespieceAcero(_despieceAceroActual).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' kg';
+}
+function agregarFilaDespieceAcero() { _despieceAceroActual.push({ codigo: '', ubicacion: '', diametro: '', longitud: 0, cantidad: 0 }); renderDespieceAcero(); }
+function guardarDespieceAcero() {
+  // Filas sin diámetro elegido o sin cantidad no aportan peso — se descartan al guardar para no
+  // dejar filas vacías/a medio llenar guardadas en el costeo.
+  _despieceAceroActual = _despieceAceroActual.filter(row => row.diametro && (row.cantidad || 0) > 0);
+  _sincronizarCampoAceroDespiece();
+  _actualizarResumenCosteo();
+  cerrarModal('modal-despiece-acero');
+}
+function quitarDespieceAcero() {
+  if (_despieceAceroActual.length && !confirm('¿Quitar el despiece? El peso de Acero Figurado vuelve a ser un valor digitado a mano.')) return;
+  _despieceAceroActual = [];
+  _sincronizarCampoAceroDespiece();
+  _actualizarResumenCosteo();
+  cerrarModal('modal-despiece-acero');
+}
+
 // "Bancos/día" (cuántos bancos completa por día una cuadrilla/máquina) es un rendimiento
 // difícil de estimar directo — es mucho más natural pensarlo al revés: "¿cuántos DÍAS le toma
 // completar UN banco?" (a pedido del usuario, 2026-08-25: confundir las dos cosas ya causó
@@ -799,6 +884,7 @@ function _leerFormularioCosteo() {
       ).value) || 0,
       unidadesDia: parseFloat(document.getElementById(tipoEstructura === 'elemento_simple' ? 'm-costeo-unidades-dia-simple' : 'm-costeo-unidades-dia-reforzado').value) || 0,
       aceroKgUnidad: parseFloat(document.getElementById('m-costeo-acero-kg').value) || 0,
+      despieceAcero: JSON.parse(JSON.stringify(_despieceAceroActual)),
       pctAlambre: document.getElementById('m-costeo-pct-alambre').value === '' ? 2 : (parseFloat(document.getElementById('m-costeo-pct-alambre').value) || 0),
       // Propios de Pretensado — inofensivos para los demás tipos (quedan en 0/sin uso ahí).
       metrosLinealesBanco: parseFloat(document.getElementById('m-costeo-metros-banco').value) || 0,
@@ -1068,15 +1154,20 @@ function _calcularCosteoReforzado(c) {
     materiaPrimaDetalle.push({ nombre: row.nombre, unidad: ins ? _labelUnidadInsumo(ins.unidad) : '', cantidad: row.cantidad, precio, costo, noEncontrado: !ins });
   });
 
-  // Refuerzo — Acero Figurado es una cantidad manual (depende de la geometría/complejidad real
-  // de cada pieza, no se puede derivar de una fórmula genérica). Alambre Dulce sí se deriva: un
-  // % del peso del Acero (editable, 2% por defecto) — a pedido del usuario, 2026-08-14. Los
-  // precios salen del mismo "Acero Figurado"/"Alambre Dulce" de Costos de Referencia que ya
-  // alimenta las varillas de acero calculadas (js/costeo-referencia.js); si el ítem no existe
-  // ahí (o está registrado con otro nombre, mayúscula o espacio — ver _mismoNombreInsumo()), se
-  // marca `noEncontrado` igual que cualquier otro insumo del costeo, para que se vea el aviso
-  // "(ya no existe)" en vez de un $0,00 silencioso sin explicación.
-  const cantidadAcero = r.aceroKgUnidad || 0;
+  // Refuerzo — Acero Figurado es, por defecto, una cantidad manual (depende de la geometría/
+  // complejidad real de cada pieza, no se puede derivar de una fórmula genérica) — salvo que
+  // haya un Despiece cargado (2026-10-09, a pedido del usuario: "calcular el peso total del
+  // figurado, que deberá ser el resultante de esta tabla y no un valor digitado"), en cuyo caso
+  // ESE es el valor que manda, sin importar lo que diga `aceroKgUnidad` (el campo del formulario
+  // se mantiene sincronizado con el despiece por `_sincronizarCampoAceroDespiece()`, pero el
+  // cálculo real no depende de esa sincronización — es la misma fuente, por si acaso). Alambre
+  // Dulce sí se deriva: un % del peso del Acero (editable, 2% por defecto) — a pedido del
+  // usuario, 2026-08-14. Los precios salen del mismo "Acero Figurado"/"Alambre Dulce" de Costos
+  // de Referencia que ya alimenta las varillas de acero calculadas (js/costeo-referencia.js); si
+  // el ítem no existe ahí (o está registrado con otro nombre, mayúscula o espacio — ver
+  // _mismoNombreInsumo()), se marca `noEncontrado` igual que cualquier otro insumo del costeo,
+  // para que se vea el aviso "(ya no existe)" en vez de un $0,00 silencioso sin explicación.
+  const cantidadAcero = (r.despieceAcero && r.despieceAcero.length) ? _pesoTotalDespieceAcero(r.despieceAcero) : (r.aceroKgUnidad || 0);
   const precioAcero = _precioInsumoPorNombre('Acero Figurado', productoGeneraIva);
   const costoAcero = cantidadAcero * precioAcero;
   const pctAlambre = r.pctAlambre ?? 2;
@@ -1839,6 +1930,8 @@ function abrirModalCosteoProducto() {
   document.getElementById('m-costeo-unidades-dia-simple').value = '';
   document.getElementById('m-costeo-acero-kg').value = '';
   document.getElementById('m-costeo-pct-alambre').value = 2;
+  _despieceAceroActual = [];
+  _sincronizarCampoAceroDespiece();
   document.getElementById('m-costeo-volumen-unidad-pretensado').value = '';
   document.getElementById('m-costeo-metros-banco').value = '';
   document.getElementById('m-costeo-hilos-banco').value = '';
@@ -1884,6 +1977,8 @@ function editarCosteoProducto(codigo) {
   document.getElementById('m-costeo-unidades-dia-simple').value = r.unidadesDia || '';
   document.getElementById('m-costeo-acero-kg').value = r.aceroKgUnidad || '';
   document.getElementById('m-costeo-pct-alambre').value = r.pctAlambre ?? 2;
+  _despieceAceroActual = JSON.parse(JSON.stringify(r.despieceAcero || []));
+  _sincronizarCampoAceroDespiece();
   document.getElementById('m-costeo-volumen-unidad-pretensado').value = r.volumenUnidadM3 || '';
   document.getElementById('m-costeo-metros-banco').value = r.metrosLinealesBanco || '';
   document.getElementById('m-costeo-hilos-banco').value = r.hilosBanco || '';

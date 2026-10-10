@@ -2022,7 +2022,13 @@
       </div>
       <div id="costeo-diseno-preview" class="caja-costeo caja-costeo-punteada"></div>
       <div id="rendimiento-refuerzo-reforzado" class="form-grid" style="margin-top:12px;display:none">
-        <div class="form-grupo"><label>Acero Figurado (kg / unidad) <span class="hint">(según diseño de refuerzo de esta pieza)</span></label><input type="number" id="m-costeo-acero-kg" min="0" step="0.01" oninput="_actualizarResumenCosteo()"></div>
+        <div class="form-grupo">
+          <label>Acero Figurado (kg / unidad) <span class="hint">(según diseño de refuerzo de esta pieza)</span></label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" id="m-costeo-acero-kg" min="0" step="0.01" oninput="_actualizarResumenCosteo()" style="flex:1">
+            <button type="button" class="btn btn-secundario btn-xs" id="btn-despiece-acero" onclick="abrirModalDespieceAcero()" style="white-space:nowrap">➕ Incluir despiece</button>
+          </div>
+        </div>
         <div class="form-grupo"><label>% Alambre Dulce <span class="hint">(sobre el peso del Acero)</span></label><input type="number" id="m-costeo-pct-alambre" min="0" step="0.1" value="2" oninput="_actualizarResumenCosteo()"></div>
       </div>
       <div id="costeo-mp-extra-wrap" style="display:none;margin-top:12px">
@@ -2093,6 +2099,35 @@
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-costeo-producto')">Cancelar</button>
       <button class="btn btn-primario" onclick="guardarCosteoProducto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Despiece de Acero Figurado (2026-10-09, a pedido del usuario) — el peso total de Acero
+     Figurado deja de ser un valor digitado y pasa a ser el resultado de sumar, barra por barra,
+     Cantidad × Longitud × peso/metro según su diámetro (misma tabla de pesos estándar que ya usa
+     Costos de Referencia para calcular las varillas de acero, VARILLAS_ACERO en
+     js/costeo-referencia.js) — se abre encima del modal de Costeo, sin cerrarlo. -->
+<div class="modal-overlay" id="modal-despiece-acero">
+  <div class="modal" style="width:760px;max-width:95vw">
+    <div class="modal-titulo">📐 Despiece de Acero Figurado</div>
+    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:10px">El peso total de Acero Figurado se calcula solo a partir de esta tabla — ya no se digita a mano mientras haya barras acá: Cantidad × Longitud × peso/metro según el diámetro de cada barra.</div>
+    <div style="overflow-x:auto">
+      <table class="tabla-items" style="width:100%">
+        <thead><tr>
+          <th>Código/Nombre</th><th>Ubicación</th><th style="width:130px">Diámetro</th><th style="width:100px">Longitud (m)</th><th style="width:90px">Cantidad</th><th style="width:100px">Peso (kg)</th><th style="width:36px"></th>
+        </tr></thead>
+        <tbody id="despiece-acero-body"></tbody>
+      </table>
+    </div>
+    <button class="btn btn-secundario btn-xs" style="margin-top:8px" onclick="agregarFilaDespieceAcero()">+ Agregar barra</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:10px;border-top:1px solid var(--gris-borde)">
+      <button class="btn btn-secundario btn-xs" onclick="quitarDespieceAcero()" title="Borra todas las barras y vuelve a digitar el peso a mano">🗑️ Quitar despiece</button>
+      <div style="font-size:14px;font-weight:700">Peso total Acero Figurado: <span id="despiece-acero-total" style="color:var(--azul)">0 kg</span></div>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-despiece-acero')">Cerrar</button>
+      <button class="btn btn-primario" onclick="guardarDespieceAcero()">Guardar despiece</button>
     </div>
   </div>
 </div>
@@ -2849,7 +2884,7 @@
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
 <script src="js/costeo-maquinaria.js?v=20260920a"></script>
 <script src="js/costeo-referencia.js?v=20260821a"></script>
-<script src="js/costeo-producto.js?v=20261009c"></script>
+<script src="js/costeo-producto.js?v=20261009d"></script>
 <script src="js/calidad-mezclas.js?v=20260827b"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
 <script src="js/logistica.js?v=20260922a"></script>
