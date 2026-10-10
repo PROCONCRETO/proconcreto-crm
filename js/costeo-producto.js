@@ -984,7 +984,7 @@ function calcularCosteoProducto(c) {
     materiaPrimaDetalle, manoObraDetalle, maquinariaDetalle, empaqueDetalle, consumosDetalle,
     // Refuerzo/Otros son propios de Reforzado — en 0/vacío aquí para que el resto de la
     // pantalla (resumen, detalle, consolidado) pueda leerlos sin distinguir el tipo.
-    refuerzo: 0, refuerzoDetalle: [], otros: 0, otrosDetalle: [],
+    refuerzo: 0, desperdicioRefuerzo: 0, refuerzoDetalle: [], otros: 0, otrosDetalle: [],
   };
 }
 
@@ -1084,6 +1084,14 @@ function _calcularCosteoReforzado(c) {
   const precioAlambre = _precioInsumoPorNombre('Alambre Dulce', productoGeneraIva);
   const costoAlambre = cantidadAlambre * precioAlambre;
   const refuerzo = costoAcero + costoAlambre;
+  // Acero Figurado y Alambre Dulce SÍ llevan el mismo % de Desperdicio que el resto de la
+  // materia prima (2026-10-09, a pedido del usuario: "tanto el acero como el alambre dulce, son
+  // materias primas, y no estás considerando el desperdicio para estos") — a diferencia de
+  // "Otras materias primas" (sección aparte, insertos/placas de anclaje) y del Acero de
+  // Pretensionamiento de Pretensado, que a propósito NO lo llevan (ver sus propios comentarios,
+  // más abajo) porque no son materia prima de la mezcla de concreto — el acero/alambre de
+  // Reforzado sí se trata explícitamente como materia prima real.
+  const desperdicioRefuerzo = refuerzo * ((c.pctDesperdicio || 0) / 100);
   const refuerzoDetalle = [
     { nombre: 'Acero Figurado', unidad: 'kg', cantidad: cantidadAcero, precio: precioAcero, costo: costoAcero, noEncontrado: !INSUMOS_COSTOS.some(x => _mismoNombreInsumo(x.nombre, 'Acero Figurado')) },
     { nombre: `Alambre Dulce (${pctAlambre}% del Acero)`, unidad: 'kg', cantidad: cantidadAlambre, precio: precioAlambre, costo: costoAlambre, noEncontrado: !INSUMOS_COSTOS.some(x => _mismoNombreInsumo(x.nombre, 'Alambre Dulce')) },
@@ -1167,13 +1175,13 @@ function _calcularCosteoReforzado(c) {
     }
   });
 
-  const totalUnidad = materiaPrima + desperdicio + refuerzo + manoObra + herramientaMenor + maquinaria + empaque + consumos + otros;
+  const totalUnidad = materiaPrima + desperdicio + refuerzo + desperdicioRefuerzo + manoObra + herramientaMenor + maquinaria + empaque + consumos + otros;
   const precioSugeridoLista = _precioPorMargenSobreVenta(totalUnidad, c.margenLista);
   const precioSugeridoMinimo = _precioPorMargenSobreVenta(totalUnidad, c.margenMinimo);
 
   return {
     volumenUnidadM3, pesoEstimadoKg, unidadesDia,
-    materiaPrima, desperdicio, refuerzo, manoObra, herramientaMenor, maquinaria, empaque, consumos, otros, totalUnidad,
+    materiaPrima, desperdicio, refuerzo, desperdicioRefuerzo, manoObra, herramientaMenor, maquinaria, empaque, consumos, otros, totalUnidad,
     precioSugeridoLista, precioSugeridoMinimo,
     materiaPrimaDetalle, refuerzoDetalle, manoObraDetalle, maquinariaDetalle, empaqueDetalle, consumosDetalle, otrosDetalle,
   };
@@ -1324,7 +1332,7 @@ function _calcularCosteoElementoSimple(c) {
     materiaPrimaDetalle, manoObraDetalle, maquinariaDetalle, empaqueDetalle, consumosDetalle, otrosDetalle,
     // Sin Refuerzo — un Elemento Simple no lleva el cálculo automático de acero de refuerzo; si
     // necesita algo puntual, entra por "Otras materias primas" (ver arriba).
-    refuerzo: 0, refuerzoDetalle: [],
+    refuerzo: 0, desperdicioRefuerzo: 0, refuerzoDetalle: [],
   };
 }
 
@@ -1390,8 +1398,6 @@ function _calcularCosteoPretensado(c) {
       materiaPrimaDetalle.push({ nombre: a.producto || a.tipo, unidad: 'g', cantidad, precio, costo });
     });
   }
-  const desperdicio = materiaPrima * ((c.pctDesperdicio || 0) / 100);
-
   // Acero de Pretensionamiento: única cantidad de refuerzo que SÍ se puede derivar de una
   // fórmula exacta (a diferencia del Acero Figurado de Reforzado, que depende del diseño de
   // cada pieza y no se puede calcular solo). Cantidad = hilos tensados en el banco × longitud
@@ -1400,11 +1406,13 @@ function _calcularCosteoPretensado(c) {
   // suma a Materia Prima, no a Refuerzo aparte (a pedido del usuario, 2026-08-25: "el acero de
   // pretensionamiento también es una materia prima, que no se discrimine en el desglose") — a
   // diferencia de Reforzado, donde el Acero Figurado sí queda en su propia sección de Refuerzo
-  // porque es una cantidad manual, no derivada de esta fórmula. Se suma DESPUÉS de calcular
-  // `desperdicio` a propósito, para no aplicarle el % de desperdicio de la mezcla (es acero, no
-  // material de la mezcla). El resto del refuerzo real de Pretensado (Resorte Loza, Alambre
-  // Dulce) no tiene fórmula — se carga como Insumo normal con reparto "Directo" (sección 6),
-  // igual que Reforzado hace con su Desmoldante.
+  // porque es una cantidad manual, no derivada de esta fórmula. Se suma ANTES de calcular
+  // `desperdicio` (2026-10-09, decisión revisada — antes se sumaba después, a propósito, para
+  // no aplicarle el % de desperdicio; el usuario confirmó que el acero SÍ debe llevar el mismo
+  // desperdicio que el resto de la materia prima, igual que ya se corrigió para Acero
+  // Figurado/Alambre Dulce de Reforzado). El resto del refuerzo real de Pretensado (Resorte
+  // Loza, Alambre Dulce) no tiene fórmula — se carga como Insumo normal con reparto "Directo"
+  // (sección 6), igual que Reforzado hace con su Desmoldante.
   const cantidadAcero = metrosLinealesBanco > 0 ? (hilosBanco * longitudBrutaHilo) / metrosLinealesBanco : 0;
   // El ítem de Costos de Referencia se elige en un <select> (`m-costeo-item-acero-pretensado`,
   // sección 3) en vez de buscarse por un nombre fijo — a pedido del usuario (2026-08-25: "no
@@ -1423,10 +1431,14 @@ function _calcularCosteoPretensado(c) {
   }
   const refuerzo = 0;
   const refuerzoDetalle = [];
+  // Desperdicio se calcula acá, después de sumar el Acero de Pretensionamiento a `materiaPrima`
+  // (ver nota arriba) — sí incluye el acero en su base, a diferencia de "Otras materias primas"
+  // (justo abajo), que sigue excluida a propósito.
+  const desperdicio = materiaPrima * ((c.pctDesperdicio || 0) / 100);
 
   // Otras materias primas fuera del Diseño de Mezcla (insertos, placas de anclaje, espuma de
-  // vacíos...) — mismo criterio que el Acero de Pretensionamiento arriba: se suman a Materia
-  // Prima DESPUÉS de `desperdicio`, para no aplicarles el % de desperdicio de la mezcla.
+  // vacíos...) — se suman a Materia Prima DESPUÉS de `desperdicio`, para no aplicarles el % de
+  // desperdicio de la mezcla (un inserto no es parte de la mezcla de concreto ni del acero).
   (c.materiaPrimaExtra || []).forEach(row => {
     const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
     const precio = _precioInsumoPorNombre(row.nombre, productoGeneraIva);
@@ -1523,7 +1535,7 @@ function _calcularCosteoPretensado(c) {
 
   return {
     volumenUnidadM3, metrosLinealesBanco, hilosBanco, longitudBrutaHilo, bancosDiaLinea,
-    materiaPrima, desperdicio, refuerzo, manoObra, herramientaMenor, maquinaria, empaque, consumos, otros, totalUnidad,
+    materiaPrima, desperdicio, refuerzo, desperdicioRefuerzo: 0, manoObra, herramientaMenor, maquinaria, empaque, consumos, otros, totalUnidad,
     precioSugeridoLista, precioSugeridoMinimo,
     materiaPrimaDetalle, refuerzoDetalle, manoObraDetalle, maquinariaDetalle, empaqueDetalle, consumosDetalle, otrosDetalle,
   };
@@ -1562,7 +1574,8 @@ function _actualizarResumenCosteo() {
     <div style="font-size:11px;color:var(--gris-medio);margin-bottom:8px">${notaIva}</div>
     <div class="fila"><span>🧱 Materia Prima</span><span>${_fmtCosteoProd(k.materiaPrima)}</span></div>
     <div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_fmtCosteoProd(k.desperdicio)}</span></div>
-    ${k.refuerzo > 0 ? `<div class="fila"><span>🔩 Refuerzo${esPretensado ? ' (Acero de Pretensionamiento)' : ' (Acero + Alambre)'}</span><span>${_fmtCosteoProd(k.refuerzo)}</span></div>` : ''}
+    ${k.refuerzo > 0 ? `<div class="fila"><span>🔩 Refuerzo${esPretensado ? ' (Acero de Pretensionamiento)' : ' (Acero + Alambre)'}</span><span>${_fmtCosteoProd(k.refuerzo)}</span></div>
+    ${k.desperdicioRefuerzo > 0 ? `<div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_fmtCosteoProd(k.desperdicioRefuerzo)}</span></div>` : ''}` : ''}
     <div class="fila"><span>👷 Mano de Obra</span><span>${_fmtCosteoProd(k.manoObra)}</span></div>
     <div class="fila sub"><span>+ Herramienta Menor (${c.pctHerramientaMenor}%)</span><span>${_fmtCosteoProd(k.herramientaMenor)}</span></div>
     <div class="fila"><span>🔧 Maquinaria</span><span>${_fmtCosteoProd(k.maquinaria)}</span></div>
@@ -2014,7 +2027,8 @@ function _seccionesDetalleCosteo(c, k) {
   const seccionRef = k.refuerzoDetalle.length
     ? _seccionDetalleCosteo(`🔩 Refuerzo <span style="font-weight:400;text-transform:none;color:var(--gris-medio)">(${c.tipoEstructura === 'pretensado' ? 'Acero de Pretensionamiento' : 'Acero Figurado + Alambre Dulce'})</span>`,
         k.refuerzoDetalle.map(f => _filaDetalleCosteo(f.nombre, f.cantidad, f.unidad, f.precio, f.costo, f.noEncontrado, k.totalUnidad)).join('')
-        + `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Refuerzo</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.refuerzo)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.refuerzo, k.totalUnidad)}</td></tr>`,
+        + (k.desperdicioRefuerzo > 0 ? `<tr style="border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right;color:var(--gris-medio)">+ Desperdicio (${c.pctDesperdicio}%)</td><td style="text-align:right;font-weight:700">${_fmtCosteoProd(k.desperdicioRefuerzo)}</td><td style="text-align:right;color:var(--gris-medio);font-size:12px">${_pctCosteoProd(k.desperdicioRefuerzo, k.totalUnidad)}</td></tr>` : '')
+        + `<tr style="font-weight:700;border-top:1px solid var(--gris-borde)"><td colspan="3" style="text-align:right">Subtotal Refuerzo</td><td style="text-align:right;color:var(--azul)">${_fmtCosteoProd(k.refuerzo + k.desperdicioRefuerzo)}</td><td style="text-align:right;color:var(--azul);font-size:12px">${_pctCosteoProd(k.refuerzo + k.desperdicioRefuerzo, k.totalUnidad)}</td></tr>`,
         'Sin refuerzo agregado.')
     : '';
 
@@ -2109,7 +2123,8 @@ function abrirDetalleCosteoProducto(codigo) {
       <div class="caja-costeo caja-costeo-resumen">
         <div class="fila"><span>🧱 Materia Prima</span><span>${_fmtCosteoProd(k.materiaPrima)}</span></div>
         <div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_fmtCosteoProd(k.desperdicio)}</span></div>
-        ${k.refuerzo > 0 ? `<div class="fila"><span>🔩 Refuerzo</span><span>${_fmtCosteoProd(k.refuerzo)}</span></div>` : ''}
+        ${k.refuerzo > 0 ? `<div class="fila"><span>🔩 Refuerzo</span><span>${_fmtCosteoProd(k.refuerzo)}</span></div>
+        ${k.desperdicioRefuerzo > 0 ? `<div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_fmtCosteoProd(k.desperdicioRefuerzo)}</span></div>` : ''}` : ''}
         <div class="fila"><span>👷 Mano de Obra</span><span>${_fmtCosteoProd(k.manoObra)}</span></div>
         <div class="fila sub"><span>+ Herramienta Menor (${c.pctHerramientaMenor}%)</span><span>${_fmtCosteoProd(k.herramientaMenor)}</span></div>
         <div class="fila"><span>🔧 Maquinaria</span><span>${_fmtCosteoProd(k.maquinaria)}</span></div>
