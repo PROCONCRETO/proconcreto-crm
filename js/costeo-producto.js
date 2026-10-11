@@ -488,14 +488,31 @@ function renderDespieceAcero() {
     tbody.innerHTML = _despieceAceroActual.map((row, i) => `<tr>
       <td><input type="text" value="${_escAttr(row.codigo || '')}" placeholder="Ej: N1" oninput="_despieceAceroActual[${i}].codigo=this.value"></td>
       <td><input type="text" value="${_escAttr(row.ubicacion || '')}" placeholder="Ej: Parrilla superior" oninput="_despieceAceroActual[${i}].ubicacion=this.value"></td>
-      <td><select onchange="_despieceAceroActual[${i}].diametro=this.value;renderDespieceAcero()">${_opcionesDiametroDespieceAcero(row.diametro)}</select></td>
-      <td><input type="number" min="0" step="0.01" value="${row.longitud || ''}" oninput="_despieceAceroActual[${i}].longitud=parseFloat(this.value)||0;renderDespieceAcero()"></td>
-      <td><input type="number" min="0" step="1" value="${row.cantidad || ''}" oninput="_despieceAceroActual[${i}].cantidad=parseFloat(this.value)||0;renderDespieceAcero()"></td>
-      <td style="text-align:right;color:var(--gris-medio)">${_pesoUnitarioBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 })}</td>
-      <td style="text-align:right;font-weight:600">${_pesoBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 })}</td>
+      <td><select onchange="_despieceAceroActual[${i}].diametro=this.value;_actualizarFilaDespieceAcero(${i})">${_opcionesDiametroDespieceAcero(row.diametro)}</select></td>
+      <td><input type="number" min="0" step="0.01" value="${row.longitud || ''}" oninput="_despieceAceroActual[${i}].longitud=parseFloat(this.value)||0;_actualizarFilaDespieceAcero(${i})"></td>
+      <td><input type="number" min="0" step="1" value="${row.cantidad || ''}" oninput="_despieceAceroActual[${i}].cantidad=parseFloat(this.value)||0;_actualizarFilaDespieceAcero(${i})"></td>
+      <td style="text-align:right;color:var(--gris-medio)" id="despiece-peso-unit-${i}">${_pesoUnitarioBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 })}</td>
+      <td style="text-align:right;font-weight:600" id="despiece-peso-total-${i}">${_pesoBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 })}</td>
       <td><button class="btn btn-rojo btn-xs" onclick="_despieceAceroActual.splice(${i},1);renderDespieceAcero()">✕</button></td>
     </tr>`).join('');
   }
+  document.getElementById('despiece-acero-total').textContent = _pesoTotalDespieceAcero(_despieceAceroActual).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' kg';
+}
+// Recalcula solo el peso de UNA fila (y el total) sin reconstruir la tabla completa — a
+// diferencia de llamar renderDespieceAcero() en cada tecla, que destruye y recrea el <input>
+// que se está escribiendo (el elemento pierde el foco a mitad de escritura, y la tecla
+// siguiente, por ejemplo el punto decimal, ya no le llega a nada). Bug real reportado por el
+// usuario (2026-10-11): "cuando intento meter la longitud en metros y voy a darle un decimal,
+// inmediatamente me salta de campo y no me deja poner el punto o coma". Mismo criterio que ya
+// usan las demás tablas de filas del Costeo (Máquinas, Insumos...): un campo de texto/número
+// nunca debe disparar un re-render completo de su propia fila en el evento `oninput`.
+function _actualizarFilaDespieceAcero(i) {
+  const row = _despieceAceroActual[i];
+  if (!row) return;
+  const celdaUnit = document.getElementById(`despiece-peso-unit-${i}`);
+  const celdaTotal = document.getElementById(`despiece-peso-total-${i}`);
+  if (celdaUnit) celdaUnit.textContent = _pesoUnitarioBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 });
+  if (celdaTotal) celdaTotal.textContent = _pesoBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 });
   document.getElementById('despiece-acero-total').textContent = _pesoTotalDespieceAcero(_despieceAceroActual).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' kg';
 }
 function agregarFilaDespieceAcero() { _despieceAceroActual.push({ codigo: '', ubicacion: '', diametro: '', longitud: 0, cantidad: 0 }); renderDespieceAcero(); }
