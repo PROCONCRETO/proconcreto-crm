@@ -79,7 +79,7 @@
   <button class="nav-modulo" onclick="activarModulo('produccion')">🏭 Producción</button>
   <button class="nav-modulo" onclick="activarModulo('logistica')">🚛 Logística</button>
   <button class="nav-modulo" onclick="activarModulo('calidad')">🔬 Calidad</button>
-  <button class="nav-modulo" onclick="activarModulo('proyectos')">📁 Proyectos</button>
+  <button class="nav-modulo" onclick="activarModulo('proyectos')">🏛️ Proyectos</button>
   <button class="nav-modulo" id="nav-centro-costos" onclick="activarModulo('costeo')">💰 Centro de Costos</button>
   <div id="nav-usuario" style="margin-left:auto">
     <span id="rt-indicador" style="font-size:14px;font-weight:700;color:#999;white-space:nowrap;padding:4px 10px;border-radius:14px;background:rgba(255,255,255,0.12)" title="Estado de sincronización">⚪ Conectando…</span>
@@ -156,7 +156,7 @@
         <span class="inicio-modulo-nombre">Calidad</span>
       </button>
       <button class="inicio-modulo" onclick="activarModulo('proyectos')">
-        <span class="inicio-modulo-icono">📁</span>
+        <span class="inicio-modulo-icono">🏛️</span>
         <span class="inicio-modulo-nombre">Proyectos</span>
       </button>
       <button class="inicio-modulo" id="inicio-btn-costeo" onclick="activarModulo('costeo')">
@@ -1138,7 +1138,7 @@
 ═══════════════════════════════════════ -->
 <div id="pantalla-proyectos" class="pantalla">
   <div class="acciones-row">
-    <div style="font-size:18px;font-weight:700;color:var(--azul)">📁 Proyectos</div>
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">🏛️ Proyectos</div>
     <button class="btn btn-primario btn-sm" onclick="abrirModalProyecto()">+ Nuevo Proyecto</button>
   </div>
   <div class="acciones-row">
@@ -1165,7 +1165,7 @@
 
 <div class="modal-overlay" id="modal-proyecto">
   <div class="modal" style="width:520px;max-width:95vw">
-    <div class="modal-titulo" id="modal-proyecto-titulo">📁 Nuevo Proyecto</div>
+    <div class="modal-titulo" id="modal-proyecto-titulo">🏛️ Nuevo Proyecto</div>
     <input type="hidden" id="mpy-id">
     <div class="form-grupo" style="margin-bottom:10px"><label>Nombre del proyecto *</label><input type="text" id="mpy-nombre" placeholder="Ej: Torres del Parque — Etapa 2"></div>
     <div class="form-grid" style="margin-bottom:10px">
@@ -2183,13 +2183,13 @@
      Costos de Referencia para calcular las varillas de acero, VARILLAS_ACERO en
      js/costeo-referencia.js) — se abre encima del modal de Costeo, sin cerrarlo. -->
 <div class="modal-overlay" id="modal-despiece-acero">
-  <div class="modal" style="width:1020px;max-width:95vw">
+  <div class="modal" style="width:1140px;max-width:95vw">
     <div class="modal-titulo">📐 Despiece de Acero Figurado</div>
     <div style="font-size:12px;color:var(--gris-medio);margin-bottom:10px">El peso total de Acero Figurado se calcula solo a partir de esta tabla — ya no se digita a mano mientras haya barras acá: Peso unitario (Longitud × peso/metro según el diámetro) × Cantidad.</div>
     <div style="overflow-x:auto">
-      <table class="tabla-items" style="width:100%;min-width:900px">
+      <table class="tabla-items" style="width:100%;min-width:1010px">
         <thead><tr>
-          <th style="width:140px">Código/Nombre</th><th style="width:230px">Ubicación</th><th style="width:130px">Diámetro</th><th style="width:100px">Longitud (m)</th><th style="width:90px">Cantidad</th><th style="width:110px">Peso unitario (kg)</th><th style="width:100px">Peso total (kg)</th><th style="width:36px"></th>
+          <th style="width:140px">Código/Nombre</th><th style="width:230px">Ubicación</th><th style="width:130px">Diámetro</th><th style="width:100px">Longitud (m)</th><th style="width:90px">Cantidad</th><th style="width:110px">Longitud total (m)</th><th style="width:110px">Peso unitario (kg)</th><th style="width:100px">Peso total (kg)</th><th style="width:36px"></th>
         </tr></thead>
         <tbody id="despiece-acero-body"></tbody>
       </table>
@@ -2958,13 +2958,13 @@
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
 <script src="js/costeo-maquinaria.js?v=20260920a"></script>
 <script src="js/costeo-referencia.js?v=20260821a"></script>
-<script src="js/costeo-producto.js?v=20261011a"></script>
+<script src="js/costeo-producto.js?v=20261013a"></script>
 <script src="js/calidad-mezclas.js?v=20260827b"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
 <script src="js/logistica.js?v=20260922a"></script>
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
-<script src="js/proyectos.js?v=20261011a"></script>
+<script src="js/proyectos.js?v=20261011b"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20261011a"></script>
 <script src="js/cotizador.js?v=20261007a"></script>

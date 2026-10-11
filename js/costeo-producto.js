@@ -435,6 +435,12 @@ function agregarMateriaPrimaExtraCosteo() { _materiaPrimaExtraCosteoActual.push(
 // Acero Figurado/Alambre Dulce (nombre que no coincide letra por letra con lo registrado).
 let _despieceAceroActual = [];
 
+// Longitud total de la fila (Longitud × Cantidad, en metros) — columna propia entre Cantidad y
+// Peso unitario (2026-10-13, a pedido del usuario), útil para pedir el material por longitud
+// antes de pasar a peso.
+function _longitudTotalBarraDespieceAcero(row) {
+  return (Number(row.longitud) || 0) * (Number(row.cantidad) || 0);
+}
 // Peso unitario (UNA barra, sin multiplicar por cantidad) y peso total de la fila (unitario ×
 // cantidad) — columnas separadas en el modal (2026-10-09, a pedido del usuario), para poder ver
 // a simple vista cuánto pesa cada barra individual antes de multiplicarla por cuántas hay.
@@ -483,7 +489,7 @@ function renderDespieceAcero() {
   const tbody = document.getElementById('despiece-acero-body');
   if (!tbody) return;
   if (!_despieceAceroActual.length) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las barras de la pieza</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega las barras de la pieza</td></tr>`;
   } else {
     tbody.innerHTML = _despieceAceroActual.map((row, i) => `<tr>
       <td><input type="text" value="${_escAttr(row.codigo || '')}" placeholder="Ej: N1" oninput="_despieceAceroActual[${i}].codigo=this.value"></td>
@@ -491,6 +497,7 @@ function renderDespieceAcero() {
       <td><select onchange="_despieceAceroActual[${i}].diametro=this.value;_actualizarFilaDespieceAcero(${i})">${_opcionesDiametroDespieceAcero(row.diametro)}</select></td>
       <td><input type="number" min="0" step="0.01" value="${row.longitud || ''}" oninput="_despieceAceroActual[${i}].longitud=parseFloat(this.value)||0;_actualizarFilaDespieceAcero(${i})"></td>
       <td><input type="number" min="0" step="1" value="${row.cantidad || ''}" oninput="_despieceAceroActual[${i}].cantidad=parseFloat(this.value)||0;_actualizarFilaDespieceAcero(${i})"></td>
+      <td style="text-align:right;color:var(--gris-medio)" id="despiece-long-total-${i}">${_longitudTotalBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 })}</td>
       <td style="text-align:right;color:var(--gris-medio)" id="despiece-peso-unit-${i}">${_pesoUnitarioBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 })}</td>
       <td style="text-align:right;font-weight:600" id="despiece-peso-total-${i}">${_pesoBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 })}</td>
       <td><button class="btn btn-rojo btn-xs" onclick="_despieceAceroActual.splice(${i},1);renderDespieceAcero()">✕</button></td>
@@ -509,17 +516,28 @@ function renderDespieceAcero() {
 function _actualizarFilaDespieceAcero(i) {
   const row = _despieceAceroActual[i];
   if (!row) return;
+  const celdaLongTotal = document.getElementById(`despiece-long-total-${i}`);
   const celdaUnit = document.getElementById(`despiece-peso-unit-${i}`);
   const celdaTotal = document.getElementById(`despiece-peso-total-${i}`);
+  if (celdaLongTotal) celdaLongTotal.textContent = _longitudTotalBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 });
   if (celdaUnit) celdaUnit.textContent = _pesoUnitarioBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 });
   if (celdaTotal) celdaTotal.textContent = _pesoBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 });
   document.getElementById('despiece-acero-total').textContent = _pesoTotalDespieceAcero(_despieceAceroActual).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' kg';
 }
 function agregarFilaDespieceAcero() { _despieceAceroActual.push({ codigo: '', ubicacion: '', diametro: '', longitud: 0, cantidad: 0 }); renderDespieceAcero(); }
 function guardarDespieceAcero() {
-  // Filas sin diámetro elegido o sin cantidad no aportan peso — se descartan al guardar para no
-  // dejar filas vacías/a medio llenar guardadas en el costeo.
-  _despieceAceroActual = _despieceAceroActual.filter(row => row.diametro && (row.cantidad || 0) > 0);
+  // Ya NO se descartan las filas sin Diámetro/Cantidad todavía (2026-10-13, a pedido del
+  // usuario: "permitamos que al momento de yo agregar una nueva fila, ya quede guardada dentro
+  // de los cambios sin tener que digitar toda la fila, pues en ocasiones las hago de manera
+  // vertical" — llena una columna completa para todas las barras antes de pasar a la siguiente,
+  // no fila por fila). Antes, cerrar el despiece a medio llenar borraba silenciosamente lo que
+  // ya se había escrito en esas filas. Una fila sin diámetro o sin cantidad simplemente no aporta
+  // peso todavía (_pesoBarraDespieceAcero ya lo maneja solo, sin romper nada) — se sigue viendo
+  // y se puede completar después. Solo se descartan las filas TOTALMENTE vacías (ningún campo
+  // tiene nada), para no dejar basura de un "+ Agregar barra" de más que nunca se llegó a usar.
+  _despieceAceroActual = _despieceAceroActual.filter(row =>
+    (row.codigo || '').trim() || (row.ubicacion || '').trim() || row.diametro || (row.longitud || 0) > 0 || (row.cantidad || 0) > 0
+  );
   _sincronizarCampoAceroDespiece();
   _actualizarResumenCosteo();
   cerrarModal('modal-despiece-acero');

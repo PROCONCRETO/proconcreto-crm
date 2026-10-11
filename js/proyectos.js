@@ -53,7 +53,7 @@ function renderProyectos() {
 function abrirModalProyecto(id) {
   const esEdit = !!id;
   const p = esEdit ? PROYECTOS.find(x => x.id === id) : null;
-  document.getElementById('modal-proyecto-titulo').textContent = esEdit ? `✏️ Editar Proyecto — ${p?.nombre || ''}` : '📁 Nuevo Proyecto';
+  document.getElementById('modal-proyecto-titulo').textContent = esEdit ? `✏️ Editar Proyecto — ${p?.nombre || ''}` : '🏛️ Nuevo Proyecto';
   document.getElementById('mpy-id').value = id || '';
   document.getElementById('mpy-nombre').value = p?.nombre || '';
   document.getElementById('mpy-cliente').value = p?.cliente || '';
