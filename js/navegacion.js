@@ -72,6 +72,13 @@ function activarModulo(modulo) {
     document.querySelector('#subnav-costeo .nav-btn[onclick*="productos"]')?.classList.add('activo');
     renderProductosAdmin();
   }
+  if (modulo === 'proyectos') {
+    // Sin subnav propio todavía (una sola pantalla) — a diferencia de los demás módulos, que
+    // siempre tienen su barra de sub-pestañas debajo del menú principal.
+    document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+    document.getElementById('pantalla-proyectos').classList.add('activa');
+    renderProyectos();
+  }
 }
 
 function ir(pantalla) {

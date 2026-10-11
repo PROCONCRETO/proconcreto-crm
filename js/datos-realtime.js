@@ -17,6 +17,9 @@ async function cargarDatosSupabase() {
     sb.from('costeo_productos').select('datos, modificado').order('creado', { ascending: true }),
     sb.from('eventos_especiales').select('datos').order('creado', { ascending: false })
   ]);
+  const { data: proys, error: e18 } = await sb.from('proyectos').select('datos').order('creado', { ascending: false });
+  if (e18) console.warn('Tabla proyectos no disponible aún — corre sql/2026-10-11_proyectos.sql en Supabase.');
+  PROYECTOS = (proys || []).filter(r => r.datos).map(r => r.datos);
   if (e3) console.warn('Tabla ordenes_servicio no disponible aún.');
   if (e4) console.warn('Tabla producciones no disponible aún.');
   if (e5) console.warn('Tabla disenos_mezcla no disponible aún.');
@@ -130,6 +133,7 @@ function rerenderPantallaActiva() {
     case 'pantalla-costeo-maquinaria': renderCosteoMaquinaria(); break;
     case 'pantalla-costeo-referencia': renderCosteoReferencia(); break;
     case 'pantalla-costeo-producto': renderCosteoProductos(); break;
+    case 'pantalla-proyectos': renderProyectos(); break;
   }
 }
 
@@ -222,6 +226,11 @@ async function recargarCosteoProductosRT() {
   COSTEO_PRODUCTOS = _normalizarOrdenLista((data || []).filter(r => r.datos).map(r => ({ ...r.datos, _modificado: r.modificado })));
   rerenderPantallaActiva();
 }
+async function recargarProyectosRT() {
+  const { data } = await sb.from('proyectos').select('datos').order('creado', { ascending: false });
+  PROYECTOS = (data || []).filter(r => r.datos).map(r => r.datos);
+  rerenderPantallaActiva();
+}
 
 function suscribirRealtime() {
   if (_canalRealtime) return; // evitar suscripciones duplicadas
@@ -243,6 +252,7 @@ function suscribirRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'insumos_costos' },           () => _rtDebounce('insumoscostos', recargarInsumosCostosRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'costeo_productos' },          () => _rtDebounce('costeoproductos', recargarCosteoProductosRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'eventos_especiales' },         () => _rtDebounce('eventosespeciales', recargarEventosEspecialesRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'proyectos' },                   () => _rtDebounce('proyectos', recargarProyectosRT))
     .subscribe((status) => {
       const ind = document.getElementById('rt-indicador');
       if (ind) {

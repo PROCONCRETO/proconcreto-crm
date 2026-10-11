@@ -79,6 +79,7 @@
   <button class="nav-modulo" onclick="activarModulo('produccion')">🏭 Producción</button>
   <button class="nav-modulo" onclick="activarModulo('logistica')">🚛 Logística</button>
   <button class="nav-modulo" onclick="activarModulo('calidad')">🔬 Calidad</button>
+  <button class="nav-modulo" onclick="activarModulo('proyectos')">📁 Proyectos</button>
   <button class="nav-modulo" id="nav-centro-costos" onclick="activarModulo('costeo')">💰 Centro de Costos</button>
   <div id="nav-usuario" style="margin-left:auto">
     <span id="rt-indicador" style="font-size:14px;font-weight:700;color:#999;white-space:nowrap;padding:4px 10px;border-radius:14px;background:rgba(255,255,255,0.12)" title="Estado de sincronización">⚪ Conectando…</span>
@@ -153,6 +154,10 @@
       <button class="inicio-modulo" onclick="activarModulo('calidad')">
         <span class="inicio-modulo-icono">🔬</span>
         <span class="inicio-modulo-nombre">Calidad</span>
+      </button>
+      <button class="inicio-modulo" onclick="activarModulo('proyectos')">
+        <span class="inicio-modulo-icono">📁</span>
+        <span class="inicio-modulo-nombre">Proyectos</span>
       </button>
       <button class="inicio-modulo" id="inicio-btn-costeo" onclick="activarModulo('costeo')">
         <span class="inicio-modulo-icono">💰</span>
@@ -1123,6 +1128,75 @@
         </thead>
         <tbody id="rev-atip-reporte-body"></tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: PROYECTOS (2026-10-11, módulo nuevo — gestión de proyectos como
+     entidad propia, independiente de Clientes/Cotizaciones)
+═══════════════════════════════════════ -->
+<div id="pantalla-proyectos" class="pantalla">
+  <div class="acciones-row">
+    <div style="font-size:18px;font-weight:700;color:var(--azul)">📁 Proyectos</div>
+    <button class="btn btn-primario btn-sm" onclick="abrirModalProyecto()">+ Nuevo Proyecto</button>
+  </div>
+  <div class="acciones-row">
+    <div class="flex-gap">
+      <input class="buscador-input" id="buscar-proyecto" placeholder="🔍 Buscar por nombre, cliente o ciudad..." oninput="renderProyectos()">
+      <select id="filtro-estado-proyecto" onchange="renderProyectos()" style="padding:8px 12px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <option value="">Todos los estados</option>
+        <option value="Planeación">Planeación</option>
+        <option value="En ejecución">En ejecución</option>
+        <option value="Finalizado">Finalizado</option>
+        <option value="Cancelado">Cancelado</option>
+      </select>
+    </div>
+  </div>
+  <div class="card" style="padding:0">
+    <table class="tabla-cots">
+      <thead><tr>
+        <th>Nombre</th><th>Cliente</th><th>Ciudad</th><th>Estado</th><th>Fecha inicio</th><th>Fecha fin est.</th><th>Responsable</th><th style="width:140px">Acciones</th>
+      </tr></thead>
+      <tbody id="tabla-proyectos-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-proyecto">
+  <div class="modal" style="width:520px;max-width:95vw">
+    <div class="modal-titulo" id="modal-proyecto-titulo">📁 Nuevo Proyecto</div>
+    <input type="hidden" id="mpy-id">
+    <div class="form-grupo" style="margin-bottom:10px"><label>Nombre del proyecto *</label><input type="text" id="mpy-nombre" placeholder="Ej: Torres del Parque — Etapa 2"></div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo">
+        <label>Cliente</label>
+        <div style="position:relative">
+          <input type="text" id="mpy-cliente" placeholder="Busca un cliente existente o escribe uno nuevo..." oninput="filtrarClienteProyecto()" style="width:100%">
+          <div id="mpy-cliente-resultados" style="display:none;position:absolute;z-index:60;left:0;right:0;margin-top:2px;border:1.5px solid #93C5FD;border-radius:8px;background:#fff;max-height:200px;overflow-y:auto;box-shadow:var(--sombra-md)"></div>
+        </div>
+      </div>
+      <div class="form-grupo"><label>Ciudad</label><input type="text" id="mpy-ciudad" placeholder="Ej: Manizales"></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Estado</label>
+        <select id="mpy-estado" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="Planeación">Planeación</option>
+          <option value="En ejecución">En ejecución</option>
+          <option value="Finalizado">Finalizado</option>
+          <option value="Cancelado">Cancelado</option>
+        </select>
+      </div>
+      <div class="form-grupo"><label>Responsable</label><input type="text" id="mpy-responsable" placeholder="Ej: Jose Pablo Escobar"></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Fecha de inicio</label><input type="date" id="mpy-fecha-inicio"></div>
+      <div class="form-grupo"><label>Fecha fin estimada</label><input type="date" id="mpy-fecha-fin"></div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:16px"><label>Descripción / Observaciones</label><textarea id="mpy-descripcion" rows="3" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px;resize:vertical"></textarea></div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-proyecto')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarProyecto()">Guardar</button>
     </div>
   </div>
 </div>
@@ -2872,7 +2946,7 @@
 <script src="js/config.js?v=20260917a"></script>
 <script src="js/calculadora-inputs.js?v=20260825a"></script>
 <script src="js/catalogo.js?v=20261009a"></script>
-<script src="js/navegacion.js?v=20260917a"></script>
+<script src="js/navegacion.js?v=20261011a"></script>
 <script src="js/ordenes-produccion.js?v=20260821a"></script>
 <script src="js/produccion-diaria.js?v=20260917a"></script>
 <script src="js/produccion-materia-prima.js?v=20260909a"></script>
@@ -2890,8 +2964,9 @@
 <script src="js/logistica.js?v=20260922a"></script>
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
+<script src="js/proyectos.js?v=20261011a"></script>
 <script src="js/auth.js?v=20260804a"></script>
-<script src="js/datos-realtime.js?v=20260917a"></script>
+<script src="js/datos-realtime.js?v=20261011a"></script>
 <script src="js/cotizador.js?v=20261007a"></script>
 <script src="js/historico-clientes-stats.js?v=20260922a"></script>
 <script src="js/retenciones.js?v=20260809c"></script>
