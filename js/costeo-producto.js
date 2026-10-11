@@ -1705,16 +1705,16 @@ function _actualizarResumenCosteo() {
     : '🧾 Selecciona un producto para saber si sus insumos se costean con o sin IVA';
   div.innerHTML = `
     <div style="font-size:11px;color:var(--gris-medio);margin-bottom:8px">${notaIva}</div>
-    <div class="fila"><span>🧱 Materia Prima</span><span>${_fmtCosteoProd(k.materiaPrima)}</span></div>
-    <div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_fmtCosteoProd(k.desperdicio)}</span></div>
-    ${k.refuerzo > 0 ? `<div class="fila"><span>🔩 Refuerzo${esPretensado ? ' (Acero de Pretensionamiento)' : ' (Acero + Alambre)'}</span><span>${_fmtCosteoProd(k.refuerzo)}</span></div>
-    ${k.desperdicioRefuerzo > 0 ? `<div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_fmtCosteoProd(k.desperdicioRefuerzo)}</span></div>` : ''}` : ''}
-    <div class="fila"><span>👷 Mano de Obra</span><span>${_fmtCosteoProd(k.manoObra)}</span></div>
-    <div class="fila sub"><span>+ Herramienta Menor (${c.pctHerramientaMenor}%)</span><span>${_fmtCosteoProd(k.herramientaMenor)}</span></div>
-    <div class="fila"><span>🔧 Maquinaria</span><span>${_fmtCosteoProd(k.maquinaria)}</span></div>
-    <div class="fila"><span>📦 Insumos de empaque</span><span>${_fmtCosteoProd(k.empaque)}</span></div>
-    <div class="fila"><span>⚡ Consumos (energía/agua/combustible)</span><span>${_fmtCosteoProd(k.consumos)}</span></div>
-    ${k.otros > 0 ? `<div class="fila"><span>📎 Otros insumos</span><span>${_fmtCosteoProd(k.otros)}</span></div>` : ''}
+    <div class="fila"><span>🧱 Materia Prima</span><span>${_valorConPctCosteo(k.materiaPrima, k.totalUnidad)}</span></div>
+    <div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_valorConPctCosteo(k.desperdicio, k.totalUnidad)}</span></div>
+    ${k.refuerzo > 0 ? `<div class="fila"><span>🔩 Refuerzo${esPretensado ? ' (Acero de Pretensionamiento)' : ' (Acero + Alambre)'}</span><span>${_valorConPctCosteo(k.refuerzo, k.totalUnidad)}</span></div>
+    ${k.desperdicioRefuerzo > 0 ? `<div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_valorConPctCosteo(k.desperdicioRefuerzo, k.totalUnidad)}</span></div>` : ''}` : ''}
+    <div class="fila"><span>👷 Mano de Obra</span><span>${_valorConPctCosteo(k.manoObra, k.totalUnidad)}</span></div>
+    <div class="fila sub"><span>+ Herramienta Menor (${c.pctHerramientaMenor}%)</span><span>${_valorConPctCosteo(k.herramientaMenor, k.totalUnidad)}</span></div>
+    <div class="fila"><span>🔧 Maquinaria</span><span>${_valorConPctCosteo(k.maquinaria, k.totalUnidad)}</span></div>
+    <div class="fila"><span>📦 Insumos de empaque</span><span>${_valorConPctCosteo(k.empaque, k.totalUnidad)}</span></div>
+    <div class="fila"><span>⚡ Consumos (energía/agua/combustible)</span><span>${_valorConPctCosteo(k.consumos, k.totalUnidad)}</span></div>
+    ${k.otros > 0 ? `<div class="fila"><span>📎 Otros insumos</span><span>${_valorConPctCosteo(k.otros, k.totalUnidad)}</span></div>` : ''}
     <div class="fila fila-total"><span>Costo total por unidad</span><span>${_fmtCosteoProd(k.totalUnidad)}</span></div>`;
   // Desglose línea-por-línea (cada material, cada máquina, cada cuadrilla, cada insumo) —
   // mismo bloque que el consolidado (➕), pero aquí en vivo mientras se arma el costeo, para
@@ -2113,6 +2113,15 @@ function _pctCosteoProd(costo, totalUnidad) {
   if (!totalUnidad) return '—';
   return ((costo || 0) / totalUnidad * 100).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
 }
+// Valor en pesos + su % del costo total, en una sola celda — para el resumen "Costo por unidad"
+// (sección 7, sin un `type="number"` de por medio: solo lectura) (2026-10-14, a pedido del
+// usuario: "incluyamos el porcentaje del costo total de cada uno de los capítulos, tal como lo
+// tienen detallados los capítulos como tal" — cada línea del resumen ya tiene su % calculado en
+// la tabla de detalle de esa misma categoría más abajo; acá se muestra el mismo número, solo que
+// de un vistazo, sin tener que bajar a buscarlo).
+function _valorConPctCosteo(valor, totalUnidad) {
+  return `${_fmtCosteoProd(valor)} <span style="color:var(--gris-medio);font-size:10.5px;font-weight:400">(${_pctCosteoProd(valor, totalUnidad)})</span>`;
+}
 
 // Fila de una tabla de detalle del consolidado: Nombre | Cantidad (con unidad) | Precio | Costo | % del costo total.
 // La columna "Valor/Unidad" (antes "Precio", 2026-08-25 a pedido del usuario: "pon VALOR/UNIDAD
@@ -2258,16 +2267,16 @@ function abrirDetalleCosteoProducto(codigo) {
     <div class="seccion-costeo">
       <div class="seccion-costeo-titulo">Resumen — costo por unidad</div>
       <div class="caja-costeo caja-costeo-resumen">
-        <div class="fila"><span>🧱 Materia Prima</span><span>${_fmtCosteoProd(k.materiaPrima)}</span></div>
-        <div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_fmtCosteoProd(k.desperdicio)}</span></div>
-        ${k.refuerzo > 0 ? `<div class="fila"><span>🔩 Refuerzo</span><span>${_fmtCosteoProd(k.refuerzo)}</span></div>
-        ${k.desperdicioRefuerzo > 0 ? `<div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_fmtCosteoProd(k.desperdicioRefuerzo)}</span></div>` : ''}` : ''}
-        <div class="fila"><span>👷 Mano de Obra</span><span>${_fmtCosteoProd(k.manoObra)}</span></div>
-        <div class="fila sub"><span>+ Herramienta Menor (${c.pctHerramientaMenor}%)</span><span>${_fmtCosteoProd(k.herramientaMenor)}</span></div>
-        <div class="fila"><span>🔧 Maquinaria</span><span>${_fmtCosteoProd(k.maquinaria)}</span></div>
-        <div class="fila"><span>📦 Insumos de empaque</span><span>${_fmtCosteoProd(k.empaque)}</span></div>
-        <div class="fila"><span>⚡ Consumos</span><span>${_fmtCosteoProd(k.consumos)}</span></div>
-        ${k.otros > 0 ? `<div class="fila"><span>📎 Otros insumos</span><span>${_fmtCosteoProd(k.otros)}</span></div>` : ''}
+        <div class="fila"><span>🧱 Materia Prima</span><span>${_valorConPctCosteo(k.materiaPrima, k.totalUnidad)}</span></div>
+        <div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_valorConPctCosteo(k.desperdicio, k.totalUnidad)}</span></div>
+        ${k.refuerzo > 0 ? `<div class="fila"><span>🔩 Refuerzo</span><span>${_valorConPctCosteo(k.refuerzo, k.totalUnidad)}</span></div>
+        ${k.desperdicioRefuerzo > 0 ? `<div class="fila sub"><span>+ Desperdicio (${c.pctDesperdicio}%)</span><span>${_valorConPctCosteo(k.desperdicioRefuerzo, k.totalUnidad)}</span></div>` : ''}` : ''}
+        <div class="fila"><span>👷 Mano de Obra</span><span>${_valorConPctCosteo(k.manoObra, k.totalUnidad)}</span></div>
+        <div class="fila sub"><span>+ Herramienta Menor (${c.pctHerramientaMenor}%)</span><span>${_valorConPctCosteo(k.herramientaMenor, k.totalUnidad)}</span></div>
+        <div class="fila"><span>🔧 Maquinaria</span><span>${_valorConPctCosteo(k.maquinaria, k.totalUnidad)}</span></div>
+        <div class="fila"><span>📦 Insumos de empaque</span><span>${_valorConPctCosteo(k.empaque, k.totalUnidad)}</span></div>
+        <div class="fila"><span>⚡ Consumos</span><span>${_valorConPctCosteo(k.consumos, k.totalUnidad)}</span></div>
+        ${k.otros > 0 ? `<div class="fila"><span>📎 Otros insumos</span><span>${_valorConPctCosteo(k.otros, k.totalUnidad)}</span></div>` : ''}
         <div class="fila fila-total"><span>Costo total por unidad</span><span>${_fmtCosteoProd(k.totalUnidad)}</span></div>
       </div>
     </div>`;
