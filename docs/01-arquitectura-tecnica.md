@@ -63,6 +63,29 @@ Además, `.tabla-cots th` no tenía ningún `background` definido (transparente,
 
 **Verificación**: se armó un arnés real (`getComputedStyle()` sobre TH de `.tabla-cots`/`.tabla-items` en varios contextos — página, dentro de `#modal-costeo-producto`, dentro de `#modal-orden`, y la pantalla de Costeo de Producto de la captura original del usuario) confirmando `position: sticky` resuelto (no invalidado por el navegador), el `top` correcto según el contexto (94px en página, 0px en modal), el `background` opaco, el `border-radius` de compensación en las esquinas, `border-collapse: separate`, y que la tarjeta del calendario de Logística (la única `overflow:hidden` que debía quedar intacta) efectivamente no se tocó — 24 aserciones, todas en orden. Tras el bug real de arriba, se repitió el mismo tipo de arnés confirmando que `.tabla-items` quedó en `position: static` (página y modal) y que `.tabla-cots` siguió exactamente igual (página y modal) — 12 aserciones más. **Lo que estos arneses NO pudieron verificar** es el comportamiento visual real de scroll (`window.scrollTo()` + `getBoundingClientRect()` en Chrome headless `--dump-dom` no refleja el recálculo de `position:sticky` de forma confiable en este entorno — tanto un caso con `overflow:hidden` como uno sin él daban el mismo resultado "no fijo" en la prueba, una señal de limitación de la herramienta, no del CSS) — de hecho, así fue como el bug de `.tabla-items` llegó a producción: el arnés solo pudo confirmar que el CSS computaba como se esperaba, no que el resultado visual con scroll real fuera el correcto; eso lo encontró el usuario, no la prueba.
 
+## "Deshacer" genérico tras eliminar (`js/config.js`, 2026-10-11)
+
+A pedido del usuario ("podemos configurar para que cualquier acción que hagamos, podamos darle control z y devolver la acción?") — un Ctrl+Z universal (deshacer CUALQUIER acción de la app) exigiría rehacer cómo persiste cada uno de los ~15 módulos, así que se optó por algo más realista y ya acordado con el usuario: un botón "↩️ Deshacer" justo después de las acciones de **eliminar** más riesgosas (las que de verdad pierden un registro si alguien se equivoca), en vez de un historial de acciones genérico.
+
+**Patrón** (`_ofrecerDeshacer()`/`_deshacerAccionPendiente()`/`_deshacerPendiente`, en `js/config.js`, disponible global porque es de los primeros scripts que carga): en vez de mandar el `DELETE` a Supabase al toque, la fila se quita de la pantalla de inmediato (se siente igual de instantáneo que antes) y aparece un toast fijo abajo-centro con el botón Deshacer; el `DELETE` real solo se manda si pasan **8 segundos** sin que nadie lo presione. Si se deshace a tiempo, el `DELETE` nunca se llegó a mandar — no hay nada que revertir del lado de Supabase, ni riesgo de que otro usuario vea desaparecer y reaparecer un registro por el error de alguien más, ni drift de `creado`/`modificado` por un reinsert. Si se dispara una nueva acción de "eliminar" mientras la anterior seguía pendiente (el usuario no alcanzó a reaccionar), la anterior se confirma de inmediato (su `DELETE` real se manda ahí mismo) antes de empezar la nueva — nunca se pisan ni se pierden en el aire.
+
+Convertidos a este patrón (quitan la fila del arreglo local + `renderX()` de inmediato, ofrecen Deshacer, solo mandan el `DELETE` real si expira sin deshacer):
+
+| Función | Archivo | Tabla |
+|---|---|---|
+| `eliminarProyecto` | `js/proyectos.js` | `proyectos` |
+| `eliminarCliente` | `js/historico-clientes-stats.js` | `clientes` |
+| `eliminarCotizacion` | `js/historico-clientes-stats.js` | `cotizaciones` |
+| `eliminarProductoDefinitivo` | `js/catalogo.js` | `productos` |
+| `eliminarCosteoProducto` | `js/costeo-producto.js` | `costeo_productos` |
+| `eliminarDiseno` | `js/calidad-mezclas.js` | `disenos_mezcla` |
+| `eliminarOrden` | `js/ordenes-produccion.js` | `ordenes_servicio` |
+| `eliminarViaje` | `js/logistica.js` | `entregas_programadas` |
+
+**Caso especial — `eliminarCosteoProducto`/`_borrarCosteoProductoDB`**: `_borrarCosteoProductoDB(codigo)` ya existía antes de este cambio y hace las dos cosas de una sola vez (quita del arreglo local Y manda el `DELETE`), porque también la usa "Resolver duplicados" de Productos (que tiene su propia confirmación agregada y SÍ quiere borrar de una, sin Deshacer individual por cada duplicado). Se dejó `_borrarCosteoProductoDB` intacta para ese otro llamador, y `eliminarCosteoProducto()` ya no la usa — en su lugar repite las dos líneas (quitar del arreglo, armar el `DELETE`) por separado, para poder diferir solo la parte remota.
+
+**A propósito NO se tocaron** (menor riesgo real, o ya tienen su propia lógica de reversión/consecuencias en cadena que complicaría diferir el `DELETE` sin repensarlas aparte): los ~22 "eliminar" de sub-filas dentro de un formulario (una fila de Materia Prima/Máquina/Insumo dentro de un Costeo, un ítem de una cotización, una fila del despiece de acero, etc. — se pierden al cerrar sin guardar de todas formas, el riesgo real es menor) y otras entidades de nivel superior (Máquinas/Cuadrillas/Clases Salariales/Insumos de Costeo de Referencia, Ensayos de Calidad, Ajustes de Mezcla, Materia Prima, Producción Diaria) — candidatas a una vuelta futura si el usuario lo pide.
+
 ## Cómo se guardan los datos en Supabase
 
 Patrón consistente en casi todas las tablas: **una columna JSONB `datos`** con el objeto completo, más metadatos mínimos (`estado`, `creado`). Es decir, no hay un esquema relacional normalizado por campo — agregar un campo nuevo a una entidad es agregarlo al objeto JS y ya, sin migración de base de datos.

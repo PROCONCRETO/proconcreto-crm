@@ -121,3 +121,55 @@ const TARIFAS_KG_TRANSPORTE = {
   'Riosucio': 96, 'Marmato': 113, 'La Merced': 110, 'Neira': 82
 };
 
+// ── "Deshacer" genérico, por acción (2026-10-14, a pedido del usuario: "configurar para que
+// cualquier acción que hagamos, podamos darle control z y devolver la acción") ──
+// Un Ctrl+Z universal (deshacer CUALQUIER acción de la app) exigiría rehacer cómo guarda cada
+// uno de los ~15 módulos — se optó por algo mucho más realista y ya acordado con el usuario:
+// un botón "Deshacer" justo después de las acciones de eliminar más riesgosas, empezando por
+// los registros que de verdad se pierden si uno se equivoca (Proyectos, Clientes, Productos,
+// Costeo de Producto, Diseño de Mezcla, Cotizaciones, Órdenes, Viajes — ver cada `eliminarX()`).
+//
+// Patrón: en vez de borrar de Supabase al toque, la fila se quita de la pantalla de inmediato
+// (se siente igual de instantáneo) y el DELETE real se manda recién cuando expira la ventana de
+// "Deshacer" (8 segundos) — así, si se alcanza a deshacer, nunca llegó a faltar nada en la base
+// de datos (nada que journar/recomponer, ni riesgo de que otro usuario vea desaparecer y
+// reaparecer un registro por un error de alguien más).
+let _deshacerPendiente = null; // { alConfirmar, alDeshacer, timer } o null
+
+function _cajaToastDeshacer() {
+  let t = document.getElementById('toast-deshacer');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast-deshacer';
+    t.style.cssText = 'display:none;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);align-items:center;gap:14px;background:#1C2333;color:white;padding:10px 12px 10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.25)';
+    document.body.appendChild(t);
+  }
+  return t;
+}
+// `mensaje`: texto a mostrar. `alConfirmar`: se ejecuta sola a los 8s si nadie deshace (ahí sí
+// se manda el DELETE real). `alDeshacer`: se ejecuta si se hace clic en "Deshacer" (solo
+// devuelve la fila a la pantalla — nunca se llegó a mandar el DELETE).
+function _ofrecerDeshacer(mensaje, alConfirmar, alDeshacer) {
+  // Si ya había una acción esperando confirmación (el usuario no alcanzó a reaccionar a esa),
+  // se confirma de una vez antes de empezar la nueva — nunca se pisan ni se pierden en el aire.
+  if (_deshacerPendiente) { clearTimeout(_deshacerPendiente.timer); const prev = _deshacerPendiente.alConfirmar; _deshacerPendiente = null; prev(); }
+  const t = _cajaToastDeshacer();
+  const timer = setTimeout(() => {
+    _deshacerPendiente = null;
+    t.style.display = 'none';
+    alConfirmar();
+  }, 8000);
+  _deshacerPendiente = { alConfirmar, alDeshacer, timer };
+  t.innerHTML = `<span>${mensaje}</span><button type="button" onclick="_deshacerAccionPendiente()" style="background:#8BC53F;color:#001F3F;border:none;border-radius:14px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">↩️ Deshacer</button>`;
+  t.style.display = 'flex';
+}
+function _deshacerAccionPendiente() {
+  if (!_deshacerPendiente) return;
+  clearTimeout(_deshacerPendiente.timer);
+  const { alDeshacer } = _deshacerPendiente;
+  _deshacerPendiente = null;
+  const t = document.getElementById('toast-deshacer');
+  if (t) t.style.display = 'none';
+  alDeshacer();
+}
+

@@ -200,18 +200,29 @@ function eliminarCotizacion(id) {
   if (!cot) return;
   const label = `${cot.numero} ${cot.version || 'V1'}`;
   if (!confirm(`¿Eliminar la cotización ${label}?`)) return;
+  const idx = COTIZACIONES.findIndex(c => c.id === id);
   COTIZACIONES = COTIZACIONES.filter(c => c.id !== id);
   // Si hay otras versiones del mismo número, borrar solo esta versión; si no, borrar todo el número
   const otrasVersiones = COTIZACIONES.filter(c => c.numero === cot.numero);
-  const deleteQuery = sb.from('cotizaciones').delete().eq('numero', cot.numero);
-  if (otrasVersiones.length > 0 && cot.version) {
-    deleteQuery.eq('version', cot.version).then(({ error }) => { if (error) console.error('Error eliminando:', error.message); });
-  } else {
-    deleteQuery.then(({ error }) => { if (error) console.error('Error eliminando:', error.message); });
-  }
   renderHistorico();
   renderPipeline();
   renderEstadisticas();
+  _ofrecerDeshacer(`🗑️ Cotización ${label} eliminada`,
+    () => {
+      const deleteQuery = sb.from('cotizaciones').delete().eq('numero', cot.numero);
+      if (otrasVersiones.length > 0 && cot.version) {
+        deleteQuery.eq('version', cot.version).then(({ error }) => { if (error) console.error('Error eliminando:', error.message); });
+      } else {
+        deleteQuery.then(({ error }) => { if (error) console.error('Error eliminando:', error.message); });
+      }
+    },
+    () => {
+      COTIZACIONES.splice(Math.min(idx, COTIZACIONES.length), 0, cot);
+      renderHistorico();
+      renderPipeline();
+      renderEstadisticas();
+    }
+  );
 }
 
 function abrirModalEstado(id) {
@@ -700,9 +711,14 @@ function verCotizacionesCliente(nombre) {
 function eliminarCliente(id) {
   if (!confirm('¿Eliminar este cliente?')) return;
   const cli = CLIENTES.find(c => String(c.id) === String(id));
+  if (!cli) return;
+  const idx = CLIENTES.findIndex(c => String(c.id) === String(id));
   CLIENTES = CLIENTES.filter(c => String(c.id) !== String(id));
-  if (cli) sb.from('clientes').delete().eq('nombre', cli.nombre);
   renderClientes();
+  _ofrecerDeshacer(`🗑️ Cliente "${cli.nombre}" eliminado`,
+    () => { sb.from('clientes').delete().eq('nombre', cli.nombre); },
+    () => { CLIENTES.splice(Math.min(idx, CLIENTES.length), 0, cli); renderClientes(); }
+  );
 }
 
 function usarCliente(id) {

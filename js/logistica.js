@@ -1300,13 +1300,14 @@ function eliminarViaje() {
   const id = document.getElementById('m-viaje-id').value;
   const v = VIAJES.find(x => String(x.id) === String(id));
   if (!v || !confirm(`¿Eliminar el viaje del ${v.fecha}${v.destino ? ' — ' + v.destino : ''}?`)) return;
+  const idx = VIAJES.findIndex(x => String(x.id) === String(id));
   VIAJES = VIAJES.filter(x => String(x.id) !== String(id));
   cerrarModal('modal-viaje');
   renderCalendarioLogistica();
-  sb.from('entregas_programadas').delete().eq('id', id)
-    .then(({ error }) => {
-      if (error) { console.error('Error eliminando viaje:', error.message); alert('Error al eliminar: ' + error.message); VIAJES.push(v); renderCalendarioLogistica(); }
-    });
+  _ofrecerDeshacer(`🗑️ Viaje del ${v.fecha}${v.destino ? ' — ' + v.destino : ''} eliminado`,
+    () => { sb.from('entregas_programadas').delete().eq('id', id).then(({ error }) => { if (error) { console.error('Error eliminando viaje:', error.message); alert('Error al eliminar: ' + error.message); } }); },
+    () => { VIAJES.splice(Math.min(idx, VIAJES.length), 0, v); renderCalendarioLogistica(); }
+  );
 }
 
 // ── Cumplidos: backlog acumulado de entregas sin confirmar ──

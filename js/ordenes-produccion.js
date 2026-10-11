@@ -324,17 +324,15 @@ async function descargarPDFOrden(id) {
 function eliminarOrden(id) {
   const o = ORDENES.find(x => String(x.id) === String(id));
   if (!o || !confirm(`¿Eliminar la orden ${o.numero}?`)) return;
+  const idx = ORDENES.findIndex(x => String(x.id) === String(id));
   ORDENES = ORDENES.filter(x => String(x.id) !== String(id));
   renderOrdenes();
-  sb.from('ordenes_servicio').delete().eq('numero', o.numero)
-    .then(({ error }) => {
-      if (error) {
-        console.error('Error eliminando orden:', error.message);
-        alert('Error al eliminar la orden: ' + error.message);
-        // Revertir si falló
-        ORDENES.push(o);
-        renderOrdenes();
-      }
-    });
+  _ofrecerDeshacer(`🗑️ Orden ${o.numero} eliminada`,
+    () => {
+      sb.from('ordenes_servicio').delete().eq('numero', o.numero)
+        .then(({ error }) => { if (error) { console.error('Error eliminando orden:', error.message); alert('Error al eliminar la orden: ' + error.message); } });
+    },
+    () => { ORDENES.splice(Math.min(idx, ORDENES.length), 0, o); renderOrdenes(); }
+  );
 }
 

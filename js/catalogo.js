@@ -675,12 +675,20 @@ function eliminarProductoDefinitivo(codigo) {
   if (!p) return;
   if (p.activo !== false) { alert('Solo se pueden eliminar productos que ya estén inactivos (o Ocultos/No de línea).'); return; }
   if (_productoTieneCosteo(codigo)) { alert('Este producto tiene un Costeo de Producto asociado — bórralo primero desde Centro de Costos.'); return; }
-  const ok = confirm(`¿Eliminar DEFINITIVAMENTE "${p.nombre}" (${codigo})?\n\nEsto SÍ borra el producto de la base de datos — no se puede deshacer. No hay forma de garantizar al 100% que este código no aparezca en alguna cotización u orden histórica ya guardada (esos módulos guardaron su propia copia de nombre y precio, así que seguirán mostrándose bien, pero si algo intenta volver a buscar este código en el catálogo, ya no lo va a encontrar).\n\n¿Continuar?`);
+  const ok = confirm(`¿Eliminar DEFINITIVAMENTE "${p.nombre}" (${codigo})?\n\nEsto SÍ borra el producto de la base de datos. No hay forma de garantizar al 100% que este código no aparezca en alguna cotización u orden histórica ya guardada (esos módulos guardaron su propia copia de nombre y precio, así que seguirán mostrándose bien, pero si algo intenta volver a buscar este código en el catálogo, ya no lo va a encontrar).\n\n¿Continuar?`);
   if (!ok) return;
+  const idx = CATALOGO.findIndex(x => x.codigo === codigo);
   CATALOGO = CATALOGO.filter(x => x.codigo !== codigo);
   PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
-  sb.from('productos').delete().eq('codigo', codigo).then(({ error }) => { if (error) alert('No se pudo eliminar: ' + error.message); });
   renderProductosAdmin();
+  _ofrecerDeshacer(`🗑️ Producto "${p.nombre}" eliminado`,
+    () => { sb.from('productos').delete().eq('codigo', codigo).then(({ error }) => { if (error) alert('No se pudo eliminar: ' + error.message); }); },
+    () => {
+      CATALOGO.splice(Math.min(idx, CATALOGO.length), 0, p);
+      PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
+      renderProductosAdmin();
+    }
+  );
 }
 
 function abrirModalProducto(codigo) {

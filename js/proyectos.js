@@ -137,8 +137,12 @@ function guardarProyecto() {
 function eliminarProyecto(id) {
   const p = PROYECTOS.find(x => x.id === id);
   if (!p) return;
-  if (!confirm(`¿Eliminar el proyecto "${p.nombre}"?\n\nEsto no se puede deshacer.`)) return;
+  if (!confirm(`¿Eliminar el proyecto "${p.nombre}"?`)) return;
+  const idx = PROYECTOS.findIndex(x => x.id === id);
   PROYECTOS = PROYECTOS.filter(x => x.id !== id);
-  sb.from('proyectos').delete().eq('id', id).then(({ error }) => { if (error) { console.error(error.message); alert('No se pudo eliminar: ' + error.message); } });
   renderProyectos();
+  _ofrecerDeshacer(`🗑️ Proyecto "${p.nombre}" eliminado`,
+    () => { sb.from('proyectos').delete().eq('id', id).then(({ error }) => { if (error) { console.error(error.message); alert('No se pudo eliminar: ' + error.message); } }); },
+    () => { PROYECTOS.splice(Math.min(idx, PROYECTOS.length), 0, p); renderProyectos(); }
+  );
 }

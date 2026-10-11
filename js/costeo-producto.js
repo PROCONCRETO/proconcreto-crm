@@ -1871,8 +1871,39 @@ function cancelarImpactoPrecios() {
 }
 
 // ── Lista principal ──
+// Celdas comunes a una fila de Costeo de Producto, iguales en la tabla principal y en la de
+// ocultos — solo cambia si trae o no la columna de arrastre (reordenar manual no aplica a un
+// costeo oculto, ver renderCosteoProductos()).
+function _celdasFilaCosteoProducto(c) {
+  const k = calcularCosteoProducto(c);
+  const tipo = TIPOS_ESTRUCTURA_COSTEO[c.tipoEstructura] || TIPOS_ESTRUCTURA_COSTEO.vibrocompactado;
+  const nombreEsc = _escNombreOnclick(c.productoCodigo);
+  // Precio/Unidad = precio de lista ACTUAL del catálogo (`producto.lista`), no el "precio
+  // sugerido" del costeo (`k.precioSugeridoLista`) — son el mismo número la mayoría del
+  // tiempo (ver "Impacto en precios" más abajo, que los mantiene sincronizados), pero el de
+  // catálogo es el que de verdad se cotiza; si todavía no se ha aprobado el último impacto de
+  // un cambio de costo, pueden estar temporalmente desalineados, y el de catálogo es el real.
+  const productoCat = CATALOGO.find(p => p.codigo === c.productoCodigo);
+  return `
+    <td style="font-weight:600">${_esc(c.productoNombre)}</td>
+    <td><span class="badge-tipo" style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:600;background:${tipo.bg};color:${tipo.fg}">${tipo.label}</span></td>
+    <td style="text-align:right;font-weight:700;color:var(--azul)">${_fmtCosteoProd(k.totalUnidad)}</td>
+    <td style="text-align:right;font-weight:700;color:var(--verde)">${productoCat ? _fmtCosteoProd(productoCat.lista) : '<span style="color:var(--rojo);font-weight:600;font-size:11px">no encontrado</span>'}</td>
+    <td style="font-size:12px;color:var(--gris-medio)">${_esc(c.disenoMezclaCodigo) || '—'}</td>
+    <td style="font-size:12px;color:var(--gris-medio)">${c._modificado ? new Date(c._modificado).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+    <td>
+      <div class="flex-gap">
+        <button class="btn btn-secundario btn-xs" onclick="abrirDetalleCosteoProducto('${nombreEsc}')" title="Ver consolidado">➕</button>
+        <button class="btn btn-primario btn-xs" onclick="editarCosteoProducto('${nombreEsc}')">✏️</button>
+        <button class="btn btn-secundario btn-xs" onclick="duplicarCosteoProducto('${nombreEsc}')" title="Duplicar como base de un costeo nuevo">📋</button>
+        <button class="btn btn-rojo btn-xs" onclick="eliminarCosteoProducto('${nombreEsc}')">🗑️</button>
+      </div>
+    </td>`;
+}
+
 function renderCosteoProductos() {
   const tbody = document.getElementById('costeo-producto-body');
+  const tbodyOcultos = document.getElementById('costeo-producto-ocultos-body');
   if (!tbody) return;
   const q = (document.getElementById('costeo-producto-buscador')?.value || '').toLowerCase();
   const fTipo = document.getElementById('costeo-producto-filtro-tipo')?.value || '';
@@ -1885,38 +1916,34 @@ function renderCosteoProductos() {
   // js/datos-realtime.js) — Productos (js/catalogo.js, _ordenCosteo) hereda este mismo orden
   // porque lee directo del arreglo global, sin volver a ordenar por su cuenta.
   data.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
-  if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">🏗️</div><div>No hay costeos de producto registrados.</div></td></tr>`;
-    return;
+
+  // Discriminar los costeos de productos OCULTOS (2026-10-11, a pedido del usuario) — el
+  // producto asociado quedó inactivo en el Catálogo (`activo:false`, ya sea descontinuado u
+  // "Oculto — No de línea") y se saca a su propia tabla al final de la pantalla, en vez de
+  // mezclarlo con los costeos de productos que sí se siguen cotizando hoy. Un costeo cuyo
+  // producto ya no existe en el Catálogo (caso raro, producto borrado) se queda en la tabla
+  // principal tal como ya mostraba — acá solo se discrimina por estar OCULTO, no por faltar.
+  const esOculto = (c) => CATALOGO.find(p => p.codigo === c.productoCodigo)?.activo === false;
+  const visibles = data.filter(c => !esOculto(c));
+  const ocultos = data.filter(esOculto);
+
+  if (!visibles.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="icono">🏗️</div><div>No hay costeos de producto registrados.</div></td></tr>`;
+  } else {
+    tbody.innerHTML = visibles.map(c => {
+      const nombreEsc = _escNombreOnclick(c.productoCodigo);
+      return `<tr ondragover="permitirSoltarCosteoProducto(event)" ondragleave="quitarResaltadoSoltarCosteoProducto(event)" ondrop="soltarCosteoProductoSobreCosteoProducto(event,'${nombreEsc}')">
+        <td style="text-align:center"><span class="drag-handle" draggable="true" ondragstart="iniciarArrastreCosteoProducto(event,'${nombreEsc}')" ondragend="terminarArrastreCosteoProducto(event)" title="Arrastra para reordenar">☰</span></td>
+        ${_celdasFilaCosteoProducto(c)}
+      </tr>`;
+    }).join('');
   }
-  tbody.innerHTML = data.map(c => {
-    const k = calcularCosteoProducto(c);
-    const tipo = TIPOS_ESTRUCTURA_COSTEO[c.tipoEstructura] || TIPOS_ESTRUCTURA_COSTEO.vibrocompactado;
-    const nombreEsc = _escNombreOnclick(c.productoCodigo);
-    // Precio/Unidad = precio de lista ACTUAL del catálogo (`producto.lista`), no el "precio
-    // sugerido" del costeo (`k.precioSugeridoLista`) — son el mismo número la mayoría del
-    // tiempo (ver "Impacto en precios" más abajo, que los mantiene sincronizados), pero el de
-    // catálogo es el que de verdad se cotiza; si todavía no se ha aprobado el último impacto de
-    // un cambio de costo, pueden estar temporalmente desalineados, y el de catálogo es el real.
-    const productoCat = CATALOGO.find(p => p.codigo === c.productoCodigo);
-    return `<tr ondragover="permitirSoltarCosteoProducto(event)" ondragleave="quitarResaltadoSoltarCosteoProducto(event)" ondrop="soltarCosteoProductoSobreCosteoProducto(event,'${nombreEsc}')">
-      <td style="text-align:center"><span class="drag-handle" draggable="true" ondragstart="iniciarArrastreCosteoProducto(event,'${nombreEsc}')" ondragend="terminarArrastreCosteoProducto(event)" title="Arrastra para reordenar">☰</span></td>
-      <td style="font-weight:600">${_esc(c.productoNombre)}</td>
-      <td><span class="badge-tipo" style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:600;background:${tipo.bg};color:${tipo.fg}">${tipo.label}</span></td>
-      <td style="text-align:right;font-weight:700;color:var(--azul)">${_fmtCosteoProd(k.totalUnidad)}</td>
-      <td style="text-align:right;font-weight:700;color:var(--verde)">${productoCat ? _fmtCosteoProd(productoCat.lista) : '<span style="color:var(--rojo);font-weight:600;font-size:11px">no encontrado</span>'}</td>
-      <td style="font-size:12px;color:var(--gris-medio)">${_esc(c.disenoMezclaCodigo) || '—'}</td>
-      <td style="font-size:12px;color:var(--gris-medio)">${c._modificado ? new Date(c._modificado).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
-      <td>
-        <div class="flex-gap">
-          <button class="btn btn-secundario btn-xs" onclick="abrirDetalleCosteoProducto('${nombreEsc}')" title="Ver consolidado">➕</button>
-          <button class="btn btn-primario btn-xs" onclick="editarCosteoProducto('${nombreEsc}')">✏️</button>
-          <button class="btn btn-secundario btn-xs" onclick="duplicarCosteoProducto('${nombreEsc}')" title="Duplicar como base de un costeo nuevo">📋</button>
-          <button class="btn btn-rojo btn-xs" onclick="eliminarCosteoProducto('${nombreEsc}')">🗑️</button>
-        </div>
-      </td>
-    </tr>`;
-  }).join('');
+
+  if (tbodyOcultos) {
+    tbodyOcultos.innerHTML = !ocultos.length
+      ? `<tr><td colspan="7" class="empty-state"><div class="icono">🚫</div><div>No hay costeos de productos ocultos.</div></td></tr>`
+      : ocultos.map(c => `<tr style="opacity:.7">${_celdasFilaCosteoProducto(c)}</tr>`).join('');
+  }
 }
 
 function _filtrarCosteoProductos() { renderCosteoProductos(); }
@@ -2103,8 +2130,17 @@ function _borrarCosteoProductoDB(codigo) {
 function eliminarCosteoProducto(codigo) {
   const c = COSTEO_PRODUCTOS.find(x => x.productoCodigo === codigo);
   if (!c || !confirm(`¿Eliminar el costeo de "${c.productoNombre}"?`)) return;
-  _borrarCosteoProductoDB(codigo).then(({ error }) => { if (error) console.error('Error eliminando costeo de producto:', error.message); });
+  // No se usa _borrarCosteoProductoDB() acá a propósito — esa función borra local Y remoto de
+  // una sola vez (la sigue usando "Resolver duplicados" tal cual, sin tocarla), pero acá hace
+  // falta separar las dos cosas: quitarlo de la pantalla ya mismo, y solo mandar el DELETE real
+  // a Supabase si nadie alcanza a deshacer.
+  const idx = COSTEO_PRODUCTOS.findIndex(x => x.productoCodigo === codigo);
+  COSTEO_PRODUCTOS = COSTEO_PRODUCTOS.filter(x => x.productoCodigo !== codigo);
   renderCosteoProductos();
+  _ofrecerDeshacer(`🗑️ Costeo de "${c.productoNombre}" eliminado`,
+    () => { sb.from('costeo_productos').delete().eq('producto_codigo', codigo).then(({ error }) => { if (error) console.error('Error eliminando costeo de producto:', error.message); }); },
+    () => { COSTEO_PRODUCTOS.splice(Math.min(idx, COSTEO_PRODUCTOS.length), 0, c); renderCosteoProductos(); }
+  );
 }
 
 // % que representa un costo frente al costo total por unidad del producto (2026-08-04, a

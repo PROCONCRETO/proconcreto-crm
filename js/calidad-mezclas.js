@@ -496,12 +496,13 @@ function _renombrarCodigoDiseno(codigoViejo, codigoNuevo, afectados) {
 function eliminarDiseno(id) {
   const d = DISENOS_MEZCLA.find(x => String(x.id) === String(id));
   if (!d || !confirm(`¿Eliminar el diseño ${d.codigo} — ${d.nombre}?`)) return;
+  const idx = DISENOS_MEZCLA.findIndex(x => String(x.id) === String(id));
   DISENOS_MEZCLA = DISENOS_MEZCLA.filter(x => String(x.id) !== String(id));
   renderDisenosMezcla();
-  sb.from('disenos_mezcla').delete().eq('id', d.id)
-    .then(({ error }) => {
-      if (error) { console.error('Error eliminando diseño:', error.message); alert('Error al eliminar: ' + error.message); DISENOS_MEZCLA.push(d); renderDisenosMezcla(); }
-    });
+  _ofrecerDeshacer(`🗑️ Diseño ${d.codigo} — ${d.nombre} eliminado`,
+    () => { sb.from('disenos_mezcla').delete().eq('id', d.id).then(({ error }) => { if (error) { console.error('Error eliminando diseño:', error.message); alert('Error al eliminar: ' + error.message); } }); },
+    () => { DISENOS_MEZCLA.splice(Math.min(idx, DISENOS_MEZCLA.length), 0, d); renderDisenosMezcla(); }
+  );
 }
 
 function poblarSelectDisenos(selectId) {
