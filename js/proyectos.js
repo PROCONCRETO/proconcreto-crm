@@ -43,6 +43,7 @@ function renderProyectos() {
       <td>${p.fechaFinEstimada ? new Date(p.fechaFinEstimada + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
       <td>${_esc(p.responsable) || '—'}</td>
       <td style="white-space:nowrap">
+        <button class="btn btn-primario btn-xs" onclick="abrirLosasDeProyecto('${_escAttr(p.id)}')" title="Lista de producción y control de producción/despacho">📋 Producción</button>
         <button class="btn btn-secundario btn-xs" onclick="abrirModalProyecto('${_escAttr(p.id)}')">✏️ Editar</button>
         <button class="btn btn-rojo btn-xs" onclick="eliminarProyecto('${_escAttr(p.id)}')">🗑️</button>
       </td>

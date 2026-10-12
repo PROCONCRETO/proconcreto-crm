@@ -20,6 +20,9 @@ async function cargarDatosSupabase() {
   const { data: proys, error: e18 } = await sb.from('proyectos').select('datos').order('creado', { ascending: false });
   if (e18) console.warn('Tabla proyectos no disponible aún — corre sql/2026-10-11_proyectos.sql en Supabase.');
   PROYECTOS = (proys || []).filter(r => r.datos).map(r => r.datos);
+  const { data: losas, error: e19 } = await sb.from('losas_proyecto').select('datos').order('creado', { ascending: true });
+  if (e19) console.warn('Tabla losas_proyecto no disponible aún — corre sql/2026-10-11_losas_proyecto.sql en Supabase.');
+  LOSAS_PROYECTO = (losas || []).filter(r => r.datos).map(r => r.datos);
   if (e3) console.warn('Tabla ordenes_servicio no disponible aún.');
   if (e4) console.warn('Tabla producciones no disponible aún.');
   if (e5) console.warn('Tabla disenos_mezcla no disponible aún.');
@@ -134,6 +137,12 @@ function rerenderPantallaActiva() {
     case 'pantalla-costeo-referencia': renderCosteoReferencia(); break;
     case 'pantalla-costeo-producto': renderCosteoProductos(); break;
     case 'pantalla-proyectos': renderProyectos(); break;
+    case 'pantalla-proyecto-losas': renderLosasProyecto(); break;
+    // 'pantalla-losa-detalle' NO tiene caso acá a propósito: esa pantalla trabaja sobre
+    // arreglos de edición en memoria (_filasLosaActual/_despachosLosaActual/
+    // _bovedillaLosaActual, ver js/losas-proyecto.js) — recargarlos automáticamente en medio
+    // de una edición en curso borraría cambios sin guardar aún. Mismo criterio ya aceptado en
+    // Ajustes de Mezcla (valores "congelados" mientras se edita).
   }
 }
 
@@ -231,6 +240,11 @@ async function recargarProyectosRT() {
   PROYECTOS = (data || []).filter(r => r.datos).map(r => r.datos);
   rerenderPantallaActiva();
 }
+async function recargarLosasProyectoRT() {
+  const { data } = await sb.from('losas_proyecto').select('datos').order('creado', { ascending: true });
+  LOSAS_PROYECTO = (data || []).filter(r => r.datos).map(r => r.datos);
+  rerenderPantallaActiva();
+}
 
 function suscribirRealtime() {
   if (_canalRealtime) return; // evitar suscripciones duplicadas
@@ -253,6 +267,7 @@ function suscribirRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'costeo_productos' },          () => _rtDebounce('costeoproductos', recargarCosteoProductosRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'eventos_especiales' },         () => _rtDebounce('eventosespeciales', recargarEventosEspecialesRT))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'proyectos' },                   () => _rtDebounce('proyectos', recargarProyectosRT))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'losas_proyecto' },               () => _rtDebounce('losasproyecto', recargarLosasProyectoRT))
     .subscribe((status) => {
       const ind = document.getElementById('rt-indicador');
       if (ind) {

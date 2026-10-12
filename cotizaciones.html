@@ -1202,6 +1202,188 @@
 </div>
 
 <!-- ═══════════════════════════════════════
+     PANTALLA: LOSAS DE UN PROYECTO (entrepisos prefabricados)
+═══════════════════════════════════════ -->
+<div id="pantalla-proyecto-losas" class="pantalla">
+  <div class="acciones-row">
+    <div class="flex-gap" style="align-items:center">
+      <button class="btn btn-secundario btn-sm" onclick="volverAProyectos()">← Volver a Proyectos</button>
+      <div id="proyecto-losas-titulo" style="font-size:18px;font-weight:700;color:var(--azul)">📋 Producción</div>
+    </div>
+    <button class="btn btn-primario btn-sm" onclick="abrirModalLosa()">+ Nueva Losa</button>
+  </div>
+  <div class="card" style="padding:0">
+    <table class="tabla-cots">
+      <thead><tr>
+        <th>Nombre</th><th>Ubicación</th><th>Sistema</th><th>Estado</th><th>Avance</th><th style="width:220px">Acciones</th>
+      </tr></thead>
+      <tbody id="tabla-losas-proyecto-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-losa">
+  <div class="modal" style="width:560px;max-width:95vw">
+    <div class="modal-titulo" id="modal-losa-titulo">🏗️ Nueva Losa</div>
+    <input type="hidden" id="ml-id">
+    <div class="form-grupo" style="margin-bottom:10px"><label>Nombre *</label><input type="text" id="ml-nombre" placeholder="Ej: LOSA PISO 2"></div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Ubicación (torre, opcional)</label><input type="text" id="ml-ubicacion" placeholder="Ej: Torre 1"></div>
+      <div class="form-grupo"><label>Estado</label>
+        <select id="ml-estado" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="Planeación">Planeación</option>
+          <option value="En producción">En producción</option>
+          <option value="Completada">Completada</option>
+          <option value="Cancelada">Cancelada</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px"><label>Sistema *</label>
+      <select id="ml-sistema" onchange="_alCambiarSistemaLosa()" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <option value="prelosa">Prelosa</option>
+        <option value="vigueta_bovedilla">Vigueta y Bovedilla</option>
+        <option value="placa_alveolar">Placa Alveolar</option>
+      </select>
+    </div>
+    <div id="ml-bloque-prelosa" class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Espesor (cm)</label><input type="number" step="0.1" id="ml-espesor"></div>
+      <div class="form-grupo"><label>Densidad concreto (kg/m³)</label><input type="number" id="ml-densidad"></div>
+    </div>
+    <div id="ml-bloque-vigueta" class="form-grupo" style="margin-bottom:10px">
+      <label>Peso por metro lineal (kg/ml)</label><input type="number" step="0.1" id="ml-factor-vigueta" placeholder="Ej: 21.5 (H11)">
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px"><label>Plano (PDF, opcional)</label>
+      <div style="border:2px dashed var(--gris-borde);border-radius:var(--radio);padding:10px;text-align:center;background:#FAFBFC;cursor:pointer" onclick="document.getElementById('losa-plano-input').click()" ondragover="onArrastreSobreArchivoLosa(event)" ondragleave="onArrastreFueraArchivoLosa(event)" ondrop="onSoltarArchivoLosa('plano',event)">
+        <div style="font-size:12px;color:var(--gris-medio)">Arrastra el PDF aquí o haz clic para buscarlo</div>
+        <input type="file" id="losa-plano-input" accept="application/pdf" style="display:none" onchange="onSeleccionArchivoLosa('plano',event)">
+        <div id="losa-plano-estado" style="font-size:11.5px;margin-top:6px"></div>
+      </div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:16px"><label>Memoria de cálculo (PDF, opcional)</label>
+      <div style="border:2px dashed var(--gris-borde);border-radius:var(--radio);padding:10px;text-align:center;background:#FAFBFC;cursor:pointer" onclick="document.getElementById('losa-memoria-input').click()" ondragover="onArrastreSobreArchivoLosa(event)" ondragleave="onArrastreFueraArchivoLosa(event)" ondrop="onSoltarArchivoLosa('memoria',event)">
+        <div style="font-size:12px;color:var(--gris-medio)">Arrastra el PDF aquí o haz clic para buscarlo</div>
+        <input type="file" id="losa-memoria-input" accept="application/pdf" style="display:none" onchange="onSeleccionArchivoLosa('memoria',event)">
+        <div id="losa-memoria-estado" style="font-size:11.5px;margin-top:6px"></div>
+      </div>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-losa')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarLosa()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: DETALLE DE UNA LOSA — lista de producción, control de producción y despacho
+═══════════════════════════════════════ -->
+<div id="pantalla-losa-detalle" class="pantalla">
+  <div class="acciones-row">
+    <div class="flex-gap" style="align-items:center">
+      <button class="btn btn-secundario btn-sm" onclick="volverALosasProyecto()">← Volver</button>
+      <div id="losa-detalle-titulo" style="font-size:18px;font-weight:700;color:var(--azul)"></div>
+    </div>
+    <button class="btn btn-secundario btn-sm" onclick="abrirModalDespachoLosa()">📦 Registrar despacho</button>
+  </div>
+
+  <div class="acciones-row">
+    <div class="flex-gap">
+      <button class="btn btn-primario btn-sm" onclick="agregarFilaProduccion()">+ Agregar fila</button>
+      <button class="btn btn-secundario btn-sm" onclick="abrirImportarFilasExcel()">📤 Importar Excel</button>
+      <input type="file" id="input-importar-filas" accept=".xlsx,.xls,.csv" style="display:none" onchange="onSeleccionImportarFilas(event)">
+      <button class="btn btn-primario btn-sm" onclick="guardarListaProduccion()">💾 Guardar lista</button>
+    </div>
+  </div>
+  <div style="font-size:11.5px;color:var(--gris-medio);margin:-8px 0 10px 2px">
+    💡 También puedes copiar un bloque de celdas de tu Excel actual y pegarlo (Ctrl+V) directamente sobre la tabla de abajo — columnas en este orden: Ejes entre, Laterales, Cuadro, Ancho/Hilos (o Vigueta/Hilos Abajo/Hilos Arriba según el sistema), Dimensión, Cantidad.
+  </div>
+
+  <div class="card" style="padding:0;overflow-x:auto" onpaste="onPasteFilasProduccion(event)" tabindex="0">
+    <table class="tabla-cots" style="min-width:1400px">
+      <thead id="filas-produccion-thead"></thead>
+      <tbody id="filas-produccion-body"></tbody>
+    </table>
+  </div>
+
+  <div id="losa-detalle-bloque-bovedilla" class="card" style="margin-top:16px">
+    <div style="font-size:15px;font-weight:700;color:var(--azul);margin-bottom:10px">🧱 Bovedilla</div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Tipo de bovedilla</label><input type="text" id="bov-tipo" placeholder="Ej: 20+6 Bovedilla Concreto Arco Doble" onchange="guardarDatosBovedilla()"></div>
+      <div class="form-grupo"><label>Cantidad requerida</label><input type="number" min="0" id="bov-cantidad-requerida" onchange="guardarDatosBovedilla()"></div>
+    </div>
+    <div id="bov-resumen" style="font-size:13px;font-weight:600;color:var(--gris-texto);margin-bottom:10px"></div>
+    <div class="form-grid">
+      <div>
+        <div class="flex-gap" style="margin-bottom:6px;justify-content:space-between"><div style="font-weight:600;font-size:12.5px">Entradas (producción)</div><button class="btn btn-secundario btn-xs" onclick="abrirModalEventoBovedilla('produccion')">+ Registrar entrada</button></div>
+        <table class="tabla-cots"><thead><tr><th>Remisión</th><th>Fecha</th><th style="text-align:right">Cantidad</th></tr></thead><tbody id="bov-produccion-body"></tbody></table>
+      </div>
+      <div>
+        <div class="flex-gap" style="margin-bottom:6px;justify-content:space-between"><div style="font-weight:600;font-size:12.5px">Salidas (despacho)</div><button class="btn btn-secundario btn-xs" onclick="abrirModalEventoBovedilla('despacho')">+ Registrar despacho</button></div>
+        <table class="tabla-cots"><thead><tr><th>Remisión</th><th>Fecha</th><th style="text-align:right">Cantidad</th></tr></thead><tbody id="bov-despacho-body"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div style="font-size:15px;font-weight:700;color:var(--azul);margin-bottom:10px">📦 Despachos registrados</div>
+    <table class="tabla-cots"><thead><tr><th>Remisión</th><th>Fecha</th><th>Contenido</th><th>Observaciones</th></tr></thead><tbody id="despachos-losa-body"></tbody></table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-produccion-fila">
+  <div class="modal" style="width:420px;max-width:95vw">
+    <div class="modal-titulo" id="modal-produccion-fila-titulo">🏗️ Registrar producción</div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Fecha</label><input type="date" id="mpf-fecha"></div>
+      <div class="form-grupo"><label>Cantidad</label><input type="number" min="0" id="mpf-cantidad"></div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:16px"><label>Tipo</label>
+      <select id="mpf-tipo" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+        <option value="Vaciado">Vaciado</option>
+        <option value="Cortado">Cortado (pieza no estándar, cortada de otra)</option>
+      </select>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-produccion-fila')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarProduccionFila()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-despacho-losa">
+  <div class="modal" style="width:620px;max-width:95vw">
+    <div class="modal-titulo">📦 Registrar despacho</div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>N° Remisión *</label><input type="text" id="mdl-remision" placeholder="Ej: REM-5844"></div>
+      <div class="form-grupo"><label>Fecha</label><input type="date" id="mdl-fecha"></div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:10px"><label>Observaciones</label><input type="text" id="mdl-observaciones"></div>
+    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:6px">Cuánto de cada fila va en esta remisión (se precargaron solo las filas con saldo pendiente):</div>
+    <div style="max-height:320px;overflow-y:auto">
+      <table class="tabla-cots"><thead><tr><th>Cuadro</th><th>Dimensión</th><th>Pendiente</th><th>A despachar</th></tr></thead><tbody id="mdl-filas-body"></tbody></table>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-despacho-losa')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarDespachoLosa()">Guardar despacho</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-evento-bovedilla">
+  <div class="modal" style="width:420px;max-width:95vw">
+    <div class="modal-titulo" id="meb-titulo">📥 Registrar entrada de bovedilla</div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Fecha</label><input type="date" id="meb-fecha"></div>
+      <div class="form-grupo"><label>Cantidad</label><input type="number" min="0" id="meb-cantidad"></div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:16px"><label>N° Remisión</label><input type="text" id="meb-remision" placeholder="Ej: REM-5844"></div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-evento-bovedilla')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarEventoBovedilla()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
      PANTALLA: PRODUCTOS (CATÁLOGO / ADMIN)
 ═══════════════════════════════════════ -->
 <div id="pantalla-productos" class="pantalla">
@@ -2984,9 +3166,10 @@
 <script src="js/logistica.js?v=20261011c"></script>
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
-<script src="js/proyectos.js?v=20261011c"></script>
+<script src="js/proyectos.js?v=20261011d"></script>
+<script src="js/losas-proyecto.js?v=20261011a"></script>
 <script src="js/auth.js?v=20260804a"></script>
-<script src="js/datos-realtime.js?v=20261011a"></script>
+<script src="js/datos-realtime.js?v=20261011b"></script>
 <script src="js/cotizador.js?v=20261007a"></script>
 <script src="js/historico-clientes-stats.js?v=20261011c"></script>
 <script src="js/retenciones.js?v=20260809c"></script>

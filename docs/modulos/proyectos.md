@@ -4,15 +4,20 @@
 
 - `js/proyectos.js`
 - `sql/2026-10-11_proyectos.sql` (correr una sola vez en el SQL Editor de Supabase)
+- `js/losas-proyecto.js` — extensión de Lista de Producción/Control de Producción/Despacho (ver sección propia más abajo)
+- `sql/2026-10-11_losas_proyecto.sql` (correr una sola vez; incluye además las instrucciones para crear a mano el bucket de Storage `proyectos-pdf`)
 
 ## Datos
 
 - Tabla Supabase: `proyectos` (`id text primary key`, `datos jsonb` — mismo patrón que el resto de la app)
+- Tabla Supabase: `losas_proyecto` (mismo molde — ver sección propia)
 - RLS: abierto a cualquier usuario autenticado, sin restricción por correo (mismo criterio que `clientes`/`cotizaciones` — todo el equipo necesita leer y escribir)
 
 ## Pantallas
 
-`proyectos` — una sola pantalla por ahora (listado + modal de crear/editar), sin subnav propio.
+- `pantalla-proyectos` — listado + modal de crear/editar, sin subnav propio.
+- `pantalla-proyecto-losas` — Losas de un proyecto (ver sección propia).
+- `pantalla-losa-detalle` — lista de producción de una Losa (ver sección propia).
 
 ## Qué hace
 
@@ -23,3 +28,128 @@ A pedido del usuario: "vamos a crear una nueva ventana de PROYECTOS... incluyela
 - **Ubicación en la navegación**: botón nuevo en la barra superior y en la pantalla de Inicio, **entre Calidad y Centro de Costos** (a pedido explícito del usuario: "pongamos la de proyectos al lado de la de calidad... movamos la ventana de costos para el extremo derecho" — Centro de Costos ya estaba al final, insertar Proyectos justo antes deja ambos pedidos resueltos a la vez).
 - **Sin subnav propio todavía** — `activarModulo('proyectos')` va directo a la única pantalla, a diferencia de los demás módulos (que siempre muestran su barra de sub-pestañas). Se puede agregar más adelante si el módulo crece (ej. una vista de estadísticas).
 - Verificado con un arnés real — 32 aserciones: el orden de los botones en la barra superior y en Inicio; la navegación activa/desactiva las pantallas correctas; el estado vacío; crear un proyecto completo de punta a punta (validación de Nombre obligatorio, el upsert real hacia Supabase, el modal cerrando y la tabla mostrando el registro); editar sin duplicar y sin perder `creadoEn`; el buscador de cliente; los filtros de estado y de búsqueda; eliminar con su `delete` real; y que los demás módulos (Calidad, Cotizaciones, Inicio) siguen funcionando igual que antes — sin errores de consola.
+
+## Losas / Lista de Producción / Control de Producción y Despacho (2026-10-11)
+
+A pedido del usuario, tras revisar en detalle 3 proyectos reales ya ejecutados (Edificio Boreal
+Sohnos — Prelosa; SYMA Tarso y SYMA Andes — Vigueta y Bovedilla): "donde tendríamos más
+utilidad sería en atender lo relacionado a las listas de producción y al desarrollo y control
+en producción y despachos" — se descartó explícitamente construir el motor de cálculo
+estructural (memorias de cálculo, ingeniería real de pretensado) por su alcance y riesgo, y se
+priorizó digitalizar el flujo real: plano → distribución por cuadros → **lista de
+producción** → **control de producción** → **control de despacho**.
+
+### Por qué una entidad "Losa" y no una lista plana por proyecto
+
+Revisando el Excel real de SYMA Andes (28 "Órdenes de Fabricación" distintas, una por cada
+combinación de piso/torre) quedó claro que un proyecto grande no tiene una sola lista — tiene
+una **Losa** por cada nivel/torre, cada una con su propia lista de producción. Boreal (un
+edificio más chico) solo necesitó 2. El modelo soporta ambos casos sin cambios.
+
+### Modelo de datos — tabla `losas_proyecto`
+
+Un registro `datos jsonb` por Losa (mismo molde `id/datos/creado/modificado` del resto de la
+app), con **todo anidado adentro** (filas, despachos, bovedilla) — mismo criterio que ya usa
+Despiece de Acero en Costeo de Producto: nadie necesita sincronizar en tiempo real una sola
+fila suelta, la Losa completa es la unidad natural de guardado/sincronización.
+
+- `proyectoId`, `nombre`, `ubicacion` (torre, opcional), `sistema` (`prelosa` /
+  `vigueta_bovedilla` / `placa_alveolar`), `estado`.
+- `espesorCm`/`densidadKgM3` (Prelosa/Placa Alveolar) o `pesoFactorKgM` (Vigueta) — factor
+  simple para calcular el peso de cada fila, editable por Losa (no es todavía una tabla de
+  referencia tipo `VARILLAS_ACERO` — no hay suficiente variedad confirmada como para
+  justificarla; se puede migrar más adelante si el usuario nota que repite los mismos valores
+  entre proyectos).
+- `planoPath`/`planoNombre`, `memoriaCalculoPath`/`memoriaCalculoNombre` — PDF opcionales,
+  bucket `proyectos-pdf`, mismo mecanismo exacto que ya usa Calidad para informes de
+  laboratorio (`js/compresor-pdf.js`: comprimir si pesa, sanear el nombre, subir recién al
+  Guardar) — reutilizado tal cual, sin duplicar lógica.
+- `filas[]` — una fila por pieza/grupo de piezas idénticas: `ejesEntre`, `laterales`,
+  `cuadro`, campos específicos del sistema (`ancho`/`hilos` para Prelosa/Placa Alveolar;
+  `tipoVigueta`/`hilosAbajo`/`hilosArriba` para Vigueta), `dimension`, `cantidad`,
+  `observaciones`, y `produccion: [{fecha, cantidad, tipo}]` (tipo `Vaciado` o `Cortado` — una
+  pieza no estándar cortada de otra en vez de fundida a su propia medida, distinción real vista
+  en el Excel de SYMA Andes). Cada fila tiene un `id` propio estable (no un `#` correlativo
+  renumerable) para poder referenciarla desde un despacho sin romperse si se borra otra fila.
+- `despachos[]` — **a nivel de Losa, no por fila**: `{remision, fecha, observaciones,
+  lineas: [{filaId, cantidad}]}` — una remisión real cubre varias filas a la vez, mismo
+  espíritu que ya usa Logística con `viaje.entregas[].productos[]`.
+- `bovedilla` (solo si `sistema === 'vigueta_bovedilla'`, si no `null`) — **sin desglose por
+  fila**, a pedido explícito del usuario ("no es tan riguroso su control más allá de cantidad
+  de entradas de producción y salidas... como fabricar un bloque de cemento"): `tipo`,
+  `cantidadRequerida`, `produccion: [{fecha,cantidad}]`, `despacho: [{remision,fecha,cantidad}]`.
+- **No se modela una dualidad "cantidad original/cantidad nueva"** — se vio en el Excel de SYMA
+  Andes (correcciones de campo), pero el usuario confirmó que no es un patrón recurrente. Cada
+  fila lleva un único valor vigente + `observaciones` libres.
+
+### Pendientes — mismo patrón ya usado en Logística/Órdenes de Producción
+
+`Math.max(0, total − Σ(eventos))`, **siempre recalculado en vivo**, nunca cacheado:
+- Pendiente de producción de una fila = `cantidad − Σ(fila.produccion[].cantidad)`.
+- Pendiente de despacho de una fila = `cantidad − Σ(sobre TODOS los despachos de la Losa, las
+  líneas cuyo `filaId` sea esta fila)`.
+- Mismo cálculo para Bovedilla, con `cantidadRequerida` en vez de `cantidad` por fila.
+
+### Peso — regresión verificada contra los 2 Excel reales
+
+- Prelosa/Placa Alveolar: `ancho × dimensión × (espesorCm/100) × densidadKgM3 × cantidad` — con
+  los valores reales de Boreal (ancho 0,5 m, dimensión 2,24 m, espesor 5 cm, densidad
+  2400 kg/m³) da **134,4 kg**, el mismo número exacto visto en la columna "KG" del Excel real.
+- Vigueta: `dimensión × pesoFactorKgM × cantidad` — con los valores reales de SYMA Andes
+  (dimensión 2,84 m, factor 21,5 kg/ml de la vigueta H11) da **61,06 kg**, también el número
+  exacto visto en el Excel real.
+
+### Carga de las 100-250+ filas por Losa — las 3 formas (a pedido del usuario)
+
+Capturarlas una por una sería impracticable (Boreal tuvo 247 filas en una sola losa):
+1. **Fila por fila** (`agregarFilaProduccion()`) — igual al patrón ya usado en Despiece de
+   Acero de Costeo de Producto.
+2. **Pegar desde Excel** (`onPasteFilasProduccion()`, listener `onpaste` sobre la tabla) —
+   parsea el texto del portapapeles (filas por salto de línea, columnas por tab) en el mismo
+   orden de columnas que la tabla visible.
+3. **Importar archivo Excel/CSV** (`onSeleccionImportarFilas()`) — reusa SheetJS (ya cargado en
+   la app) y `_normHdr()` (`js/catalogo.js`, el mismo helper que ya usa el import de Catálogo)
+   para mapear columnas por nombre de encabezado, tolerante a mayúsculas/tildes — funciona
+   directo con los Excel reales de la empresa (mismos encabezados vistos en Boreal/SYMA:
+   CUADRO, DIMENSIONES, CANTIDAD...). Busca la fila de encabezados aunque no sea la primera
+   (los Excel reales traen un título arriba).
+
+`guardarListaProduccion()` solo descarta filas 100% vacías (mismo criterio que
+`guardarDespieceAcero()`), nunca las parcialmente llenas.
+
+### Navegación — pantalla nueva, no un patrón ya existente
+
+No existe en la app ningún patrón de "pantalla completa con alcance a un registro padre"
+(confirmado explorando el código antes de construir esto) — se armó uno a mano: variables de
+estado (`_PROYECTO_ACTIVO_ID`/`_LOSA_ACTIVA_ID`) + activar/desactivar `.pantalla` directamente,
+sin pasar por `ir()`/subnav (esas funciones no soportan pantallas parametrizadas por id).
+Botón "📋 Producción" nuevo en cada fila de la tabla de Proyectos.
+
+**Realtime**: `pantalla-proyecto-losas` sí se refresca automáticamente
+(`rerenderPantallaActiva()`); `pantalla-losa-detalle` **a propósito no** — esa pantalla trabaja
+sobre arreglos de edición en memoria (`_filasLosaActual`/`_despachosLosaActual`/
+`_bovedillaLosaActual`) y recargarlos automáticamente en medio de una edición en curso borraría
+cambios sin guardar — mismo criterio ya aceptado en Ajustes de Mezcla (valores "congelados"
+mientras se edita).
+
+### Fuera de alcance en esta vuelta (conocido, no es un olvido)
+
+- Motor de cálculo estructural (memorias de cálculo) — descartado explícitamente por el
+  usuario, alcance de ingeniería real, no un CRUD.
+- Tabla de referencia reutilizable para el factor de peso de vigueta (tipo `VARILLAS_ACERO`) —
+  por ahora es un campo simple por Losa.
+- Eliminar un Proyecto no borra en cascada sus Losas — una Losa huérfana (con `proyectoId`
+  apuntando a un proyecto ya borrado) queda en la tabla pero no es alcanzable desde la
+  navegación; no se automatizó la limpieza, es un caso borde poco frecuente.
+
+Verificado con un arnés real — 68 aserciones (incluye las de la sección original de arriba):
+crear una Losa de cada sistema (Prelosa y Vigueta y Bovedilla) y confirmar que el modal muestra
+solo los campos relevantes a cada una; navegación Proyectos → Losas → Detalle y de vuelta;
+columnas de la tabla de filas correctas según el sistema; las 3 formas de cargar filas,
+incluyendo un `.xlsx` real armado en memoria con los mismos encabezados que trae el Excel real
+de la empresa; el peso calculado exacto contra los 2 casos reales (Boreal y SYMA Andes);
+control de producción por fila con su pendiente recalculado; control de despacho multi-fila
+por remisión, confirmando que una fila NO incluida en una remisión conserva su pendiente
+intacto; Bovedilla (entradas/salidas, rechazo de un despacho sin remisión); adjuntar un PDF
+real (firma `%PDF-` válida) y el rechazo de uno sin esa firma; eliminar una Losa con Deshacer —
+sin errores de consola.
