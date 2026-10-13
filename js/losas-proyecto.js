@@ -425,7 +425,7 @@ function renderFilasProduccion() {
   const esVigueta = l.sistema === 'vigueta_bovedilla';
   const thead = document.getElementById('filas-produccion-thead');
   thead.innerHTML = `<tr>
-    <th>#</th><th>Ejes entre</th><th>Laterales</th><th>Cuadro</th>
+    <th>#</th><th>Ejes numéricos</th><th>Ejes alfabéticos</th><th>Cuadro</th>
     ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (m)</th><th>Hilos</th>'}
     <th>Dimensión (m)</th><th>Cantidad</th><th>Long. total (m)</th><th>Peso (kg)</th>
     <th>Pend. Producción</th><th>Pend. Despacho</th><th>Observaciones</th><th></th>
@@ -453,10 +453,27 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
   const num = (valor, campo, ancho, recalcula) => esLista
     ? `<input type="number" ${campo === 'dimension' || campo === 'ancho' ? 'step="0.01"' : ''} value="${valor || 0}" oninput="_filasLosaActual[${i}].${campo}=parseFloat(this.value)||0${recalcula ? `;_actualizarFilaProduccion(${i})` : ''}" style="width:${ancho}px">`
     : (valor || 0);
+  // "Ejes numéricos"/"Ejes alfabéticos" (2026-10-13, a pedido del usuario) — de entrada
+  // aparecen como dos cuadros de texto chicos separados por un guion ("(cuadro) - (cuadro)"),
+  // en vez de un solo campo de texto libre — coincide con cómo se ve el dato en los Excel
+  // reales ("1-1´", "I-G": un eje de inicio y uno de fin), pero sigue guardándose como un solo
+  // string (`ejesEntre`/`laterales`, sin cambiar el modelo de datos ni el mapeo de Importar/
+  // Pegar, que ya traían ese valor combinado en una sola celda).
+  const par = (valor, campo) => {
+    if (!esLista) return _esc(valor || '—');
+    const idx = (valor || '').indexOf('-');
+    const a = idx >= 0 ? valor.slice(0, idx) : (valor || '');
+    const b = idx >= 0 ? valor.slice(idx + 1) : '';
+    return `<div style="display:flex;align-items:center;gap:2px">
+      <input type="text" value="${_escAttr(a)}" oninput="_actualizarParEje(${i},'${campo}',0,this.value)" style="width:30px;text-align:center;padding:4px 2px">
+      <span style="color:var(--gris-medio)">-</span>
+      <input type="text" value="${_escAttr(b)}" oninput="_actualizarParEje(${i},'${campo}',1,this.value)" style="width:30px;text-align:center;padding:4px 2px">
+    </div>`;
+  };
   return `<tr>
     <td>${i + 1}</td>
-    <td>${txt(f.ejesEntre, 'ejesEntre', 70)}</td>
-    <td>${txt(f.laterales, 'laterales', 70)}</td>
+    <td>${par(f.ejesEntre, 'ejesEntre')}</td>
+    <td>${par(f.laterales, 'laterales')}</td>
     <td>${txt(f.cuadro, 'cuadro', 50)}</td>
     ${esVigueta ? `
     <td>${txt(f.tipoVigueta, 'tipoVigueta', 60)}</td>
@@ -500,14 +517,30 @@ function _actualizarFilaProduccion(i) {
   const elPD = document.getElementById(`fp-penddesp-${i}`); if (elPD) { elPD.textContent = pendDesp; elPD.style.color = pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'; }
 }
 
+// Recompone el valor combinado ("1-1´", "I-G"...) de Ejes numéricos/Ejes alfabéticos a partir
+// de los dos cuadros de texto chicos — `parte` 0 = antes del guion, 1 = después.
+function _actualizarParEje(i, campo, parte, valor) {
+  const f = _filasLosaActual[i];
+  if (!f) return;
+  const actual = f[campo] || '';
+  const idx = actual.indexOf('-');
+  const a = idx >= 0 ? actual.slice(0, idx) : actual;
+  const b = idx >= 0 ? actual.slice(idx + 1) : '';
+  const nuevaA = parte === 0 ? valor : a;
+  const nuevaB = parte === 1 ? valor : b;
+  f[campo] = (nuevaA || nuevaB) ? `${nuevaA}-${nuevaB}` : '';
+}
+
 function agregarFilaProduccion() {
   _filasLosaActual.push({ id: _nuevoIdFila(), ejesEntre: '', laterales: '', cuadro: '', ancho: 0, hilos: 0, tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0, dimension: 0, cantidad: 0, observaciones: '', produccion: [] });
   renderFilasProduccion();
 }
 
-// (b) Pegar desde Excel — columnas en el mismo orden que la tabla visible: Ejes entre,
-// Laterales, Cuadro, [Ancho, Hilos] o [Vigueta, Hilos Abajo, Hilos Arriba], Dimensión,
-// Cantidad (ver nota en la pantalla).
+// (b) Pegar desde Excel — columnas en el mismo orden que la tabla visible: Ejes numéricos,
+// Ejes alfabéticos, Cuadro, [Ancho, Hilos] o [Vigueta, Hilos Abajo, Hilos Arriba], Dimensión,
+// Cantidad (ver nota en la pantalla). El valor de cada celda sigue siendo un solo texto
+// combinado (ej. "1-1´"), igual que en el Excel real — el guion se separa solo al mostrarlo
+// en los dos cuadros chicos (ver `par()` en `_filaProduccionHTML`).
 function onPasteFilasProduccion(event) {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   if (!l) return;

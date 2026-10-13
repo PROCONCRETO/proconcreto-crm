@@ -126,13 +126,24 @@ fila suelta, la Losa completa es la unidad natural de guardado/sincronización.
   bucket `proyectos-pdf`, mismo mecanismo exacto que ya usa Calidad para informes de
   laboratorio (`js/compresor-pdf.js`: comprimir si pesa, sanear el nombre, subir recién al
   Guardar) — reutilizado tal cual, sin duplicar lógica.
-- `filas[]` — una fila por pieza/grupo de piezas idénticas: `ejesEntre`, `laterales`,
-  `cuadro`, campos específicos del sistema (`ancho`/`hilos` para Prelosa/Placa Alveolar;
-  `tipoVigueta`/`hilosAbajo`/`hilosArriba` para Vigueta), `dimension`, `cantidad`,
-  `observaciones`, y `produccion: [{fecha, cantidad, tipo}]` (tipo `Vaciado` o `Cortado` — una
-  pieza no estándar cortada de otra en vez de fundida a su propia medida, distinción real vista
-  en el Excel de SYMA Andes). Cada fila tiene un `id` propio estable (no un `#` correlativo
-  renumerable) para poder referenciarla desde un despacho sin romperse si se borra otra fila.
+- `filas[]` — una fila por pieza/grupo de piezas idénticas: `ejesEntre` ("Ejes numéricos" en
+  pantalla), `laterales` ("Ejes alfabéticos" en pantalla — mismo nombre interno de siempre, solo
+  cambió la etiqueta visible), `cuadro`, campos específicos del sistema (`ancho`/`hilos` para
+  Prelosa/Placa Alveolar; `tipoVigueta`/`hilosAbajo`/`hilosArriba` para Vigueta), `dimension`,
+  `cantidad`, `observaciones`, y `produccion: [{fecha, cantidad, tipo}]` (tipo `Vaciado` o
+  `Cortado` — una pieza no estándar cortada de otra en vez de fundida a su propia medida,
+  distinción real vista en el Excel de SYMA Andes). Cada fila tiene un `id` propio estable (no
+  un `#` correlativo renumerable) para poder referenciarla desde un despacho sin romperse si se
+  borra otra fila.
+  - **Ejes numéricos/Ejes alfabéticos como "(cuadro) - (cuadro)"** (2026-10-13, a pedido del
+    usuario): en modo lista, cada una de estas dos columnas se captura con dos cuadros de texto
+    chicos separados por un guion visual, en vez de un solo campo libre — coincide con cómo se
+    ve el dato en los Excel reales ("1-1´", "I-G": un eje de inicio y uno de fin). El dato
+    SIGUE guardándose como un solo texto combinado (`ejesEntre`/`laterales`, sin cambiar el
+    modelo de datos ni el mapeo de Importar/Pegar, que ya traían ese valor combinado en una
+    sola celda) — los dos cuadros solo parten y recomponen ese string en memoria
+    (`_actualizarParEje()`), partiendo en el primer guion que encuentren. En modo
+    producción/despacho se ve de nuevo como un solo texto de solo lectura, sin los cuadros.
 - `despachos[]` — **a nivel de Losa, no por fila**: `{remision, fecha, observaciones,
   lineas: [{filaId, cantidad}]}` — una remisión real cubre varias filas a la vez, mismo
   espíritu que ya usa Logística con `viaje.entregas[].productos[]`.
