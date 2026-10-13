@@ -90,9 +90,11 @@ function _pesoFila(fila, losa) {
   if (losa.sistema === 'vigueta_bovedilla') {
     return dim * (Number(losa.pesoFactorKgM) || 0) * cant;
   }
-  const ancho = Number(fila.ancho) || 0;
+  // Ancho se captura en cm (2026-10-14, a pedido del usuario) — se convierte a metros acá,
+  // solo para el cálculo, igual que el espesor.
+  const anchoM = (Number(fila.ancho) || 0) / 100;
   const espesorM = (Number(losa.espesorCm) || 0) / 100;
-  return ancho * dim * espesorM * (Number(losa.densidadKgM3) || 0) * cant;
+  return anchoM * dim * espesorM * (Number(losa.densidadKgM3) || 0) * cant;
 }
 
 let _contadorIdFila = 0;
@@ -446,7 +448,7 @@ function renderFilasProduccion() {
   thead.innerHTML = `<tr>
     ${esProduccion ? '<th style="width:28px"><input type="checkbox" id="chk-todas-filas-print" onchange="_toggleSeleccionTodasFilas(this.checked)"></th>' : ''}
     <th>#</th><th>Cuadro</th><th>Ejes numéricos</th><th>Ejes alfabéticos</th>
-    ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (m)</th><th>Hilos</th>'}
+    ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
     <th>Dimensión (m)</th><th>Cantidad</th><th>Long. total (m)</th><th>Peso (kg)</th>
     ${esLista ? '' : (esProduccion ? '<th>Pend. Producción</th>' : '<th>Pend. Despacho</th>')}
     <th>Observaciones</th><th></th>
@@ -471,8 +473,13 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
   const txt = (valor, campo, ancho) => esLista
     ? `<input type="text" value="${_escAttr(valor || '')}" oninput="_filasLosaActual[${i}].${campo}=this.value" style="width:${ancho}px">`
     : _esc(valor || '—');
+  // Sin el "|| 0" en `value` (2026-10-14, a pedido del usuario: "deja todos los campos sin
+  // datos, pues algunos están incluyendo ceros de entrada que me dificultan la digitación") —
+  // una fila nueva arranca en 0 internamente (ver `agregarFilaProduccion()`), pero el campo se
+  // ve vacío hasta que el usuario escribe; `parseFloat(this.value)||0` en el oninput sigue
+  // guardando 0 si lo deja vacío, así que el dato no cambia, solo la comodidad de digitar.
   const num = (valor, campo, ancho, recalcula) => esLista
-    ? `<input type="number" ${campo === 'dimension' || campo === 'ancho' ? 'step="0.01"' : ''} value="${valor || 0}" oninput="_filasLosaActual[${i}].${campo}=parseFloat(this.value)||0${recalcula ? `;_actualizarFilaProduccion(${i})` : ''}" style="width:${ancho}px">`
+    ? `<input type="number" ${campo === 'dimension' ? 'step="0.01"' : ''} value="${valor || ''}" oninput="_filasLosaActual[${i}].${campo}=parseFloat(this.value)||0${recalcula ? `;_actualizarFilaProduccion(${i})` : ''}" style="width:${ancho}px">`
     : (valor || 0);
   // "Ejes numéricos"/"Ejes alfabéticos" (2026-10-13, a pedido del usuario) — de entrada
   // aparecen como dos cuadros de texto chicos separados por un guion ("(cuadro) - (cuadro)"),
@@ -486,33 +493,33 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     const a = idx >= 0 ? valor.slice(0, idx) : (valor || '');
     const b = idx >= 0 ? valor.slice(idx + 1) : '';
     return `<div style="display:flex;align-items:center;gap:2px">
-      <input type="text" value="${_escAttr(a)}" oninput="_actualizarParEje(${i},'${campo}',0,this.value)" style="width:30px;text-align:center;padding:4px 2px">
+      <input type="text" value="${_escAttr(a)}" oninput="_actualizarParEje(${i},'${campo}',0,this.value)" style="width:24px;text-align:center;padding:4px 2px">
       <span style="color:var(--gris-medio)">-</span>
-      <input type="text" value="${_escAttr(b)}" oninput="_actualizarParEje(${i},'${campo}',1,this.value)" style="width:30px;text-align:center;padding:4px 2px">
+      <input type="text" value="${_escAttr(b)}" oninput="_actualizarParEje(${i},'${campo}',1,this.value)" style="width:24px;text-align:center;padding:4px 2px">
     </div>`;
   };
   return `<tr>
     ${_MODO_FLUJO_LOSA === 'produccion' ? `<td><input type="checkbox" class="chk-fila-print" data-idx="${i}"></td>` : ''}
     <td>${i + 1}</td>
-    <td>${txt(f.cuadro, 'cuadro', 50)}</td>
+    <td>${txt(f.cuadro, 'cuadro', 40)}</td>
     <td>${par(f.ejesEntre, 'ejesEntre')}</td>
     <td>${par(f.laterales, 'laterales')}</td>
     ${esVigueta ? `
-    <td>${txt(f.tipoVigueta, 'tipoVigueta', 60)}</td>
-    <td>${num(f.hilosAbajo, 'hilosAbajo', 55, false)}</td>
-    <td>${num(f.hilosArriba, 'hilosArriba', 55, false)}</td>
+    <td>${txt(f.tipoVigueta, 'tipoVigueta', 48)}</td>
+    <td>${num(f.hilosAbajo, 'hilosAbajo', 38, false)}</td>
+    <td>${num(f.hilosArriba, 'hilosArriba', 38, false)}</td>
     ` : `
-    <td>${num(f.ancho, 'ancho', 60, true)}</td>
-    <td>${num(f.hilos, 'hilos', 50, false)}</td>
+    <td>${num(f.ancho, 'ancho', 44, true)}</td>
+    <td>${num(f.hilos, 'hilos', 38, false)}</td>
     `}
-    <td>${num(f.dimension, 'dimension', 65, true)}</td>
-    <td>${num(f.cantidad, 'cantidad', 55, true)}</td>
+    <td>${num(f.dimension, 'dimension', 50, true)}</td>
+    <td>${num(f.cantidad, 'cantidad', 42, true)}</td>
     <td id="fp-longtotal-${i}" style="text-align:right">${longTotal.toFixed(2)}</td>
     <td id="fp-peso-${i}" style="text-align:right">${peso.toFixed(1)}</td>
     ${esLista ? '' : (_MODO_FLUJO_LOSA === 'produccion'
       ? `<td id="fp-pendprod-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProd}</td>`
       : `<td id="fp-penddesp-${i}" style="text-align:right;font-weight:600;color:${pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendDesp}</td>`)}
-    <td>${txt(f.observaciones, 'observaciones', 110)}</td>
+    <td>${txt(f.observaciones, 'observaciones', 90)}</td>
     <td style="white-space:nowrap">
       ${esLista
         ? `<button class="btn btn-rojo btn-xs" onclick="_filasLosaActual.splice(${i},1);renderFilasProduccion()">✕</button>`
@@ -671,11 +678,13 @@ function _toggleSeleccionTodasFilas(marcar) {
 
 // Imprimible para pasar a planta (2026-10-13, a pedido del usuario: "agregamos un botón de
 // imprimir listas de producción, donde se pueda seleccionar las filas y de esto me salga un
-// imprimible para pasar a planta y puedan ellos fabricar lo que se necesita") — mismo patrón
-// ya usado en Órdenes de Producción/Logística (`verPDFOrden()`/`imprimirProgramacionDia()`,
-// js/ordenes-produccion.js / js/logistica.js): un `<div>` con estilo inline se arma en
-// memoria, se muestra en el `#vista-previa` compartido de toda la app, y "Descargar PDF" lo
-// rasteriza con html2canvas + jsPDF.
+// imprimible para pasar a planta y puedan ellos fabricar lo que se necesita"). Reescrito
+// 2026-10-15 ("revisa el formato de imprimible de diseño de mezcla para que manejemos el mismo
+// lenguaje gráfico") para seguir el mismo molde que `verFormatoProduccionAjuste()`
+// (js/calidad-ajuste-mezcla.js) y `descargarPDF()` (js/pdf.js, la cotización): membrete
+// (`membrete-top.jpg`) + `.preview-doc`/`.preview-content`/`.preview-membrete-footer` (clases
+// compartidas, css/estilos.css) en vez de un header/footer con estilo inline propio — mismo
+// lenguaje gráfico en todos los documentos oficiales de la empresa, no uno distinto por módulo.
 function imprimirListaProduccion() {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   if (!l) return;
@@ -689,126 +698,148 @@ function imprimirListaProduccion() {
   const filas = indices.map(i => _filasLosaActual[i]).filter(Boolean);
   if (!filas.length) { alert('No hay filas para imprimir.'); return; }
 
-  let totalPiezas = 0, totalMetros = 0, totalPeso = 0;
+  // Sin columna de Peso (2026-10-15, a pedido del usuario: "en este, no es necesario incluir la
+  // columna de peso") — este imprimible es para que planta sepa QUÉ fabricar, no cuánto pesa.
+  let totalPiezas = 0, totalMetros = 0;
   const filasHTML = filas.map((f, n) => {
     const longTotal = (Number(f.dimension) || 0) * (Number(f.cantidad) || 0);
-    const peso = _pesoFila(f, l);
     totalPiezas += Number(f.cantidad) || 0;
     totalMetros += longTotal;
-    totalPeso += peso;
     const colEspecifica = esVigueta
-      ? `<td style="padding:5px 6px;border-bottom:1px solid #eee;font-size:11px">${_esc(f.tipoVigueta) || '—'}</td><td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:center;font-size:11px">${f.hilosAbajo || 0}</td><td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:center;font-size:11px">${f.hilosArriba || 0}</td>`
-      : `<td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:center;font-size:11px">${f.ancho || 0}</td><td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:center;font-size:11px">${f.hilos || 0}</td>`;
+      ? `<td>${_esc(f.tipoVigueta) || '—'}</td><td style="text-align:center">${f.hilosAbajo || 0}</td><td style="text-align:center">${f.hilosArriba || 0}</td>`
+      : `<td style="text-align:center">${f.ancho || 0}</td><td style="text-align:center">${f.hilos || 0}</td>`;
     return `<tr>
-      <td style="padding:5px 6px;border-bottom:1px solid #eee;font-size:11px;color:#888">${n + 1}</td>
-      <td style="padding:5px 6px;border-bottom:1px solid #eee;font-size:11px;font-weight:600">${_esc(f.cuadro) || '—'}</td>
-      <td style="padding:5px 6px;border-bottom:1px solid #eee;font-size:11px">${_esc(f.ejesEntre) || '—'}</td>
-      <td style="padding:5px 6px;border-bottom:1px solid #eee;font-size:11px">${_esc(f.laterales) || '—'}</td>
+      <td style="color:#888">${n + 1}</td>
+      <td style="font-weight:600">${_esc(f.cuadro) || '—'}</td>
+      <td>${_esc(f.ejesEntre) || '—'}</td>
+      <td>${_esc(f.laterales) || '—'}</td>
       ${colEspecifica}
-      <td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:right;font-size:11px">${(Number(f.dimension) || 0).toFixed(2)}</td>
-      <td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:center;font-size:11px;font-weight:700">${f.cantidad || 0}</td>
-      <td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:right;font-size:11px">${longTotal.toFixed(2)}</td>
-      <td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:right;font-size:11px">${peso.toFixed(1)}</td>
-      <td style="padding:5px 6px;border-bottom:1px solid #eee;font-size:11px;color:#555">${_esc(f.observaciones) || ''}</td>
+      <td style="text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>
+      <td style="text-align:center;font-weight:700">${f.cantidad || 0}</td>
+      <td style="text-align:right">${longTotal.toFixed(2)}</td>
+      <td style="color:#555">${_esc(f.observaciones) || ''}</td>
     </tr>`;
   }).join('');
 
-  const html = `
-  <div id="lp-preview-doc" style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:0;color:#222">
-    <div style="background:#001F3F;color:white;padding:18px 24px;display:flex;align-items:center;justify-content:space-between">
-      <div>
-        <div style="font-size:17px;font-weight:700">Proconcreto Prefabricados</div>
-        <div style="font-size:11px;opacity:0.6;margin-top:2px">LISTA DE PRODUCCIÓN</div>
-      </div>
-      <div style="background:#8BC53F;padding:8px 16px;border-radius:6px;text-align:right">
-        <div style="font-size:16px;font-weight:700;color:#001F3F">${_esc(l.nombre)}</div>
-        <div style="font-size:10px;color:#001F3F;opacity:0.85">${new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
-      </div>
-    </div>
-    <div style="padding:14px 16px;border-bottom:1px solid #eee">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px">
-        <div><div style="font-size:10px;color:#888">Proyecto</div><div style="font-size:12px;font-weight:600;margin-top:2px">${_esc(p?.nombre) || '—'}</div></div>
-        <div><div style="font-size:10px;color:#888">Ubicación</div><div style="font-size:12px;margin-top:2px">${_esc(l.ubicacion) || '—'}</div></div>
-        <div><div style="font-size:10px;color:#888">Sistema</div><div style="font-size:12px;margin-top:2px">${sis ? _esc(sis.etiqueta) : '—'}</div></div>
-        <div><div style="font-size:10px;color:#888">Piezas / filas</div><div style="font-size:12px;margin-top:2px">${totalPiezas} piezas en ${filas.length} fila${filas.length === 1 ? '' : 's'}</div></div>
-      </div>
-    </div>
-    <div style="padding:14px 16px">
-      <table style="width:100%;border-collapse:collapse">
-        <thead><tr style="background:#f5f5f5">
-          <th style="padding:6px;text-align:left;font-size:10px;color:#555">#</th>
-          <th style="padding:6px;text-align:left;font-size:10px;color:#555">Cuadro</th>
-          <th style="padding:6px;text-align:left;font-size:10px;color:#555">Ejes num.</th>
-          <th style="padding:6px;text-align:left;font-size:10px;color:#555">Ejes alfa.</th>
-          ${esVigueta
-            ? '<th style="padding:6px;text-align:left;font-size:10px;color:#555">Vigueta</th><th style="padding:6px;text-align:center;font-size:10px;color:#555">Hilos ab.</th><th style="padding:6px;text-align:center;font-size:10px;color:#555">Hilos ar.</th>'
-            : '<th style="padding:6px;text-align:center;font-size:10px;color:#555">Ancho (m)</th><th style="padding:6px;text-align:center;font-size:10px;color:#555">Hilos</th>'}
-          <th style="padding:6px;text-align:right;font-size:10px;color:#555">Dim. (m)</th>
-          <th style="padding:6px;text-align:center;font-size:10px;color:#555">Cant.</th>
-          <th style="padding:6px;text-align:right;font-size:10px;color:#555">Long. tot. (m)</th>
-          <th style="padding:6px;text-align:right;font-size:10px;color:#555">Peso (kg)</th>
-          <th style="padding:6px;text-align:left;font-size:10px;color:#555">Observaciones</th>
-        </tr></thead>
-        <tbody>${filasHTML}</tbody>
-        <tfoot>
-          <tr style="background:#E8F5E9">
-            <td colspan="${esVigueta ? 7 : 6}" style="padding:7px 6px;text-align:right;font-size:11px;font-weight:700;color:#1B5E20">TOTALES</td>
-            <td style="padding:7px 6px;text-align:center;font-size:11px;font-weight:700;color:#1B5E20">${totalPiezas}</td>
-            <td style="padding:7px 6px;text-align:right;font-size:11px;font-weight:700;color:#1B5E20">${totalMetros.toFixed(2)}</td>
-            <td style="padding:7px 6px;text-align:right;font-size:11px;font-weight:700;color:#1B5E20">${totalPeso.toFixed(1)}</td>
-            <td></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #eee">
-      <div style="padding:16px">
-        <div style="border-top:1px solid #333;margin-top:36px;padding-top:6px;text-align:center">
-          <div style="font-size:11px;color:#888">Entregado por (Ingeniería)</div>
-        </div>
-      </div>
-      <div style="padding:16px">
-        <div style="border-top:1px solid #333;margin-top:36px;padding-top:6px;text-align:center">
-          <div style="font-size:11px;color:#888">Recibido en planta</div>
-        </div>
-      </div>
-    </div>
-    <div style="background:#f5f5f5;padding:8px 16px;text-align:center;font-size:10px;color:#999">
-      Proconcreto Prefabricados · Autopista del Café Km2, Vía Chinchiná – Santa Rosa · www.proconcreto.com.co
-    </div>
-  </div>`;
+  // La etiqueta "TOTALES" ocupa todas las columnas antes de "Cant." (# + Cuadro + Ejes num. +
+  // Ejes alfa. + [2 o 3 columnas propias del sistema] + Dim.) para que el total de piezas caiga
+  // justo debajo de "Cant." — antes quedaba una columna corrida (colspan de menos) y los totales
+  // no alineaban con su columna (2026-10-15, a pedido del usuario: "revisa los totales pues no
+  // están quedando bien alineados").
+  const colspanTotales = esVigueta ? 8 : 7;
 
-  document.getElementById('contenido-preview').innerHTML = `
+  const html = `
     <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
       <span style="font-weight:700">Lista de Producción — ${_esc(l.nombre)}</span>
       <div style="flex:1"></div>
-      <button onclick="descargarPDFListaProduccion()" style="background:#1D9E75;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-lista">⬇️ Descargar PDF</button>
+      <button onclick="descargarPDFListaProduccion()" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-lista">⬇️ Descargar PDF</button>
       <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
     </div>
-    <div class="preview-doc" style="padding:0">${html}</div>`;
+    <div class="preview-doc" id="lp-preview-doc">
+      <div class="preview-membrete-header"><img src="membrete-top.jpg" alt=""></div>
+      <div class="preview-content" id="lp-preview-content" style="padding-top:6px">
+        <div style="text-align:center;font-size:12px;font-weight:700;color:#003F7F;letter-spacing:0.03em;margin-bottom:8px">LISTA DE PRODUCCIÓN</div>
+        <div style="padding-bottom:6px;border-bottom:1px solid #eee;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <div style="font-size:14px;font-weight:700;color:#003F7F">${_esc(l.nombre)}${l.ubicacion ? ' — ' + _esc(l.ubicacion) : ''}</div>
+            <div style="font-size:11px;color:#555">${new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+          </div>
+          <div style="font-size:12px;font-weight:600;margin-top:2px">${_esc(p?.nombre) || '—'}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px;font-size:10.5px">
+            <div><b>SISTEMA:</b> ${sis ? _esc(sis.etiqueta) : '—'}</div>
+            <div><b>PIEZAS / FILAS:</b> ${totalPiezas} piezas en ${filas.length} fila${filas.length === 1 ? '' : 's'}</div>
+          </div>
+        </div>
+        <table class="preview-tabla">
+          <thead><tr>
+            <th>#</th><th>Cuadro</th><th>Ejes num.</th><th>Ejes alfa.</th>
+            ${esVigueta ? '<th>Vigueta</th><th>Hilos ab.</th><th>Hilos ar.</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
+            <th>Dim. (m)</th><th>Cant.</th><th>Long. tot. (m)</th><th>Observaciones</th>
+          </tr></thead>
+          <tbody>${filasHTML}</tbody>
+          <tfoot><tr class="total-row">
+            <td colspan="${colspanTotales}" style="text-align:right">TOTALES</td>
+            <td style="text-align:center">${totalPiezas}</td>
+            <td style="text-align:right">${totalMetros.toFixed(2)}</td>
+            <td></td>
+          </tr></tfoot>
+        </table>
+        <div class="preview-firma" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Entregado por (Ingeniería)</div>
+          <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Recibido en planta</div>
+        </div>
+      </div>
+      <div class="preview-membrete-footer" id="lp-preview-footer">
+        <div class="pf-arco"></div>
+        <div class="pf-datos">
+          <div class="pf-col"><span class="pf-icon">📞</span><span>+57 314 620 1650<br>+57 311 408 2285</span></div>
+          <div class="pf-col"><span class="pf-icon">🏠</span><span>Autopista del Café Km2<br>Vía Chinchiná – Santa Rosa</span></div>
+          <div class="pf-col"><span class="pf-icon">🌐</span><span>www.proconcreto.com.co</span></div>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('contenido-preview').innerHTML = html;
   document.getElementById('vista-previa').style.display = 'block';
   document.querySelectorAll('.pantalla').forEach(p2 => p2.classList.remove('activa'));
   window.scrollTo(0, 0);
 }
 
+// Genera el PDF con el mismo membrete (cabecera repetida + pie con arco/datos de contacto) y la
+// misma paginación con corte en fila blanca que el resto de documentos oficiales — mismo
+// cuerpo exacto que `descargarFormatoProduccionAjuste()` (js/calidad-ajuste-mezcla.js).
 async function descargarPDFListaProduccion() {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   const btn = document.getElementById('btn-pdf-lista');
   if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
   try {
     const { jsPDF } = window.jspdf;
-    const el = document.getElementById('lp-preview-doc');
-    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = 210, pageH = 297;
-    const imgH = (canvas.height * pageW) / canvas.width;
-    let y = 0;
-    while (y < imgH) {
-      if (y > 0) pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, -y, pageW, imgH);
-      y += pageH;
+
+    const topImg = await cargarImagen('membrete-top.jpg');
+    const headerH = pageW * (topImg.naturalHeight / topImg.naturalWidth);
+
+    const contentEl = document.getElementById('lp-preview-content');
+    const contentCanvas = await html2canvas(contentEl, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    const pxToMm = pageW / contentCanvas.width;
+    const contentH_px = _alturaContenidoReal(contentCanvas);
+
+    const footerEl = document.getElementById('lp-preview-footer');
+    const footerCanvas = await html2canvas(footerEl, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    const footerH = footerCanvas.height * pxToMm;
+
+    const availH = pageH - headerH - footerH - 6;
+    const pageH_px = availH / pxToMm;
+
+    const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    const footerData = footerCanvas.toDataURL('image/jpeg', 0.95);
+
+    let cursorY = 0, pageIndex = 0, guard = 0;
+    while (cursorY < contentH_px - 1 && guard < 60) {
+      guard++;
+      let bottom = Math.min(contentH_px, cursorY + pageH_px);
+      if (bottom < contentH_px) bottom = _filaBlancaCerca(contentCanvas, Math.floor(bottom), cursorY + pageH_px * 0.55);
+      const sliceH_px = bottom - cursorY;
+      if (sliceH_px <= 1) break;
+
+      if (pageIndex > 0) pdf.addPage();
+      pdf.addImage(topImg, 'JPEG', 0, 0, pageW, headerH);
+
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = contentCanvas.width;
+      sliceCanvas.height = Math.ceil(sliceH_px);
+      sliceCanvas.getContext('2d').drawImage(
+        contentCanvas, 0, Math.floor(cursorY),
+        contentCanvas.width, Math.ceil(sliceH_px),
+        0, 0, contentCanvas.width, Math.ceil(sliceH_px)
+      );
+      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, headerH + 2, pageW, sliceH_px * pxToMm);
+      pdf.addImage(footerData, 'JPEG', 0, pageH - footerH, pageW, footerH);
+
+      cursorY = bottom;
+      pageIndex++;
     }
+
     const fecha = new Date().toISOString().split('T')[0].replace(/-/g, '_');
     const nombreLosa = (l?.nombre || 'losa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '_');
     pdf.save(`Lista_Produccion_${nombreLosa}_${fecha}.pdf`);

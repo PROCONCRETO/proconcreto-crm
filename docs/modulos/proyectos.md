@@ -129,7 +129,9 @@ fila suelta, la Losa completa es la unidad natural de guardado/sincronización.
 - `filas[]` — una fila por pieza/grupo de piezas idénticas: `ejesEntre` ("Ejes numéricos" en
   pantalla), `laterales` ("Ejes alfabéticos" en pantalla — mismo nombre interno de siempre, solo
   cambió la etiqueta visible), `cuadro`, campos específicos del sistema (`ancho`/`hilos` para
-  Prelosa/Placa Alveolar; `tipoVigueta`/`hilosAbajo`/`hilosArriba` para Vigueta), `dimension`,
+  Prelosa/Placa Alveolar — **`ancho` se captura en CENTÍMETROS** (2026-10-14, a pedido del
+  usuario), se convierte a metros solo dentro de `_pesoFila()` para el cálculo —;
+  `tipoVigueta`/`hilosAbajo`/`hilosArriba` para Vigueta), `dimension`,
   `cantidad`, `observaciones`, y `produccion: [{fecha, cantidad, tipo}]` (tipo `Vaciado` o
   `Cortado` — una pieza no estándar cortada de otra en vez de fundida a su propia medida,
   distinción real vista en el Excel de SYMA Andes). Cada fila tiene un `id` propio estable (no
@@ -149,6 +151,19 @@ fila suelta, la Losa completa es la unidad natural de guardado/sincronización.
     esperado al pegar desde Excel (`onPasteFilasProduccion()`) se actualizó igual (Cuadro, Ejes
     numéricos, Ejes alfabéticos, ...) — Importar Excel no se vio afectado, mapea por nombre de
     encabezado, no por posición.
+  - **Celdas numéricas vacías en una fila nueva, no en "0"** (2026-10-14, a pedido del usuario:
+    "deja todos los campos sin datos, pues algunos están incluyendo ceros de entrada que me
+    dificultan la digitación") — `agregarFilaProduccion()` sigue inicializando el modelo en 0
+    internamente (nada cambia en el dato guardado), pero el `<input>` ya no renderiza
+    `value="0"` sino `value=""` cuando el campo está en 0 — así el usuario escribe directo en
+    vez de tener que borrar el cero primero. `oninput` sigue guardando 0 si el campo queda
+    vacío (`parseFloat(this.value)||0`), mismo comportamiento de siempre.
+  - **Columnas más angostas** (2026-10-14, a pedido del usuario: "estamos muy holgados y para
+    ver el listado completo me toca mover el scroll") — se redujo el ancho de los `<input>` de
+    cada celda (Cuadro 50→40px, Ejes num./alfa. 30→24px cada cuadro, Ancho/Hilos/Vigueta/Hilos
+    Abajo/Arriba ~55-60→38-48px, Dimensión 65→50px, Cantidad 55→42px, Observaciones
+    110→90px) y el `min-width` de la tabla bajó de 1400px a 980px, para que cupiera completa
+    sin scroll horizontal en pantallas normales.
   - **Pend. Producción/Pend. Despacho, una sola por pantalla** (2026-10-13, a pedido del
     usuario: "las listas de producción, pasémoslas tal cual a la ventana de producción como un
     no editable" — la tabla de Producción/Despachos es la MISMA de Listas de Producción, de
@@ -171,19 +186,39 @@ fila suelta, la Losa completa es la unidad natural de guardado/sincronización.
     junto a "← Volver", visible solo si `_MODO_FLUJO_LOSA === 'produccion'`, mismo lugar donde
     Despachos tiene su "📦 Registrar despacho") llama `imprimirListaProduccion()`: si no hay
     ninguna fila marcada, imprime TODAS (más amigable que bloquear pidiendo una selección);
-    construye un documento autocontenido
-    con estilo inline (header Proconcreto + datos del proyecto/losa/sistema + tabla de las
-    filas elegidas, SIN columnas de pendiente ni checkboxes ni botones de acción — es un
-    imprimible estático — + fila de totales de piezas/metros/peso + firmas "Entregado por
-    (Ingeniería)" / "Recibido en planta") y lo muestra en el contenedor compartido
-    `#vista-previa`/`#contenido-preview` (el mismo que usa toda la app para vistas previas de
-    PDF). "⬇️ Descargar PDF" llama `descargarPDFListaProduccion()`, que sigue el patrón más
-    simple ya usado en Órdenes de Producción (`verPDFOrden()`/`descargarPDFOrden()`,
-    `js/ordenes-produccion.js`) — html2canvas + jsPDF con slicing simple a varias páginas A4,
-    sin membrete ni page-break inteligente (se descartó el patrón más elaborado de Logística,
-    `imprimirProgramacionDia()`, por ser más complejo de lo que este imprimible necesita) —
-    archivo `Lista_Produccion_<nombre de la Losa>_<fecha>.pdf`. "← Volver" cierra la vista
-    previa y reactiva `pantalla-losa-detalle` tal como estaba.
+    construye el documento (tabla de las filas elegidas, SIN columnas de pendiente, de peso, ni
+    checkboxes ni botones de acción — es un imprimible estático) y lo muestra en el contenedor
+    compartido `#vista-previa`/`#contenido-preview` (el mismo que usa toda la app para vistas
+    previas de PDF).
+    - **Sin columna de Peso** (2026-10-15, a pedido del usuario: "en este, no es necesario
+      incluir la columna de peso") — este imprimible le dice a planta QUÉ fabricar (cuadro,
+      ejes, dimensión, cantidad), no cuánto pesa; la columna de Peso sigue viéndose en la
+      pantalla normal (`_filaProduccionHTML()`), solo se quitó del imprimible
+      (`imprimirListaProduccion()`).
+    - **Mismo lenguaje gráfico que los demás documentos oficiales** (2026-10-15, a pedido del
+      usuario: "revisa el formato de imprimible de diseño de mezcla para que manejemos el mismo
+      lenguaje gráfico") — se reescribió para seguir el mismo molde que
+      `verFormatoProduccionAjuste()`/`descargarFormatoProduccionAjuste()`
+      (`js/calidad-ajuste-mezcla.js`) y `descargarPDF()` (`js/pdf.js`, la cotización), en vez
+      del header/footer con estilo inline propio que tenía antes: membrete real
+      (`membrete-top.jpg`) arriba, clases compartidas `css/estilos.css`
+      (`.preview-doc`/`.preview-content`/`.preview-tabla`/`.total-row`/`.preview-firma`) para
+      el cuerpo, y pie compartido `.preview-membrete-footer` (arco + teléfono/dirección/web)
+      abajo — el mismo "papel membretado" que ya usan la cotización y el Formato de Producción
+      de Calidad. "⬇️ Descargar PDF" llama `descargarPDFListaProduccion()`, que copia el cuerpo
+      completo de `descargarFormatoProduccionAjuste()`: `cargarImagen()`/`_alturaContenidoReal()`/
+      `_filaBlancaCerca()` (helpers compartidos, `js/pdf.js`) para paginar a varias páginas A4
+      con el membrete repetido en cada una y el corte entre filas (nunca partiendo una fila a la
+      mitad) — reemplaza el slicing simple sin membrete que tenía antes (heredado de
+      `descargarPDFOrden()`, Órdenes de Producción, que ya no es el patrón que sigue este
+      imprimible). Archivo `Lista_Produccion_<nombre de la Losa>_<fecha>.pdf`.
+    - **Alineación de la fila de TOTALES** (corregido 2026-10-15, a pedido del usuario: "revisa
+      los totales pues no están quedando bien alineados") — el `colspan` de la celda "TOTALES"
+      debe cubrir exactamente las columnas antes de "Cant." (# + Cuadro + Ejes num. + Ejes alfa.
+      + las 2 o 3 columnas propias del sistema + Dim.) para que el total de piezas caiga debajo
+      de "Cant." y el total de metros debajo de "Long. tot." — antes el colspan se quedaba una
+      columna corto y los totales aparecían corridos una posición a la izquierda.
+    - "← Volver" cierra la vista previa y reactiva `pantalla-losa-detalle` tal como estaba.
 - `despachos[]` — **a nivel de Losa, no por fila**: `{remision, fecha, observaciones,
   lineas: [{filaId, cantidad}]}` — una remisión real cubre varias filas a la vez, mismo
   espíritu que ya usa Logística con `viaje.entregas[].productos[]`.
@@ -205,9 +240,11 @@ fila suelta, la Losa completa es la unidad natural de guardado/sincronización.
 
 ### Peso — regresión verificada contra los 2 Excel reales
 
-- Prelosa/Placa Alveolar: `ancho × dimensión × (espesorCm/100) × densidadKgM3 × cantidad` — con
-  los valores reales de Boreal (ancho 0,5 m, dimensión 2,24 m, espesor 5 cm, densidad
-  2400 kg/m³) da **134,4 kg**, el mismo número exacto visto en la columna "KG" del Excel real.
+- Prelosa/Placa Alveolar: `(ancho/100) × dimensión × (espesorCm/100) × densidadKgM3 × cantidad`
+  — `ancho` se captura en cm en pantalla (2026-10-14), de ahí el `/100` extra frente a la
+  versión original de esta fórmula. Con los valores reales de Boreal (ancho 50 cm, dimensión
+  2,24 m, espesor 5 cm, densidad 2400 kg/m³) da **134,4 kg**, el mismo número exacto visto en
+  la columna "KG" del Excel real.
 - Vigueta: `dimensión × pesoFactorKgM × cantidad` — con los valores reales de SYMA Andes
   (dimensión 2,84 m, factor 21,5 kg/ml de la vigueta H11) da **61,06 kg**, también el número
   exacto visto en el Excel real.
