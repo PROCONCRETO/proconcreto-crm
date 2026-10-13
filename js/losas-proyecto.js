@@ -405,10 +405,16 @@ function renderLosaDetalle() {
   if (!l) return;
   const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
   const esLista = _MODO_FLUJO_LOSA === 'lista';
+  const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
   const esDespacho = _MODO_FLUJO_LOSA === 'despacho';
   document.getElementById('losa-detalle-titulo').textContent = `${_ICONOS_MODO_LOSA[_MODO_FLUJO_LOSA] || ''} ${l.nombre}${l.ubicacion ? ' — ' + l.ubicacion : ''} (${sis ? sis.etiqueta : ''})`;
   document.getElementById('losa-barra-lista').style.display = esLista ? '' : 'none';
   document.getElementById('losa-nota-pegar').style.display = esLista ? '' : 'none';
+  // El imprimible para planta vive en Producción, no en Lista (2026-10-14, a pedido del
+  // usuario: "esto lo hago para que más adelante podamos asignar permisos más fácil a ciertas
+  // ventanas a los diferentes roles" — Ingeniería define la lista, Planta es quien imprime
+  // para fabricar).
+  document.getElementById('losa-btn-imprimir-produccion').style.display = esProduccion ? '' : 'none';
   document.getElementById('losa-btn-registrar-despacho').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-card-despachos').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-detalle-bloque-bovedilla').style.display = l.sistema === 'vigueta_bovedilla' ? '' : 'none';
@@ -433,10 +439,12 @@ function renderFilasProduccion() {
   const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
   const thead = document.getElementById('filas-produccion-thead');
   // Casilla de selección (2026-10-13, a pedido del usuario: "agregamos un botón de imprimir
-  // listas de producción, donde se pueda seleccionar las filas...") — solo en modo lista, que
-  // es donde vive el botón "🖨️ Imprimir" (ver imprimirListaProduccion()).
+  // listas de producción, donde se pueda seleccionar las filas...") — vive en modo producción,
+  // no en lista (2026-10-14, a pedido del usuario: el imprimible para planta es de Producción,
+  // para poder asignarle permisos por ventana a futuro independiente de Ingeniería), que es
+  // donde vive el botón "🖨️ Imprimir" (ver imprimirListaProduccion()).
   thead.innerHTML = `<tr>
-    ${esLista ? '<th style="width:28px"><input type="checkbox" id="chk-todas-filas-print" onchange="_toggleSeleccionTodasFilas(this.checked)"></th>' : ''}
+    ${esProduccion ? '<th style="width:28px"><input type="checkbox" id="chk-todas-filas-print" onchange="_toggleSeleccionTodasFilas(this.checked)"></th>' : ''}
     <th>#</th><th>Cuadro</th><th>Ejes numéricos</th><th>Ejes alfabéticos</th>
     ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (m)</th><th>Hilos</th>'}
     <th>Dimensión (m)</th><th>Cantidad</th><th>Long. total (m)</th><th>Peso (kg)</th>
@@ -484,7 +492,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     </div>`;
   };
   return `<tr>
-    ${esLista ? `<td><input type="checkbox" class="chk-fila-print" data-idx="${i}"></td>` : ''}
+    ${_MODO_FLUJO_LOSA === 'produccion' ? `<td><input type="checkbox" class="chk-fila-print" data-idx="${i}"></td>` : ''}
     <td>${i + 1}</td>
     <td>${txt(f.cuadro, 'cuadro', 50)}</td>
     <td>${par(f.ejesEntre, 'ejesEntre')}</td>

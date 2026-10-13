@@ -160,11 +160,18 @@ fila suelta, la Losa completa es la unidad natural de guardado/sincronización.
     principal de filas.
   - **🖨️ Imprimir lista de producción** (2026-10-13, a pedido del usuario: "agregamos un botón
     de imprimir listas de producción, donde se pueda seleccionar las filas y de esto me salga
-    un imprimible para pasar a planta y puedan ellos fabricar lo que se necesita") — solo en
-    modo lista. Cada fila lleva un checkbox (`.chk-fila-print`) más uno "marcar todas" en el
-    encabezado (`_toggleSeleccionTodasFilas()`); el botón "🖨️ Imprimir" junto a "💾 Guardar
-    lista" llama `imprimirListaProduccion()`: si no hay ninguna fila marcada, imprime TODAS
-    (más amigable que bloquear pidiendo una selección); construye un documento autocontenido
+    un imprimible para pasar a planta y puedan ellos fabricar lo que se necesita") — vive en
+    modo **producción**, no en modo lista (corregido 2026-10-14, a pedido del usuario: "el
+    imprimible debe salir de la ventana de Producción, no de la de Listas de Producción... lo
+    hago para que más adelante podamos asignar permisos más fácil a ciertas ventanas a los
+    diferentes roles" — Ingeniería solo define la lista, Planta es quien imprime para
+    fabricar, y cada pantalla debe poder aislarse por rol a futuro). Cada fila lleva un
+    checkbox (`.chk-fila-print`) más uno "marcar todas" en el encabezado
+    (`_toggleSeleccionTodasFilas()`); el botón "🖨️ Imprimir" (`losa-btn-imprimir-produccion`,
+    junto a "← Volver", visible solo si `_MODO_FLUJO_LOSA === 'produccion'`, mismo lugar donde
+    Despachos tiene su "📦 Registrar despacho") llama `imprimirListaProduccion()`: si no hay
+    ninguna fila marcada, imprime TODAS (más amigable que bloquear pidiendo una selección);
+    construye un documento autocontenido
     con estilo inline (header Proconcreto + datos del proyecto/losa/sistema + tabla de las
     filas elegidas, SIN columnas de pendiente ni checkboxes ni botones de acción — es un
     imprimible estático — + fila de totales de piezas/metros/peso + firmas "Entregado por
