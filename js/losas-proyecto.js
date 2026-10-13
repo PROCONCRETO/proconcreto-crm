@@ -32,6 +32,15 @@ let LOSAS_PROYECTO = [];
 let _PROYECTO_ACTIVO_ID = null;
 let _LOSA_ACTIVA_ID = null;
 
+// 'lista' (Ingeniería — crea/edita la lista de producción, dueña de cuadro/dimensión/cantidad)
+// o 'produccion' (Planta/Logística — solo ve la lista como insumo de solo lectura y registra
+// avance: producción/despacho) — ver pantalla de Carpetas más abajo. Mismo registro de Losa,
+// dos modos de entrada con permisos distintos (2026-10-13, a pedido del usuario: "vamos a
+// independizar las listas de producción, que salen del departamento de ingeniería como un
+// insumo para el área de producción, la cual al hacer la producción, genera un insumo para el
+// área de despachos").
+let _MODO_FLUJO_LOSA = 'lista';
+
 // Arreglos de trabajo mientras se tiene abierta la pantalla de detalle de una Losa — mismo
 // criterio que `_despieceAceroActual` en Costeo de Producto: se editan en memoria, y se
 // persisten completos (toda la Losa de una vez) con `_guardarLosaActual()`.
@@ -86,25 +95,99 @@ function _pesoFila(fila, losa) {
 let _contadorIdFila = 0;
 function _nuevoIdFila() { _contadorIdFila++; return 'f' + Date.now() + '_' + _contadorIdFila; }
 
-// ── Navegación Proyectos → Losas del proyecto → Detalle de una Losa ──
+// ── Navegación Proyectos → Carpetas del proyecto → Losas (en modo lista o producción) →
+// Detalle de una Losa ──
 // No existe en la app ningún patrón de "pantalla completa con alcance a un registro padre"
 // (confirmado explorando el código) — acá se arma uno nuevo, a mano: variables de estado
-// (`_PROYECTO_ACTIVO_ID`/`_LOSA_ACTIVA_ID`) + activar/desactivar `.pantalla` directamente, sin
-// pasar por `ir()`/subnav (esas funciones no soportan pantallas parametrizadas por id).
-function abrirLosasDeProyecto(proyectoId) {
+// (`_PROYECTO_ACTIVO_ID`/`_LOSA_ACTIVA_ID`/`_MODO_FLUJO_LOSA`) + activar/desactivar `.pantalla`
+// directamente, sin pasar por `ir()`/subnav (esas funciones no soportan pantallas
+// parametrizadas por id).
+function abrirCarpetasProyecto(proyectoId) {
   const p = PROYECTOS.find(x => x.id === proyectoId);
   if (!p) return;
   _PROYECTO_ACTIVO_ID = proyectoId;
   document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
-  document.getElementById('pantalla-proyecto-losas').classList.add('activa');
-  document.getElementById('proyecto-losas-titulo').textContent = `📋 Producción — ${p.nombre}`;
-  renderLosasProyecto();
+  document.getElementById('pantalla-proyecto-carpetas').classList.add('activa');
+  document.getElementById('proyecto-carpetas-titulo').textContent = p.nombre;
+  renderCarpetasProyecto();
+}
+function renderCarpetasProyecto() {
+  const grid = document.getElementById('grid-carpetas-proyecto');
+  if (!grid) return;
+  const losas = LOSAS_PROYECTO.filter(l => l.proyectoId === _PROYECTO_ACTIVO_ID);
+  const nMemorias = losas.filter(l => l.memoriaCalculoPath).length;
+  const nPlanos = losas.filter(l => l.planoPath).length;
+  grid.innerHTML = `
+    <div class="inicio-modulo" onclick="abrirDocumentosProyecto('memoria')">
+      <span class="inicio-modulo-icono">📐</span>
+      <span class="inicio-modulo-nombre">Memorias de Cálculo</span>
+      <span style="font-size:11.5px;color:var(--gris-medio)">${nMemorias} archivo${nMemorias === 1 ? '' : 's'}</span>
+    </div>
+    <div class="inicio-modulo" onclick="abrirDocumentosProyecto('plano')">
+      <span class="inicio-modulo-icono">📋</span>
+      <span class="inicio-modulo-nombre">Planos de Producción</span>
+      <span style="font-size:11.5px;color:var(--gris-medio)">${nPlanos} archivo${nPlanos === 1 ? '' : 's'}</span>
+    </div>
+    <div class="inicio-modulo" onclick="abrirLosasDeProyecto('lista')">
+      <span class="inicio-modulo-icono">📄</span>
+      <span class="inicio-modulo-nombre">Listas de Producción</span>
+      <span style="font-size:11.5px;color:var(--gris-medio)">${losas.length} losa${losas.length === 1 ? '' : 's'}</span>
+    </div>
+    <div class="inicio-modulo" onclick="abrirLosasDeProyecto('produccion')">
+      <span class="inicio-modulo-icono">🏗️</span>
+      <span class="inicio-modulo-nombre">Producción y Despachos</span>
+      <span style="font-size:11.5px;color:var(--gris-medio)">${losas.length} losa${losas.length === 1 ? '' : 's'}</span>
+    </div>`;
 }
 function volverAProyectos() {
   _PROYECTO_ACTIVO_ID = null;
   document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
   document.getElementById('pantalla-proyectos').classList.add('activa');
   renderProyectos();
+}
+function volverACarpetasProyecto() {
+  document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
+  document.getElementById('pantalla-proyecto-carpetas').classList.add('activa');
+  renderCarpetasProyecto();
+}
+
+// ── Memorias de Cálculo / Planos de Producción — junta en un solo lugar los PDF que ya se
+// adjuntan por Losa (planoPath/memoriaCalculoPath), sin duplicar el archivo ni la lógica de
+// subida (eso sigue viviendo en el modal de la Losa, ver más abajo). ──
+function abrirDocumentosProyecto(tipo) {
+  _TIPO_DOCUMENTO_PROYECTO = tipo; // 'plano' | 'memoria'
+  document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
+  document.getElementById('pantalla-proyecto-documentos').classList.add('activa');
+  document.getElementById('proyecto-documentos-titulo').textContent = tipo === 'plano' ? '📋 Planos de Producción' : '📐 Memorias de Cálculo';
+  renderDocumentosProyecto();
+}
+let _TIPO_DOCUMENTO_PROYECTO = null;
+function renderDocumentosProyecto() {
+  const tbody = document.getElementById('tabla-proyecto-documentos-body');
+  if (!tbody) return;
+  const campoPath = _TIPO_DOCUMENTO_PROYECTO === 'plano' ? 'planoPath' : 'memoriaCalculoPath';
+  const campoNombre = _TIPO_DOCUMENTO_PROYECTO === 'plano' ? 'planoNombre' : 'memoriaCalculoNombre';
+  const losas = LOSAS_PROYECTO.filter(l => l.proyectoId === _PROYECTO_ACTIVO_ID && l[campoPath]);
+  if (!losas.length) {
+    const etiqueta = _TIPO_DOCUMENTO_PROYECTO === 'plano' ? 'un plano' : 'una memoria de cálculo';
+    tbody.innerHTML = `<tr><td colspan="4" class="empty-state"><div class="icono">${_TIPO_DOCUMENTO_PROYECTO === 'plano' ? '📋' : '📐'}</div><div>Ninguna losa de este proyecto tiene ${etiqueta} adjunto todavía — se adjunta al editar la losa, desde "Listas de Producción".</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = losas.map(l => `<tr>
+    <td style="font-weight:600">${_esc(l.nombre)}</td>
+    <td>${_esc(l.ubicacion) || '—'}</td>
+    <td>${_esc(l[campoNombre])}</td>
+    <td><button class="btn btn-secundario btn-xs" onclick="_abrirPdfStorage('proyectos-pdf','${_escAttr(l[campoPath])}')">👁️ Ver</button></td>
+  </tr>`).join('');
+}
+
+function abrirLosasDeProyecto(modo) {
+  _MODO_FLUJO_LOSA = modo;
+  document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
+  document.getElementById('pantalla-proyecto-losas').classList.add('activa');
+  document.getElementById('proyecto-losas-titulo').textContent = modo === 'lista' ? '📄 Listas de Producción' : '🏗️ Producción y Despachos';
+  document.getElementById('btn-nueva-losa').style.display = modo === 'lista' ? '' : 'none';
+  renderLosasProyecto();
 }
 function volverALosasProyecto() {
   _LOSA_ACTIVA_ID = null;
@@ -118,9 +201,10 @@ function renderLosasProyecto() {
   if (!tbody) return;
   const losas = LOSAS_PROYECTO.filter(l => l.proyectoId === _PROYECTO_ACTIVO_ID);
   if (!losas.length) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="icono">📋</div><div>No hay losas registradas todavía — crea la primera con "+ Nueva Losa".</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="icono">📋</div><div>No hay losas registradas todavía${_MODO_FLUJO_LOSA === 'lista' ? ' — crea la primera con "+ Nueva Losa".' : ' — Ingeniería todavía no ha cargado una lista de producción.'}</div></td></tr>`;
     return;
   }
+  const esLista = _MODO_FLUJO_LOSA === 'lista';
   tbody.innerHTML = losas.map(l => {
     const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
     const totalCant = (l.filas || []).reduce((s, f) => s + (Number(f.cantidad) || 0), 0);
@@ -133,9 +217,11 @@ function renderLosasProyecto() {
       <td><span class="badge" style="background:${col.bg};color:${col.fg}">${_esc(l.estado)}</span></td>
       <td>${(l.filas || []).length} filas · ${totalProd}/${totalCant} producidas</td>
       <td style="white-space:nowrap">
-        <button class="btn btn-primario btn-xs" onclick="abrirLosaDetalle('${_escAttr(l.id)}')">📋 Ver lista</button>
-        <button class="btn btn-secundario btn-xs" onclick="abrirModalLosa('${_escAttr(l.id)}')">✏️</button>
-        <button class="btn btn-rojo btn-xs" onclick="eliminarLosa('${_escAttr(l.id)}')">🗑️</button>
+        ${esLista
+          ? `<button class="btn btn-primario btn-xs" onclick="abrirLosaDetalle('${_escAttr(l.id)}')">📄 Ver lista</button>
+             <button class="btn btn-secundario btn-xs" onclick="abrirModalLosa('${_escAttr(l.id)}')">✏️</button>
+             <button class="btn btn-rojo btn-xs" onclick="eliminarLosa('${_escAttr(l.id)}')">🗑️</button>`
+          : `<button class="btn btn-primario btn-xs" onclick="abrirLosaDetalle('${_escAttr(l.id)}')">🏗️ Ver avance</button>`}
       </td>
     </tr>`;
   }).join('');
@@ -308,7 +394,12 @@ function renderLosaDetalle() {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   if (!l) return;
   const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
-  document.getElementById('losa-detalle-titulo').textContent = `${l.nombre}${l.ubicacion ? ' — ' + l.ubicacion : ''} (${sis ? sis.etiqueta : ''})`;
+  const esLista = _MODO_FLUJO_LOSA === 'lista';
+  document.getElementById('losa-detalle-titulo').textContent = `${esLista ? '📄' : '🏗️'} ${l.nombre}${l.ubicacion ? ' — ' + l.ubicacion : ''} (${sis ? sis.etiqueta : ''})`;
+  document.getElementById('losa-barra-lista').style.display = esLista ? '' : 'none';
+  document.getElementById('losa-nota-pegar').style.display = esLista ? '' : 'none';
+  document.getElementById('losa-btn-registrar-despacho').style.display = esLista ? 'none' : '';
+  document.getElementById('losa-card-despachos').style.display = esLista ? 'none' : '';
   document.getElementById('losa-detalle-bloque-bovedilla').style.display = l.sistema === 'vigueta_bovedilla' ? '' : 'none';
   renderFilasProduccion();
   if (l.sistema === 'vigueta_bovedilla') renderBovedillaLosa();
@@ -335,34 +426,46 @@ function renderFilasProduccion() {
   }
   tbody.innerHTML = _filasLosaActual.map((f, i) => _filaProduccionHTML(f, i, l, esVigueta)).join('');
 }
+// En modo 'lista' (Ingeniería) las celdas base son editables; en modo 'produccion'
+// (Planta/Logística) se muestran de solo lectura — esa zona solo puede REGISTRAR avance
+// (🏗️ producción, abajo el botón de despacho), nunca tocar cuadro/dimensión/cantidad, que son
+// el insumo que recibe de Ingeniería.
 function _filaProduccionHTML(f, i, l, esVigueta) {
   const longTotal = (Number(f.dimension) || 0) * (Number(f.cantidad) || 0);
   const peso = _pesoFila(f, l);
   const pendProd = _pendienteProduccionFila(f);
   const pendDesp = _pendienteDespachoFila(f, _despachosLosaActual);
+  const esLista = _MODO_FLUJO_LOSA === 'lista';
+  const txt = (valor, campo, ancho) => esLista
+    ? `<input type="text" value="${_escAttr(valor || '')}" oninput="_filasLosaActual[${i}].${campo}=this.value" style="width:${ancho}px">`
+    : _esc(valor || '—');
+  const num = (valor, campo, ancho, recalcula) => esLista
+    ? `<input type="number" ${campo === 'dimension' || campo === 'ancho' ? 'step="0.01"' : ''} value="${valor || 0}" oninput="_filasLosaActual[${i}].${campo}=parseFloat(this.value)||0${recalcula ? `;_actualizarFilaProduccion(${i})` : ''}" style="width:${ancho}px">`
+    : (valor || 0);
   return `<tr>
     <td>${i + 1}</td>
-    <td><input type="text" value="${_escAttr(f.ejesEntre || '')}" oninput="_filasLosaActual[${i}].ejesEntre=this.value" style="width:70px"></td>
-    <td><input type="text" value="${_escAttr(f.laterales || '')}" oninput="_filasLosaActual[${i}].laterales=this.value" style="width:70px"></td>
-    <td><input type="text" value="${_escAttr(f.cuadro || '')}" oninput="_filasLosaActual[${i}].cuadro=this.value" style="width:50px"></td>
+    <td>${txt(f.ejesEntre, 'ejesEntre', 70)}</td>
+    <td>${txt(f.laterales, 'laterales', 70)}</td>
+    <td>${txt(f.cuadro, 'cuadro', 50)}</td>
     ${esVigueta ? `
-    <td><input type="text" value="${_escAttr(f.tipoVigueta || '')}" oninput="_filasLosaActual[${i}].tipoVigueta=this.value" style="width:60px"></td>
-    <td><input type="number" value="${f.hilosAbajo || 0}" oninput="_filasLosaActual[${i}].hilosAbajo=parseFloat(this.value)||0" style="width:55px"></td>
-    <td><input type="number" value="${f.hilosArriba || 0}" oninput="_filasLosaActual[${i}].hilosArriba=parseFloat(this.value)||0" style="width:55px"></td>
+    <td>${txt(f.tipoVigueta, 'tipoVigueta', 60)}</td>
+    <td>${num(f.hilosAbajo, 'hilosAbajo', 55, false)}</td>
+    <td>${num(f.hilosArriba, 'hilosArriba', 55, false)}</td>
     ` : `
-    <td><input type="number" step="0.01" value="${f.ancho || 0}" oninput="_filasLosaActual[${i}].ancho=parseFloat(this.value)||0;_actualizarFilaProduccion(${i})" style="width:60px"></td>
-    <td><input type="number" value="${f.hilos || 0}" oninput="_filasLosaActual[${i}].hilos=parseFloat(this.value)||0" style="width:50px"></td>
+    <td>${num(f.ancho, 'ancho', 60, true)}</td>
+    <td>${num(f.hilos, 'hilos', 50, false)}</td>
     `}
-    <td><input type="number" step="0.01" value="${f.dimension || 0}" oninput="_filasLosaActual[${i}].dimension=parseFloat(this.value)||0;_actualizarFilaProduccion(${i})" style="width:65px"></td>
-    <td><input type="number" value="${f.cantidad || 0}" oninput="_filasLosaActual[${i}].cantidad=parseFloat(this.value)||0;_actualizarFilaProduccion(${i})" style="width:55px"></td>
+    <td>${num(f.dimension, 'dimension', 65, true)}</td>
+    <td>${num(f.cantidad, 'cantidad', 55, true)}</td>
     <td id="fp-longtotal-${i}" style="text-align:right">${longTotal.toFixed(2)}</td>
     <td id="fp-peso-${i}" style="text-align:right">${peso.toFixed(1)}</td>
     <td id="fp-pendprod-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProd}</td>
     <td id="fp-penddesp-${i}" style="text-align:right;font-weight:600;color:${pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendDesp}</td>
-    <td><input type="text" value="${_escAttr(f.observaciones || '')}" oninput="_filasLosaActual[${i}].observaciones=this.value" style="width:110px"></td>
+    <td>${txt(f.observaciones, 'observaciones', 110)}</td>
     <td style="white-space:nowrap">
-      <button class="btn btn-secundario btn-xs" onclick="abrirModalProduccionFila(${i})" title="Registrar producción">🏗️</button>
-      <button class="btn btn-rojo btn-xs" onclick="_filasLosaActual.splice(${i},1);renderFilasProduccion()">✕</button>
+      ${esLista
+        ? `<button class="btn btn-rojo btn-xs" onclick="_filasLosaActual.splice(${i},1);renderFilasProduccion()">✕</button>`
+        : `<button class="btn btn-secundario btn-xs" onclick="abrirModalProduccionFila(${i})" title="Registrar producción">🏗️</button>`}
     </td>
   </tr>`;
 }
@@ -594,12 +697,24 @@ function renderDespachosLosa() {
 // ── Bovedilla — sin control fila-por-fila, solo cantidad requerida + entradas/salidas por
 // remisión (a pedido del usuario: "no es tan riguroso su control... como fabricar un bloque
 // de cemento") ──
+// En modo 'lista' (Ingeniería) se edita tipo/cantidad requerida, sin ver el seguimiento. En
+// modo 'produccion' (Planta/Logística) es al revés: tipo/cantidad quedan de solo lectura (son
+// el insumo que define Ingeniería) y se muestra el seguimiento completo (pendientes + eventos).
 function renderBovedillaLosa() {
   const b = _bovedillaLosaActual;
-  const elTipo = document.getElementById('bov-tipo');
-  const elCant = document.getElementById('bov-cantidad-requerida');
-  if (elTipo) elTipo.value = b?.tipo || '';
-  if (elCant) elCant.value = b?.cantidadRequerida || 0;
+  const esLista = _MODO_FLUJO_LOSA === 'lista';
+  document.getElementById('bov-campos-editables').style.display = esLista ? '' : 'none';
+  document.getElementById('bov-campos-solo-lectura').style.display = esLista ? 'none' : '';
+  document.getElementById('bov-resumen').style.display = esLista ? 'none' : '';
+  document.getElementById('bov-seguimiento').style.display = esLista ? 'none' : '';
+  if (esLista) {
+    const elTipo = document.getElementById('bov-tipo');
+    const elCant = document.getElementById('bov-cantidad-requerida');
+    if (elTipo) elTipo.value = b?.tipo || '';
+    if (elCant) elCant.value = b?.cantidadRequerida || 0;
+    return;
+  }
+  document.getElementById('bov-campos-solo-lectura').textContent = `Tipo: ${b?.tipo || '—'} — Cantidad requerida: ${Number(b?.cantidadRequerida) || 0}`;
   const prod = (b?.produccion || []).reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
   const desp = (b?.despacho || []).reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
   const req = Number(b?.cantidadRequerida) || 0;

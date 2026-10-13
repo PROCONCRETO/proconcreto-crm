@@ -137,6 +137,8 @@ function rerenderPantallaActiva() {
     case 'pantalla-costeo-referencia': renderCosteoReferencia(); break;
     case 'pantalla-costeo-producto': renderCosteoProductos(); break;
     case 'pantalla-proyectos': renderProyectos(); break;
+    case 'pantalla-proyecto-carpetas': renderCarpetasProyecto(); break;
+    case 'pantalla-proyecto-documentos': renderDocumentosProyecto(); break;
     case 'pantalla-proyecto-losas': renderLosasProyecto(); break;
     // 'pantalla-losa-detalle' NO tiene caso acá a propósito: esa pantalla trabaja sobre
     // arreglos de edición en memoria (_filasLosaActual/_despachosLosaActual/

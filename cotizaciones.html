@@ -1153,14 +1153,7 @@
       </select>
     </div>
   </div>
-  <div class="card" style="padding:0">
-    <table class="tabla-cots">
-      <thead><tr>
-        <th>Nombre</th><th>Cliente</th><th>Ciudad</th><th>Estado</th><th>Fecha inicio</th><th>Fecha fin est.</th><th>Responsable</th><th style="width:140px">Acciones</th>
-      </tr></thead>
-      <tbody id="tabla-proyectos-body"></tbody>
-    </table>
-  </div>
+  <div id="grid-proyectos" class="inicio-grid"></div>
 </div>
 
 <div class="modal-overlay" id="modal-proyecto">
@@ -1202,15 +1195,51 @@
 </div>
 
 <!-- ═══════════════════════════════════════
-     PANTALLA: LOSAS DE UN PROYECTO (entrepisos prefabricados)
+     PANTALLA: CARPETAS DE UN PROYECTO (2026-10-13, a pedido del usuario: "independizar las
+     listas de producción, que salen del departamento de ingeniería como un insumo para el área
+     de producción, la cual al hacer la producción, genera un insumo para el área de despachos")
+═══════════════════════════════════════ -->
+<div id="pantalla-proyecto-carpetas" class="pantalla">
+  <div class="acciones-row">
+    <div class="flex-gap" style="align-items:center">
+      <button class="btn btn-secundario btn-sm" onclick="volverAProyectos()">← Volver a Proyectos</button>
+      <div id="proyecto-carpetas-titulo" style="font-size:18px;font-weight:700;color:var(--azul)"></div>
+    </div>
+  </div>
+  <div id="grid-carpetas-proyecto" class="inicio-grid"></div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: DOCUMENTOS DE UN PROYECTO (Memorias de Cálculo / Planos de Producción) — junta
+     en un solo lugar los PDF que ya se adjuntan por Losa, sin duplicar el archivo.
+═══════════════════════════════════════ -->
+<div id="pantalla-proyecto-documentos" class="pantalla">
+  <div class="acciones-row">
+    <div class="flex-gap" style="align-items:center">
+      <button class="btn btn-secundario btn-sm" onclick="volverACarpetasProyecto()">← Volver</button>
+      <div id="proyecto-documentos-titulo" style="font-size:18px;font-weight:700;color:var(--azul)"></div>
+    </div>
+  </div>
+  <div class="card" style="padding:0">
+    <table class="tabla-cots">
+      <thead><tr><th>Losa</th><th>Ubicación</th><th>Archivo</th><th style="width:100px">Acciones</th></tr></thead>
+      <tbody id="tabla-proyecto-documentos-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: LOSAS DE UN PROYECTO (entrepisos prefabricados) — pantalla compartida entre las
+     carpetas "Listas de Producción" (Ingeniería, puede crear/editar/borrar) y "Producción y
+     Despachos" (Planta/Logística, solo entra a ver/registrar avance) — ver `_MODO_FLUJO_LOSA`.
 ═══════════════════════════════════════ -->
 <div id="pantalla-proyecto-losas" class="pantalla">
   <div class="acciones-row">
     <div class="flex-gap" style="align-items:center">
-      <button class="btn btn-secundario btn-sm" onclick="volverAProyectos()">← Volver a Proyectos</button>
+      <button class="btn btn-secundario btn-sm" onclick="volverACarpetasProyecto()">← Volver</button>
       <div id="proyecto-losas-titulo" style="font-size:18px;font-weight:700;color:var(--azul)">📋 Producción</div>
     </div>
-    <button class="btn btn-primario btn-sm" onclick="abrirModalLosa()">+ Nueva Losa</button>
+    <button id="btn-nueva-losa" class="btn btn-primario btn-sm" onclick="abrirModalLosa()">+ Nueva Losa</button>
   </div>
   <div class="card" style="padding:0">
     <table class="tabla-cots">
@@ -1282,10 +1311,10 @@
       <button class="btn btn-secundario btn-sm" onclick="volverALosasProyecto()">← Volver</button>
       <div id="losa-detalle-titulo" style="font-size:18px;font-weight:700;color:var(--azul)"></div>
     </div>
-    <button class="btn btn-secundario btn-sm" onclick="abrirModalDespachoLosa()">📦 Registrar despacho</button>
+    <button id="losa-btn-registrar-despacho" class="btn btn-secundario btn-sm" onclick="abrirModalDespachoLosa()" style="display:none">📦 Registrar despacho</button>
   </div>
 
-  <div class="acciones-row">
+  <div id="losa-barra-lista" class="acciones-row">
     <div class="flex-gap">
       <button class="btn btn-primario btn-sm" onclick="agregarFilaProduccion()">+ Agregar fila</button>
       <button class="btn btn-secundario btn-sm" onclick="abrirImportarFilasExcel()">📤 Importar Excel</button>
@@ -1293,7 +1322,7 @@
       <button class="btn btn-primario btn-sm" onclick="guardarListaProduccion()">💾 Guardar lista</button>
     </div>
   </div>
-  <div style="font-size:11.5px;color:var(--gris-medio);margin:-8px 0 10px 2px">
+  <div id="losa-nota-pegar" style="font-size:11.5px;color:var(--gris-medio);margin:-8px 0 10px 2px">
     💡 También puedes copiar un bloque de celdas de tu Excel actual y pegarlo (Ctrl+V) directamente sobre la tabla de abajo — columnas en este orden: Ejes entre, Laterales, Cuadro, Ancho/Hilos (o Vigueta/Hilos Abajo/Hilos Arriba según el sistema), Dimensión, Cantidad.
   </div>
 
@@ -1306,12 +1335,13 @@
 
   <div id="losa-detalle-bloque-bovedilla" class="card" style="margin-top:16px">
     <div style="font-size:15px;font-weight:700;color:var(--azul);margin-bottom:10px">🧱 Bovedilla</div>
-    <div class="form-grid" style="margin-bottom:10px">
+    <div id="bov-campos-editables" class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Tipo de bovedilla</label><input type="text" id="bov-tipo" placeholder="Ej: 20+6 Bovedilla Concreto Arco Doble" onchange="guardarDatosBovedilla()"></div>
       <div class="form-grupo"><label>Cantidad requerida</label><input type="number" min="0" id="bov-cantidad-requerida" onchange="guardarDatosBovedilla()"></div>
     </div>
-    <div id="bov-resumen" style="font-size:13px;font-weight:600;color:var(--gris-texto);margin-bottom:10px"></div>
-    <div class="form-grid">
+    <div id="bov-campos-solo-lectura" style="display:none;font-size:13px;margin-bottom:10px"></div>
+    <div id="bov-resumen" style="font-size:13px;font-weight:600;color:var(--gris-texto);margin-bottom:10px;display:none"></div>
+    <div id="bov-seguimiento" class="form-grid" style="display:none">
       <div>
         <div class="flex-gap" style="margin-bottom:6px;justify-content:space-between"><div style="font-weight:600;font-size:12.5px">Entradas (producción)</div><button class="btn btn-secundario btn-xs" onclick="abrirModalEventoBovedilla('produccion')">+ Registrar entrada</button></div>
         <table class="tabla-cots"><thead><tr><th>Remisión</th><th>Fecha</th><th style="text-align:right">Cantidad</th></tr></thead><tbody id="bov-produccion-body"></tbody></table>
@@ -1323,7 +1353,7 @@
     </div>
   </div>
 
-  <div class="card" style="margin-top:16px">
+  <div id="losa-card-despachos" class="card" style="margin-top:16px;display:none">
     <div style="font-size:15px;font-weight:700;color:var(--azul);margin-bottom:10px">📦 Despachos registrados</div>
     <table class="tabla-cots"><thead><tr><th>Remisión</th><th>Fecha</th><th>Contenido</th><th>Observaciones</th></tr></thead><tbody id="despachos-losa-body"></tbody></table>
   </div>
@@ -3166,10 +3196,10 @@
 <script src="js/logistica.js?v=20261011c"></script>
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
-<script src="js/proyectos.js?v=20261011d"></script>
-<script src="js/losas-proyecto.js?v=20261011a"></script>
+<script src="js/proyectos.js?v=20261013b"></script>
+<script src="js/losas-proyecto.js?v=20261013a"></script>
 <script src="js/auth.js?v=20260804a"></script>
-<script src="js/datos-realtime.js?v=20261011b"></script>
+<script src="js/datos-realtime.js?v=20261013a"></script>
 <script src="js/cotizador.js?v=20261007a"></script>
 <script src="js/historico-clientes-stats.js?v=20261011c"></script>
 <script src="js/retenciones.js?v=20260809c"></script>

@@ -16,18 +16,74 @@
 ## Pantallas
 
 - `pantalla-proyectos` — listado + modal de crear/editar, sin subnav propio.
-- `pantalla-proyecto-losas` — Losas de un proyecto (ver sección propia).
-- `pantalla-losa-detalle` — lista de producción de una Losa (ver sección propia).
+- `pantalla-proyecto-carpetas` — carpetas-ícono de un proyecto (ver sección propia).
+- `pantalla-proyecto-documentos` — Memorias de Cálculo / Planos de Producción reunidos (ver sección propia).
+- `pantalla-proyecto-losas` — Losas de un proyecto, en modo "lista" o "producción" (ver sección propia).
+- `pantalla-losa-detalle` — lista de producción de una Losa, o su seguimiento de producción/despacho según el modo (ver sección propia).
 
 ## Qué hace
 
 A pedido del usuario: "vamos a crear una nueva ventana de PROYECTOS... incluyela en la pantalla de inicio y en la fila superior con las demás ventanas". Al preguntar qué debía mostrar/gestionar, eligió explícitamente **"gestión de proyectos como entidad nueva"**: un registro propio (nombre, cliente, ciudad, estado, fechas, responsable, descripción), **independiente** de lo que ya existe en Clientes (`cliente.proyectos[]`) y Cotizaciones (`cot.cliente.proyecto`) — no reutiliza ni modifica esas estructuras, son conceptos separados que coexisten.
 
 - **Campos de un Proyecto**: `nombre` (único obligatorio), `cliente` (texto libre, con buscador contra `CLIENTES` para autocompletar — no obliga a que el cliente ya exista en el catálogo), `ciudad`, `estado` (`Planeación` / `En ejecución` / `Finalizado` / `Cancelado`), `fechaInicio`, `fechaFinEstimada`, `responsable` (texto libre), `descripcion`.
-- **Listado** (`renderProyectos()`): tabla con buscador (nombre/cliente/ciudad) y filtro por estado, más reciente primero. Cada fila tiene un badge de color según el estado y botones "✏️ Editar"/"🗑️" (eliminar definitivo, con confirmación — a diferencia de Productos/Clientes, acá no hay ningún otro módulo que referencie un Proyecto todavía, así que no hace falta el patrón de "ocultar en vez de borrar").
+- **Listado** (`renderProyectos()`): desde el 2026-10-13, a pedido del usuario ("en vez de un listado de proyectos, iconos de acceso para los proyectos... tamaño similar a los iconos de la pantalla de inicio"), ya no es una tabla — es una grilla de tarjetas-ícono, una por proyecto, reusando tal cual las clases `.inicio-grid`/`.inicio-modulo` (`css/estilos.css`) que ya arma el grid de módulos de Inicio, para que el tamaño quede idéntico sin duplicar CSS. Buscador (nombre/cliente/ciudad) y filtro por estado, más reciente primero. Cada tarjeta: ícono 🏗️, nombre, cliente como subtítulo, badge de color según el estado, y dos botones chiquitos "✏️"/"🗑️" con `stopPropagation` (para no disparar también el clic de la tarjeta). **El clic en la tarjeta misma entra a las Carpetas de ese proyecto** (`abrirCarpetasProyecto()`, ver sección propia más abajo) — es la puerta de entrada a todo lo demás del proyecto.
 - **Ubicación en la navegación**: botón nuevo en la barra superior y en la pantalla de Inicio, **entre Calidad y Centro de Costos** (a pedido explícito del usuario: "pongamos la de proyectos al lado de la de calidad... movamos la ventana de costos para el extremo derecho" — Centro de Costos ya estaba al final, insertar Proyectos justo antes deja ambos pedidos resueltos a la vez).
 - **Sin subnav propio todavía** — `activarModulo('proyectos')` va directo a la única pantalla, a diferencia de los demás módulos (que siempre muestran su barra de sub-pestañas). Se puede agregar más adelante si el módulo crece (ej. una vista de estadísticas).
 - Verificado con un arnés real — 32 aserciones: el orden de los botones en la barra superior y en Inicio; la navegación activa/desactiva las pantallas correctas; el estado vacío; crear un proyecto completo de punta a punta (validación de Nombre obligatorio, el upsert real hacia Supabase, el modal cerrando y la tabla mostrando el registro); editar sin duplicar y sin perder `creadoEn`; el buscador de cliente; los filtros de estado y de búsqueda; eliminar con su `delete` real; y que los demás módulos (Calidad, Cotizaciones, Inicio) siguen funcionando igual que antes — sin errores de consola.
+
+## Carpetas de un proyecto y separación Ingeniería/Producción (2026-10-13)
+
+A pedido del usuario: primero "incluyamos subcarpetas por ahora, de, memorias de cálculo,
+planos de producción, listas de producción, producción y despachos, todas a modo de ícono", y
+acto seguido la razón de fondo: "vamos a independizar las listas de producción, que salen del
+departamento de ingeniería como un insumo para el área de producción, la cual al hacer la
+producción, genera un insumo para el área de despachos" — no es solo una reorganización visual,
+es un flujo real entre 3 áreas con una sola dirección: Ingeniería → Producción → Despachos.
+
+- **`pantalla-proyecto-carpetas`** (`abrirCarpetasProyecto()`): 4 tarjetas-ícono, mismo tamaño
+  `.inicio-modulo` que el resto de la app, con un conteo en cada una:
+  - 📐 **Memorias de Cálculo** y 📋 **Planos de Producción** → `abrirDocumentosProyecto('memoria'|'plano')`
+    → `pantalla-proyecto-documentos`: junta en una sola tabla los PDF que **ya se adjuntan por
+    Losa** (`planoPath`/`memoriaCalculoPath`, ver sección de Losas) de TODAS las losas del
+    proyecto — no duplica el archivo ni reinventa la subida, solo reúne lo que Ingeniería ya
+    adjuntó al crear/editar cada Losa, para no tener que entrar losa por losa a buscarlo.
+  - 📄 **Listas de Producción** y 🏗️ **Producción y Despachos** → ambas llaman
+    `abrirLosasDeProyecto(modo)` con `modo` = `'lista'` o `'produccion'` — la MISMA pantalla de
+    Losas y el MISMO registro de Losa por debajo, pero con permisos distintos (ver abajo).
+
+- **`_MODO_FLUJO_LOSA`** (`'lista'` | `'produccion'`, variable de módulo en `js/losas-proyecto.js`):
+  decide qué puede hacer cada pantalla reusada:
+  | | Modo `lista` (Ingeniería) | Modo `produccion` (Planta/Logística) |
+  |---|---|---|
+  | `pantalla-proyecto-losas` | "+ Nueva Losa", ✏️ Editar, 🗑️ Eliminar visibles | Esos 3 ocultos — solo "🏗️ Ver avance" |
+  | Filas de la lista (`pantalla-losa-detalle`) | Celdas editables (ejes/laterales/cuadro/ancho/hilos/dimensión/cantidad/observaciones), botón ✕ eliminar fila, barra de Agregar/Pegar/Importar/Guardar | Celdas de **solo lectura** (texto plano, sin `<input>`), sin botón de eliminar fila, barra de edición oculta — solo aparece el botón 🏗️ para registrar producción |
+  | Despacho | Botón "Registrar despacho" y el historial de despachos ocultos | Visibles — acá se registra |
+  | Bovedilla | `tipo`/`cantidadRequerida` editables, sin ver el seguimiento | `tipo`/`cantidadRequerida` de solo lectura, con el resumen de pendientes + tablas de entradas/salidas + botones de registrar |
+
+  Es decir: lo que Ingeniería define (cuadro, dimensión, cantidad, tipo/cantidad de bovedilla)
+  nunca se puede tocar desde la pantalla de Producción y Despachos — ahí solo se **consume**
+  como insumo de solo lectura y se **registra avance** encima (eventos de `produccion`/
+  `despacho`, que si viven en el mismo arreglo `filas[]`/`bovedilla`, nunca pisan los campos
+  base). Pendiente de producción/despacho se sigue calculando igual en ambos modos
+  (`Math.max(0, total − Σeventos)`), visible también en modo lista como referencia aunque ahí no
+  se pueda registrar nada.
+
+- Pantallas reusadas, no duplicadas: en vez de crear dos pantallas HTML separadas (una por
+  cada modo), se mantuvo una sola `pantalla-losa-detalle` y `pantalla-proyecto-losas`, con
+  varios bloques (`#losa-barra-lista`, `#losa-btn-registrar-despacho`, `#losa-card-despachos`,
+  `#bov-campos-editables`/`#bov-seguimiento`, botones Editar/Eliminar/Nueva Losa) que se
+  muestran/ocultan según `_MODO_FLUJO_LOSA` — mismo registro de Losa, misma lógica de cálculo,
+  una sola fuente de verdad, sin tener que mantener dos copias de la tabla de filas.
+
+- Verificado con un arnés real — 43 aserciones: el clic en una tarjeta de proyecto entra a
+  Carpetas (no directo a Losas); las 4 carpetas con sus conteos correctos; Documentos reúne los
+  PDF de las losas que sí tienen adjunto y muestra el estado vacío cuando ninguna losa tiene
+  memoria adjunta; en modo lista las celdas son editables y el guardado persiste el cambio real;
+  en modo producción las mismas celdas aparecen de solo lectura mostrando el valor que
+  Ingeniería guardó, sin botón de eliminar fila, pero con el botón de registrar producción
+  funcionando y actualizando el pendiente; Bovedilla alterna correctamente entre sus campos
+  editables (modo lista) y su seguimiento completo con pendientes recalculados (modo
+  producción) — sin errores de consola.
 
 ## Losas / Lista de Producción / Control de Producción y Despacho (2026-10-11)
 
@@ -121,9 +177,11 @@ Capturarlas una por una sería impracticable (Boreal tuvo 247 filas en una sola 
 
 No existe en la app ningún patrón de "pantalla completa con alcance a un registro padre"
 (confirmado explorando el código antes de construir esto) — se armó uno a mano: variables de
-estado (`_PROYECTO_ACTIVO_ID`/`_LOSA_ACTIVA_ID`) + activar/desactivar `.pantalla` directamente,
-sin pasar por `ir()`/subnav (esas funciones no soportan pantallas parametrizadas por id).
-Botón "📋 Producción" nuevo en cada fila de la tabla de Proyectos.
+estado (`_PROYECTO_ACTIVO_ID`/`_LOSA_ACTIVA_ID`/`_MODO_FLUJO_LOSA`) + activar/desactivar
+`.pantalla` directamente, sin pasar por `ir()`/subnav (esas funciones no soportan pantallas
+parametrizadas por id). Se entra desde la tarjeta de un proyecto en `pantalla-proyectos` → las
+Carpetas del proyecto → según la carpeta elegida, Losas en modo lista o en modo producción (ver
+sección "Carpetas de un proyecto..." más arriba).
 
 **Realtime**: `pantalla-proyecto-losas` sí se refresca automáticamente
 (`rerenderPantallaActiva()`); `pantalla-losa-detalle` **a propósito no** — esa pantalla trabaja

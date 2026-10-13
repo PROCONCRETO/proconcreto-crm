@@ -15,9 +15,17 @@ const _COLOR_ESTADO_PROYECTO = {
   'Cancelado': { bg: '#F8D7DA', fg: '#842029' },
 };
 
+// (2026-10-13, a pedido del usuario: "en vez de un listado de proyectos, iconos de acceso para
+// los proyectos... tamaño similar a los iconos de la pantalla de inicio") — reusa tal cual las
+// clases `.inicio-grid`/`.inicio-modulo` (css/estilos.css) que ya arma el grid de módulos de
+// Inicio, para que el tamaño quede idéntico sin duplicar CSS. Clic en la tarjeta entra a las
+// Carpetas de ese proyecto (Memorias de Cálculo/Planos/Listas de Producción/Producción y
+// Despachos, ver js/losas-proyecto.js — `abrirCarpetasProyecto()`); Editar/Eliminar quedan
+// como botones chiquitos aparte, con `stopPropagation` para no disparar también el clic de la
+// tarjeta.
 function renderProyectos() {
-  const tbody = document.getElementById('tabla-proyectos-body');
-  if (!tbody) return;
+  const grid = document.getElementById('grid-proyectos');
+  if (!grid) return;
   const q = (document.getElementById('buscar-proyecto')?.value || '').toLowerCase().trim();
   const filtroEstado = document.getElementById('filtro-estado-proyecto')?.value || '';
   let data = PROYECTOS.slice();
@@ -29,25 +37,22 @@ function renderProyectos() {
   );
   data.sort((a, b) => (b.creadoEn || '').localeCompare(a.creadoEn || ''));
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--gris-medio)">No hay proyectos${(q || filtroEstado) ? ' con ese filtro.' : ' todavía — crea el primero con "+ Nuevo Proyecto".'}</td></tr>`;
+    grid.innerHTML = `<div style="width:100%;text-align:center;padding:20px;color:var(--gris-medio)">No hay proyectos${(q || filtroEstado) ? ' con ese filtro.' : ' todavía — crea el primero con "+ Nuevo Proyecto".'}</div>`;
     return;
   }
-  tbody.innerHTML = data.map(p => {
+  grid.innerHTML = data.map(p => {
     const col = _COLOR_ESTADO_PROYECTO[p.estado] || { bg: '#EEE', fg: '#555' };
-    return `<tr>
-      <td style="font-weight:600">${_esc(p.nombre)}</td>
-      <td>${_esc(p.cliente) || '—'}</td>
-      <td>${_esc(p.ciudad) || '—'}</td>
-      <td><span class="badge" style="background:${col.bg};color:${col.fg}">${_esc(p.estado)}</span></td>
-      <td>${p.fechaInicio ? new Date(p.fechaInicio + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
-      <td>${p.fechaFinEstimada ? new Date(p.fechaFinEstimada + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
-      <td>${_esc(p.responsable) || '—'}</td>
-      <td style="white-space:nowrap">
-        <button class="btn btn-primario btn-xs" onclick="abrirLosasDeProyecto('${_escAttr(p.id)}')" title="Lista de producción y control de producción/despacho">📋 Producción</button>
-        <button class="btn btn-secundario btn-xs" onclick="abrirModalProyecto('${_escAttr(p.id)}')">✏️ Editar</button>
-        <button class="btn btn-rojo btn-xs" onclick="eliminarProyecto('${_escAttr(p.id)}')">🗑️</button>
-      </td>
-    </tr>`;
+    const detalle = [p.ciudad, p.responsable].filter(Boolean).join(' · ');
+    return `<div class="inicio-modulo" onclick="abrirCarpetasProyecto('${_escAttr(p.id)}')" title="${_escAttr(detalle)}">
+      <span class="inicio-modulo-icono">🏗️</span>
+      <span class="inicio-modulo-nombre" style="text-align:center">${_esc(p.nombre)}</span>
+      ${p.cliente ? `<span style="font-size:11.5px;color:var(--gris-medio);text-align:center">${_esc(p.cliente)}</span>` : ''}
+      <span class="badge" style="background:${col.bg};color:${col.fg}">${_esc(p.estado)}</span>
+      <div style="display:flex;gap:6px;margin-top:2px" onclick="event.stopPropagation()">
+        <button class="btn btn-secundario btn-xs" onclick="abrirModalProyecto('${_escAttr(p.id)}')" title="Editar">✏️</button>
+        <button class="btn btn-rojo btn-xs" onclick="eliminarProyecto('${_escAttr(p.id)}')" title="Eliminar">🗑️</button>
+      </div>
+    </div>`;
   }).join('');
 }
 
