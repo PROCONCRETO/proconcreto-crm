@@ -31,59 +31,65 @@ A pedido del usuario: "vamos a crear una nueva ventana de PROYECTOS... incluyela
 - **Sin subnav propio todavía** — `activarModulo('proyectos')` va directo a la única pantalla, a diferencia de los demás módulos (que siempre muestran su barra de sub-pestañas). Se puede agregar más adelante si el módulo crece (ej. una vista de estadísticas).
 - Verificado con un arnés real — 32 aserciones: el orden de los botones en la barra superior y en Inicio; la navegación activa/desactiva las pantallas correctas; el estado vacío; crear un proyecto completo de punta a punta (validación de Nombre obligatorio, el upsert real hacia Supabase, el modal cerrando y la tabla mostrando el registro); editar sin duplicar y sin perder `creadoEn`; el buscador de cliente; los filtros de estado y de búsqueda; eliminar con su `delete` real; y que los demás módulos (Calidad, Cotizaciones, Inicio) siguen funcionando igual que antes — sin errores de consola.
 
-## Carpetas de un proyecto y separación Ingeniería/Producción (2026-10-13)
+## Carpetas de un proyecto y separación Ingeniería/Producción/Despachos (2026-10-13)
 
-A pedido del usuario: primero "incluyamos subcarpetas por ahora, de, memorias de cálculo,
-planos de producción, listas de producción, producción y despachos, todas a modo de ícono", y
-acto seguido la razón de fondo: "vamos a independizar las listas de producción, que salen del
-departamento de ingeniería como un insumo para el área de producción, la cual al hacer la
-producción, genera un insumo para el área de despachos" — no es solo una reorganización visual,
-es un flujo real entre 3 áreas con una sola dirección: Ingeniería → Producción → Despachos.
+A pedido del usuario, en 3 pasos el mismo día: primero "incluyamos subcarpetas por ahora, de,
+memorias de cálculo, planos de producción, listas de producción, producción y despachos, todas
+a modo de ícono"; después la razón de fondo, "vamos a independizar las listas de producción,
+que salen del departamento de ingeniería como un insumo para el área de producción, la cual al
+hacer la producción, genera un insumo para el área de despachos"; y por último "partamos
+producción de despachos en dos carpetas diferentes" — no es solo una reorganización visual, es
+un flujo real entre **3 áreas** con una sola dirección: Ingeniería → Producción → Despachos,
+cada una con su propia carpeta.
 
-- **`pantalla-proyecto-carpetas`** (`abrirCarpetasProyecto()`): 4 tarjetas-ícono, mismo tamaño
+- **`pantalla-proyecto-carpetas`** (`abrirCarpetasProyecto()`): 5 tarjetas-ícono, mismo tamaño
   `.inicio-modulo` que el resto de la app, con un conteo en cada una:
   - 📐 **Memorias de Cálculo** y 📋 **Planos de Producción** → `abrirDocumentosProyecto('memoria'|'plano')`
     → `pantalla-proyecto-documentos`: junta en una sola tabla los PDF que **ya se adjuntan por
     Losa** (`planoPath`/`memoriaCalculoPath`, ver sección de Losas) de TODAS las losas del
     proyecto — no duplica el archivo ni reinventa la subida, solo reúne lo que Ingeniería ya
     adjuntó al crear/editar cada Losa, para no tener que entrar losa por losa a buscarlo.
-  - 📄 **Listas de Producción** y 🏗️ **Producción y Despachos** → ambas llaman
-    `abrirLosasDeProyecto(modo)` con `modo` = `'lista'` o `'produccion'` — la MISMA pantalla de
-    Losas y el MISMO registro de Losa por debajo, pero con permisos distintos (ver abajo).
+  - 📄 **Listas de Producción**, 🏗️ **Producción** y 📦 **Despachos** → las 3 llaman
+    `abrirLosasDeProyecto(modo)` con `modo` = `'lista'` / `'produccion'` / `'despacho'` — la
+    MISMA pantalla de Losas y el MISMO registro de Losa por debajo, pero con permisos y
+    contenido distintos (ver abajo).
 
-- **`_MODO_FLUJO_LOSA`** (`'lista'` | `'produccion'`, variable de módulo en `js/losas-proyecto.js`):
-  decide qué puede hacer cada pantalla reusada:
-  | | Modo `lista` (Ingeniería) | Modo `produccion` (Planta/Logística) |
-  |---|---|---|
-  | `pantalla-proyecto-losas` | "+ Nueva Losa", ✏️ Editar, 🗑️ Eliminar visibles | Esos 3 ocultos — solo "🏗️ Ver avance" |
-  | Filas de la lista (`pantalla-losa-detalle`) | Celdas editables (ejes/laterales/cuadro/ancho/hilos/dimensión/cantidad/observaciones), botón ✕ eliminar fila, barra de Agregar/Pegar/Importar/Guardar | Celdas de **solo lectura** (texto plano, sin `<input>`), sin botón de eliminar fila, barra de edición oculta — solo aparece el botón 🏗️ para registrar producción |
-  | Despacho | Botón "Registrar despacho" y el historial de despachos ocultos | Visibles — acá se registra |
-  | Bovedilla | `tipo`/`cantidadRequerida` editables, sin ver el seguimiento | `tipo`/`cantidadRequerida` de solo lectura, con el resumen de pendientes + tablas de entradas/salidas + botones de registrar |
+- **`_MODO_FLUJO_LOSA`** (`'lista'` | `'produccion'` | `'despacho'`, variable de módulo en
+  `js/losas-proyecto.js`): decide qué puede hacer y qué ve cada pantalla reusada:
+  | | `lista` (Ingeniería) | `produccion` (Planta) | `despacho` (Logística) |
+  |---|---|---|---|
+  | `pantalla-proyecto-losas` | "+ Nueva Losa", ✏️ Editar, 🗑️ Eliminar visibles | Solo "🏗️ Ver producción" | Solo "📦 Ver despachos" |
+  | Filas de la lista | Celdas editables, botón ✕ eliminar fila, barra de Agregar/Pegar/Importar/Guardar | Celdas de **solo lectura**, botón 🏗️ para registrar producción | Celdas de **solo lectura**, sin acción por fila (el despacho se registra multi-fila con el botón de arriba) |
+  | Botón "Registrar despacho" / historial de despachos | Ocultos | Ocultos | Visibles |
+  | Bovedilla | `tipo`/`cantidadRequerida` editables, sin seguimiento | Solo lectura + SOLO columna "Entradas (producción)" | Solo lectura + SOLO columna "Salidas (despacho)" |
 
-  Es decir: lo que Ingeniería define (cuadro, dimensión, cantidad, tipo/cantidad de bovedilla)
-  nunca se puede tocar desde la pantalla de Producción y Despachos — ahí solo se **consume**
-  como insumo de solo lectura y se **registra avance** encima (eventos de `produccion`/
-  `despacho`, que si viven en el mismo arreglo `filas[]`/`bovedilla`, nunca pisan los campos
-  base). Pendiente de producción/despacho se sigue calculando igual en ambos modos
-  (`Math.max(0, total − Σeventos)`), visible también en modo lista como referencia aunque ahí no
-  se pueda registrar nada.
+  Lo que Ingeniería define (cuadro, dimensión, cantidad, tipo/cantidad de bovedilla) nunca se
+  puede tocar desde Producción ni desde Despachos — ahí solo se **consume** como insumo de solo
+  lectura. Y ahora tampoco se mezclan entre sí: Producción no ve ni registra despachos, y
+  Despachos no ve ni registra producción — cada una ve solo lo suyo (`bov-columna-produccion`/
+  `bov-columna-despacho` se muestran una a la vez, nunca juntas fuera del modo lista). El
+  resumen de Bovedilla también quedó partido: en modo producción solo menciona "Producido/
+  Pendiente producción", en modo despacho solo "Despachado/Pendiente despacho" — antes mostraba
+  ambos pares juntos. Pendiente de producción/despacho se sigue calculando igual en los 3 modos
+  (`Math.max(0, total − Σeventos)`).
 
-- Pantallas reusadas, no duplicadas: en vez de crear dos pantallas HTML separadas (una por
-  cada modo), se mantuvo una sola `pantalla-losa-detalle` y `pantalla-proyecto-losas`, con
-  varios bloques (`#losa-barra-lista`, `#losa-btn-registrar-despacho`, `#losa-card-despachos`,
-  `#bov-campos-editables`/`#bov-seguimiento`, botones Editar/Eliminar/Nueva Losa) que se
-  muestran/ocultan según `_MODO_FLUJO_LOSA` — mismo registro de Losa, misma lógica de cálculo,
-  una sola fuente de verdad, sin tener que mantener dos copias de la tabla de filas.
+- Pantallas reusadas, no duplicadas: en vez de crear 3 pantallas HTML separadas (una por cada
+  modo), se mantuvo una sola `pantalla-losa-detalle` y `pantalla-proyecto-losas`, con varios
+  bloques (`#losa-barra-lista`, `#losa-btn-registrar-despacho`, `#losa-card-despachos`,
+  `#bov-campos-editables`, `#bov-columna-produccion`/`#bov-columna-despacho`, botones Editar/
+  Eliminar/Nueva Losa) que se muestran/ocultan según `_MODO_FLUJO_LOSA` — mismo registro de
+  Losa, misma lógica de cálculo, una sola fuente de verdad.
 
-- Verificado con un arnés real — 43 aserciones: el clic en una tarjeta de proyecto entra a
-  Carpetas (no directo a Losas); las 4 carpetas con sus conteos correctos; Documentos reúne los
-  PDF de las losas que sí tienen adjunto y muestra el estado vacío cuando ninguna losa tiene
-  memoria adjunta; en modo lista las celdas son editables y el guardado persiste el cambio real;
-  en modo producción las mismas celdas aparecen de solo lectura mostrando el valor que
-  Ingeniería guardó, sin botón de eliminar fila, pero con el botón de registrar producción
-  funcionando y actualizando el pendiente; Bovedilla alterna correctamente entre sus campos
-  editables (modo lista) y su seguimiento completo con pendientes recalculados (modo
-  producción) — sin errores de consola.
+- Verificado con dos arneses reales — 43 aserciones para la primera versión (Carpetas + modos
+  lista/producción) y 29 más para la partición en Producción/Despachos: el clic en una tarjeta
+  de proyecto entra a Carpetas; las 5 carpetas (ya no 4) con sus conteos correctos; Documentos
+  reúne los PDF de las losas que sí tienen adjunto; en modo lista las celdas son editables y el
+  guardado persiste; en modo producción las celdas aparecen de solo lectura con el botón de
+  registrar producción funcionando (sin ningún rastro de despacho — botón e historial ocultos);
+  en modo despacho aparece el botón de registrar despacho multi-fila funcionando y el historial
+  visible (sin ningún rastro de producción — sin botón por fila); Bovedilla muestra solo la
+  columna y el resumen que corresponden a cada modo, nunca ambos a la vez fuera de modo lista —
+  sin errores de consola.
 
 ## Losas / Lista de Producción / Control de Producción y Despacho (2026-10-11)
 

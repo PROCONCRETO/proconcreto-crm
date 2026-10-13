@@ -32,13 +32,16 @@ let LOSAS_PROYECTO = [];
 let _PROYECTO_ACTIVO_ID = null;
 let _LOSA_ACTIVA_ID = null;
 
-// 'lista' (Ingeniería — crea/edita la lista de producción, dueña de cuadro/dimensión/cantidad)
-// o 'produccion' (Planta/Logística — solo ve la lista como insumo de solo lectura y registra
-// avance: producción/despacho) — ver pantalla de Carpetas más abajo. Mismo registro de Losa,
-// dos modos de entrada con permisos distintos (2026-10-13, a pedido del usuario: "vamos a
-// independizar las listas de producción, que salen del departamento de ingeniería como un
-// insumo para el área de producción, la cual al hacer la producción, genera un insumo para el
-// área de despachos").
+// 'lista' (Ingeniería — crea/edita la lista de producción, dueña de cuadro/dimensión/cantidad),
+// 'produccion' (Planta — solo ve la lista como insumo de solo lectura y registra lo fabricado)
+// o 'despacho' (Logística — solo ve la lista como insumo de solo lectura y registra lo que
+// sale) — ver pantalla de Carpetas más abajo. Mismo registro de Losa, tres modos de entrada con
+// permisos distintos (2026-10-13, a pedido del usuario: primero "vamos a independizar las
+// listas de producción, que salen del departamento de ingeniería como un insumo para el área
+// de producción, la cual al hacer la producción, genera un insumo para el área de despachos",
+// y después "partamos producción de despachos en dos carpetas diferentes" — Producción y
+// Despachos no solo son insumo uno del otro, son además dos áreas distintas que no deberían
+// compartir pantalla).
 let _MODO_FLUJO_LOSA = 'lista';
 
 // Arreglos de trabajo mientras se tiene abierta la pantalla de detalle de una Losa — mismo
@@ -135,7 +138,12 @@ function renderCarpetasProyecto() {
     </div>
     <div class="inicio-modulo" onclick="abrirLosasDeProyecto('produccion')">
       <span class="inicio-modulo-icono">🏗️</span>
-      <span class="inicio-modulo-nombre">Producción y Despachos</span>
+      <span class="inicio-modulo-nombre">Producción</span>
+      <span style="font-size:11.5px;color:var(--gris-medio)">${losas.length} losa${losas.length === 1 ? '' : 's'}</span>
+    </div>
+    <div class="inicio-modulo" onclick="abrirLosasDeProyecto('despacho')">
+      <span class="inicio-modulo-icono">📦</span>
+      <span class="inicio-modulo-nombre">Despachos</span>
       <span style="font-size:11.5px;color:var(--gris-medio)">${losas.length} losa${losas.length === 1 ? '' : 's'}</span>
     </div>`;
 }
@@ -181,11 +189,12 @@ function renderDocumentosProyecto() {
   </tr>`).join('');
 }
 
+const _TITULOS_MODO_LOSA = { lista: '📄 Listas de Producción', produccion: '🏗️ Producción', despacho: '📦 Despachos' };
 function abrirLosasDeProyecto(modo) {
   _MODO_FLUJO_LOSA = modo;
   document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
   document.getElementById('pantalla-proyecto-losas').classList.add('activa');
-  document.getElementById('proyecto-losas-titulo').textContent = modo === 'lista' ? '📄 Listas de Producción' : '🏗️ Producción y Despachos';
+  document.getElementById('proyecto-losas-titulo').textContent = _TITULOS_MODO_LOSA[modo] || '';
   document.getElementById('btn-nueva-losa').style.display = modo === 'lista' ? '' : 'none';
   renderLosasProyecto();
 }
@@ -221,7 +230,7 @@ function renderLosasProyecto() {
           ? `<button class="btn btn-primario btn-xs" onclick="abrirLosaDetalle('${_escAttr(l.id)}')">📄 Ver lista</button>
              <button class="btn btn-secundario btn-xs" onclick="abrirModalLosa('${_escAttr(l.id)}')">✏️</button>
              <button class="btn btn-rojo btn-xs" onclick="eliminarLosa('${_escAttr(l.id)}')">🗑️</button>`
-          : `<button class="btn btn-primario btn-xs" onclick="abrirLosaDetalle('${_escAttr(l.id)}')">🏗️ Ver avance</button>`}
+          : `<button class="btn btn-primario btn-xs" onclick="abrirLosaDetalle('${_escAttr(l.id)}')">${_MODO_FLUJO_LOSA === 'despacho' ? '📦 Ver despachos' : '🏗️ Ver producción'}</button>`}
       </td>
     </tr>`;
   }).join('');
@@ -390,16 +399,18 @@ function abrirLosaDetalle(id) {
   renderLosaDetalle();
 }
 
+const _ICONOS_MODO_LOSA = { lista: '📄', produccion: '🏗️', despacho: '📦' };
 function renderLosaDetalle() {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   if (!l) return;
   const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
   const esLista = _MODO_FLUJO_LOSA === 'lista';
-  document.getElementById('losa-detalle-titulo').textContent = `${esLista ? '📄' : '🏗️'} ${l.nombre}${l.ubicacion ? ' — ' + l.ubicacion : ''} (${sis ? sis.etiqueta : ''})`;
+  const esDespacho = _MODO_FLUJO_LOSA === 'despacho';
+  document.getElementById('losa-detalle-titulo').textContent = `${_ICONOS_MODO_LOSA[_MODO_FLUJO_LOSA] || ''} ${l.nombre}${l.ubicacion ? ' — ' + l.ubicacion : ''} (${sis ? sis.etiqueta : ''})`;
   document.getElementById('losa-barra-lista').style.display = esLista ? '' : 'none';
   document.getElementById('losa-nota-pegar').style.display = esLista ? '' : 'none';
-  document.getElementById('losa-btn-registrar-despacho').style.display = esLista ? 'none' : '';
-  document.getElementById('losa-card-despachos').style.display = esLista ? 'none' : '';
+  document.getElementById('losa-btn-registrar-despacho').style.display = esDespacho ? '' : 'none';
+  document.getElementById('losa-card-despachos').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-detalle-bloque-bovedilla').style.display = l.sistema === 'vigueta_bovedilla' ? '' : 'none';
   renderFilasProduccion();
   if (l.sistema === 'vigueta_bovedilla') renderBovedillaLosa();
@@ -465,7 +476,9 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     <td style="white-space:nowrap">
       ${esLista
         ? `<button class="btn btn-rojo btn-xs" onclick="_filasLosaActual.splice(${i},1);renderFilasProduccion()">✕</button>`
-        : `<button class="btn btn-secundario btn-xs" onclick="abrirModalProduccionFila(${i})" title="Registrar producción">🏗️</button>`}
+        : (_MODO_FLUJO_LOSA === 'produccion'
+          ? `<button class="btn btn-secundario btn-xs" onclick="abrirModalProduccionFila(${i})" title="Registrar producción">🏗️</button>`
+          : '')}
     </td>
   </tr>`;
 }
@@ -698,15 +711,20 @@ function renderDespachosLosa() {
 // remisión (a pedido del usuario: "no es tan riguroso su control... como fabricar un bloque
 // de cemento") ──
 // En modo 'lista' (Ingeniería) se edita tipo/cantidad requerida, sin ver el seguimiento. En
-// modo 'produccion' (Planta/Logística) es al revés: tipo/cantidad quedan de solo lectura (son
-// el insumo que define Ingeniería) y se muestra el seguimiento completo (pendientes + eventos).
+// modo 'produccion' se ve tipo/cantidad de solo lectura + SOLO las entradas (lo que define
+// Ingeniería no se toca acá). En modo 'despacho', igual pero con SOLO las salidas — Producción
+// y Despachos quedan tan separados en Bovedilla como en las filas normales.
 function renderBovedillaLosa() {
   const b = _bovedillaLosaActual;
   const esLista = _MODO_FLUJO_LOSA === 'lista';
+  const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
+  const esDespacho = _MODO_FLUJO_LOSA === 'despacho';
   document.getElementById('bov-campos-editables').style.display = esLista ? '' : 'none';
   document.getElementById('bov-campos-solo-lectura').style.display = esLista ? 'none' : '';
   document.getElementById('bov-resumen').style.display = esLista ? 'none' : '';
   document.getElementById('bov-seguimiento').style.display = esLista ? 'none' : '';
+  document.getElementById('bov-columna-produccion').style.display = esProduccion ? '' : 'none';
+  document.getElementById('bov-columna-despacho').style.display = esDespacho ? '' : 'none';
   if (esLista) {
     const elTipo = document.getElementById('bov-tipo');
     const elCant = document.getElementById('bov-cantidad-requerida');
@@ -715,14 +733,16 @@ function renderBovedillaLosa() {
     return;
   }
   document.getElementById('bov-campos-solo-lectura').textContent = `Tipo: ${b?.tipo || '—'} — Cantidad requerida: ${Number(b?.cantidadRequerida) || 0}`;
-  const prod = (b?.produccion || []).reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
-  const desp = (b?.despacho || []).reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
   const req = Number(b?.cantidadRequerida) || 0;
-  const pendProd = Math.max(0, req - prod);
-  const pendDesp = Math.max(0, req - desp);
-  document.getElementById('bov-resumen').textContent = `Producido: ${prod} · Pendiente producción: ${pendProd} — Despachado: ${desp} · Pendiente despacho: ${pendDesp}`;
-  _renderEventosBovedilla('produccion', 'bov-produccion-body');
-  _renderEventosBovedilla('despacho', 'bov-despacho-body');
+  if (esProduccion) {
+    const prod = (b?.produccion || []).reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
+    document.getElementById('bov-resumen').textContent = `Producido: ${prod} · Pendiente producción: ${Math.max(0, req - prod)}`;
+    _renderEventosBovedilla('produccion', 'bov-produccion-body');
+  } else {
+    const desp = (b?.despacho || []).reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
+    document.getElementById('bov-resumen').textContent = `Despachado: ${desp} · Pendiente despacho: ${Math.max(0, req - desp)}`;
+    _renderEventosBovedilla('despacho', 'bov-despacho-body');
+  }
 }
 function _renderEventosBovedilla(campo, tbodyId) {
   const tbody = document.getElementById(tbodyId);

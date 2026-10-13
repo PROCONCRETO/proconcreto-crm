@@ -1326,7 +1326,7 @@
     💡 También puedes copiar un bloque de celdas de tu Excel actual y pegarlo (Ctrl+V) directamente sobre la tabla de abajo — columnas en este orden: Ejes entre, Laterales, Cuadro, Ancho/Hilos (o Vigueta/Hilos Abajo/Hilos Arriba según el sistema), Dimensión, Cantidad.
   </div>
 
-  <div class="card" style="padding:0;overflow-x:auto" onpaste="onPasteFilasProduccion(event)" tabindex="0">
+  <div class="card" style="padding:0;overflow-x:auto;overflow-y:visible" onpaste="onPasteFilasProduccion(event)" tabindex="0">
     <table class="tabla-cots" style="min-width:1400px">
       <thead id="filas-produccion-thead"></thead>
       <tbody id="filas-produccion-body"></tbody>
@@ -1342,11 +1342,11 @@
     <div id="bov-campos-solo-lectura" style="display:none;font-size:13px;margin-bottom:10px"></div>
     <div id="bov-resumen" style="font-size:13px;font-weight:600;color:var(--gris-texto);margin-bottom:10px;display:none"></div>
     <div id="bov-seguimiento" class="form-grid" style="display:none">
-      <div>
+      <div id="bov-columna-produccion">
         <div class="flex-gap" style="margin-bottom:6px;justify-content:space-between"><div style="font-weight:600;font-size:12.5px">Entradas (producción)</div><button class="btn btn-secundario btn-xs" onclick="abrirModalEventoBovedilla('produccion')">+ Registrar entrada</button></div>
         <table class="tabla-cots"><thead><tr><th>Remisión</th><th>Fecha</th><th style="text-align:right">Cantidad</th></tr></thead><tbody id="bov-produccion-body"></tbody></table>
       </div>
-      <div>
+      <div id="bov-columna-despacho">
         <div class="flex-gap" style="margin-bottom:6px;justify-content:space-between"><div style="font-weight:600;font-size:12.5px">Salidas (despacho)</div><button class="btn btn-secundario btn-xs" onclick="abrirModalEventoBovedilla('despacho')">+ Registrar despacho</button></div>
         <table class="tabla-cots"><thead><tr><th>Remisión</th><th>Fecha</th><th style="text-align:right">Cantidad</th></tr></thead><tbody id="bov-despacho-body"></tbody></table>
       </div>
@@ -3197,7 +3197,7 @@
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
 <script src="js/proyectos.js?v=20261013b"></script>
-<script src="js/losas-proyecto.js?v=20261013a"></script>
+<script src="js/losas-proyecto.js?v=20261013b"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20261013a"></script>
 <script src="js/cotizador.js?v=20261007a"></script>
