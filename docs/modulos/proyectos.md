@@ -144,6 +144,39 @@ fila suelta, la Losa completa es la unidad natural de guardado/sincronización.
     sola celda) — los dos cuadros solo parten y recomponen ese string en memoria
     (`_actualizarParEje()`), partiendo en el primer guion que encuentren. En modo
     producción/despacho se ve de nuevo como un solo texto de solo lectura, sin los cuadros.
+  - **Orden de columnas** (2026-10-13, a pedido del usuario): `Cuadro` va en la posición 2,
+    justo después del consecutivo `#` — antes de Ejes numéricos/Ejes alfabéticos. El orden
+    esperado al pegar desde Excel (`onPasteFilasProduccion()`) se actualizó igual (Cuadro, Ejes
+    numéricos, Ejes alfabéticos, ...) — Importar Excel no se vio afectado, mapea por nombre de
+    encabezado, no por posición.
+  - **Pend. Producción/Pend. Despacho, una sola por pantalla** (2026-10-13, a pedido del
+    usuario: "las listas de producción, pasémoslas tal cual a la ventana de producción como un
+    no editable" — la tabla de Producción/Despachos es la MISMA de Listas de Producción, de
+    solo lectura, más la única columna de pendiente que le compete a esa área): modo lista no
+    muestra ninguna (Ingeniería solo define cantidades, nada se ha producido/despachado
+    todavía); modo producción muestra solo "Pend. Producción" (no le compete Despacho); modo
+    despacho muestra solo "Pend. Despacho" (no le compete Producción) — mismo criterio ya usado
+    en Bovedilla (`bov-columna-produccion`/`bov-columna-despacho`), aplicado también a la tabla
+    principal de filas.
+  - **🖨️ Imprimir lista de producción** (2026-10-13, a pedido del usuario: "agregamos un botón
+    de imprimir listas de producción, donde se pueda seleccionar las filas y de esto me salga
+    un imprimible para pasar a planta y puedan ellos fabricar lo que se necesita") — solo en
+    modo lista. Cada fila lleva un checkbox (`.chk-fila-print`) más uno "marcar todas" en el
+    encabezado (`_toggleSeleccionTodasFilas()`); el botón "🖨️ Imprimir" junto a "💾 Guardar
+    lista" llama `imprimirListaProduccion()`: si no hay ninguna fila marcada, imprime TODAS
+    (más amigable que bloquear pidiendo una selección); construye un documento autocontenido
+    con estilo inline (header Proconcreto + datos del proyecto/losa/sistema + tabla de las
+    filas elegidas, SIN columnas de pendiente ni checkboxes ni botones de acción — es un
+    imprimible estático — + fila de totales de piezas/metros/peso + firmas "Entregado por
+    (Ingeniería)" / "Recibido en planta") y lo muestra en el contenedor compartido
+    `#vista-previa`/`#contenido-preview` (el mismo que usa toda la app para vistas previas de
+    PDF). "⬇️ Descargar PDF" llama `descargarPDFListaProduccion()`, que sigue el patrón más
+    simple ya usado en Órdenes de Producción (`verPDFOrden()`/`descargarPDFOrden()`,
+    `js/ordenes-produccion.js`) — html2canvas + jsPDF con slicing simple a varias páginas A4,
+    sin membrete ni page-break inteligente (se descartó el patrón más elaborado de Logística,
+    `imprimirProgramacionDia()`, por ser más complejo de lo que este imprimible necesita) —
+    archivo `Lista_Produccion_<nombre de la Losa>_<fecha>.pdf`. "← Volver" cierra la vista
+    previa y reactiva `pantalla-losa-detalle` tal como estaba.
 - `despachos[]` — **a nivel de Losa, no por fila**: `{remision, fecha, observaciones,
   lineas: [{filaId, cantidad}]}` — una remisión real cubre varias filas a la vez, mismo
   espíritu que ya usa Logística con `viaje.entregas[].productos[]`.

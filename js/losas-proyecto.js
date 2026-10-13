@@ -423,16 +423,29 @@ function renderFilasProduccion() {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   if (!l) return;
   const esVigueta = l.sistema === 'vigueta_bovedilla';
+  // La tabla de "Listas de Producción" (Ingeniería) pasa TAL CUAL a Producción y a Despachos,
+  // de solo lectura — cada una solo le suma la ÚNICA columna de pendiente que le importa a esa
+  // área (2026-10-13, a pedido del usuario): Producción ve Pend. Producción (no le compete
+  // Despacho), Despachos ve Pend. Despacho (no le compete Producción). Lista no ve ninguna de
+  // las dos — ahí Ingeniería solo define la lista, el pendiente es ruido mientras nada se ha
+  // producido/despachado todavía.
+  const esLista = _MODO_FLUJO_LOSA === 'lista';
+  const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
   const thead = document.getElementById('filas-produccion-thead');
+  // Casilla de selección (2026-10-13, a pedido del usuario: "agregamos un botón de imprimir
+  // listas de producción, donde se pueda seleccionar las filas...") — solo en modo lista, que
+  // es donde vive el botón "🖨️ Imprimir" (ver imprimirListaProduccion()).
   thead.innerHTML = `<tr>
-    <th>#</th><th>Ejes numéricos</th><th>Ejes alfabéticos</th><th>Cuadro</th>
+    ${esLista ? '<th style="width:28px"><input type="checkbox" id="chk-todas-filas-print" onchange="_toggleSeleccionTodasFilas(this.checked)"></th>' : ''}
+    <th>#</th><th>Cuadro</th><th>Ejes numéricos</th><th>Ejes alfabéticos</th>
     ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (m)</th><th>Hilos</th>'}
     <th>Dimensión (m)</th><th>Cantidad</th><th>Long. total (m)</th><th>Peso (kg)</th>
-    <th>Pend. Producción</th><th>Pend. Despacho</th><th>Observaciones</th><th></th>
+    ${esLista ? '' : (esProduccion ? '<th>Pend. Producción</th>' : '<th>Pend. Despacho</th>')}
+    <th>Observaciones</th><th></th>
   </tr>`;
   const tbody = document.getElementById('filas-produccion-body');
   if (!_filasLosaActual.length) {
-    tbody.innerHTML = `<tr><td colspan="16" class="empty-state"><div class="icono">📋</div><div>No hay filas todavía — agrega una a mano, pégalas desde Excel o importa el archivo.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="15" class="empty-state"><div class="icono">📋</div><div>No hay filas todavía — agrega una a mano, pégalas desde Excel o importa el archivo.</div></td></tr>`;
     return;
   }
   tbody.innerHTML = _filasLosaActual.map((f, i) => _filaProduccionHTML(f, i, l, esVigueta)).join('');
@@ -471,10 +484,11 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     </div>`;
   };
   return `<tr>
+    ${esLista ? `<td><input type="checkbox" class="chk-fila-print" data-idx="${i}"></td>` : ''}
     <td>${i + 1}</td>
+    <td>${txt(f.cuadro, 'cuadro', 50)}</td>
     <td>${par(f.ejesEntre, 'ejesEntre')}</td>
     <td>${par(f.laterales, 'laterales')}</td>
-    <td>${txt(f.cuadro, 'cuadro', 50)}</td>
     ${esVigueta ? `
     <td>${txt(f.tipoVigueta, 'tipoVigueta', 60)}</td>
     <td>${num(f.hilosAbajo, 'hilosAbajo', 55, false)}</td>
@@ -487,8 +501,9 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     <td>${num(f.cantidad, 'cantidad', 55, true)}</td>
     <td id="fp-longtotal-${i}" style="text-align:right">${longTotal.toFixed(2)}</td>
     <td id="fp-peso-${i}" style="text-align:right">${peso.toFixed(1)}</td>
-    <td id="fp-pendprod-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProd}</td>
-    <td id="fp-penddesp-${i}" style="text-align:right;font-weight:600;color:${pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendDesp}</td>
+    ${esLista ? '' : (_MODO_FLUJO_LOSA === 'produccion'
+      ? `<td id="fp-pendprod-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProd}</td>`
+      : `<td id="fp-penddesp-${i}" style="text-align:right;font-weight:600;color:${pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendDesp}</td>`)}
     <td>${txt(f.observaciones, 'observaciones', 110)}</td>
     <td style="white-space:nowrap">
       ${esLista
@@ -532,13 +547,13 @@ function _actualizarParEje(i, campo, parte, valor) {
 }
 
 function agregarFilaProduccion() {
-  _filasLosaActual.push({ id: _nuevoIdFila(), ejesEntre: '', laterales: '', cuadro: '', ancho: 0, hilos: 0, tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0, dimension: 0, cantidad: 0, observaciones: '', produccion: [] });
+  _filasLosaActual.push({ id: _nuevoIdFila(), cuadro: '', ejesEntre: '', laterales: '', ancho: 0, hilos: 0, tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0, dimension: 0, cantidad: 0, observaciones: '', produccion: [] });
   renderFilasProduccion();
 }
 
-// (b) Pegar desde Excel — columnas en el mismo orden que la tabla visible: Ejes numéricos,
-// Ejes alfabéticos, Cuadro, [Ancho, Hilos] o [Vigueta, Hilos Abajo, Hilos Arriba], Dimensión,
-// Cantidad (ver nota en la pantalla). El valor de cada celda sigue siendo un solo texto
+// (b) Pegar desde Excel — columnas en el mismo orden que la tabla visible: Cuadro, Ejes
+// numéricos, Ejes alfabéticos, [Ancho, Hilos] o [Vigueta, Hilos Abajo, Hilos Arriba], Dimensión,
+// Cantidad (ver nota en la pantalla). El valor de cada celda de ejes sigue siendo un solo texto
 // combinado (ej. "1-1´"), igual que en el Excel real — el guion se separa solo al mostrarlo
 // en los dos cuadros chicos (ver `par()` en `_filaProduccionHTML`).
 function onPasteFilasProduccion(event) {
@@ -550,7 +565,7 @@ function onPasteFilasProduccion(event) {
   const esVigueta = l.sistema === 'vigueta_bovedilla';
   const filas = texto.split(/\r?\n/).filter(r => r.trim() !== '').map(linea => {
     const cols = linea.split('\t');
-    const base = { id: _nuevoIdFila(), ejesEntre: cols[0] || '', laterales: cols[1] || '', cuadro: cols[2] || '', observaciones: '', produccion: [] };
+    const base = { id: _nuevoIdFila(), cuadro: cols[0] || '', ejesEntre: cols[1] || '', laterales: cols[2] || '', observaciones: '', produccion: [] };
     if (esVigueta) {
       return { ...base, tipoVigueta: cols[3] || '', hilosAbajo: parseFloat(cols[4]) || 0, hilosArriba: parseFloat(cols[5]) || 0, dimension: parseFloat(cols[6]) || 0, cantidad: parseFloat(cols[7]) || 0, ancho: 0, hilos: 0 };
     }
@@ -640,6 +655,158 @@ function guardarListaProduccion() {
   _guardarLosaActual();
   renderFilasProduccion();
   alert('Lista de producción guardada.');
+}
+
+function _toggleSeleccionTodasFilas(marcar) {
+  document.querySelectorAll('.chk-fila-print').forEach(chk => { chk.checked = marcar; });
+}
+
+// Imprimible para pasar a planta (2026-10-13, a pedido del usuario: "agregamos un botón de
+// imprimir listas de producción, donde se pueda seleccionar las filas y de esto me salga un
+// imprimible para pasar a planta y puedan ellos fabricar lo que se necesita") — mismo patrón
+// ya usado en Órdenes de Producción/Logística (`verPDFOrden()`/`imprimirProgramacionDia()`,
+// js/ordenes-produccion.js / js/logistica.js): un `<div>` con estilo inline se arma en
+// memoria, se muestra en el `#vista-previa` compartido de toda la app, y "Descargar PDF" lo
+// rasteriza con html2canvas + jsPDF.
+function imprimirListaProduccion() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  if (!l) return;
+  const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
+  const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
+  const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const seleccionadas = Array.from(document.querySelectorAll('.chk-fila-print:checked')).map(chk => parseInt(chk.dataset.idx, 10));
+  // Si no se marcó ninguna fila, se imprimen todas — más amigable que bloquear con una alerta
+  // pidiendo que marques algo primero.
+  const indices = seleccionadas.length ? seleccionadas : _filasLosaActual.map((_, i) => i);
+  const filas = indices.map(i => _filasLosaActual[i]).filter(Boolean);
+  if (!filas.length) { alert('No hay filas para imprimir.'); return; }
+
+  let totalPiezas = 0, totalMetros = 0, totalPeso = 0;
+  const filasHTML = filas.map((f, n) => {
+    const longTotal = (Number(f.dimension) || 0) * (Number(f.cantidad) || 0);
+    const peso = _pesoFila(f, l);
+    totalPiezas += Number(f.cantidad) || 0;
+    totalMetros += longTotal;
+    totalPeso += peso;
+    const colEspecifica = esVigueta
+      ? `<td style="padding:5px 6px;border-bottom:1px solid #eee;font-size:11px">${_esc(f.tipoVigueta) || '—'}</td><td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:center;font-size:11px">${f.hilosAbajo || 0}</td><td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:center;font-size:11px">${f.hilosArriba || 0}</td>`
+      : `<td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:center;font-size:11px">${f.ancho || 0}</td><td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:center;font-size:11px">${f.hilos || 0}</td>`;
+    return `<tr>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;font-size:11px;color:#888">${n + 1}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;font-size:11px;font-weight:600">${_esc(f.cuadro) || '—'}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;font-size:11px">${_esc(f.ejesEntre) || '—'}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;font-size:11px">${_esc(f.laterales) || '—'}</td>
+      ${colEspecifica}
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:right;font-size:11px">${(Number(f.dimension) || 0).toFixed(2)}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:center;font-size:11px;font-weight:700">${f.cantidad || 0}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:right;font-size:11px">${longTotal.toFixed(2)}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:right;font-size:11px">${peso.toFixed(1)}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;font-size:11px;color:#555">${_esc(f.observaciones) || ''}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `
+  <div id="lp-preview-doc" style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:0;color:#222">
+    <div style="background:#001F3F;color:white;padding:18px 24px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:17px;font-weight:700">Proconcreto Prefabricados</div>
+        <div style="font-size:11px;opacity:0.6;margin-top:2px">LISTA DE PRODUCCIÓN</div>
+      </div>
+      <div style="background:#8BC53F;padding:8px 16px;border-radius:6px;text-align:right">
+        <div style="font-size:16px;font-weight:700;color:#001F3F">${_esc(l.nombre)}</div>
+        <div style="font-size:10px;color:#001F3F;opacity:0.85">${new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+      </div>
+    </div>
+    <div style="padding:14px 16px;border-bottom:1px solid #eee">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px">
+        <div><div style="font-size:10px;color:#888">Proyecto</div><div style="font-size:12px;font-weight:600;margin-top:2px">${_esc(p?.nombre) || '—'}</div></div>
+        <div><div style="font-size:10px;color:#888">Ubicación</div><div style="font-size:12px;margin-top:2px">${_esc(l.ubicacion) || '—'}</div></div>
+        <div><div style="font-size:10px;color:#888">Sistema</div><div style="font-size:12px;margin-top:2px">${sis ? _esc(sis.etiqueta) : '—'}</div></div>
+        <div><div style="font-size:10px;color:#888">Piezas / filas</div><div style="font-size:12px;margin-top:2px">${totalPiezas} piezas en ${filas.length} fila${filas.length === 1 ? '' : 's'}</div></div>
+      </div>
+    </div>
+    <div style="padding:14px 16px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:#f5f5f5">
+          <th style="padding:6px;text-align:left;font-size:10px;color:#555">#</th>
+          <th style="padding:6px;text-align:left;font-size:10px;color:#555">Cuadro</th>
+          <th style="padding:6px;text-align:left;font-size:10px;color:#555">Ejes num.</th>
+          <th style="padding:6px;text-align:left;font-size:10px;color:#555">Ejes alfa.</th>
+          ${esVigueta
+            ? '<th style="padding:6px;text-align:left;font-size:10px;color:#555">Vigueta</th><th style="padding:6px;text-align:center;font-size:10px;color:#555">Hilos ab.</th><th style="padding:6px;text-align:center;font-size:10px;color:#555">Hilos ar.</th>'
+            : '<th style="padding:6px;text-align:center;font-size:10px;color:#555">Ancho (m)</th><th style="padding:6px;text-align:center;font-size:10px;color:#555">Hilos</th>'}
+          <th style="padding:6px;text-align:right;font-size:10px;color:#555">Dim. (m)</th>
+          <th style="padding:6px;text-align:center;font-size:10px;color:#555">Cant.</th>
+          <th style="padding:6px;text-align:right;font-size:10px;color:#555">Long. tot. (m)</th>
+          <th style="padding:6px;text-align:right;font-size:10px;color:#555">Peso (kg)</th>
+          <th style="padding:6px;text-align:left;font-size:10px;color:#555">Observaciones</th>
+        </tr></thead>
+        <tbody>${filasHTML}</tbody>
+        <tfoot>
+          <tr style="background:#E8F5E9">
+            <td colspan="${esVigueta ? 7 : 6}" style="padding:7px 6px;text-align:right;font-size:11px;font-weight:700;color:#1B5E20">TOTALES</td>
+            <td style="padding:7px 6px;text-align:center;font-size:11px;font-weight:700;color:#1B5E20">${totalPiezas}</td>
+            <td style="padding:7px 6px;text-align:right;font-size:11px;font-weight:700;color:#1B5E20">${totalMetros.toFixed(2)}</td>
+            <td style="padding:7px 6px;text-align:right;font-size:11px;font-weight:700;color:#1B5E20">${totalPeso.toFixed(1)}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #eee">
+      <div style="padding:16px">
+        <div style="border-top:1px solid #333;margin-top:36px;padding-top:6px;text-align:center">
+          <div style="font-size:11px;color:#888">Entregado por (Ingeniería)</div>
+        </div>
+      </div>
+      <div style="padding:16px">
+        <div style="border-top:1px solid #333;margin-top:36px;padding-top:6px;text-align:center">
+          <div style="font-size:11px;color:#888">Recibido en planta</div>
+        </div>
+      </div>
+    </div>
+    <div style="background:#f5f5f5;padding:8px 16px;text-align:center;font-size:10px;color:#999">
+      Proconcreto Prefabricados · Autopista del Café Km2, Vía Chinchiná – Santa Rosa · www.proconcreto.com.co
+    </div>
+  </div>`;
+
+  document.getElementById('contenido-preview').innerHTML = `
+    <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
+      <span style="font-weight:700">Lista de Producción — ${_esc(l.nombre)}</span>
+      <div style="flex:1"></div>
+      <button onclick="descargarPDFListaProduccion()" style="background:#1D9E75;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-lista">⬇️ Descargar PDF</button>
+      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+    </div>
+    <div class="preview-doc" style="padding:0">${html}</div>`;
+  document.getElementById('vista-previa').style.display = 'block';
+  document.querySelectorAll('.pantalla').forEach(p2 => p2.classList.remove('activa'));
+  window.scrollTo(0, 0);
+}
+
+async function descargarPDFListaProduccion() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const btn = document.getElementById('btn-pdf-lista');
+  if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
+  try {
+    const { jsPDF } = window.jspdf;
+    const el = document.getElementById('lp-preview-doc');
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = 210, pageH = 297;
+    const imgH = (canvas.height * pageW) / canvas.width;
+    let y = 0;
+    while (y < imgH) {
+      if (y > 0) pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, -y, pageW, imgH);
+      y += pageH;
+    }
+    const fecha = new Date().toISOString().split('T')[0].replace(/-/g, '_');
+    const nombreLosa = (l?.nombre || 'losa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '_');
+    pdf.save(`Lista_Produccion_${nombreLosa}_${fecha}.pdf`);
+  } finally {
+    if (btn) { btn.textContent = '⬇️ Descargar PDF'; btn.disabled = false; }
+  }
 }
 
 // Persiste la Losa completa (filas + despachos + bovedilla) de una sola vez — mismo criterio
