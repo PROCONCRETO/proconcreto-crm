@@ -63,6 +63,36 @@ Además, `.tabla-cots th` no tenía ningún `background` definido (transparente,
 
 **Verificación**: se armó un arnés real (`getComputedStyle()` sobre TH de `.tabla-cots`/`.tabla-items` en varios contextos — página, dentro de `#modal-costeo-producto`, dentro de `#modal-orden`, y la pantalla de Costeo de Producto de la captura original del usuario) confirmando `position: sticky` resuelto (no invalidado por el navegador), el `top` correcto según el contexto (94px en página, 0px en modal), el `background` opaco, el `border-radius` de compensación en las esquinas, `border-collapse: separate`, y que la tarjeta del calendario de Logística (la única `overflow:hidden` que debía quedar intacta) efectivamente no se tocó — 24 aserciones, todas en orden. Tras el bug real de arriba, se repitió el mismo tipo de arnés confirmando que `.tabla-items` quedó en `position: static` (página y modal) y que `.tabla-cots` siguió exactamente igual (página y modal) — 12 aserciones más. **Lo que estos arneses NO pudieron verificar** es el comportamiento visual real de scroll (`window.scrollTo()` + `getBoundingClientRect()` en Chrome headless `--dump-dom` no refleja el recálculo de `position:sticky` de forma confiable en este entorno — tanto un caso con `overflow:hidden` como uno sin él daban el mismo resultado "no fijo" en la prueba, una señal de limitación de la herramienta, no del CSS) — de hecho, así fue como el bug de `.tabla-items` llegó a producción: el arnés solo pudo confirmar que el CSS computaba como se esperaba, no que el resultado visual con scroll real fuera el correcto; eso lo encontró el usuario, no la prueba.
 
+### El mismo bug se repitió al construir Losas de Proyecto (2026-10-13) — por usar la clase equivocada
+
+Al construir la tabla de filas de producción de una Losa (`js/losas-proyecto.js`,
+`docs/modulos/proyectos.md`) se usó `.tabla-cots` por costumbre (es la clase que más se usa en
+la app) sin pensarlo como lo que en realidad es: una tabla de **captura**, donde el usuario va
+agregando filas con "+ Agregar fila" — exactamente el caso que esta sección ya identificó como
+el que NO debe llevar encabezado fijo. El usuario lo reportó con una captura real: al agregar
+varias filas, el encabezado aparecía encajado entre la fila 1 y la fila 3, tapando la fila 2
+por completo (el síntoma visual de este bug es ese — no es que el `<thead>` se mueva de
+posición en el DOM, es que al quedar "pegado" (`position:sticky`) tapa visualmente cualquier
+fila que caiga justo en ese punto de la pantalla).
+
+Primer intento de arreglo (equivocado): se pensó que faltaba `overflow-y:visible` en el
+`<div overflow-x:auto>` que envuelve la tabla (la tabla es ancha, con 14 columnas, necesita
+scroll horizontal) — se agregó, pero el usuario confirmó con una segunda captura que el
+problema seguía igual. El arnés automatizado tampoco pudo diferenciar entre "con el `overflow-
+y:visible`" y "sin él" (mismo resultado en ambos casos), confirmando otra vez la limitación ya
+documentada arriba — este bug en particular no se puede verificar con Chrome headless
+`--dump-dom`, solo mirándolo de verdad en el navegador.
+
+Arreglo real: cambiar la tabla de `class="tabla-cots"` a `class="tabla-items"` — es una tabla de
+formulario que crece fila por fila, el mismo caso exacto que Despiece de Acero (Costeo de
+Producto) o los ítems de una cotización, no una lista de navegación. Con `.tabla-items` el
+encabezado nunca fue `position:sticky` desde el principio (confirmado con `getComputedStyle` →
+`position: static`), así que no hay forma de que tape una fila nueva. **Lección para la próxima
+tabla nueva que se agregue**: antes de usar `.tabla-cots` por costumbre, preguntarse si es una
+lista de navegación (sí → `.tabla-cots`) o un formulario donde se van agregando/editando filas
+(sí → `.tabla-items`) — la clase correcta se decide por lo que hace la tabla, no por cuál se usa
+más seguido en el resto de la app.
+
 ## "Deshacer" genérico tras eliminar (`js/config.js`, 2026-10-11)
 
 A pedido del usuario ("podemos configurar para que cualquier acción que hagamos, podamos darle control z y devolver la acción?") — un Ctrl+Z universal (deshacer CUALQUIER acción de la app) exigiría rehacer cómo persiste cada uno de los ~15 módulos, así que se optó por algo más realista y ya acordado con el usuario: un botón "↩️ Deshacer" justo después de las acciones de **eliminar** más riesgosas (las que de verdad pierden un registro si alguien se equivoca), en vez de un historial de acciones genérico.
