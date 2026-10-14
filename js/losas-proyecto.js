@@ -58,6 +58,15 @@ let _bovedillaLosaActual = null;
 // `despachos[]`: un lote con `lineas[]`, cada línea referencia una fila por `filaId`.
 // `cantidadReal: null` en una línea = todavía no se cargó esa línea.
 let _programacionesLosaActual = [];
+// Despachos programados (2026-10-16, a pedido del usuario: "incluyamos la misma lógica que
+// tenemos en producción" — mismo molde exacto que `_programacionesLosaActual`) — "+ Programar
+// despacho" arma el lote; "+ Cargar despacho" confirma línea por línea lo que REALMENTE salió,
+// con la remisión real del camión. A diferencia de producción, el libro real sigue siendo
+// `despachos[]` (`_despachosLosaActual`, sin cambios en su forma ni en `_pendienteDespachoFila()`
+// — una remisión real cubre varias filas a la vez, por eso vive a nivel de Losa, no por fila
+// como `fila.produccion[]`) — "Cargar despacho" lo alimenta (find-or-create por
+// `despachoProgramadoId`) en vez de que el usuario lo arme directo, como antes.
+let _despachosProgramadosLosaActual = [];
 
 const ESTADOS_LOSA = ['Planeación', 'En producción', 'Completada', 'Cancelada'];
 const _COLOR_ESTADO_LOSA = {
@@ -405,6 +414,7 @@ function abrirLosaDetalle(id) {
   _despachosLosaActual = JSON.parse(JSON.stringify(l.despachos || []));
   _bovedillaLosaActual = l.bovedilla ? JSON.parse(JSON.stringify(l.bovedilla)) : null;
   _programacionesLosaActual = JSON.parse(JSON.stringify(l.produccionesProgramadas || []));
+  _despachosProgramadosLosaActual = JSON.parse(JSON.stringify(l.despachosProgramados || []));
   document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
   document.getElementById('pantalla-losa-detalle').classList.add('activa');
   renderLosaDetalle();
@@ -421,20 +431,17 @@ function renderLosaDetalle() {
   document.getElementById('losa-detalle-titulo').textContent = `${_ICONOS_MODO_LOSA[_MODO_FLUJO_LOSA] || ''} ${l.nombre}${l.ubicacion ? ' — ' + l.ubicacion : ''} (${sis ? sis.etiqueta : ''})`;
   document.getElementById('losa-barra-lista').style.display = esLista ? '' : 'none';
   document.getElementById('losa-nota-pegar').style.display = esLista ? '' : 'none';
-  // El imprimible para planta vive en Producción, no en Lista (2026-10-14, a pedido del
-  // usuario: "esto lo hago para que más adelante podamos asignar permisos más fácil a ciertas
-  // ventanas a los diferentes roles" — Ingeniería define la lista, Planta es quien imprime
-  // para fabricar).
-  document.getElementById('losa-btn-imprimir-produccion').style.display = esProduccion ? '' : 'none';
   document.getElementById('losa-btn-programar-produccion').style.display = esProduccion ? '' : 'none';
   document.getElementById('losa-btn-cargar-produccion').style.display = esProduccion ? '' : 'none';
   document.getElementById('losa-btn-produccion-diaria').style.display = esProduccion ? '' : 'none';
-  document.getElementById('losa-btn-registrar-despacho').style.display = esDespacho ? '' : 'none';
-  document.getElementById('losa-card-despachos').style.display = esDespacho ? '' : 'none';
+  document.getElementById('losa-btn-programar-despacho').style.display = esDespacho ? '' : 'none';
+  document.getElementById('losa-btn-cargar-despacho').style.display = esDespacho ? '' : 'none';
+  document.getElementById('losa-btn-historial-despachos').style.display = esDespacho ? '' : 'none';
+  document.getElementById('losa-card-produccion-registrada').style.display = esProduccion ? '' : 'none';
   document.getElementById('losa-detalle-bloque-bovedilla').style.display = l.sistema === 'vigueta_bovedilla' ? '' : 'none';
   renderFilasProduccion();
   if (l.sistema === 'vigueta_bovedilla') renderBovedillaLosa();
-  renderDespachosLosa();
+  if (esProduccion) renderProduccionRegistrada();
 }
 
 // ── Filas de producción — columnas según sistema (Prelosa/Placa Alveolar: ancho+hilos;
@@ -514,8 +521,8 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
   // una fila nueva arranca en 0 internamente (ver `agregarFilaProduccion()`), pero el campo se
   // ve vacío hasta que el usuario escribe; `parseFloat(this.value)||0` en el oninput sigue
   // guardando 0 si lo deja vacío, así que el dato no cambia, solo la comodidad de digitar.
-  const num = (valor, campo, ancho, recalcula) => esLista
-    ? `<input type="number" ${campo === 'dimension' ? 'step="0.01"' : ''} value="${valor || ''}" oninput="_filasLosaActual[${i}].${campo}=parseFloat(this.value)||0${recalcula ? `;_actualizarFilaProduccion(${i})` : ''}" style="width:${ancho}px">`
+  const num = (valor, campo, ancho, recalcula, onchangeExtra) => esLista
+    ? `<input type="number" ${campo === 'dimension' ? 'step="0.01"' : ''} value="${valor || ''}" oninput="_filasLosaActual[${i}].${campo}=parseFloat(this.value)||0${recalcula ? `;_actualizarFilaProduccion(${i})` : ''}" ${onchangeExtra ? `onchange="${onchangeExtra}"` : ''} style="width:${ancho}px">`
     : (valor || 0);
   // "Ejes numéricos"/"Ejes alfabéticos" (2026-10-13, a pedido del usuario) — de entrada
   // aparecen como dos cuadros de texto chicos separados por un guion ("(cuadro) - (cuadro)"),
@@ -544,7 +551,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     <td>${num(f.hilosAbajo, 'hilosAbajo', 38, false)}</td>
     <td>${num(f.hilosArriba, 'hilosArriba', 38, false)}</td>
     ` : `
-    <td>${num(f.ancho, 'ancho', 44, true)}</td>
+    <td>${num(f.ancho, 'ancho', 44, true, l.sistema === 'prelosa' ? `_validarAnchoPrelosa(${i})` : '')}</td>
     <td>${num(f.hilos, 'hilos', 38, false)}</td>
     `}
     <td>${num(f.dimension, 'dimension', 50, true)}</td>
@@ -562,6 +569,22 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     </td>
   </tr>`;
 }
+// Estandarización de ancho de prelosa (2026-10-16, a pedido del usuario: "el ancho del elemento
+// no se debe salir de 20 30 40 o 50cm por estandarización... no puede ser menos, no puede ser
+// mas ni puede ser intermedio") — esta es la validación "en caliente" al terminar de escribir
+// (onchange, no oninput — para no interrumpir a mitad de tecleo); el bloqueo real que cubre
+// también Pegar/Importar vive en `guardarListaProduccion()`, más abajo.
+const ANCHOS_ESTANDAR_PRELOSA = [20, 30, 40, 50];
+function _validarAnchoPrelosa(i) {
+  const f = _filasLosaActual[i];
+  if (!f || !f.ancho) return; // 0/vacío: el usuario puede seguir escribiendo, no interrumpir
+  if (!ANCHOS_ESTANDAR_PRELOSA.includes(Number(f.ancho))) {
+    alert(`El ancho de la prelosa debe ser 20, 30, 40 o 50 cm por estandarización — no se admiten medidas intermedias. Corrige el ancho de la fila "Cuadro ${f.cuadro || i + 1}".`);
+    f.ancho = 0;
+    renderFilasProduccion();
+  }
+}
+
 // Actualización quirúrgica (solo las celdas calculadas) al cambiar ancho/dimensión/cantidad —
 // mismo motivo que `_actualizarFilaDespieceAcero()` en Costeo de Producto: un render completo
 // en cada tecla destruye el <input> que se está escribiendo y hace perder el foco a mitad de
@@ -700,124 +723,28 @@ function guardarListaProduccion() {
   _filasLosaActual = _filasLosaActual.filter(f =>
     (f.ejesEntre || '').trim() || (f.cuadro || '').trim() || (f.dimension || 0) > 0 || (f.cantidad || 0) > 0
   );
+  // Bloqueo real de ancho estandarizado de prelosa (2026-10-16) — cubre Pegar/Importar además
+  // de la digitación manual (que ya avisa al vuelo en `_validarAnchoPrelosa()`), para que no se
+  // cuele una medida intermedia por ninguna de las 3 vías de carga.
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  if (l && l.sistema === 'prelosa') {
+    const invalidas = _filasLosaActual.filter(f => !ANCHOS_ESTANDAR_PRELOSA.includes(Number(f.ancho)));
+    if (invalidas.length) {
+      alert(`El ancho de la prelosa debe ser 20, 30, 40 o 50 cm por estandarización. Corrige el ancho de: ${invalidas.map(f => f.cuadro || '(sin cuadro)').join(', ')}.`);
+      return;
+    }
+  }
   _guardarLosaActual();
   renderFilasProduccion();
   alert('Lista de producción guardada.');
 }
 
-// Imprimible para pasar a planta (2026-10-13, a pedido del usuario: "agregamos un botón de
-// imprimir listas de producción... y de esto me salga un imprimible para pasar a planta y
-// puedan ellos fabricar lo que se necesita"). Reescrito 2026-10-15 ("revisa el formato de
-// imprimible de diseño de mezcla para que manejemos el mismo lenguaje gráfico") para seguir el
-// mismo molde que `verFormatoProduccionAjuste()` (js/calidad-ajuste-mezcla.js) y
-// `descargarPDF()` (js/pdf.js, la cotización): membrete (`membrete-top.jpg`) +
-// `.preview-doc`/`.preview-content`/`.preview-membrete-footer` (clases compartidas,
-// css/estilos.css) en vez de un header/footer con estilo inline propio — mismo lenguaje
-// gráfico en todos los documentos oficiales de la empresa, no uno distinto por módulo.
-// Imprime SIEMPRE todas las filas (2026-10-15, a pedido del usuario: "quitemos mejor el
-// seleccionable de la primera columna") — ya no hay selección de filas por checkbox.
-function imprimirListaProduccion() {
-  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
-  if (!l) return;
-  const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
-  const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
-  const esVigueta = l.sistema === 'vigueta_bovedilla';
-  const filas = _filasLosaActual;
-  if (!filas.length) { alert('No hay filas para imprimir.'); return; }
-
-  // Sin columna de Peso (2026-10-15, a pedido del usuario: "en este, no es necesario incluir la
-  // columna de peso") — este imprimible es para que planta sepa QUÉ fabricar, no cuánto pesa.
-  let totalPiezas = 0, totalMetros = 0;
-  const filasHTML = filas.map((f, n) => {
-    const longTotal = (Number(f.dimension) || 0) * (Number(f.cantidad) || 0);
-    totalPiezas += Number(f.cantidad) || 0;
-    totalMetros += longTotal;
-    const colEspecifica = esVigueta
-      ? `<td>${_esc(f.tipoVigueta) || '—'}</td><td style="text-align:center">${f.hilosAbajo || 0}</td><td style="text-align:center">${f.hilosArriba || 0}</td>`
-      : `<td style="text-align:center">${f.ancho || 0}</td><td style="text-align:center">${f.hilos || 0}</td>`;
-    return `<tr>
-      <td style="color:#888">${n + 1}</td>
-      <td style="font-weight:600">${_esc(f.cuadro) || '—'}</td>
-      <td>${_esc(f.ejesEntre) || '—'}</td>
-      <td>${_esc(f.laterales) || '—'}</td>
-      ${colEspecifica}
-      <td style="text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>
-      <td style="text-align:center;font-weight:700">${f.cantidad || 0}</td>
-      <td style="text-align:right">${longTotal.toFixed(2)}</td>
-      <td style="color:#555">${_esc(f.observaciones) || ''}</td>
-    </tr>`;
-  }).join('');
-
-  // La etiqueta "TOTALES" ocupa todas las columnas antes de "Cant." (# + Cuadro + Ejes num. +
-  // Ejes alfa. + [2 o 3 columnas propias del sistema] + Dim.) para que el total de piezas caiga
-  // justo debajo de "Cant." — antes quedaba una columna corrida (colspan de menos) y los totales
-  // no alineaban con su columna (2026-10-15, a pedido del usuario: "revisa los totales pues no
-  // están quedando bien alineados").
-  const colspanTotales = esVigueta ? 8 : 7;
-
-  const html = `
-    <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
-      <span style="font-weight:700">Lista de Producción — ${_esc(l.nombre)}</span>
-      <div style="flex:1"></div>
-      <button onclick="descargarPDFListaProduccion()" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-lista">⬇️ Descargar PDF</button>
-      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
-    </div>
-    <div class="preview-doc" id="lp-preview-doc">
-      <div class="preview-membrete-header"><img src="membrete-top.jpg" alt=""></div>
-      <div class="preview-content" id="lp-preview-content" style="padding-top:6px">
-        <div style="text-align:center;font-size:12px;font-weight:700;color:#003F7F;letter-spacing:0.03em;margin-bottom:8px">LISTA DE PRODUCCIÓN</div>
-        <div style="padding-bottom:6px;border-bottom:1px solid #eee;margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;align-items:baseline">
-            <div style="font-size:14px;font-weight:700;color:#003F7F">${_esc(l.nombre)}${l.ubicacion ? ' — ' + _esc(l.ubicacion) : ''}</div>
-            <div style="font-size:11px;color:#555">${new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
-          </div>
-          <div style="font-size:12px;font-weight:600;margin-top:2px">${_esc(p?.nombre) || '—'}</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px;font-size:10.5px">
-            <div><b>SISTEMA:</b> ${sis ? _esc(sis.etiqueta) : '—'}</div>
-            <div><b>PIEZAS / FILAS:</b> ${totalPiezas} piezas en ${filas.length} fila${filas.length === 1 ? '' : 's'}</div>
-          </div>
-        </div>
-        <table class="preview-tabla">
-          <thead><tr>
-            <th>#</th><th>Cuadro</th><th>Ejes num.</th><th>Ejes alfa.</th>
-            ${esVigueta ? '<th>Vigueta</th><th>Hilos ab.</th><th>Hilos ar.</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
-            <th>Dim. (m)</th><th>Cant.</th><th>Long. tot. (m)</th><th>Observaciones</th>
-          </tr></thead>
-          <tbody>${filasHTML}</tbody>
-          <tfoot><tr class="total-row">
-            <td colspan="${colspanTotales}" style="text-align:right">TOTALES</td>
-            <td style="text-align:center">${totalPiezas}</td>
-            <td style="text-align:right">${totalMetros.toFixed(2)}</td>
-            <td></td>
-          </tr></tfoot>
-        </table>
-        <div class="preview-firma" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
-          <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Entregado por (Ingeniería)</div>
-          <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Recibido en planta</div>
-        </div>
-      </div>
-      <div class="preview-membrete-footer" id="lp-preview-footer">
-        <div class="pf-arco"></div>
-        <div class="pf-datos">
-          <div class="pf-col"><span class="pf-icon">📞</span><span>+57 314 620 1650<br>+57 311 408 2285</span></div>
-          <div class="pf-col"><span class="pf-icon">🏠</span><span>Autopista del Café Km2<br>Vía Chinchiná – Santa Rosa</span></div>
-          <div class="pf-col"><span class="pf-icon">🌐</span><span>www.proconcreto.com.co</span></div>
-        </div>
-      </div>
-    </div>`;
-
-  document.getElementById('contenido-preview').innerHTML = html;
-  document.getElementById('vista-previa').style.display = 'block';
-  document.querySelectorAll('.pantalla').forEach(p2 => p2.classList.remove('activa'));
-  window.scrollTo(0, 0);
-}
-
 // Genera el PDF con el mismo membrete (cabecera repetida + pie con arco/datos de contacto) y la
 // misma paginación con corte en fila blanca que el resto de documentos oficiales — mismo
-// cuerpo exacto que `descargarFormatoProduccionAjuste()` (js/calidad-ajuste-mezcla.js).
-// Compartido entre `descargarPDFListaProduccion()` y `descargarPDFProgramacionProduccion()`
-// (2026-10-15) — ambos imprimibles usan el mismo membrete/paginación, solo cambia qué
-// contenido/pie se captura y el nombre del archivo.
+// cuerpo exacto que `descargarFormatoProduccionAjuste()` (js/calidad-ajuste-mezcla.js). Usado
+// por `descargarPDFProgramacionProduccion()` — queda factorizado aparte por si otro imprimible
+// con membrete lo necesita más adelante (ya sirvió para la Lista de Producción completa, que se
+// quitó el 2026-10-16 al quedar redundante con el imprimible de la programación del día).
 async function _descargarPDFConMembrete(contentElId, footerElId, nombreArchivo, btnId) {
   const btn = document.getElementById(btnId);
   if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
@@ -874,20 +801,13 @@ async function _descargarPDFConMembrete(contentElId, footerElId, nombreArchivo, 
     if (btn) { btn.textContent = '⬇️ Descargar PDF'; btn.disabled = false; }
   }
 }
-async function descargarPDFListaProduccion() {
-  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
-  const fecha = new Date().toISOString().split('T')[0].replace(/-/g, '_');
-  const nombreLosa = (l?.nombre || 'losa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '_');
-  await _descargarPDFConMembrete('lp-preview-content', 'lp-preview-footer', `Lista_Produccion_${nombreLosa}_${fecha}.pdf`, 'btn-pdf-lista');
-}
-
 // Persiste la Losa completa (filas + despachos + bovedilla + producciones programadas) de una
 // sola vez — mismo criterio que el resto de la app: un solo upsert del registro completo, nunca
 // escrituras parciales.
 function _guardarLosaActual() {
   const idx = LOSAS_PROYECTO.findIndex(x => x.id === _LOSA_ACTIVA_ID);
   if (idx < 0) return;
-  const l = { ...LOSAS_PROYECTO[idx], filas: _filasLosaActual, despachos: _despachosLosaActual, bovedilla: _bovedillaLosaActual, produccionesProgramadas: _programacionesLosaActual };
+  const l = { ...LOSAS_PROYECTO[idx], filas: _filasLosaActual, despachos: _despachosLosaActual, bovedilla: _bovedillaLosaActual, produccionesProgramadas: _programacionesLosaActual, despachosProgramados: _despachosProgramadosLosaActual };
   LOSAS_PROYECTO[idx] = l;
   sb.from('losas_proyecto').upsert({ id: l.id, datos: l, modificado: new Date().toISOString() }, { onConflict: 'id' })
     .then(({ error }) => { if (error) { console.error('Error guardando losa:', error.message); alert('No se pudo guardar: ' + error.message); } });
@@ -898,8 +818,8 @@ function _guardarLosaActual() {
 // va a fabricar (qué filas, cuánto); "+ Cargar producción" confirma, línea por línea, lo que
 // REALMENTE se fabricó frente a lo programado — "de esta entrada es que ingresamos la
 // producción", es la única puerta de entrada a `fila.produccion[]`. Mismo molde que
-// `despachos[]`/`abrirModalDespachoLosa()`: un lote con `lineas[]` que referencian cada fila por
-// `filaId`, precargado solo con las filas que tienen saldo pendiente.
+// `despachos[]`: un lote con `lineas[]` que referencian cada fila por `filaId`, precargado solo
+// con las filas que tienen saldo pendiente.
 function abrirModalProgramarProduccion() {
   const conPendiente = _filasLosaActual.filter(f => _pendienteProduccionFila(f) > 0);
   document.getElementById('mpp-fecha').value = _fmtISO(new Date());
@@ -978,13 +898,16 @@ function guardarProgramacionProduccion() {
   alert('Producción programada guardada. Cuando se fabrique, regístrala con "+ Cargar producción".');
 }
 
-// Imprimible de la PROGRAMACIÓN, no de la lista completa (2026-10-15, a pedido del usuario: "la
-// idea es poder imprimir lo que se espera producir, osea la programación de producción que
-// damos con el primer botón" — vive dentro del propio modal "+ Programar producción", a la
-// misma altura de "Guardar programación"). Lee lo que esté digitado en ese momento en el modal
-// — no hace falta haber guardado antes. Mismo lenguaje gráfico que `imprimirListaProduccion()`
-// (membrete + clases compartidas), pero con solo las filas/cantidades programadas: es un plan a
-// futuro, no lleva pendientes ni unidades fabricadas.
+// Imprimible de la PROGRAMACIÓN (2026-10-15, a pedido del usuario: "la idea es poder imprimir
+// lo que se espera producir, osea la programación de producción que damos con el primer botón"
+// — vive dentro del propio modal "+ Programar producción", a la misma altura de "Guardar
+// programación"). Lee lo que esté digitado en ese momento en el modal — no hace falta haber
+// guardado antes. Mismo lenguaje gráfico que el resto de documentos oficiales de la empresa
+// (membrete + clases compartidas, ver `verFormatoProduccionAjuste()` en
+// js/calidad-ajuste-mezcla.js), pero con solo las filas/cantidades programadas: es un plan a
+// futuro, no lleva pendientes ni unidades fabricadas. Es el ÚNICO imprimible de esta pantalla
+// desde el 2026-10-16 — el que sacaba la Lista de Producción completa se quitó por quedar
+// redundante (nadie lo usaba frente a este, que sí refleja el plan real del día).
 let _fechaProgramacionImpresa = null;
 function imprimirProgramacionProduccion() {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
@@ -1085,23 +1008,27 @@ async function descargarPDFProgramacionProduccion() {
   await _descargarPDFConMembrete('pp-preview-content', 'pp-preview-footer', `Programacion_Produccion_${nombreLosa}_${fecha}.pdf`, 'btn-pdf-programacion');
 }
 
-// "Cargar producción" — elige una programación con líneas pendientes de cargar y, frente a
-// cada "teórico programado", deja digitar lo que realmente se produjo. Una línea ya cargada
-// (`cantidadReal != null`) queda de solo lectura — no se puede volver a cargar ni duplicar.
+// "Cargar producción" — elige una programación y, frente a cada "teórico programado", deja
+// digitar lo que realmente se produjo. Una línea ya cargada (`cantidadReal != null`) sigue
+// siendo editable (2026-10-16, a pedido del usuario: "permitamos que se puedan también editar
+// producciones ya cargadas, pues es posible que se cometan errores en el camino que se deban
+// solucionar") — ya no es de solo lectura; se corrige con el mismo campo, sin duplicar el
+// registro de producción (ver `guardarCargaProduccion()`, que ACTUALIZA la entrada existente en
+// `fila.produccion[]` en vez de agregar una nueva).
 function abrirModalCargarProduccion() {
-  const pendientes = _programacionesLosaActual.filter(p => (p.lineas || []).some(l => l.cantidadReal == null));
+  const todas = _programacionesLosaActual;
   const select = document.getElementById('mcp-select-programacion');
-  document.getElementById('mcp-sin-programaciones').style.display = pendientes.length ? 'none' : '';
-  if (!pendientes.length) {
+  document.getElementById('mcp-sin-programaciones').style.display = todas.length ? 'none' : '';
+  if (!todas.length) {
     select.innerHTML = '';
     document.getElementById('mcp-contenido').style.display = 'none';
     document.getElementById('mcp-btn-guardar').style.display = 'none';
   } else {
-    select.innerHTML = pendientes.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(p => {
+    select.innerHTML = todas.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(p => {
       const totalProgramado = (p.lineas || []).reduce((s, l) => s + (Number(l.cantidadProgramada) || 0), 0);
       const porCargar = (p.lineas || []).filter(l => l.cantidadReal == null).length;
       const fechaTxt = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—';
-      return `<option value="${_escAttr(p.id)}">${fechaTxt} — ${(p.lineas || []).length} fila(s), ${totalProgramado} piezas programadas (${porCargar} por cargar)</option>`;
+      return `<option value="${_escAttr(p.id)}">${fechaTxt} — ${(p.lineas || []).length} fila(s), ${totalProgramado} piezas programadas${porCargar > 0 ? ` (${porCargar} por cargar)` : ' (completa, editable)'}</option>`;
     }).join('');
     _renderLineasCargarProduccion();
   }
@@ -1117,12 +1044,14 @@ function _renderLineasCargarProduccion() {
   tbody.innerHTML = (p.lineas || []).map((linea, li) => {
     const f = _filasLosaActual.find(x => x.id === linea.filaId);
     const cargada = linea.cantidadReal != null;
-    return `<tr>
+    const valorActual = cargada ? linea.cantidadReal : linea.cantidadProgramada;
+    return `<tr${cargada ? ' style="background:#F1F8F4"' : ''}>
       <td>${_esc(f?.cuadro || '—')}</td>
       <td>${linea.cantidadProgramada}</td>
-      <td>${cargada
-        ? `<span style="color:var(--verde);font-weight:600">✓ ${linea.cantidadReal}</span>`
-        : `<input type="number" min="0" value="${linea.cantidadProgramada}" data-linea-idx="${li}" style="width:70px">`}</td>
+      <td>
+        <input type="number" min="0" value="${valorActual}" data-linea-idx="${li}" style="width:70px">
+        ${cargada ? '<span style="font-size:10px;color:var(--verde);margin-left:4px">✓ cargado</span>' : ''}
+      </td>
     </tr>`;
   }).join('');
 }
@@ -1133,117 +1062,367 @@ function guardarCargaProduccion() {
   const inputs = document.querySelectorAll('#mcp-filas-body input[data-linea-idx]');
   let huboAlguna = false;
   inputs.forEach(inp => {
-    if (inp.value === '') return; // se deja en blanco a propósito: sigue pendiente para otro día
+    if (inp.value === '') return; // se deja en blanco a propósito: sin cambios en esta línea
     const idx = parseInt(inp.dataset.lineaIdx, 10);
     const linea = p.lineas[idx];
-    if (!linea || linea.cantidadReal != null) return;
-    const cantidadReal = parseFloat(inp.value) || 0;
-    linea.cantidadReal = cantidadReal;
+    if (!linea) return;
+    const nuevaCantidad = parseFloat(inp.value) || 0;
+    const yaEstabaCargada = linea.cantidadReal != null;
+    if (yaEstabaCargada && nuevaCantidad === linea.cantidadReal) return; // sin cambios reales
+    linea.cantidadReal = nuevaCantidad;
     huboAlguna = true;
-    if (cantidadReal > 0) {
-      const f = _filasLosaActual.find(x => x.id === linea.filaId);
-      if (f) { f.produccion = f.produccion || []; f.produccion.push({ fecha: p.fecha, cantidad: cantidadReal, tipo: 'Vaciado', programacionId: p.id }); }
+    const f = _filasLosaActual.find(x => x.id === linea.filaId);
+    if (f) {
+      f.produccion = f.produccion || [];
+      // Corrige la entrada existente de esta programación en vez de duplicarla — una línea
+      // solo empuja UNA entrada a fila.produccion[] en toda su vida, se edita in situ.
+      const entradaExistente = f.produccion.find(e => e.programacionId === p.id);
+      if (entradaExistente) entradaExistente.cantidad = nuevaCantidad;
+      else if (nuevaCantidad > 0) f.produccion.push({ fecha: p.fecha, cantidad: nuevaCantidad, tipo: 'Vaciado', programacionId: p.id });
     }
   });
-  if (!huboAlguna) { alert('Ingresa al menos una cantidad producida.'); return; }
+  if (!huboAlguna) { alert('Ingresa al menos una cantidad producida, o cambia alguna ya cargada para corregirla.'); return; }
   _guardarLosaActual();
   cerrarModal('modal-cargar-produccion');
   renderFilasProduccion();
+  renderProduccionRegistrada();
   alert('Producción cargada.');
 }
 
+// "Producciones registradas" — mismo espíritu que "📦 Despachos registrados", pero del lado de
+// Producción (2026-10-15, a pedido del usuario: "incluyamos... algo similar a lo que tenemos en
+// Despachos de Despachos Registrados... fila a fila lo producido y seleccionándola podamos ver
+// el resumen... lo realmente fabricado"). Lista las programaciones que ya tienen AL MENOS una
+// línea cargada (`cantidadReal != null`) — una programación sin nada cargado todavía no es
+// "producción", es solo un plan, no aparece acá (si está 100% pendiente, vive en "+ Cargar
+// producción"). "Contenido" cuenta solo lo REALMENTE fabricado, no lo programado.
+function renderProduccionRegistrada() {
+  const tbody = document.getElementById('produccion-registrada-body');
+  if (!tbody) return;
+  const conCarga = _programacionesLosaActual.filter(p => (p.lineas || []).some(l => l.cantidadReal != null));
+  if (!conCarga.length) {
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--gris-medio);padding:10px">No hay producción cargada todavía.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = conCarga.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(p => {
+    const cargadas = (p.lineas || []).filter(l => l.cantidadReal != null);
+    const pendientes = (p.lineas || []).length - cargadas.length;
+    const totalFabricado = cargadas.reduce((s, l) => s + (Number(l.cantidadReal) || 0), 0);
+    return `<tr onclick="verDetalleProduccionRegistrada('${_escAttr(p.id)}')" style="cursor:pointer">
+      <td>${p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
+      <td>${cargadas.length} fila(s), ${totalFabricado} piezas fabricadas${pendientes > 0 ? ` (${pendientes} por cargar)` : ''}</td>
+      <td>${_esc(p.observaciones) || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+// Detalle de solo lectura al seleccionar una fila de "Producciones registradas" — mismo
+// contenido que ve "+ Cargar producción" (Cuadro / Programado / Producido), pero sin inputs:
+// es historial, no una carga en curso.
+function verDetalleProduccionRegistrada(id) {
+  const p = _programacionesLosaActual.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('vdp-fecha').textContent = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—';
+  document.getElementById('vdp-observaciones').textContent = p.observaciones || '—';
+  document.getElementById('vdp-filas-body').innerHTML = (p.lineas || []).map(linea => {
+    const f = _filasLosaActual.find(x => x.id === linea.filaId);
+    const cargada = linea.cantidadReal != null;
+    return `<tr>
+      <td>${_esc(f?.cuadro || '—')}</td>
+      <td>${linea.cantidadProgramada}</td>
+      <td>${cargada ? linea.cantidadReal : '<span style="color:var(--naranja)">Pendiente</span>'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('modal-detalle-produccion').classList.add('abierto');
+}
+
 // "Ver producción diaria" — matriz fila × fecha, mismo formato que los Excel reales
-// compartidos por el usuario (una columna por día de producción).
+// compartidos por el usuario (una columna por día de producción). Siempre lista TODAS las
+// filas de la Losa (2026-10-15, a pedido del usuario), no solo las que ya tienen producción —
+// antes, si todavía no se había cargado ninguna producción, no se veía ninguna fila. Las
+// columnas Cuadro/Ancho/Largo/Cant. a fabricar/Total fabricado quedan FIJAS a la izquierda
+// (`position:sticky;left:...`, mismo mecanismo que ya usa `.tabla-cots th` para fijarse arriba
+// al bajar, pero en el eje horizontal) porque en una Losa grande las columnas de fecha pueden
+// ser muchas — se desplazan con la barra horizontal sin perder de vista qué fila es cada una.
 function abrirMatrizProduccionDiaria() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const esVigueta = l?.sistema === 'vigueta_bovedilla';
   const fechasSet = new Set();
   _filasLosaActual.forEach(f => (f.produccion || []).forEach(e => { if (e.fecha) fechasSet.add(e.fecha); }));
   const fechas = Array.from(fechasSet).sort();
   const thead = document.getElementById('pd-thead');
   const tbody = document.getElementById('pd-tbody');
   const tfoot = document.getElementById('pd-tfoot');
-  if (!fechas.length) {
-    thead.innerHTML = '<tr><th>Cuadro</th></tr>';
-    tbody.innerHTML = '<tr><td style="text-align:center;color:var(--gris-medio);padding:14px">No hay producción registrada todavía.</td></tr>';
+
+  // Anchos fijos para las columnas congeladas — position:sticky necesita un "left" numérico,
+  // no sirve con anchos automáticos; thead/tbody/tfoot usan exactamente el mismo ancho por
+  // columna para que las celdas queden alineadas.
+  const AW = { cuadro: 60, ancho: 70, largo: 70, cantidad: 100, total: 110 };
+  let acum = 0;
+  const leftCuadro = acum; acum += AW.cuadro;
+  const leftAncho = acum; if (!esVigueta) acum += AW.ancho;
+  const leftLargo = acum; acum += AW.largo;
+  const leftCantidad = acum; acum += AW.cantidad;
+  const leftTotal = acum;
+  const numColsFijas = esVigueta ? 4 : 5;
+  // z-index 5 en los `<th>` ya viene de `.tabla-cots th` (también les da el `top:0` que los fija
+  // arriba al bajar) — acá solo hace falta agregar el `left` para fijarlos también a la
+  // izquierda. Los `<td>`/`<tfoot><td>` sí necesitan su propio z-index + fondo sólido (si no, el
+  // contenido de las columnas de fecha se vería "por debajo" al desplazar la barra).
+  const thFijo = (leftPx, w, texto) => `<th style="position:sticky;left:${leftPx}px;width:${w}px;min-width:${w}px;text-align:center">${texto}</th>`;
+  const tdFijo = (leftPx, w, texto, extra) => `<td style="position:sticky;left:${leftPx}px;width:${w}px;min-width:${w}px;z-index:2;background:#fff;${extra || ''}">${texto}</td>`;
+
+  thead.innerHTML = `<tr>
+    ${thFijo(leftCuadro, AW.cuadro, 'Cuadro')}
+    ${esVigueta ? '' : thFijo(leftAncho, AW.ancho, 'Ancho (cm)')}
+    ${thFijo(leftLargo, AW.largo, 'Largo (m)')}
+    ${thFijo(leftCantidad, AW.cantidad, 'Cant. a fabricar')}
+    ${thFijo(leftTotal, AW.total, 'Total fabricado')}
+    ${fechas.map(fe => `<th style="text-align:center;min-width:55px">${new Date(fe + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' })}</th>`).join('')}
+  </tr>`;
+
+  if (!_filasLosaActual.length) {
+    tbody.innerHTML = `<tr><td colspan="${numColsFijas + fechas.length}" style="text-align:center;color:var(--gris-medio);padding:14px">No hay filas en esta Losa todavía.</td></tr>`;
     tfoot.innerHTML = '';
-  } else {
-    thead.innerHTML = `<tr><th>Cuadro</th>${fechas.map(fe => `<th style="text-align:center">${new Date(fe + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' })}</th>`).join('')}<th style="text-align:center">Total</th></tr>`;
-    const totalesPorFecha = fechas.map(() => 0);
-    let granTotal = 0;
-    tbody.innerHTML = _filasLosaActual.map(f => {
-      let filaTotal = 0;
-      const celdas = fechas.map((fe, fi) => {
-        const cant = (f.produccion || []).filter(e => e.fecha === fe).reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
-        filaTotal += cant;
-        totalesPorFecha[fi] += cant;
-        return `<td style="text-align:center">${cant || ''}</td>`;
-      }).join('');
-      granTotal += filaTotal;
-      return `<tr><td>${_esc(f.cuadro) || '—'}</td>${celdas}<td style="text-align:center;font-weight:700">${filaTotal || ''}</td></tr>`;
-    }).join('');
-    tfoot.innerHTML = `<tr style="background:var(--azul-suave);font-weight:700"><td>Total día</td>${totalesPorFecha.map(t => `<td style="text-align:center">${t || ''}</td>`).join('')}<td style="text-align:center">${granTotal}</td></tr>`;
+    document.getElementById('modal-produccion-diaria').classList.add('abierto');
+    return;
   }
+
+  const totalesPorFecha = fechas.map(() => 0);
+  let granTotalCantidad = 0, granTotalFabricado = 0;
+  tbody.innerHTML = _filasLosaActual.map(f => {
+    let filaTotal = 0;
+    const celdas = fechas.map((fe, fi) => {
+      const cant = (f.produccion || []).filter(e => e.fecha === fe).reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
+      filaTotal += cant;
+      totalesPorFecha[fi] += cant;
+      return `<td style="text-align:center">${cant || ''}</td>`;
+    }).join('');
+    granTotalCantidad += Number(f.cantidad) || 0;
+    granTotalFabricado += filaTotal;
+    return `<tr>
+      ${tdFijo(leftCuadro, AW.cuadro, _esc(f.cuadro) || '—', 'font-weight:600')}
+      ${esVigueta ? '' : tdFijo(leftAncho, AW.ancho, f.ancho || 0, 'text-align:center')}
+      ${tdFijo(leftLargo, AW.largo, (Number(f.dimension) || 0).toFixed(2), 'text-align:center')}
+      ${tdFijo(leftCantidad, AW.cantidad, f.cantidad || 0, 'text-align:center')}
+      ${tdFijo(leftTotal, AW.total, filaTotal || 0, 'text-align:center;font-weight:700')}
+      ${celdas}
+    </tr>`;
+  }).join('');
+
+  tfoot.innerHTML = fechas.length ? `<tr style="font-weight:700">
+    ${tdFijo(leftCuadro, AW.cuadro, 'Total día', 'background:var(--azul-suave)')}
+    ${esVigueta ? '' : tdFijo(leftAncho, AW.ancho, '', 'background:var(--azul-suave)')}
+    ${tdFijo(leftLargo, AW.largo, '', 'background:var(--azul-suave)')}
+    ${tdFijo(leftCantidad, AW.cantidad, granTotalCantidad, 'background:var(--azul-suave);text-align:center')}
+    ${tdFijo(leftTotal, AW.total, granTotalFabricado, 'background:var(--azul-suave);text-align:center')}
+    ${totalesPorFecha.map(t => `<td style="text-align:center;background:var(--azul-suave)">${t || ''}</td>`).join('')}
+  </tr>` : '';
+
   document.getElementById('modal-produccion-diaria').classList.add('abierto');
 }
 
-// ── Control de Despacho (a nivel Losa, con líneas — una remisión real cubre varias filas a
-// la vez, mismo espíritu que `viaje.entregas[].productos[]` en Logística) ──
-function abrirModalDespachoLosa() {
-  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
-  if (!l) return;
-  document.getElementById('mdl-remision').value = '';
-  document.getElementById('mdl-fecha').value = _fmtISO(new Date());
-  document.getElementById('mdl-observaciones').value = '';
+// ── Control de Despacho — mismo flujo de dos pasos que Producción (2026-10-16, a pedido del
+// usuario: "incluyamos la misma lógica que tenemos en producción, con los tres botones
+// superiores de programar despacho, cargar despacho e historial de despachos"). Reemplaza el
+// registro directo de un solo paso que había antes: "+ Programar despacho" arma el lote de lo
+// que se va a despachar; "+ Cargar despacho" confirma, línea por línea, lo que REALMENTE salió
+// frente a lo programado, con la remisión real del camión. `despachos[]`
+// (`_despachosLosaActual`) sigue siendo el libro real — sin cambios en su forma ni en
+// `_pendienteDespachoFila()` — "Cargar despacho" lo alimenta (find-or-create por
+// `despachoProgramadoId`) en vez de que el usuario lo arme directo como antes.
+function abrirModalProgramarDespacho() {
   const conPendiente = _filasLosaActual.filter(f => _pendienteDespachoFila(f, _despachosLosaActual) > 0);
-  const tbody = document.getElementById('mdl-filas-body');
+  document.getElementById('mpd-fecha').value = _fmtISO(new Date());
+  document.getElementById('mpd-observaciones').value = '';
+  document.getElementById('mpd-filtro-desde').value = '';
+  document.getElementById('mpd-filtro-hasta').value = '';
+  const tbody = document.getElementById('mpd-filas-body');
   if (!conPendiente.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--gris-medio);padding:10px">No hay filas con saldo pendiente de despacho.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gris-medio);padding:10px">No hay filas con saldo pendiente de despacho.</td></tr>`;
   } else {
     tbody.innerHTML = conPendiente.map(f => {
       const pend = _pendienteDespachoFila(f, _despachosLosaActual);
-      return `<tr>
+      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}">
+        <td><input type="checkbox" class="mpd-chk-fila" onchange="_marcarFilaProgramarDespacho(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
         <td>${f.dimension || 0} m</td>
         <td>${pend}</td>
-        <td><input type="number" min="0" max="${pend}" value="0" data-fila-id="${_escAttr(f.id)}" style="width:70px"></td>
+        <td><input type="number" min="0" max="${pend}" value="0" data-fila-id="${_escAttr(f.id)}" data-pendiente="${pend}" style="width:70px"></td>
       </tr>`;
     }).join('');
   }
-  document.getElementById('modal-despacho-losa').classList.add('abierto');
+  document.getElementById('modal-programar-despacho').classList.add('abierto');
 }
-function guardarDespachoLosa() {
-  const remision = document.getElementById('mdl-remision').value.trim();
-  if (!remision) { alert('Ingresa el número de remisión.'); return; }
-  const fecha = document.getElementById('mdl-fecha').value;
+function _marcarFilaProgramarDespacho(checkbox) {
+  const input = checkbox.closest('tr').querySelector('input[data-fila-id]');
+  if (input) input.value = checkbox.checked ? input.dataset.pendiente : 0;
+}
+function _marcarTodasFilasProgramarDespacho(marcar) {
+  document.querySelectorAll('#mpd-filas-body tr').forEach(tr => {
+    if (tr.style.display === 'none') return;
+    const chk = tr.querySelector('.mpd-chk-fila');
+    if (!chk) return;
+    chk.checked = marcar;
+    _marcarFilaProgramarDespacho(chk);
+  });
+}
+function _aplicarFiltroCuadroProgramarDespacho() {
+  const desdeRaw = document.getElementById('mpd-filtro-desde').value;
+  const hastaRaw = document.getElementById('mpd-filtro-hasta').value;
+  const desde = desdeRaw === '' ? null : parseFloat(desdeRaw);
+  const hasta = hastaRaw === '' ? null : parseFloat(hastaRaw);
+  document.querySelectorAll('#mpd-filas-body tr[data-cuadro]').forEach(tr => {
+    if (desde == null && hasta == null) { tr.style.display = ''; return; }
+    const cuadroNum = parseFloat(tr.dataset.cuadro);
+    const dentro = !isNaN(cuadroNum) && (desde == null || cuadroNum >= desde) && (hasta == null || cuadroNum <= hasta);
+    tr.style.display = dentro ? '' : 'none';
+  });
+}
+function guardarProgramacionDespacho() {
+  const fecha = document.getElementById('mpd-fecha').value;
   if (!fecha) { alert('Elige una fecha.'); return; }
-  const inputs = document.querySelectorAll('#mdl-filas-body input[data-fila-id]');
+  const inputs = document.querySelectorAll('#mpd-filas-body input[data-fila-id]');
   const lineas = [];
   inputs.forEach(inp => {
-    const cantidad = parseFloat(inp.value) || 0;
-    if (cantidad > 0) lineas.push({ filaId: inp.dataset.filaId, cantidad });
+    const cantidadProgramada = parseFloat(inp.value) || 0;
+    if (cantidadProgramada > 0) lineas.push({ filaId: inp.dataset.filaId, cantidadProgramada, cantidadReal: null });
   });
-  if (!lineas.length) { alert('Ingresa al menos una cantidad a despachar.'); return; }
-  _despachosLosaActual.push({ id: String(Date.now()), remision, fecha, observaciones: document.getElementById('mdl-observaciones').value.trim(), lineas });
+  if (!lineas.length) { alert('Ingresa al menos una cantidad a programar.'); return; }
+  _despachosProgramadosLosaActual.push({ id: String(Date.now()), fecha, observaciones: document.getElementById('mpd-observaciones').value.trim(), lineas });
   _guardarLosaActual();
-  cerrarModal('modal-despacho-losa');
-  renderFilasProduccion();
-  renderDespachosLosa();
+  cerrarModal('modal-programar-despacho');
+  alert('Despacho programado guardado. Cuando salga el camión, regístralo con "+ Cargar despacho".');
 }
-function renderDespachosLosa() {
-  const tbody = document.getElementById('despachos-losa-body');
-  if (!tbody) return;
-  if (!_despachosLosaActual.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--gris-medio);padding:10px">No hay despachos registrados todavía.</td></tr>`;
-    return;
+
+// "Cargar despacho" — mismo patrón que "Cargar producción" (línea ya cargada sigue siendo
+// editable, para poder corregir errores), más la remisión real del camión, que producción no
+// necesita. Al guardar, reconstruye por completo la entrada de esta programación en el libro
+// real `despachos[]` (find-or-create por `despachoProgramadoId`) a partir de TODAS las líneas
+// ya cargadas de este plan — nunca parcial ni duplicado, así `_pendienteDespachoFila()` sigue
+// funcionando exactamente igual que antes, sin tocar su fórmula.
+function abrirModalCargarDespacho() {
+  const todas = _despachosProgramadosLosaActual;
+  const select = document.getElementById('mcd-select-programacion');
+  document.getElementById('mcd-sin-programaciones').style.display = todas.length ? 'none' : '';
+  document.getElementById('mcd-fecha').value = _fmtISO(new Date());
+  document.getElementById('mcd-remision').value = ''; // se vuelve a prellenar en _renderLineasCargarDespacho() según la programación elegida
+  if (!todas.length) {
+    select.innerHTML = '';
+    document.getElementById('mcd-contenido').style.display = 'none';
+    document.getElementById('mcd-btn-guardar').style.display = 'none';
+  } else {
+    select.innerHTML = todas.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(p => {
+      const totalProgramado = (p.lineas || []).reduce((s, l) => s + (Number(l.cantidadProgramada) || 0), 0);
+      const porCargar = (p.lineas || []).filter(l => l.cantidadReal == null).length;
+      const fechaTxt = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—';
+      return `<option value="${_escAttr(p.id)}">${fechaTxt} — ${(p.lineas || []).length} fila(s), ${totalProgramado} piezas programadas${porCargar > 0 ? ` (${porCargar} por cargar)` : ' (completa, editable)'}</option>`;
+    }).join('');
+    _renderLineasCargarDespacho();
   }
-  tbody.innerHTML = _despachosLosaActual.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(d => {
-    const totalPiezas = (d.lineas || []).reduce((s, l) => s + (Number(l.cantidad) || 0), 0);
-    return `<tr>
-      <td>${_esc(d.remision)}</td>
-      <td>${d.fecha ? new Date(d.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
-      <td>${(d.lineas || []).length} fila(s), ${totalPiezas} piezas</td>
-      <td>${_esc(d.observaciones) || '—'}</td>
+  document.getElementById('modal-cargar-despacho').classList.add('abierto');
+}
+function _renderLineasCargarDespacho() {
+  const select = document.getElementById('mcd-select-programacion');
+  const p = _despachosProgramadosLosaActual.find(x => x.id === select.value);
+  const tbody = document.getElementById('mcd-filas-body');
+  if (!p) { document.getElementById('mcd-contenido').style.display = 'none'; document.getElementById('mcd-btn-guardar').style.display = 'none'; return; }
+  document.getElementById('mcd-contenido').style.display = '';
+  document.getElementById('mcd-btn-guardar').style.display = '';
+  const inpRemision = document.getElementById('mcd-remision');
+  if (!inpRemision.value) inpRemision.value = p.remision || '';
+  tbody.innerHTML = (p.lineas || []).map((linea, li) => {
+    const f = _filasLosaActual.find(x => x.id === linea.filaId);
+    const cargada = linea.cantidadReal != null;
+    const valorActual = cargada ? linea.cantidadReal : linea.cantidadProgramada;
+    return `<tr${cargada ? ' style="background:#F1F8F4"' : ''}>
+      <td>${_esc(f?.cuadro || '—')}</td>
+      <td>${linea.cantidadProgramada}</td>
+      <td>
+        <input type="number" min="0" value="${valorActual}" data-linea-idx="${li}" style="width:70px">
+        ${cargada ? '<span style="font-size:10px;color:var(--verde);margin-left:4px">✓ cargado</span>' : ''}
+      </td>
     </tr>`;
   }).join('');
+}
+function guardarCargaDespacho() {
+  const remision = document.getElementById('mcd-remision').value.trim();
+  if (!remision) { alert('Ingresa el número de remisión.'); return; }
+  const fecha = document.getElementById('mcd-fecha').value;
+  if (!fecha) { alert('Elige una fecha.'); return; }
+  const select = document.getElementById('mcd-select-programacion');
+  const p = _despachosProgramadosLosaActual.find(x => x.id === select.value);
+  if (!p) return;
+  const inputs = document.querySelectorAll('#mcd-filas-body input[data-linea-idx]');
+  let huboAlguna = false;
+  inputs.forEach(inp => {
+    if (inp.value === '') return; // se deja en blanco a propósito: sin cambios en esta línea
+    const idx = parseInt(inp.dataset.lineaIdx, 10);
+    const linea = p.lineas[idx];
+    if (!linea) return;
+    const nuevaCantidad = parseFloat(inp.value) || 0;
+    const yaEstabaCargada = linea.cantidadReal != null;
+    if (yaEstabaCargada && nuevaCantidad === linea.cantidadReal) return; // sin cambios reales
+    linea.cantidadReal = nuevaCantidad;
+    huboAlguna = true;
+  });
+  if (!huboAlguna) { alert('Ingresa al menos una cantidad despachada, o cambia alguna ya cargada para corregirla.'); return; }
+  p.remision = remision;
+  const lineasReales = (p.lineas || []).filter(l => l.cantidadReal != null && l.cantidadReal > 0).map(l => ({ filaId: l.filaId, cantidad: l.cantidadReal }));
+  let entrada = _despachosLosaActual.find(d => d.despachoProgramadoId === p.id);
+  if (entrada) {
+    entrada.remision = remision; entrada.fecha = fecha; entrada.observaciones = p.observaciones; entrada.lineas = lineasReales;
+  } else {
+    _despachosLosaActual.push({ id: String(Date.now()), despachoProgramadoId: p.id, remision, fecha, observaciones: p.observaciones, lineas: lineasReales });
+  }
+  _guardarLosaActual();
+  cerrarModal('modal-cargar-despacho');
+  renderFilasProduccion();
+  alert('Despacho cargado.');
+}
+
+// "Historial de despachos" — mismo patrón que "🏗️ Producciones registradas" de Producción,
+// como modal (a pedido del usuario) en vez de tarjeta siempre visible — reemplaza la tarjeta
+// "📦 Despachos registrados" que había antes. Lista las `despachosProgramados[]` que ya tienen
+// AL MENOS una línea cargada; "Contenido" cuenta solo lo REALMENTE despachado, no lo
+// programado.
+function abrirHistorialDespachos() {
+  const tbody = document.getElementById('hd-filas-body');
+  const conCarga = _despachosProgramadosLosaActual.filter(p => (p.lineas || []).some(l => l.cantidadReal != null));
+  if (!conCarga.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--gris-medio);padding:10px">No hay despachos cargados todavía.</td></tr>`;
+  } else {
+    tbody.innerHTML = conCarga.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(p => {
+      const cargadas = (p.lineas || []).filter(l => l.cantidadReal != null);
+      const pendientes = (p.lineas || []).length - cargadas.length;
+      const totalDespachado = cargadas.reduce((s, l) => s + (Number(l.cantidadReal) || 0), 0);
+      return `<tr onclick="verDetalleDespachoRegistrado('${_escAttr(p.id)}')" style="cursor:pointer">
+        <td>${_esc(p.remision) || '—'}</td>
+        <td>${p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
+        <td>${cargadas.length} fila(s), ${totalDespachado} piezas despachadas${pendientes > 0 ? ` (${pendientes} por cargar)` : ''}</td>
+        <td>${_esc(p.observaciones) || '—'}</td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('modal-historial-despachos').classList.add('abierto');
+}
+// Detalle de solo lectura al seleccionar una fila del historial — mismo contenido que ve "+
+// Cargar despacho" (Cuadro / Programado / Despachado), sin inputs: es historial.
+function verDetalleDespachoRegistrado(id) {
+  const p = _despachosProgramadosLosaActual.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('vdd-remision').textContent = p.remision || '—';
+  document.getElementById('vdd-fecha').textContent = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—';
+  document.getElementById('vdd-observaciones').textContent = p.observaciones || '—';
+  document.getElementById('vdd-filas-body').innerHTML = (p.lineas || []).map(linea => {
+    const f = _filasLosaActual.find(x => x.id === linea.filaId);
+    const cargada = linea.cantidadReal != null;
+    return `<tr>
+      <td>${_esc(f?.cuadro || '—')}</td>
+      <td>${linea.cantidadProgramada}</td>
+      <td>${cargada ? linea.cantidadReal : '<span style="color:var(--naranja)">Pendiente</span>'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('modal-detalle-despacho').classList.add('abierto');
 }
 
 // ── Bovedilla — sin control fila-por-fila, solo cantidad requerida + entradas/salidas por

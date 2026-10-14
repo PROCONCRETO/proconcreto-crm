@@ -1315,8 +1315,9 @@
       <button id="losa-btn-programar-produccion" class="btn btn-primario btn-sm" onclick="abrirModalProgramarProduccion()" style="display:none">+ Programar producción</button>
       <button id="losa-btn-cargar-produccion" class="btn btn-primario btn-sm" onclick="abrirModalCargarProduccion()" style="display:none">+ Cargar producción</button>
       <button id="losa-btn-produccion-diaria" class="btn btn-secundario btn-sm" onclick="abrirMatrizProduccionDiaria()" style="display:none">📊 Producción diaria</button>
-      <button id="losa-btn-imprimir-produccion" class="btn btn-secundario btn-sm" onclick="imprimirListaProduccion()" style="display:none">🖨️ Imprimir</button>
-      <button id="losa-btn-registrar-despacho" class="btn btn-secundario btn-sm" onclick="abrirModalDespachoLosa()" style="display:none">📦 Registrar despacho</button>
+      <button id="losa-btn-programar-despacho" class="btn btn-primario btn-sm" onclick="abrirModalProgramarDespacho()" style="display:none">+ Programar despacho</button>
+      <button id="losa-btn-cargar-despacho" class="btn btn-primario btn-sm" onclick="abrirModalCargarDespacho()" style="display:none">+ Cargar despacho</button>
+      <button id="losa-btn-historial-despachos" class="btn btn-secundario btn-sm" onclick="abrirHistorialDespachos()" style="display:none">📜 Historial de despachos</button>
     </div>
   </div>
 
@@ -1340,6 +1341,11 @@
     </table>
   </div>
 
+  <div id="losa-card-produccion-registrada" class="card" style="margin-top:16px;display:none">
+    <div style="font-size:15px;font-weight:700;color:var(--azul);margin-bottom:10px">🏗️ Producciones registradas</div>
+    <table class="tabla-cots"><thead><tr><th>Fecha</th><th>Contenido</th><th>Observaciones</th></tr></thead><tbody id="produccion-registrada-body"></tbody></table>
+  </div>
+
   <div id="losa-detalle-bloque-bovedilla" class="card" style="margin-top:16px">
     <div style="font-size:15px;font-weight:700;color:var(--azul);margin-bottom:10px">🧱 Bovedilla</div>
     <div id="bov-campos-editables" class="form-grid" style="margin-bottom:10px">
@@ -1360,10 +1366,6 @@
     </div>
   </div>
 
-  <div id="losa-card-despachos" class="card" style="margin-top:16px;display:none">
-    <div style="font-size:15px;font-weight:700;color:var(--azul);margin-bottom:10px">📦 Despachos registrados</div>
-    <table class="tabla-cots"><thead><tr><th>Remisión</th><th>Fecha</th><th>Contenido</th><th>Observaciones</th></tr></thead><tbody id="despachos-losa-body"></tbody></table>
-  </div>
 </div>
 
 <div class="modal-overlay" id="modal-programar-produccion">
@@ -1426,21 +1428,94 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-despacho-losa">
+<div class="modal-overlay" id="modal-detalle-produccion">
   <div class="modal" style="width:620px;max-width:95vw">
-    <div class="modal-titulo">📦 Registrar despacho</div>
-    <div class="form-grid" style="margin-bottom:10px">
-      <div class="form-grupo"><label>N° Remisión *</label><input type="text" id="mdl-remision" placeholder="Ej: REM-5844"></div>
-      <div class="form-grupo"><label>Fecha</label><input type="date" id="mdl-fecha"></div>
+    <div class="modal-titulo">🏗️ Detalle de producción cargada</div>
+    <div class="form-grid" style="margin-bottom:10px;font-size:13px">
+      <div><b>Fecha:</b> <span id="vdp-fecha"></span></div>
+      <div><b>Observaciones:</b> <span id="vdp-observaciones"></span></div>
     </div>
-    <div class="form-grupo" style="margin-bottom:10px"><label>Observaciones</label><input type="text" id="mdl-observaciones"></div>
-    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:6px">Cuánto de cada fila va en esta remisión (se precargaron solo las filas con saldo pendiente):</div>
     <div style="max-height:320px;overflow-y:auto">
-      <table class="tabla-cots"><thead><tr><th>Cuadro</th><th>Dimensión</th><th>Pendiente</th><th>A despachar</th></tr></thead><tbody id="mdl-filas-body"></tbody></table>
+      <table class="tabla-cots"><thead><tr><th>Cuadro</th><th>Programado</th><th>Producido</th></tr></thead><tbody id="vdp-filas-body"></tbody></table>
     </div>
     <div class="modal-acciones">
-      <button class="btn btn-secundario" onclick="cerrarModal('modal-despacho-losa')">Cancelar</button>
-      <button class="btn btn-primario" onclick="guardarDespachoLosa()">Guardar despacho</button>
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-detalle-produccion')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-programar-despacho">
+  <div class="modal" style="width:680px;max-width:95vw">
+    <div class="modal-titulo">📋 Programar despacho</div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Fecha programada</label><input type="date" id="mpd-fecha"></div>
+      <div class="form-grupo"><label>Observaciones</label><input type="text" id="mpd-observaciones"></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Desde cuadro</label><input type="number" id="mpd-filtro-desde" placeholder="Ej: 1" oninput="_aplicarFiltroCuadroProgramarDespacho()"></div>
+      <div class="form-grupo"><label>Hasta cuadro</label><input type="number" id="mpd-filtro-hasta" placeholder="Ej: 20" oninput="_aplicarFiltroCuadroProgramarDespacho()"></div>
+    </div>
+    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:6px">Cuánto de cada fila se va a programar para despacho (se precargaron solo las filas con saldo pendiente):</div>
+    <div style="max-height:320px;overflow-y:auto">
+      <table class="tabla-cots"><thead><tr><th style="width:28px"><input type="checkbox" onchange="_marcarTodasFilasProgramarDespacho(this.checked)"></th><th>Cuadro</th><th>Dimensión</th><th>Pendiente</th><th>A programar</th></tr></thead><tbody id="mpd-filas-body"></tbody></table>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-programar-despacho')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarProgramacionDespacho()">Guardar programación</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-cargar-despacho">
+  <div class="modal" style="width:680px;max-width:95vw">
+    <div class="modal-titulo">✅ Cargar despacho</div>
+    <div class="form-grupo" style="margin-bottom:12px">
+      <label>Despacho programado</label>
+      <select id="mcd-select-programacion" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px" onchange="_renderLineasCargarDespacho()"></select>
+    </div>
+    <div id="mcd-sin-programaciones" style="display:none;text-align:center;color:var(--gris-medio);padding:16px">No hay despachos programados todavía. Primero programa despacho con el botón "+ Programar despacho".</div>
+    <div id="mcd-contenido" style="display:none">
+      <div class="form-grid" style="margin-bottom:10px">
+        <div class="form-grupo"><label>N° Remisión *</label><input type="text" id="mcd-remision" placeholder="Ej: REM-5844"></div>
+        <div class="form-grupo"><label>Fecha</label><input type="date" id="mcd-fecha"></div>
+      </div>
+      <div style="font-size:12px;color:var(--gris-medio);margin-bottom:6px">Frente a lo teórico programado, digita lo que realmente salió en esta remisión (las filas ya cargadas se pueden corregir):</div>
+      <div style="max-height:320px;overflow-y:auto">
+        <table class="tabla-cots"><thead><tr><th>Cuadro</th><th>Programado</th><th>Despachado</th></tr></thead><tbody id="mcd-filas-body"></tbody></table>
+      </div>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-cargar-despacho')">Cancelar</button>
+      <button class="btn btn-primario" id="mcd-btn-guardar" onclick="guardarCargaDespacho()" style="display:none">Guardar despacho cargado</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-historial-despachos">
+  <div class="modal" style="width:680px;max-width:95vw">
+    <div class="modal-titulo">📜 Historial de despachos</div>
+    <div style="max-height:400px;overflow-y:auto">
+      <table class="tabla-cots"><thead><tr><th>Remisión</th><th>Fecha</th><th>Contenido</th><th>Observaciones</th></tr></thead><tbody id="hd-filas-body"></tbody></table>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-historial-despachos')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-detalle-despacho">
+  <div class="modal" style="width:620px;max-width:95vw">
+    <div class="modal-titulo">📦 Detalle de despacho cargado</div>
+    <div class="form-grid" style="margin-bottom:10px;font-size:13px">
+      <div><b>Remisión:</b> <span id="vdd-remision"></span></div>
+      <div><b>Fecha:</b> <span id="vdd-fecha"></span></div>
+    </div>
+    <div style="font-size:13px;margin-bottom:10px"><b>Observaciones:</b> <span id="vdd-observaciones"></span></div>
+    <div style="max-height:320px;overflow-y:auto">
+      <table class="tabla-cots"><thead><tr><th>Cuadro</th><th>Programado</th><th>Despachado</th></tr></thead><tbody id="vdd-filas-body"></tbody></table>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-detalle-despacho')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3244,7 +3319,7 @@
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
 <script src="js/proyectos.js?v=20261013b"></script>
-<script src="js/losas-proyecto.js?v=20261015c"></script>
+<script src="js/losas-proyecto.js?v=20261016b"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20261013a"></script>
 <script src="js/cotizador.js?v=20261007a"></script>

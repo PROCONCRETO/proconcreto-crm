@@ -59,8 +59,8 @@ cada una con su propia carpeta.
   | | `lista` (Ingeniería) | `produccion` (Planta) | `despacho` (Logística) |
   |---|---|---|---|
   | `pantalla-proyecto-losas` | "+ Nueva Losa", ✏️ Editar, 🗑️ Eliminar visibles | Solo "🏗️ Ver producción" | Solo "📦 Ver despachos" |
-  | Filas de la lista | Celdas editables, botón ✕ eliminar fila, barra de Agregar/Pegar/Importar/Guardar | Celdas de **solo lectura**, sin acción por fila (la producción se registra en lote con "+ Programar"/"+ Cargar producción", ver sección propia más abajo) | Celdas de **solo lectura**, sin acción por fila (el despacho se registra multi-fila con el botón de arriba) |
-  | Botones "+ Programar"/"+ Cargar producción"/"📊 Producción diaria" / "Registrar despacho" + historial | Ocultos | Los 3 de producción visibles | Solo "Registrar despacho" + historial visibles |
+  | Filas de la lista | Celdas editables, botón ✕ eliminar fila, barra de Agregar/Pegar/Importar/Guardar | Celdas de **solo lectura**, sin acción por fila (la producción se registra en lote con "+ Programar"/"+ Cargar producción", ver sección propia más abajo) | Celdas de **solo lectura**, sin acción por fila (el despacho se registra en lote con "+ Programar"/"+ Cargar despacho", mismo patrón que Producción, ver sección propia más abajo) |
+  | Botones "+ Programar"/"+ Cargar producción"/"📊 Producción diaria" / "+ Programar"/"+ Cargar despacho"/"📜 Historial de despachos" | Ocultos | Los 3 de producción visibles | Los 3 de despacho visibles |
   | Bovedilla | `tipo`/`cantidadRequerida` editables, sin seguimiento | Solo lectura + SOLO columna "Entradas (producción)" | Solo lectura + SOLO columna "Salidas (despacho)" |
 
   Lo que Ingeniería define (cuadro, dimensión, cantidad, tipo/cantidad de bovedilla) nunca se
@@ -132,6 +132,17 @@ fila suelta, la Losa completa es la unidad natural de guardado/sincronización.
   Prelosa/Placa Alveolar — **`ancho` se captura en CENTÍMETROS** (2026-10-14, a pedido del
   usuario), se convierte a metros solo dentro de `_pesoFila()` para el cálculo —;
   `tipoVigueta`/`hilosAbajo`/`hilosArriba` para Vigueta), `dimension`,
+  - **Ancho estandarizado — SOLO prelosa, no placa alveolar** (2026-10-16, a pedido del usuario:
+    "para las prelosas, el ancho del elemento no se debe salir de 20 30 40 o 50cm por
+    estandarización. no puede ser menos, no puede ser mas ni puede ser intermedio") —
+    `ANCHOS_ESTANDAR_PRELOSA = [20, 30, 40, 50]`, validado en dos capas: (1) al terminar de
+    escribir el ancho en modo lista (`onchange`, no `oninput` — para no interrumpir a mitad de
+    tecleo), `_validarAnchoPrelosa(i)` avisa y resetea a 0 si el valor no es uno de los 4
+    válidos; (2) al Guardar (`guardarListaProduccion()`), un bloqueo real que SÍ impide guardar
+    si queda algún ancho fuera del estándar — cubre Pegar/Importar además de la digitación
+    manual, que son las otras 2 vías por las que un ancho inválido podría colarse sin pasar por
+    el input. Placa Alveolar usa el mismo campo `ancho` pero NO tiene esta restricción — el
+    usuario fue explícito en que es "para las prelosas".
   `cantidad`, `observaciones`, y `produccion: [{fecha, cantidad, tipo}]` (tipo `Vaciado` o
   `Cortado` — una pieza no estándar cortada de otra en vez de fundida a su propia medida,
   distinción real vista en el Excel de SYMA Andes). Cada fila tiene un `id` propio estable (no
@@ -173,55 +184,27 @@ fila suelta, la Losa completa es la unidad natural de guardado/sincronización.
     despacho muestra solo "Pend. Despacho" (no le compete Producción) — mismo criterio ya usado
     en Bovedilla (`bov-columna-produccion`/`bov-columna-despacho`), aplicado también a la tabla
     principal de filas.
-  - **🖨️ Imprimir lista de producción** (2026-10-13, a pedido del usuario: "agregamos un botón
-    de imprimir listas de producción, donde se pueda seleccionar las filas y de esto me salga
-    un imprimible para pasar a planta y puedan ellos fabricar lo que se necesita") — vive en
-    modo **producción**, no en modo lista (corregido 2026-10-14, a pedido del usuario: "el
-    imprimible debe salir de la ventana de Producción, no de la de Listas de Producción... lo
-    hago para que más adelante podamos asignar permisos más fácil a ciertas ventanas a los
-    diferentes roles" — Ingeniería solo define la lista, Planta es quien imprime para
-    fabricar, y cada pantalla debe poder aislarse por rol a futuro). Cada fila lleva un
-    checkbox (`.chk-fila-print`) más uno "marcar todas" en el encabezado
-    (`_toggleSeleccionTodasFilas()`); el botón "🖨️ Imprimir" (`losa-btn-imprimir-produccion`,
-    junto a "← Volver", visible solo si `_MODO_FLUJO_LOSA === 'produccion'`, mismo lugar donde
-    Despachos tiene su "📦 Registrar despacho") llama `imprimirListaProduccion()`: si no hay
-    ninguna fila marcada, imprime TODAS (más amigable que bloquear pidiendo una selección);
-    construye el documento (tabla de las filas elegidas, SIN columnas de pendiente, de peso, ni
-    checkboxes ni botones de acción — es un imprimible estático) y lo muestra en el contenedor
-    compartido `#vista-previa`/`#contenido-preview` (el mismo que usa toda la app para vistas
-    previas de PDF).
-    - **Sin columna de Peso** (2026-10-15, a pedido del usuario: "en este, no es necesario
-      incluir la columna de peso") — este imprimible le dice a planta QUÉ fabricar (cuadro,
-      ejes, dimensión, cantidad), no cuánto pesa; la columna de Peso sigue viéndose en la
-      pantalla normal (`_filaProduccionHTML()`), solo se quitó del imprimible
-      (`imprimirListaProduccion()`).
-    - **Mismo lenguaje gráfico que los demás documentos oficiales** (2026-10-15, a pedido del
-      usuario: "revisa el formato de imprimible de diseño de mezcla para que manejemos el mismo
-      lenguaje gráfico") — se reescribió para seguir el mismo molde que
-      `verFormatoProduccionAjuste()`/`descargarFormatoProduccionAjuste()`
-      (`js/calidad-ajuste-mezcla.js`) y `descargarPDF()` (`js/pdf.js`, la cotización), en vez
-      del header/footer con estilo inline propio que tenía antes: membrete real
-      (`membrete-top.jpg`) arriba, clases compartidas `css/estilos.css`
-      (`.preview-doc`/`.preview-content`/`.preview-tabla`/`.total-row`/`.preview-firma`) para
-      el cuerpo, y pie compartido `.preview-membrete-footer` (arco + teléfono/dirección/web)
-      abajo — el mismo "papel membretado" que ya usan la cotización y el Formato de Producción
-      de Calidad. "⬇️ Descargar PDF" llama `descargarPDFListaProduccion()`, que copia el cuerpo
-      completo de `descargarFormatoProduccionAjuste()`: `cargarImagen()`/`_alturaContenidoReal()`/
-      `_filaBlancaCerca()` (helpers compartidos, `js/pdf.js`) para paginar a varias páginas A4
-      con el membrete repetido en cada una y el corte entre filas (nunca partiendo una fila a la
-      mitad) — reemplaza el slicing simple sin membrete que tenía antes (heredado de
-      `descargarPDFOrden()`, Órdenes de Producción, que ya no es el patrón que sigue este
-      imprimible). Archivo `Lista_Produccion_<nombre de la Losa>_<fecha>.pdf`.
-    - **Alineación de la fila de TOTALES** (corregido 2026-10-15, a pedido del usuario: "revisa
-      los totales pues no están quedando bien alineados") — el `colspan` de la celda "TOTALES"
-      debe cubrir exactamente las columnas antes de "Cant." (# + Cuadro + Ejes num. + Ejes alfa.
-      + las 2 o 3 columnas propias del sistema + Dim.) para que el total de piezas caiga debajo
-      de "Cant." y el total de metros debajo de "Long. tot." — antes el colspan se quedaba una
-      columna corto y los totales aparecían corridos una posición a la izquierda.
-    - "← Volver" cierra la vista previa y reactiva `pantalla-losa-detalle` tal como estaba.
+  - **🖨️ Imprimir lista de producción — QUITADO (2026-10-16)**. Existió entre el 2026-10-13 y
+    el 2026-10-16 un botón en la barra superior del modo producción que imprimía la Lista de
+    Producción completa (todas las filas, con membrete real, mismo lenguaje gráfico que
+    `verFormatoProduccionAjuste()` en Calidad). Se quitó por quedar redundante: una vez que
+    existió el imprimible de "+ Programar producción" (ver más abajo), que sí refleja el plan
+    real del día, nadie usaba ya el de la lista completa — confirmado con el usuario
+    ("¿qué función quedó cumpliendo el botón de imprimir... no sería reemplazado por el que
+    tenemos ya en las programaciones de producción?"). `imprimirListaProduccion()`/
+    `descargarPDFListaProduccion()` y el botón `losa-btn-imprimir-produccion` se eliminaron del
+    todo; el helper compartido `_descargarPDFConMembrete()` se conservó porque lo sigue usando
+    `descargarPDFProgramacionProduccion()`.
 - `despachos[]` — **a nivel de Losa, no por fila**: `{remision, fecha, observaciones,
   lineas: [{filaId, cantidad}]}` — una remisión real cubre varias filas a la vez, mismo
-  espíritu que ya usa Logística con `viaje.entregas[].productos[]`.
+  espíritu que ya usa Logística con `viaje.entregas[].productos[]`. Sigue siendo el libro real
+  de remisiones (sin cambios en su forma), ahora alimentado por "+ Cargar despacho" en vez de
+  directo por el usuario — ver "Control de Despacho" más abajo.
+- `despachosProgramados[]` — mismo molde EXACTO que `produccionesProgramadas[]` (ver "Control de
+  Producción" más abajo): `{id, fecha, observaciones, lineas: [{filaId, cantidadProgramada,
+  cantidadReal}]}`, más `remision` una vez que se carga por primera vez. Es el PLAN; `despachos[]`
+  sigue siendo el libro REAL — misma separación plan/real que ya existe entre
+  `produccionesProgramadas[]` y `fila.produccion[]`.
 - `bovedilla` (solo si `sistema === 'vigueta_bovedilla'`, si no `null`) — **sin desglose por
   fila**, a pedido explícito del usuario ("no es tan riguroso su control más allá de cantidad
   de entradas de producción y salidas... como fabricar un bloque de cemento"): `tipo`,
@@ -285,14 +268,38 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     membrete, solo cambia qué contenido se captura y el nombre del archivo), con el nombre
     `Programacion_Produccion_<Losa>_<fecha programada>.pdf`.
 - **"+ Cargar producción"** (`abrirModalCargarProduccion()`/`_renderLineasCargarProduccion()`/
-  `guardarCargaProduccion()`) — selector de las programaciones que todavía tienen alguna línea
-  sin cargar; al elegir una, cada línea muestra "lo teórico programado" justo al lado de un
-  campo para digitar lo que realmente se produjo (precargado con el valor programado, editable
-  por si difiere). **Esta es la única puerta de entrada real a `fila.produccion[]`** — al
-  guardar, cada línea con un valor digitado fija su `cantidadReal` (ya no se puede volver a
-  cargar ni duplicar) y empuja `{fecha: <fecha de la programación>, cantidad, tipo:'Vaciado',
-  programacionId}` a la fila correspondiente. Se puede cargar parcial (dejar algunas líneas en
-  blanco para otro día) — las que se dejan en blanco siguen ofreciéndose la próxima vez.
+  `guardarCargaProduccion()`) — selector de TODAS las programaciones (ya no solo las que tienen
+  líneas pendientes, ver más abajo); al elegir una, cada línea muestra "lo teórico programado"
+  justo al lado de un campo para digitar lo que realmente se produjo (precargado con el valor ya
+  cargado, o con lo programado si todavía no se cargó). **Esta es la única puerta de entrada
+  real a `fila.produccion[]`** — al guardar, cada línea con un valor digitado fija su
+  `cantidadReal` y empuja/actualiza `{fecha: <fecha de la programación>, cantidad,
+  tipo:'Vaciado', programacionId}` en la fila correspondiente. Se puede cargar parcial (dejar
+  algunas líneas en blanco para otro día) — las que se dejan en blanco siguen ofreciéndose la
+  próxima vez, sin cambios.
+  - **Una línea ya cargada se puede volver a editar** (2026-10-16, a pedido del usuario:
+    "permitamos que se puedan también editar producciones ya cargadas, pues es posible que se
+    cometan errores en el camino que se deban solucionar") — ya NO es de solo lectura; el
+    selector ahora lista TODAS las programaciones (antes solo las que tenían algo pendiente), y
+    una completa se marca "(completa, editable)". Al corregir el valor de una línea ya cargada,
+    `guardarCargaProduccion()` busca la entrada EXISTENTE que esa línea ya había empujado a
+    `fila.produccion[]` (identificada por `programacionId`) y la ACTUALIZA en el lugar — nunca
+    empuja una segunda entrada, así nunca se duplica el conteo. Si el valor no cambió frente al
+    ya guardado, esa línea se ignora (no hay nada que corregir).
+- **"🏗️ Producciones registradas"** (`renderProduccionRegistrada()`/
+  `verDetalleProduccionRegistrada()`, tarjeta nueva debajo de la tabla de filas, solo en modo
+  producción — 2026-10-15, a pedido del usuario: "algo similar a lo que tenemos en Despachos de
+  Despachos Registrados... fila a fila lo producido y seleccionándola podamos ver el resumen...
+  lo realmente fabricado") — lista las `produccionesProgramadas[]` que ya tienen AL MENOS una
+  línea cargada (`cantidadReal != null`) — una programación 100% sin cargar todavía no es
+  "producción", es solo un plan, no aparece acá (sigue ofreciéndose completa en "+ Cargar
+  producción"). La columna "Contenido" cuenta solo lo REALMENTE fabricado (`Σ cantidadReal`), no
+  lo programado, y avisa si a esa programación todavía le faltan líneas por cargar. Cada fila es
+  clicable y abre `#modal-detalle-produccion`: mismo contenido que ve "+ Cargar producción"
+  (Cuadro / Programado / Producido) pero de **solo lectura** — es historial, no una carga en
+  curso; una línea sin cargar se muestra como "Pendiente" en vez de un número. (Esta tarjeta fue
+  el molde que se replicó para Despachos el 2026-10-16, ver sección propia más abajo — ahí quedó
+  como modal en vez de tarjeta siempre visible, a pedido del usuario.)
 - **Columna "Unidades fabricadas"** (`_filaProduccionHTML()`, justo antes de "Pend.
   Producción", solo en modo producción) = `cantidad − pendienteProducción` — mismo origen que el
   pendiente, solo mostrado desde el otro lado.
@@ -304,13 +311,75 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
   fila con muchas piezas cortas. `% avance = Σ(dimensión×fabricadas) / Σ(dimensión×cantidad)`,
   `% faltante = 100 − % avance`.
 - **"📊 Producción diaria"** (`abrirMatrizProduccionDiaria()`) — matriz fila × fecha, mismo
-  formato que los Excel reales del usuario (una columna por día de producción, con el total de
-  esa fila y el total de ese día). Las fechas salen de `fila.produccion[].fecha` de toda la
-  Losa, sin pasar por `produccionesProgramadas` (así también refleja cualquier producción
-  antigua que ya existiera antes de este flujo).
+  formato que los Excel reales del usuario (una columna por día de producción). Las fechas
+  salen de `fila.produccion[].fecha` de toda la Losa, sin pasar por `produccionesProgramadas`
+  (así también refleja cualquier producción antigua que ya existiera antes de este flujo).
+  - **Siempre lista TODAS las filas de la Losa** (2026-10-15, a pedido del usuario: "la idea es
+    que aparezcan todas las filas de la losa") — antes, si no había ninguna producción cargada
+    todavía (`fechas.length === 0`), se mostraba un mensaje y NINGUNA fila; ahora las filas
+    siempre aparecen (con "Total fabricado" en 0 y sin columnas de fecha si aún no hay nada
+    registrado). Solo se muestra un mensaje si la Losa en sí no tiene filas todavía.
+  - **Columnas fijas (`position:sticky;left:...`) a la izquierda — Cuadro, Ancho, Largo, Cant.
+    a fabricar y Total fabricado** (2026-10-15, a pedido del usuario: "si la losa es muy
+    grande, [las columnas de fecha] van a ser muchas... permitamos que se vean todas los
+    registros de fabricación, bloqueando [esas columnas]... y permitiendo desplazar con la
+    barra hacia la derecha") — mismo mecanismo que ya fija `.tabla-cots th` arriba al bajar
+    (`top:0`, ya heredado de la clase), aplicado ahora también al eje horizontal con un `left`
+    numérico por columna (no sirve con anchos automáticos — thead/tbody/tfoot usan exactamente
+    el mismo ancho por columna para que las celdas congeladas queden alineadas). Ancho (cm)
+    solo aparece en prelosa/placa alveolar (vigueta no tiene un "ancho" propio — tiene
+    `tipoVigueta`/hilos en su lugar), así que el `left` de las columnas siguientes se recalcula
+    según si esa columna existe o no. El pie "Total día" muestra el total general de Cant. a
+    fabricar y de Total fabricado en sus columnas fijas, más el total de cada fecha a la
+    derecha. **Caveat ya documentado para `position:sticky` en este repo**
+    (`docs/01-arquitectura-tecnica.md`): su recálculo visual no es verificable de forma
+    confiable con el arnés de Chrome headless (`--dump-dom`) — se probaron los valores de
+    `left`/`position` en el DOM, no el resultado visual en pantalla.
 - **Selección de filas por checkbox, eliminada** (2026-10-15, a pedido del usuario: "quitemos
-  mejor el seleccionable de la primera columna") — existía solo para elegir qué imprimir;
-  `imprimirListaProduccion()` ahora imprime siempre todas las filas de la Losa.
+  mejor el seleccionable de la primera columna") — existía solo para elegir qué imprimir con el
+  ahora ya eliminado `imprimirListaProduccion()` (ver bullet "🖨️ Imprimir lista de producción —
+  QUITADO" más arriba).
+
+### Control de Despacho — mismo flujo que Producción (2026-10-16, a pedido del usuario:
+### "incluyamos la misma lógica que tenemos en producción, con los tres botones superiores de
+### programar despacho, cargar despacho e historial de despachos")
+
+Réplica casi exacta del flujo Programar → Cargar de Producción, con dos diferencias reales:
+Despacho necesita el número de **remisión** del camión (Producción no tiene un equivalente), y
+el libro real sigue siendo `despachos[]` **a nivel de Losa** (una remisión cubre varias filas a
+la vez) en vez de `fila.produccion[]` **por fila** — esa asimetría ya existía desde antes y se
+conservó a propósito (mismo espíritu que `viaje.entregas[].productos[]` en Logística).
+
+- **"+ Programar despacho"** (`abrirModalProgramarDespacho()`/`guardarProgramacionDespacho()`)
+  — idéntico a "+ Programar producción": filas con saldo pendiente de despacho
+  (`_pendienteDespachoFila()`, sin cambios), casilla por fila que autocompleta el pendiente
+  (`_marcarFilaProgramarDespacho()`/`_marcarTodasFilasProgramarDespacho()`), filtro "Desde
+  cuadro / Hasta cuadro" (`_aplicarFiltroCuadroProgramarDespacho()`). Crea una entrada en
+  `despachosProgramados[]` con todas sus líneas en `cantidadReal: null`.
+- **"+ Cargar despacho"** (`abrirModalCargarDespacho()`/`_renderLineasCargarDespacho()`/
+  `guardarCargaDespacho()`) — el selector lista TODAS las programaciones (editable incluso si ya
+  están completas, igual que Producción), más dos campos que Producción no tiene: **N° Remisión**
+  (obligatorio) y **Fecha** (de cuándo salió realmente el camión, puede diferir de la fecha
+  programada). Al guardar: fija `cantidadReal` en cada línea tocada (o la corrige si ya estaba
+  cargada, sin duplicar — mismo mecanismo que Producción), guarda la remisión en
+  `p.remision`, y **reconstruye por completo** la entrada de esa programación en el libro real
+  `despachos[]` (`_despachosLosaActual.find(d => d.despachoProgramadoId === p.id)`, find-or-create)
+  a partir de TODAS las líneas ya cargadas de ese plan en ese momento — nunca parcial ni
+  duplicado. `_pendienteDespachoFila()` sigue funcionando exactamente igual que siempre, sin
+  tocar su fórmula ni su firma.
+- **"📜 Historial de despachos"** (`abrirHistorialDespachos()`/`verDetalleDespachoRegistrado()`)
+  — mismo patrón que "🏗️ Producciones registradas", pero como **modal** (a pedido explícito del
+  usuario, tras preguntarle si prefería una lista clicable como Producciones registradas o una
+  matriz día × fila como Producción diaria) en vez de tarjeta siempre visible — reemplaza del
+  todo la tarjeta "📦 Despachos registrados" que había antes. Lista las `despachosProgramados[]`
+  con AL MENOS una línea cargada; "Contenido" cuenta solo lo REALMENTE despachado. Cada fila
+  abre `#modal-detalle-despacho` (Remisión / Fecha / Observaciones + Cuadro / Programado /
+  Despachado por línea, solo lectura).
+- **El antiguo "📦 Registrar despacho" de un solo paso se eliminó del todo**
+  (`abrirModalDespachoLosa()`/`guardarDespachoLosa()`/`renderDespachosLosa()`/
+  `#modal-despacho-losa`) — reemplazado enteramente por Programar/Cargar, igual que ya se había
+  hecho antes con el registro rápido de Producción. No quedaron dos caminos paralelos para
+  registrar un despacho.
 
 ### Peso — regresión verificada contra los 2 Excel reales
 
