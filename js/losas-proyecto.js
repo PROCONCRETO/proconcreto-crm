@@ -217,6 +217,17 @@ function abrirLosasDeProyecto(modo) {
   document.getElementById('btn-nueva-losa').style.display = modo === 'lista' ? '' : 'none';
   renderLosasProyecto();
 }
+// Atajo directo desde la grilla de Proyectos (2026-10-16, a pedido del usuario: "pongamos
+// también en la segunda fila los botones para entrar a las subventanas de proyectos") — mismo
+// destino que entrar por Carpetas → Listas/Producción/Despachos, pero sin pasar por esa
+// pantalla intermedia: fija `_PROYECTO_ACTIVO_ID` directo (que normalmente fija
+// `abrirCarpetasProyecto()`) y reusa `abrirLosasDeProyecto()` tal cual.
+function abrirLosasDeProyectoDesdeGrid(proyectoId, modo) {
+  const p = PROYECTOS.find(x => x.id === proyectoId);
+  if (!p) return;
+  _PROYECTO_ACTIVO_ID = proyectoId;
+  abrirLosasDeProyecto(modo);
+}
 function volverALosasProyecto() {
   _LOSA_ACTIVA_ID = null;
   document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
