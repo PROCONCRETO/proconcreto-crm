@@ -976,7 +976,7 @@ function _resumenPorMedidasHTML(lineas, l) {
       <div style="font-size:11px;font-weight:700;color:#003F7F;margin-bottom:4px;letter-spacing:0.03em">RESUMEN POR MEDIDAS</div>
       <table class="preview-tabla">
         <thead><tr>
-          <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Dim. (m)</th><th>Cantidad</th><th>Long. tot. (m)</th>
+          <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Largo (m)</th><th>Cantidad</th><th>Long. tot. (m)</th>
         </tr></thead>
         <tbody>${filasHTML}</tbody>
         <tfoot><tr class="total-row">
@@ -994,6 +994,7 @@ function imprimirProgramacionProduccion() {
   if (!l) return;
   const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
   const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
+  const esVigueta = l.sistema === 'vigueta_bovedilla';
   const fecha = document.getElementById('mpp-fecha').value;
   const observaciones = document.getElementById('mpp-observaciones').value.trim();
   const lineas = [];
@@ -1011,14 +1012,17 @@ function imprimirProgramacionProduccion() {
     const longTotal = (Number(f.dimension) || 0) * cantidad;
     totalPiezas += cantidad;
     totalMetros += longTotal;
+    const colEspecifica = esVigueta
+      ? `<td>${_esc(f.tipoVigueta) || '—'}</td>`
+      : `<td style="text-align:center">${f.ancho || 0}</td>`;
     return `<tr>
       <td style="color:#888">${n + 1}</td>
       <td style="font-weight:600">${_esc(f.cuadro) || '—'}</td>
-      <td>${_esc(f.ejesEntre) || '—'}</td>
-      <td>${_esc(f.laterales) || '—'}</td>
+      ${colEspecifica}
       <td style="text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>
       <td style="text-align:center;font-weight:700">${cantidad}</td>
       <td style="text-align:right">${longTotal.toFixed(2)}</td>
+      <td style="min-width:65px"></td>
     </tr>`;
   }).join('');
 
@@ -1039,22 +1043,23 @@ function imprimirProgramacionProduccion() {
             <div style="font-size:11px;color:#555">${fecha ? new Date(fecha + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}</div>
           </div>
           <div style="font-size:12px;font-weight:600;margin-top:2px">${_esc(p?.nombre) || '—'}</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px;font-size:10.5px">
-            <div><b>SISTEMA:</b> ${sis ? _esc(sis.etiqueta) : '—'}</div>
-            <div><b>PIEZAS A PROGRAMAR:</b> ${totalPiezas} piezas en ${lineas.length} fila${lineas.length === 1 ? '' : 's'}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:6px;text-align:center">
+            <div><div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.04em">Sistema</div><div style="font-size:12px;font-weight:700;color:#003F7F;margin-top:2px">${sis ? _esc(sis.etiqueta) : '—'}</div></div>
+            <div><div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.04em">Piezas a programar</div><div style="font-size:12px;font-weight:700;color:#003F7F;margin-top:2px">${totalPiezas} piezas en ${lineas.length} fila${lineas.length === 1 ? '' : 's'}</div></div>
           </div>
-          ${observaciones ? `<div style="margin-top:4px;font-size:10.5px"><b>OBSERVACIONES:</b> ${_esc(observaciones)}</div>` : ''}
+          ${observaciones ? `<div style="margin-top:6px;font-size:10.5px"><b>OBSERVACIONES:</b> ${_esc(observaciones)}</div>` : ''}
         </div>
         <table class="preview-tabla">
           <thead><tr>
-            <th>#</th><th>Cuadro</th><th>Ejes num.</th><th>Ejes alfa.</th>
-            <th>Dim. (m)</th><th>Cant. a programar</th><th>Long. tot. (m)</th>
+            <th>#</th><th>Cuadro</th>
+            <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Largo (m)</th><th>Cant. a programar</th><th>Long. tot. (m)</th><th>Observaciones (cant. real)</th>
           </tr></thead>
           <tbody>${filasHTML}</tbody>
           <tfoot><tr class="total-row">
-            <td colspan="5" style="text-align:right">TOTALES</td>
+            <td colspan="4" style="text-align:right">TOTALES</td>
             <td style="text-align:center">${totalPiezas}</td>
             <td style="text-align:right">${totalMetros.toFixed(2)}</td>
+            <td></td>
           </tr></tfoot>
         </table>
         ${_resumenPorMedidasHTML(lineas, l)}
@@ -1386,6 +1391,7 @@ function imprimirProgramacionDespacho() {
   if (!l) return;
   const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
   const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
+  const esVigueta = l.sistema === 'vigueta_bovedilla';
   const fecha = document.getElementById('mpd-fecha').value;
   const observaciones = document.getElementById('mpd-observaciones').value.trim();
   const lineas = [];
@@ -1398,19 +1404,32 @@ function imprimirProgramacionDespacho() {
   if (!lineas.length) { alert('Ingresa al menos una cantidad a programar antes de imprimir.'); return; }
   _fechaProgramacionImpresa = fecha || new Date().toISOString().split('T')[0];
 
-  let totalPiezas = 0, totalMetros = 0;
+  // Peso como columna adicional (2026-10-17, a pedido del usuario: "en el imprimible de
+  // despachos, a diferencia del de producción, es muy importante incluir el peso... " —
+  // logística necesita saber cuánto pesa lo que va en cada viaje, a producción no le hace
+  // falta en SU imprimible, ver el que no lo lleva más arriba). Reusa `_pesoFila()` (mismo
+  // cálculo exacto de la pantalla normal), pero sobre la CANTIDAD que se está imprimiendo —
+  // que puede ser menor a `f.cantidad` si solo se programa una parte de la fila — en vez de la
+  // cantidad total de la fila.
+  let totalPiezas = 0, totalMetros = 0, totalPeso = 0;
   const filasHTML = lineas.map(({ f, cantidad }, n) => {
     const longTotal = (Number(f.dimension) || 0) * cantidad;
+    const peso = _pesoFila({ ...f, cantidad }, l);
     totalPiezas += cantidad;
     totalMetros += longTotal;
+    totalPeso += peso;
+    const colEspecifica = esVigueta
+      ? `<td>${_esc(f.tipoVigueta) || '—'}</td>`
+      : `<td style="text-align:center">${f.ancho || 0}</td>`;
     return `<tr>
       <td style="color:#888">${n + 1}</td>
       <td style="font-weight:600">${_esc(f.cuadro) || '—'}</td>
-      <td>${_esc(f.ejesEntre) || '—'}</td>
-      <td>${_esc(f.laterales) || '—'}</td>
+      ${colEspecifica}
       <td style="text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>
       <td style="text-align:center;font-weight:700">${cantidad}</td>
       <td style="text-align:right">${longTotal.toFixed(2)}</td>
+      <td style="text-align:right">${peso.toFixed(1)}</td>
+      <td style="min-width:65px"></td>
     </tr>`;
   }).join('');
 
@@ -1431,22 +1450,24 @@ function imprimirProgramacionDespacho() {
             <div style="font-size:11px;color:#555">${fecha ? new Date(fecha + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}</div>
           </div>
           <div style="font-size:12px;font-weight:600;margin-top:2px">${_esc(p?.nombre) || '—'}</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px;font-size:10.5px">
-            <div><b>SISTEMA:</b> ${sis ? _esc(sis.etiqueta) : '—'}</div>
-            <div><b>PIEZAS A PROGRAMAR:</b> ${totalPiezas} piezas en ${lineas.length} fila${lineas.length === 1 ? '' : 's'}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:6px;text-align:center">
+            <div><div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.04em">Sistema</div><div style="font-size:12px;font-weight:700;color:#003F7F;margin-top:2px">${sis ? _esc(sis.etiqueta) : '—'}</div></div>
+            <div><div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.04em">Piezas a programar</div><div style="font-size:12px;font-weight:700;color:#003F7F;margin-top:2px">${totalPiezas} piezas en ${lineas.length} fila${lineas.length === 1 ? '' : 's'}</div></div>
           </div>
-          ${observaciones ? `<div style="margin-top:4px;font-size:10.5px"><b>OBSERVACIONES:</b> ${_esc(observaciones)}</div>` : ''}
+          ${observaciones ? `<div style="margin-top:6px;font-size:10.5px"><b>OBSERVACIONES:</b> ${_esc(observaciones)}</div>` : ''}
         </div>
         <table class="preview-tabla">
           <thead><tr>
-            <th>#</th><th>Cuadro</th><th>Ejes num.</th><th>Ejes alfa.</th>
-            <th>Dim. (m)</th><th>Cant. a programar</th><th>Long. tot. (m)</th>
+            <th>#</th><th>Cuadro</th>
+            <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Largo (m)</th><th>Cant. a programar</th><th>Long. tot. (m)</th><th>Peso (kg)</th><th>Observaciones (cant. real)</th>
           </tr></thead>
           <tbody>${filasHTML}</tbody>
           <tfoot><tr class="total-row">
-            <td colspan="5" style="text-align:right">TOTALES</td>
+            <td colspan="4" style="text-align:right">TOTALES</td>
             <td style="text-align:center">${totalPiezas}</td>
             <td style="text-align:right">${totalMetros.toFixed(2)}</td>
+            <td style="text-align:right">${totalPeso.toFixed(1)}</td>
+            <td></td>
           </tr></tfoot>
         </table>
         ${_resumenPorMedidasHTML(lineas, l)}

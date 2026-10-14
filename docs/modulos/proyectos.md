@@ -259,8 +259,8 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     no lo que se iba a programar ese día) — a la misma altura de "Guardar programación". Lee lo
     que esté digitado en el modal EN ESE MOMENTO (no hace falta haber guardado antes). Mismo
     lenguaje gráfico que `imprimirListaProduccion()` (membrete + clases compartidas), pero
-    titulado "PROGRAMACIÓN DE PRODUCCIÓN", con solo cuadro/ejes/dimensión/cantidad a programar
-    — es un plan, no lleva pendientes ni unidades fabricadas. Antes de mostrar la vista previa
+    titulado "PROGRAMACIÓN DE PRODUCCIÓN", con solo cuadro/ancho(o vigueta)/largo/cantidad a
+    programar — es un plan, no lleva pendientes ni unidades fabricadas. Antes de mostrar la vista previa
     cierra el modal (`cerrarModal('modal-programar-produccion')`) — si no, el fondo oscuro del
     modal (`z-index` más alto) tapa la vista previa por completo. El PDF usa el helper
     compartido `_descargarPDFConMembrete()` (factorizado de `descargarPDFListaProduccion()` en
@@ -278,6 +278,41 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     Tabla aparte debajo de la tabla de filas (antes de la firma), con su propia fila de
     totales. Función compartida entre `imprimirProgramacionProduccion()` e
     `imprimirProgramacionDespacho()` — ambos imprimibles la llevan igual.
+  - **Columnas de la tabla principal** (2026-10-17, dos ajustes a pedido del usuario): "Dim."
+    pasó a decir **"Largo"** en las dos tablas de cada imprimible (la principal y el resumen por
+    medidas) — más claro para planta/logística que la abreviatura. La columna
+    Ancho(cm)/Vigueta, que antes solo aparecía en el resumen por medidas, ahora también
+    aparece en la tabla principal, **justo antes de "Largo"** ("incluyamos en el primer cuadro,
+    el ancho antes del largo"). **Las columnas "Ejes num."/"Ejes alfa." se quitaron del todo**
+    de ambos imprimibles ("no son necesarios en estos imprimibles y podrían llegar a confundir
+    a los operarios") — siguen viéndose en la pantalla normal (`_filaProduccionHTML()`), solo
+    se quitaron de lo que se imprime; el `colspan` de la fila TOTALES bajó de 6 a 4 para
+    acompañar. Orden final de columnas: `#, Cuadro, Ancho(cm)/Vigueta, Largo (m), Cant. a
+    programar, Long. tot. (m)` (más Peso y Observaciones solo en despacho, ver los dos bullets
+    siguientes).
+  - **Datos centrados bajo su etiqueta** (2026-10-17, a pedido del usuario: "centremos los
+    datos, debajo del título, pues como las columnas son tan anchas, no se identifica bien a
+    qué corresponde cada dato") — el bloque Sistema/Piezas a programar, que antes era
+    "ETIQUETA: valor" en una sola línea dentro de una grilla de 2 columnas muy anchas, pasó a
+    ser una etiqueta chica en mayúsculas arriba y el valor centrado debajo, mismo estilo en los
+    dos imprimibles.
+  - **Columna de Peso — SOLO en el imprimible de despacho, no en el de producción**
+    (2026-10-17, a pedido del usuario: "en el imprimible de despachos, a diferencia del de
+    producción, es muy importante incluir el peso como otra columna adicional" — logística
+    necesita saber cuánto va a pesar cada viaje; producción no lo necesita en SU imprimible, por
+    eso se había quitado antes del que sacaba la lista completa). Va después de "Long. tot.
+    (m)". Reusa `_pesoFila()` (mismo cálculo de la pantalla normal), pero evaluado sobre la
+    **cantidad que se está imprimiendo** (`{...f, cantidad}`), no sobre `f.cantidad` — si solo
+    se programa una parte de una fila, el peso impreso corresponde a esa parte, no a la fila
+    completa.
+  - **Columna de Observaciones (cant. real) — en los dos imprimibles, última columna**
+    (2026-10-17, a pedido del usuario: "incluyamos una columna a mano derecha de
+    observaciones, donde el personal pueda registrar a mano cuántas unidades se produjeron o se
+    despacharon, y con este insumo podamos cargar las producciones y los despachos reales al
+    sistema") — celda vacía por diseño (`<td style="min-width:65px"></td>`, sin contenido), para
+    que planta/logística anoten a mano sobre el papel impreso cuánto se produjo/despachó
+    realmente; ese papel es después el insumo con el que se digita en "+ Cargar producción"/"+
+    Cargar despacho". No guarda nada en el sistema — es una columna de papel, no de datos.
 - **"+ Cargar producción"** (`abrirModalCargarProduccion()`/`_renderLineasCargarProduccion()`/
   `guardarCargaProduccion()`) — selector de TODAS las programaciones (ya no solo las que tienen
   líneas pendientes, ver más abajo); al elegir una, cada línea muestra "lo teórico programado"
