@@ -39,6 +39,12 @@ function activarModulo(modulo) {
   document.getElementById('subnav-logistica').style.display = modulo === 'logistica' ? 'flex' : 'none';
   document.getElementById('subnav-calidad').style.display = modulo === 'calidad' ? 'flex' : 'none';
   document.getElementById('subnav-costeo').style.display = modulo === 'costeo' ? 'flex' : 'none';
+  // Sub-nav dinámica de Proyectos (2026-10-16) — a diferencia de las 5 de arriba, no tiene un
+  // `display` fijo por módulo: la decide `_sincronizarSubnavProyecto()` según si hay un
+  // proyecto abierto. Acá solo se garantiza que quede oculta al entrar a CUALQUIER otro módulo
+  // (entrar de nuevo a Proyectos por la barra superior resetea `_PROYECTO_ACTIVO_ID` más abajo,
+  // así que siempre aterriza en la grilla con esta fila ya escondida).
+  if (modulo !== 'proyectos') document.getElementById('subnav-proyecto-activo').style.display = 'none';
   if (modulo === 'cotizaciones') {
     document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
     document.getElementById('pantalla-nueva-cotizacion').classList.add('activa');
@@ -73,11 +79,17 @@ function activarModulo(modulo) {
     renderProductosAdmin();
   }
   if (modulo === 'proyectos') {
-    // Sin subnav propio todavía (una sola pantalla) — a diferencia de los demás módulos, que
-    // siempre tienen su barra de sub-pestañas debajo del menú principal.
+    // Entrar por la barra superior siempre aterriza en la grilla de todos los proyectos (mismo
+    // comportamiento que ya tenía antes de la sub-nav dinámica) — por eso se resetea
+    // `_PROYECTO_ACTIVO_ID`, igual que hace `volverAProyectos()`. `_sincronizarSubnavProyecto()`
+    // (no el `if (modulo !== 'proyectos')` de más arriba, que no corre en esta rama) es quien
+    // de verdad esconde la fila si se vuelve a hacer clic en "Proyectos" estando ya dentro de
+    // uno — si no, se quedaría pegada mostrando el proyecto anterior.
+    _PROYECTO_ACTIVO_ID = null;
     document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
     document.getElementById('pantalla-proyectos').classList.add('activa');
     renderProyectos();
+    _sincronizarSubnavProyecto(null);
   }
 }
 

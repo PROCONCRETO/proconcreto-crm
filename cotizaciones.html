@@ -128,6 +128,24 @@
   <button class="nav-btn" onclick="ir('costeo-producto')">🏗️ Costeo de Producto</button>
 </nav>
 
+<!-- SUB-NAV: PROYECTO ACTIVO (2026-10-16, a pedido del usuario: "como en proyectos tenemos un
+     nivel adicional de subcarpetas, al costado izquierdo de la fila podemos nombrar el proyecto
+     y de ahí en adelante mostrar los botones correspondientes al proyecto" — mismo lenguaje
+     visual que las demás sub-navegaciones (.nav/.nav-btn), pero a diferencia de esas 5, el
+     contenido de ESTA es dinámico: solo se ve cuando hay un proyecto abierto
+     (`_sincronizarSubnavProyecto()`, js/losas-proyecto.js, decide visibilidad/nombre/sección
+     activa), y el primer botón hace de "salir del proyecto" en vez de abrir una pantalla fija.
+     No reemplaza la pantalla de Carpetas (sigue existiendo, a pedido explícito del usuario) —
+     es un atajo adicional para moverse entre secciones sin volver a Carpetas primero. -->
+<nav class="nav" id="subnav-proyecto-activo" style="display:none">
+  <button class="nav-btn" id="subnav-proyecto-nombre-btn" onclick="volverAProyectos()" style="font-weight:700"></button>
+  <button class="nav-btn" data-seccion-proyecto="memoria" onclick="abrirDocumentosProyecto('memoria')">📐 Memorias de Cálculo</button>
+  <button class="nav-btn" data-seccion-proyecto="plano" onclick="abrirDocumentosProyecto('plano')">📋 Planos</button>
+  <button class="nav-btn" data-seccion-proyecto="lista" onclick="abrirLosasDeProyecto('lista')">📄 Listas de Producción</button>
+  <button class="nav-btn" data-seccion-proyecto="produccion" onclick="abrirLosasDeProyecto('produccion')">🏗️ Producción</button>
+  <button class="nav-btn" data-seccion-proyecto="despacho" onclick="abrirLosasDeProyecto('despacho')">📦 Despachos</button>
+</nav>
+
 <!-- ═══════════════════════════════════════
      PANTALLA: INICIO
 ═══════════════════════════════════════ -->
@@ -3300,7 +3318,7 @@
 <script src="js/config.js?v=20261011c"></script>
 <script src="js/calculadora-inputs.js?v=20260825a"></script>
 <script src="js/catalogo.js?v=20261011c"></script>
-<script src="js/navegacion.js?v=20261011a"></script>
+<script src="js/navegacion.js?v=20261016a"></script>
 <script src="js/ordenes-produccion.js?v=20261011c"></script>
 <script src="js/produccion-diaria.js?v=20260917a"></script>
 <script src="js/produccion-materia-prima.js?v=20260909a"></script>
@@ -3318,8 +3336,8 @@
 <script src="js/logistica.js?v=20261011c"></script>
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
-<script src="js/proyectos.js?v=20261016a"></script>
-<script src="js/losas-proyecto.js?v=20261016c"></script>
+<script src="js/proyectos.js?v=20261016b"></script>
+<script src="js/losas-proyecto.js?v=20261016d"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20261013a"></script>
 <script src="js/cotizador.js?v=20261007a"></script>

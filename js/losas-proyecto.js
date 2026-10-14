@@ -132,6 +132,31 @@ function abrirCarpetasProyecto(proyectoId) {
   document.getElementById('pantalla-proyecto-carpetas').classList.add('activa');
   document.getElementById('proyecto-carpetas-titulo').textContent = p.nombre;
   renderCarpetasProyecto();
+  _sincronizarSubnavProyecto(null);
+}
+// Sub-nav dinámica de Proyectos (2026-10-16, a pedido del usuario: "como en proyectos tenemos
+// un nivel adicional de subcarpetas, al costado izquierdo de la fila podemos nombrar el
+// proyecto y de ahí en adelante mostrar los botones correspondientes al proyecto" — mismo
+// lenguaje visual que la sub-navegación de Cotizaciones y Ventas (`.nav`/`.nav-btn`, ver
+// `#subnav-proyecto-activo` en cotizaciones.html), pero con contenido dinámico — no existe
+// ningún otro precedente en la app de una fila de sub-navegación cuyo contenido dependa del
+// estado (confirmado explorando el código antes de construir esto). Los 5 botones de sección
+// son fijos (ya vienen en el HTML); esta función solo decide si la fila se ve, actualiza el
+// nombre del proyecto activo en el primer botón, y marca cuál sección queda resaltada. NO
+// reemplaza la pantalla de Carpetas (sigue existiendo tal cual, a pedido explícito del
+// usuario: "sin eliminar la ventana de inicio de cada proyecto") — es un atajo adicional para
+// moverse entre secciones sin tener que volver a Carpetas primero. `seccion` es `null` cuando
+// se está viendo la propia pantalla de Carpetas (ninguna sección puntual resaltada).
+function _sincronizarSubnavProyecto(seccion) {
+  const nav = document.getElementById('subnav-proyecto-activo');
+  if (!nav) return;
+  const p = _PROYECTO_ACTIVO_ID ? PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID) : null;
+  if (!p) { nav.style.display = 'none'; return; }
+  nav.style.display = 'flex';
+  document.getElementById('subnav-proyecto-nombre-btn').textContent = `🏛️ ${p.nombre}`;
+  nav.querySelectorAll('.nav-btn[data-seccion-proyecto]').forEach(b => {
+    b.classList.toggle('activo', b.dataset.seccionProyecto === seccion);
+  });
 }
 function renderCarpetasProyecto() {
   const grid = document.getElementById('grid-carpetas-proyecto');
@@ -171,11 +196,13 @@ function volverAProyectos() {
   document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
   document.getElementById('pantalla-proyectos').classList.add('activa');
   renderProyectos();
+  _sincronizarSubnavProyecto(null);
 }
 function volverACarpetasProyecto() {
   document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
   document.getElementById('pantalla-proyecto-carpetas').classList.add('activa');
   renderCarpetasProyecto();
+  _sincronizarSubnavProyecto(null);
 }
 
 // ── Memorias de Cálculo / Planos de Producción — junta en un solo lugar los PDF que ya se
@@ -187,6 +214,7 @@ function abrirDocumentosProyecto(tipo) {
   document.getElementById('pantalla-proyecto-documentos').classList.add('activa');
   document.getElementById('proyecto-documentos-titulo').textContent = tipo === 'plano' ? '📋 Planos de Producción' : '📐 Memorias de Cálculo';
   renderDocumentosProyecto();
+  _sincronizarSubnavProyecto(tipo);
 }
 let _TIPO_DOCUMENTO_PROYECTO = null;
 function renderDocumentosProyecto() {
@@ -216,23 +244,14 @@ function abrirLosasDeProyecto(modo) {
   document.getElementById('proyecto-losas-titulo').textContent = _TITULOS_MODO_LOSA[modo] || '';
   document.getElementById('btn-nueva-losa').style.display = modo === 'lista' ? '' : 'none';
   renderLosasProyecto();
-}
-// Atajo directo desde la grilla de Proyectos (2026-10-16, a pedido del usuario: "pongamos
-// también en la segunda fila los botones para entrar a las subventanas de proyectos") — mismo
-// destino que entrar por Carpetas → Listas/Producción/Despachos, pero sin pasar por esa
-// pantalla intermedia: fija `_PROYECTO_ACTIVO_ID` directo (que normalmente fija
-// `abrirCarpetasProyecto()`) y reusa `abrirLosasDeProyecto()` tal cual.
-function abrirLosasDeProyectoDesdeGrid(proyectoId, modo) {
-  const p = PROYECTOS.find(x => x.id === proyectoId);
-  if (!p) return;
-  _PROYECTO_ACTIVO_ID = proyectoId;
-  abrirLosasDeProyecto(modo);
+  _sincronizarSubnavProyecto(modo);
 }
 function volverALosasProyecto() {
   _LOSA_ACTIVA_ID = null;
   document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
   document.getElementById('pantalla-proyecto-losas').classList.add('activa');
   renderLosasProyecto();
+  _sincronizarSubnavProyecto(_MODO_FLUJO_LOSA);
 }
 
 function renderLosasProyecto() {
@@ -429,6 +448,7 @@ function abrirLosaDetalle(id) {
   document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
   document.getElementById('pantalla-losa-detalle').classList.add('activa');
   renderLosaDetalle();
+  _sincronizarSubnavProyecto(_MODO_FLUJO_LOSA);
 }
 
 const _ICONOS_MODO_LOSA = { lista: '📄', produccion: '🏗️', despacho: '📦' };

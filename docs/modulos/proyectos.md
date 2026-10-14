@@ -26,9 +26,9 @@
 A pedido del usuario: "vamos a crear una nueva ventana de PROYECTOS... incluyela en la pantalla de inicio y en la fila superior con las demás ventanas". Al preguntar qué debía mostrar/gestionar, eligió explícitamente **"gestión de proyectos como entidad nueva"**: un registro propio (nombre, cliente, ciudad, estado, fechas, responsable, descripción), **independiente** de lo que ya existe en Clientes (`cliente.proyectos[]`) y Cotizaciones (`cot.cliente.proyecto`) — no reutiliza ni modifica esas estructuras, son conceptos separados que coexisten.
 
 - **Campos de un Proyecto**: `nombre` (único obligatorio), `cliente` (texto libre, con buscador contra `CLIENTES` para autocompletar — no obliga a que el cliente ya exista en el catálogo), `ciudad`, `estado` (`Planeación` / `En ejecución` / `Finalizado` / `Cancelado`), `fechaInicio`, `fechaFinEstimada`, `responsable` (texto libre), `descripcion`.
-- **Listado** (`renderProyectos()`): desde el 2026-10-13, a pedido del usuario ("en vez de un listado de proyectos, iconos de acceso para los proyectos... tamaño similar a los iconos de la pantalla de inicio"), ya no es una tabla — es una grilla de tarjetas-ícono, una por proyecto, reusando tal cual las clases `.inicio-grid`/`.inicio-modulo` (`css/estilos.css`) que ya arma el grid de módulos de Inicio, para que el tamaño quede idéntico sin duplicar CSS. Buscador (nombre/cliente/ciudad) y filtro por estado, más reciente primero. Cada tarjeta: ícono 🏗️, nombre, cliente como subtítulo, badge de color según el estado, y DOS filas de botones chiquitos con `stopPropagation` (para no disparar también el clic de la tarjeta): "✏️"/"🗑️" (Editar/Eliminar), y — segunda fila, 2026-10-16, a pedido del usuario: "pongamos también en la segunda fila los botones para entrar a las subventanas de proyectos" — "📄"/"🏗️"/"📦" (Listas de Producción/Producción/Despachos), que llaman `abrirLosasDeProyectoDesdeGrid(proyectoId, modo)` (`js/losas-proyecto.js`): fija `_PROYECTO_ACTIVO_ID` directo y reusa `abrirLosasDeProyecto(modo)` tal cual, saltándose la pantalla de Carpetas como paso intermedio. **El clic en la tarjeta misma entra a las Carpetas de ese proyecto** (`abrirCarpetasProyecto()`, ver sección propia más abajo) — sigue siendo la puerta de entrada completa (también a Memorias de Cálculo/Planos, que el atajo no cubre); los atajos solo acortan el camino a las 3 subventanas de uso más frecuente.
+- **Listado** (`renderProyectos()`): desde el 2026-10-13, a pedido del usuario ("en vez de un listado de proyectos, iconos de acceso para los proyectos... tamaño similar a los iconos de la pantalla de inicio"), ya no es una tabla — es una grilla de tarjetas-ícono, una por proyecto, reusando tal cual las clases `.inicio-grid`/`.inicio-modulo` (`css/estilos.css`) que ya arma el grid de módulos de Inicio, para que el tamaño quede idéntico sin duplicar CSS. Buscador (nombre/cliente/ciudad) y filtro por estado, más reciente primero. Cada tarjeta: ícono 🏗️, nombre, cliente como subtítulo, badge de color según el estado, y dos botones chiquitos "✏️"/"🗑️" con `stopPropagation` (para no disparar también el clic de la tarjeta). **El clic en la tarjeta misma entra a las Carpetas de ese proyecto** (`abrirCarpetasProyecto()`, ver sección propia más abajo) — es la puerta de entrada a todo lo demás del proyecto. (2026-10-16: se probó primero poner acá mismo, por tarjeta, botones de atajo a las subventanas — el usuario aclaró que no era eso: lo que quería era una sub-navegación tipo Cotizaciones y Ventas, debajo de la barra superior; ver "Sub-navegación dinámica de Proyectos" más abajo. Ese primer intento se revirtió del todo.)
 - **Ubicación en la navegación**: botón nuevo en la barra superior y en la pantalla de Inicio, **entre Calidad y Centro de Costos** (a pedido explícito del usuario: "pongamos la de proyectos al lado de la de calidad... movamos la ventana de costos para el extremo derecho" — Centro de Costos ya estaba al final, insertar Proyectos justo antes deja ambos pedidos resueltos a la vez).
-- **Sin subnav propio todavía** — `activarModulo('proyectos')` va directo a la única pantalla, a diferencia de los demás módulos (que siempre muestran su barra de sub-pestañas). Se puede agregar más adelante si el módulo crece (ej. una vista de estadísticas).
+- **Sub-nav propia, dinámica** (2026-10-16, ver sección "Sub-navegación dinámica de Proyectos" más abajo) — `activarModulo('proyectos')` sigue yendo directo a la grilla de todos los proyectos (sin subnav visible ahí, nada que mostrar todavía), pero una vez dentro de un proyecto aparece una fila de sub-navegación igual en estilo a la de los demás módulos.
 - Verificado con un arnés real — 32 aserciones: el orden de los botones en la barra superior y en Inicio; la navegación activa/desactiva las pantallas correctas; el estado vacío; crear un proyecto completo de punta a punta (validación de Nombre obligatorio, el upsert real hacia Supabase, el modal cerrando y la tabla mostrando el registro); editar sin duplicar y sin perder `creadoEn`; el buscador de cliente; los filtros de estado y de búsqueda; eliminar con su `delete` real; y que los demás módulos (Calidad, Cotizaciones, Inicio) siguen funcionando igual que antes — sin errores de consola.
 
 ## Carpetas de un proyecto y separación Ingeniería/Producción/Despachos (2026-10-13)
@@ -427,6 +427,54 @@ sobre arreglos de edición en memoria (`_filasLosaActual`/`_despachosLosaActual`
 una edición en curso borraría
 cambios sin guardar — mismo criterio ya aceptado en Ajustes de Mezcla (valores "congelados"
 mientras se edita).
+
+### Sub-navegación dinámica de Proyectos (2026-10-16, a pedido del usuario)
+
+El usuario pidió primero "en la segunda fila los botones para entrar a las subventanas de
+proyectos" — se interpretó mal al principio (se probó poner esos botones EN CADA TARJETA de la
+grilla de proyectos, ver nota en "Listado" más arriba, y se revirtió del todo). Lo que en
+realidad pedía era una fila de sub-navegación igual a la que ya tienen los demás módulos
+(Cotizaciones y Ventas: "+ Nueva Cotización" / "Pipeline" / "Histórico" / "Clientes" /
+"Estadísticas", debajo de la barra superior) — pero como Proyectos tiene un nivel adicional
+(primero se elige UN proyecto, después sus secciones), el primer botón de esa fila no abre una
+pantalla fija: muestra el **nombre del proyecto activo** y sirve para **salir** de él ("al
+costado izquierdo de la fila podemos nombrar el proyecto... si quiero salir del proyecto, pincho
+el botón del nombre del proyecto y de ahí me manda a la ventana donde me muestra los iconos de
+todos los proyectos"). La pantalla de Carpetas (el "inicio" de cada proyecto, con sus 5
+tarjetas-ícono) **no se eliminó** — el usuario fue explícito: "sin eliminar la ventana de inicio
+de cada proyecto". La sub-nav es un atajo ADICIONAL para moverse entre secciones sin tener que
+volver a Carpetas primero, no un reemplazo.
+
+- **`#subnav-proyecto-activo`** (`cotizaciones.html`, junto a las otras 5 filas `<nav class="nav"
+  id="subnav-*">` que arma `js/navegacion.js`) — mismas clases `.nav`/`.nav-btn` que las demás
+  (mismo `box-shadow`/sticky/`top:50px`/altura 44px, `css/estilos.css`), para que se vea
+  idéntica. A diferencia de esas 5, que son listas de botones 100% fijas en el HTML (confirmado
+  explorando el código: no existe en toda la app ningún otro precedente de una fila de
+  sub-navegación cuyo contenido dependa del estado — esto es la primera), el HTML de esta trae
+  los 5 botones de sección fijos (sus etiquetas no cambian), más el primer botón
+  (`#subnav-proyecto-nombre-btn`) vacío, que `_sincronizarSubnavProyecto()` llena con el nombre
+  del proyecto activo.
+- **`_sincronizarSubnavProyecto(seccion)`** (`js/losas-proyecto.js`) — la única función que
+  decide todo sobre esta fila: si `_PROYECTO_ACTIVO_ID` no apunta a un proyecto real, la
+  esconde; si sí, la muestra, pone `🏛️ <nombre>` en el primer botón, y resalta (`.activo`) el
+  botón cuya `data-seccion-proyecto` sea igual al parámetro `seccion` (`null` = ninguno
+  resaltado, para cuando se está viendo la propia pantalla de Carpetas). Se llama al final de
+  **todas** las funciones de navegación dentro de Proyectos: `abrirCarpetasProyecto()` (`null`),
+  `abrirDocumentosProyecto(tipo)` (`tipo`), `abrirLosasDeProyecto(modo)`/`abrirLosaDetalle(id)`/
+  `volverALosasProyecto()` (`modo`/`_MODO_FLUJO_LOSA`), `volverACarpetasProyecto()` (`null`),
+  `volverAProyectos()` (`null`, la esconde porque ya no hay `_PROYECTO_ACTIVO_ID`).
+- **Botón del nombre del proyecto = "salir"**: `onclick="volverAProyectos()"` directo — mismo
+  destino que ya usaba el único botón "← Volver a Proyectos" que existía en Carpetas, ahora
+  también alcanzable desde cualquier sección sin tener que pasar primero por Carpetas.
+- **Se esconde al cambiar de módulo** — `activarModulo()` (`js/navegacion.js`) esconde
+  `#subnav-proyecto-activo` en cualquier rama que no sea `modulo === 'proyectos'` (una línea
+  nueva, junto a las 5 que ya prendían/apagaban las otras filas). La rama `proyectos` en sí
+  siempre resetea `_PROYECTO_ACTIVO_ID = null` y llama `_sincronizarSubnavProyecto(null)` — así
+  entrar por la barra superior aterriza siempre en la grilla con la fila escondida, **incluso
+  si se vuelve a hacer clic en "Proyectos" estando ya dentro de uno** (caso borde real:
+  sin ese `_sincronizarSubnavProyecto(null)` ahí, la fila se quedaba pegada mostrando el
+  proyecto anterior, porque esa rama no pasa por el `if (modulo !== 'proyectos')` que esconde
+  las demás).
 
 ### Fuera de alcance en esta vuelta (conocido, no es un olvido)
 

@@ -20,12 +20,11 @@ const _COLOR_ESTADO_PROYECTO = {
 // clases `.inicio-grid`/`.inicio-modulo` (css/estilos.css) que ya arma el grid de módulos de
 // Inicio, para que el tamaño quede idéntico sin duplicar CSS. Clic en la tarjeta entra a las
 // Carpetas de ese proyecto (Memorias de Cálculo/Planos/Listas de Producción/Producción y
-// Despachos, ver js/losas-proyecto.js — `abrirCarpetasProyecto()`). Debajo, dos filas de
-// botones chiquitos con `stopPropagation` (para no disparar también el clic de la tarjeta):
-// Editar/Eliminar, y — segunda fila, 2026-10-16, a pedido del usuario: "pongamos también en la
-// segunda fila los botones para entrar a las subventanas de proyectos" — un atajo directo a
-// Listas de Producción/Producción/Despachos (`abrirLosasDeProyectoDesdeGrid()`,
-// js/losas-proyecto.js), sin pasar primero por la pantalla de Carpetas.
+// Despachos, ver js/losas-proyecto.js — `abrirCarpetasProyecto()`); Editar/Eliminar quedan
+// como botones chiquitos aparte, con `stopPropagation` para no disparar también el clic de la
+// tarjeta. (2026-10-16: el atajo a las subventanas NO va acá — el usuario aclaró que lo que
+// quería era una sub-navegación tipo Cotizaciones y Ventas, no botones por tarjeta; ver
+// `_sincronizarSubnavProyecto()` en js/losas-proyecto.js.)
 function renderProyectos() {
   const grid = document.getElementById('grid-proyectos');
   if (!grid) return;
@@ -51,16 +50,9 @@ function renderProyectos() {
       <span class="inicio-modulo-nombre" style="text-align:center">${_esc(p.nombre)}</span>
       ${p.cliente ? `<span style="font-size:11.5px;color:var(--gris-medio);text-align:center">${_esc(p.cliente)}</span>` : ''}
       <span class="badge" style="background:${col.bg};color:${col.fg}">${_esc(p.estado)}</span>
-      <div style="display:flex;flex-direction:column;gap:6px" onclick="event.stopPropagation()">
-        <div style="display:flex;gap:6px;justify-content:center">
-          <button class="btn btn-secundario btn-xs" onclick="abrirModalProyecto('${_escAttr(p.id)}')" title="Editar">✏️</button>
-          <button class="btn btn-rojo btn-xs" onclick="eliminarProyecto('${_escAttr(p.id)}')" title="Eliminar">🗑️</button>
-        </div>
-        <div style="display:flex;gap:6px;justify-content:center">
-          <button class="btn btn-secundario btn-xs" onclick="abrirLosasDeProyectoDesdeGrid('${_escAttr(p.id)}','lista')" title="Listas de Producción">📄</button>
-          <button class="btn btn-secundario btn-xs" onclick="abrirLosasDeProyectoDesdeGrid('${_escAttr(p.id)}','produccion')" title="Producción">🏗️</button>
-          <button class="btn btn-secundario btn-xs" onclick="abrirLosasDeProyectoDesdeGrid('${_escAttr(p.id)}','despacho')" title="Despachos">📦</button>
-        </div>
+      <div style="display:flex;gap:6px;margin-top:2px" onclick="event.stopPropagation()">
+        <button class="btn btn-secundario btn-xs" onclick="abrirModalProyecto('${_escAttr(p.id)}')" title="Editar">✏️</button>
+        <button class="btn btn-rojo btn-xs" onclick="eliminarProyecto('${_escAttr(p.id)}')" title="Eliminar">🗑️</button>
       </div>
     </div>`;
   }).join('');
