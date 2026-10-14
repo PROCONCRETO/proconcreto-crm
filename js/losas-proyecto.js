@@ -939,6 +939,55 @@ function guardarProgramacionProduccion() {
 // futuro, no lleva pendientes ni unidades fabricadas. Es el ÚNICO imprimible de esta pantalla
 // desde el 2026-10-16 — el que sacaba la Lista de Producción completa se quitó por quedar
 // redundante (nadie lo usaba frente a este, que sí refleja el plan real del día).
+// Resumen por medidas al pie de los imprimibles de programación (2026-10-17, a pedido del
+// usuario: "incluyamos un resumen, que muestre la cantidad por medidas, esto porque en
+// ocasiones la medida es la misma para varios cuadros en el plano... y termina siendo más
+// fácil revisar unos totales que cuadro por cuadro") — agrupa las líneas que comparten la
+// misma medida real de la pieza: Ancho+Dimensión en prelosa/placa alveolar (dos piezas del
+// mismo ancho y largo son intercambiables); Vigueta+Dimensión en vigueta (el tipo de vigueta
+// es parte de la medida, no solo un dato aparte — dos viguetas del mismo largo pero de tipo
+// distinto NO son la misma pieza). Compartido entre `imprimirProgramacionProduccion()` e
+// `imprimirProgramacionDespacho()`.
+function _resumenPorMedidasHTML(lineas, l) {
+  const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const grupos = new Map();
+  lineas.forEach(({ f, cantidad }) => {
+    const dim = Number(f.dimension) || 0;
+    const medida = esVigueta ? (f.tipoVigueta || '—') : (Number(f.ancho) || 0);
+    const clave = `${medida}__${dim.toFixed(2)}`;
+    if (!grupos.has(clave)) grupos.set(clave, { medida, dim, cantidad: 0 });
+    grupos.get(clave).cantidad += cantidad;
+  });
+  const filas = Array.from(grupos.values()).sort((a, b) => a.dim - b.dim || String(a.medida).localeCompare(String(b.medida)));
+  let totalCantidad = 0, totalMetros = 0;
+  const filasHTML = filas.map(g => {
+    totalCantidad += g.cantidad;
+    const longTotal = g.dim * g.cantidad;
+    totalMetros += longTotal;
+    return `<tr>
+      <td>${esVigueta ? _esc(g.medida) : g.medida + ' cm'}</td>
+      <td style="text-align:right">${g.dim.toFixed(2)}</td>
+      <td style="text-align:center;font-weight:700">${g.cantidad}</td>
+      <td style="text-align:right">${longTotal.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+  return `
+    <div style="margin-top:14px">
+      <div style="font-size:11px;font-weight:700;color:#003F7F;margin-bottom:4px;letter-spacing:0.03em">RESUMEN POR MEDIDAS</div>
+      <table class="preview-tabla">
+        <thead><tr>
+          <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Dim. (m)</th><th>Cantidad</th><th>Long. tot. (m)</th>
+        </tr></thead>
+        <tbody>${filasHTML}</tbody>
+        <tfoot><tr class="total-row">
+          <td colspan="2" style="text-align:right">TOTALES</td>
+          <td style="text-align:center">${totalCantidad}</td>
+          <td style="text-align:right">${totalMetros.toFixed(2)}</td>
+        </tr></tfoot>
+      </table>
+    </div>`;
+}
+
 let _fechaProgramacionImpresa = null;
 function imprimirProgramacionProduccion() {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
@@ -1008,6 +1057,7 @@ function imprimirProgramacionProduccion() {
             <td style="text-align:right">${totalMetros.toFixed(2)}</td>
           </tr></tfoot>
         </table>
+        ${_resumenPorMedidasHTML(lineas, l)}
         <div class="preview-firma" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
           <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Programado por</div>
           <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Recibido en planta</div>
@@ -1323,6 +1373,111 @@ function guardarProgramacionDespacho() {
   _guardarLosaActual();
   cerrarModal('modal-programar-despacho');
   alert('Despacho programado guardado. Cuando salga el camión, regístralo con "+ Cargar despacho".');
+}
+
+// Imprimible de la PROGRAMACIÓN DE DESPACHO (2026-10-17, a pedido del usuario: "en la
+// programación de despachos, incluyamos el botón de imprimir, para poder pasar el impreso de
+// lo que se debe organizar y cargar en el viaje") — mismo patrón EXACTO que
+// `imprimirProgramacionProduccion()` (membrete + clases compartidas, resumen por medidas al
+// pie), con dos diferencias: título/firmas propios de despacho, y SIN remisión (esa se captura
+// recién en "+ Cargar despacho" — acá todavía es solo un plan, el camión ni ha llegado).
+function imprimirProgramacionDespacho() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  if (!l) return;
+  const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
+  const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
+  const fecha = document.getElementById('mpd-fecha').value;
+  const observaciones = document.getElementById('mpd-observaciones').value.trim();
+  const lineas = [];
+  document.querySelectorAll('#mpd-filas-body input[data-fila-id]').forEach(inp => {
+    const cantidad = parseFloat(inp.value) || 0;
+    if (cantidad <= 0) return;
+    const f = _filasLosaActual.find(x => x.id === inp.dataset.filaId);
+    if (f) lineas.push({ f, cantidad });
+  });
+  if (!lineas.length) { alert('Ingresa al menos una cantidad a programar antes de imprimir.'); return; }
+  _fechaProgramacionImpresa = fecha || new Date().toISOString().split('T')[0];
+
+  let totalPiezas = 0, totalMetros = 0;
+  const filasHTML = lineas.map(({ f, cantidad }, n) => {
+    const longTotal = (Number(f.dimension) || 0) * cantidad;
+    totalPiezas += cantidad;
+    totalMetros += longTotal;
+    return `<tr>
+      <td style="color:#888">${n + 1}</td>
+      <td style="font-weight:600">${_esc(f.cuadro) || '—'}</td>
+      <td>${_esc(f.ejesEntre) || '—'}</td>
+      <td>${_esc(f.laterales) || '—'}</td>
+      <td style="text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>
+      <td style="text-align:center;font-weight:700">${cantidad}</td>
+      <td style="text-align:right">${longTotal.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `
+    <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
+      <span style="font-weight:700">Programación de Despacho — ${_esc(l.nombre)}</span>
+      <div style="flex:1"></div>
+      <button onclick="descargarPDFProgramacionDespacho()" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-programacion-despacho">⬇️ Descargar PDF</button>
+      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+    </div>
+    <div class="preview-doc" id="pd-prog-preview-doc">
+      <div class="preview-membrete-header"><img src="membrete-top.jpg" alt=""></div>
+      <div class="preview-content" id="pd-prog-preview-content" style="padding-top:6px">
+        <div style="text-align:center;font-size:12px;font-weight:700;color:#003F7F;letter-spacing:0.03em;margin-bottom:8px">PROGRAMACIÓN DE DESPACHO</div>
+        <div style="padding-bottom:6px;border-bottom:1px solid #eee;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <div style="font-size:14px;font-weight:700;color:#003F7F">${_esc(l.nombre)}${l.ubicacion ? ' — ' + _esc(l.ubicacion) : ''}</div>
+            <div style="font-size:11px;color:#555">${fecha ? new Date(fecha + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}</div>
+          </div>
+          <div style="font-size:12px;font-weight:600;margin-top:2px">${_esc(p?.nombre) || '—'}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px;font-size:10.5px">
+            <div><b>SISTEMA:</b> ${sis ? _esc(sis.etiqueta) : '—'}</div>
+            <div><b>PIEZAS A PROGRAMAR:</b> ${totalPiezas} piezas en ${lineas.length} fila${lineas.length === 1 ? '' : 's'}</div>
+          </div>
+          ${observaciones ? `<div style="margin-top:4px;font-size:10.5px"><b>OBSERVACIONES:</b> ${_esc(observaciones)}</div>` : ''}
+        </div>
+        <table class="preview-tabla">
+          <thead><tr>
+            <th>#</th><th>Cuadro</th><th>Ejes num.</th><th>Ejes alfa.</th>
+            <th>Dim. (m)</th><th>Cant. a programar</th><th>Long. tot. (m)</th>
+          </tr></thead>
+          <tbody>${filasHTML}</tbody>
+          <tfoot><tr class="total-row">
+            <td colspan="5" style="text-align:right">TOTALES</td>
+            <td style="text-align:center">${totalPiezas}</td>
+            <td style="text-align:right">${totalMetros.toFixed(2)}</td>
+          </tr></tfoot>
+        </table>
+        ${_resumenPorMedidasHTML(lineas, l)}
+        <div class="preview-firma" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Programado por</div>
+          <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Cargado por</div>
+        </div>
+      </div>
+      <div class="preview-membrete-footer" id="pd-prog-preview-footer">
+        <div class="pf-arco"></div>
+        <div class="pf-datos">
+          <div class="pf-col"><span class="pf-icon">📞</span><span>+57 314 620 1650<br>+57 311 408 2285</span></div>
+          <div class="pf-col"><span class="pf-icon">🏠</span><span>Autopista del Café Km2<br>Vía Chinchiná – Santa Rosa</span></div>
+          <div class="pf-col"><span class="pf-icon">🌐</span><span>www.proconcreto.com.co</span></div>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('contenido-preview').innerHTML = html;
+  // El modal queda tapado por el fondo oscuro de #vista-previa si no se cierra primero (el
+  // z-index de los modales es mayor al de #vista-previa).
+  cerrarModal('modal-programar-despacho');
+  document.getElementById('vista-previa').style.display = 'block';
+  document.querySelectorAll('.pantalla').forEach(p2 => p2.classList.remove('activa'));
+  window.scrollTo(0, 0);
+}
+async function descargarPDFProgramacionDespacho() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const fecha = (_fechaProgramacionImpresa || new Date().toISOString().split('T')[0]).replace(/-/g, '_');
+  const nombreLosa = (l?.nombre || 'losa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '_');
+  await _descargarPDFConMembrete('pd-prog-preview-content', 'pd-prog-preview-footer', `Programacion_Despacho_${nombreLosa}_${fecha}.pdf`, 'btn-pdf-programacion-despacho');
 }
 
 // "Cargar despacho" — mismo patrón que "Cargar producción" (línea ya cargada sigue siendo

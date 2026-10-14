@@ -267,6 +267,17 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     esta misma vuelta — ambos imprimibles comparten el 100% de la lógica de paginación con
     membrete, solo cambia qué contenido se captura y el nombre del archivo), con el nombre
     `Programacion_Produccion_<Losa>_<fecha programada>.pdf`.
+  - **"RESUMEN POR MEDIDAS" al pie del imprimible** (`_resumenPorMedidasHTML()`, 2026-10-17, a
+    pedido del usuario: "incluyamos un resumen, que muestre la cantidad por medidas, esto
+    porque en ocasiones la medida es la misma para varios cuadros en el plano... y termina
+    siendo más fácil revisar unos totales que cuadro por cuadro") — agrupa las líneas impresas
+    por la medida REAL de la pieza, no por fila: en prelosa/placa alveolar, Ancho + Dimensión
+    (dos piezas del mismo ancho y largo son intercambiables, sin importar en qué cuadro vayan);
+    en vigueta, Vigueta (tipo) + Dimensión — el tipo de vigueta es parte de la medida, no un
+    dato aparte, así que dos viguetas del mismo largo pero de tipo distinto NO se agrupan.
+    Tabla aparte debajo de la tabla de filas (antes de la firma), con su propia fila de
+    totales. Función compartida entre `imprimirProgramacionProduccion()` e
+    `imprimirProgramacionDespacho()` — ambos imprimibles la llevan igual.
 - **"+ Cargar producción"** (`abrirModalCargarProduccion()`/`_renderLineasCargarProduccion()`/
   `guardarCargaProduccion()`) — selector de TODAS las programaciones (ya no solo las que tienen
   líneas pendientes, ver más abajo); al elegir una, cada línea muestra "lo teórico programado"
@@ -356,6 +367,14 @@ conservó a propósito (mismo espíritu que `viaje.entregas[].productos[]` en Lo
   (`_marcarFilaProgramarDespacho()`/`_marcarTodasFilasProgramarDespacho()`), filtro "Desde
   cuadro / Hasta cuadro" (`_aplicarFiltroCuadroProgramarDespacho()`). Crea una entrada en
   `despachosProgramados[]` con todas sus líneas en `cantidadReal: null`.
+  - **"🖨️ Imprimir" dentro del propio modal** (`imprimirProgramacionDespacho()`/
+    `descargarPDFProgramacionDespacho()`, 2026-10-17, a pedido del usuario: "incluyamos el
+    botón de imprimir, para poder pasar el impreso de lo que se debe organizar y cargar en el
+    viaje") — mismo patrón EXACTO que `imprimirProgramacionProduccion()` (membrete, resumen por
+    medidas al pie), con dos diferencias: título/firmas propios de despacho ("Programado por" /
+    "Cargado por", en vez de "Recibido en planta") y **sin remisión** — esa se captura recién
+    en "+ Cargar despacho"; acá todavía es solo un plan, el camión ni ha llegado. Archivo
+    `Programacion_Despacho_<Losa>_<fecha programada>.pdf`.
 - **"+ Cargar despacho"** (`abrirModalCargarDespacho()`/`_renderLineasCargarDespacho()`/
   `guardarCargaDespacho()`) — el selector lista TODAS las programaciones (editable incluso si ya
   están completas, igual que Producción), más dos campos que Producción no tiene: **N° Remisión**
