@@ -1312,6 +1312,9 @@
       <div id="losa-detalle-titulo" style="font-size:18px;font-weight:700;color:var(--azul)"></div>
     </div>
     <div class="flex-gap">
+      <button id="losa-btn-programar-produccion" class="btn btn-primario btn-sm" onclick="abrirModalProgramarProduccion()" style="display:none">+ Programar producción</button>
+      <button id="losa-btn-cargar-produccion" class="btn btn-primario btn-sm" onclick="abrirModalCargarProduccion()" style="display:none">+ Cargar producción</button>
+      <button id="losa-btn-produccion-diaria" class="btn btn-secundario btn-sm" onclick="abrirMatrizProduccionDiaria()" style="display:none">📊 Producción diaria</button>
       <button id="losa-btn-imprimir-produccion" class="btn btn-secundario btn-sm" onclick="imprimirListaProduccion()" style="display:none">🖨️ Imprimir</button>
       <button id="losa-btn-registrar-despacho" class="btn btn-secundario btn-sm" onclick="abrirModalDespachoLosa()" style="display:none">📦 Registrar despacho</button>
     </div>
@@ -1333,6 +1336,7 @@
     <table class="tabla-items" style="min-width:980px">
       <thead id="filas-produccion-thead"></thead>
       <tbody id="filas-produccion-body"></tbody>
+      <tfoot id="filas-produccion-tfoot"></tfoot>
     </table>
   </div>
 
@@ -1362,22 +1366,57 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-produccion-fila">
-  <div class="modal" style="width:420px;max-width:95vw">
-    <div class="modal-titulo" id="modal-produccion-fila-titulo">🏗️ Registrar producción</div>
+<div class="modal-overlay" id="modal-programar-produccion">
+  <div class="modal" style="width:680px;max-width:95vw">
+    <div class="modal-titulo">📋 Programar producción</div>
     <div class="form-grid" style="margin-bottom:10px">
-      <div class="form-grupo"><label>Fecha</label><input type="date" id="mpf-fecha"></div>
-      <div class="form-grupo"><label>Cantidad</label><input type="number" min="0" id="mpf-cantidad"></div>
+      <div class="form-grupo"><label>Fecha programada</label><input type="date" id="mpp-fecha"></div>
+      <div class="form-grupo"><label>Observaciones</label><input type="text" id="mpp-observaciones"></div>
     </div>
-    <div class="form-grupo" style="margin-bottom:16px"><label>Tipo</label>
-      <select id="mpf-tipo" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
-        <option value="Vaciado">Vaciado</option>
-        <option value="Cortado">Cortado (pieza no estándar, cortada de otra)</option>
-      </select>
+    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:6px">Cuánto de cada fila se va a programar (se precargaron solo las filas con saldo pendiente de producción):</div>
+    <div style="max-height:320px;overflow-y:auto">
+      <table class="tabla-cots"><thead><tr><th>Cuadro</th><th>Dimensión</th><th>Pendiente</th><th>A programar</th></tr></thead><tbody id="mpp-filas-body"></tbody></table>
     </div>
     <div class="modal-acciones">
-      <button class="btn btn-secundario" onclick="cerrarModal('modal-produccion-fila')">Cancelar</button>
-      <button class="btn btn-primario" onclick="guardarProduccionFila()">Guardar</button>
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-programar-produccion')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarProgramacionProduccion()">Guardar programación</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-cargar-produccion">
+  <div class="modal" style="width:680px;max-width:95vw">
+    <div class="modal-titulo">✅ Cargar producción</div>
+    <div class="form-grupo" style="margin-bottom:12px">
+      <label>Producción programada</label>
+      <select id="mcp-select-programacion" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px" onchange="_renderLineasCargarProduccion()"></select>
+    </div>
+    <div id="mcp-sin-programaciones" style="display:none;text-align:center;color:var(--gris-medio);padding:16px">No hay producciones programadas pendientes de cargar. Primero programa producción con el botón "+ Programar producción".</div>
+    <div id="mcp-contenido" style="display:none">
+      <div style="font-size:12px;color:var(--gris-medio);margin-bottom:6px">Frente a lo teórico programado, digita lo que realmente se produjo (las filas ya cargadas se muestran de solo lectura):</div>
+      <div style="max-height:320px;overflow-y:auto">
+        <table class="tabla-cots"><thead><tr><th>Cuadro</th><th>Programado</th><th>Producido</th></tr></thead><tbody id="mcp-filas-body"></tbody></table>
+      </div>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-cargar-produccion')">Cancelar</button>
+      <button class="btn btn-primario" id="mcp-btn-guardar" onclick="guardarCargaProduccion()" style="display:none">Guardar producción cargada</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-produccion-diaria">
+  <div class="modal" style="width:900px;max-width:95vw">
+    <div class="modal-titulo">📊 Producción diaria</div>
+    <div style="max-height:60vh;overflow:auto">
+      <table class="tabla-cots" style="min-width:600px">
+        <thead id="pd-thead"></thead>
+        <tbody id="pd-tbody"></tbody>
+        <tfoot id="pd-tfoot"></tfoot>
+      </table>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-produccion-diaria')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3200,7 +3239,7 @@
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
 <script src="js/proyectos.js?v=20261013b"></script>
-<script src="js/losas-proyecto.js?v=20261015a"></script>
+<script src="js/losas-proyecto.js?v=20261015b"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20261013a"></script>
 <script src="js/cotizador.js?v=20261007a"></script>

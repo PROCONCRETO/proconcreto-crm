@@ -50,6 +50,14 @@ let _MODO_FLUJO_LOSA = 'lista';
 let _filasLosaActual = [];
 let _despachosLosaActual = [];
 let _bovedillaLosaActual = null;
+// Producciones programadas (2026-10-15, a pedido del usuario) — flujo de dos pasos: "+
+// Programar producción" arma el lote (qué filas, cuánto se planea fabricar); "+ Cargar
+// producción" confirma, línea por línea, lo que REALMENTE se fabricó frente a lo programado —
+// es la única puerta de entrada real a `fila.produccion[]` ("de esta entrada es que ingresamos
+// la producción"), reemplaza el registro rápido por fila que había antes. Mismo molde que
+// `despachos[]`: un lote con `lineas[]`, cada línea referencia una fila por `filaId`.
+// `cantidadReal: null` en una línea = todavía no se cargó esa línea.
+let _programacionesLosaActual = [];
 
 const ESTADOS_LOSA = ['Planeación', 'En producción', 'Completada', 'Cancelada'];
 const _COLOR_ESTADO_LOSA = {
@@ -396,6 +404,7 @@ function abrirLosaDetalle(id) {
   _filasLosaActual = JSON.parse(JSON.stringify(l.filas || []));
   _despachosLosaActual = JSON.parse(JSON.stringify(l.despachos || []));
   _bovedillaLosaActual = l.bovedilla ? JSON.parse(JSON.stringify(l.bovedilla)) : null;
+  _programacionesLosaActual = JSON.parse(JSON.stringify(l.produccionesProgramadas || []));
   document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
   document.getElementById('pantalla-losa-detalle').classList.add('activa');
   renderLosaDetalle();
@@ -417,6 +426,9 @@ function renderLosaDetalle() {
   // ventanas a los diferentes roles" — Ingeniería define la lista, Planta es quien imprime
   // para fabricar).
   document.getElementById('losa-btn-imprimir-produccion').style.display = esProduccion ? '' : 'none';
+  document.getElementById('losa-btn-programar-produccion').style.display = esProduccion ? '' : 'none';
+  document.getElementById('losa-btn-cargar-produccion').style.display = esProduccion ? '' : 'none';
+  document.getElementById('losa-btn-produccion-diaria').style.display = esProduccion ? '' : 'none';
   document.getElementById('losa-btn-registrar-despacho').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-card-despachos').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-detalle-bloque-bovedilla').style.display = l.sistema === 'vigueta_bovedilla' ? '' : 'none';
@@ -440,25 +452,49 @@ function renderFilasProduccion() {
   const esLista = _MODO_FLUJO_LOSA === 'lista';
   const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
   const thead = document.getElementById('filas-produccion-thead');
-  // Casilla de selección (2026-10-13, a pedido del usuario: "agregamos un botón de imprimir
-  // listas de producción, donde se pueda seleccionar las filas...") — vive en modo producción,
-  // no en lista (2026-10-14, a pedido del usuario: el imprimible para planta es de Producción,
-  // para poder asignarle permisos por ventana a futuro independiente de Ingeniería), que es
-  // donde vive el botón "🖨️ Imprimir" (ver imprimirListaProduccion()).
+  // "Unidades fabricadas" (2026-10-15, a pedido del usuario), justo antes de "Pend.
+  // Producción" — solo en modo producción, igual que el resto de columnas de seguimiento.
   thead.innerHTML = `<tr>
-    ${esProduccion ? '<th style="width:28px"><input type="checkbox" id="chk-todas-filas-print" onchange="_toggleSeleccionTodasFilas(this.checked)"></th>' : ''}
     <th>#</th><th>Cuadro</th><th>Ejes numéricos</th><th>Ejes alfabéticos</th>
     ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
     <th>Dimensión (m)</th><th>Cantidad</th><th>Long. total (m)</th><th>Peso (kg)</th>
-    ${esLista ? '' : (esProduccion ? '<th>Pend. Producción</th>' : '<th>Pend. Despacho</th>')}
+    ${esLista ? '' : (esProduccion ? '<th>Unidades fabricadas</th><th>Pend. Producción</th>' : '<th>Pend. Despacho</th>')}
     <th>Observaciones</th><th></th>
   </tr>`;
   const tbody = document.getElementById('filas-produccion-body');
+  const tfoot = document.getElementById('filas-produccion-tfoot');
   if (!_filasLosaActual.length) {
     tbody.innerHTML = `<tr><td colspan="15" class="empty-state"><div class="icono">📋</div><div>No hay filas todavía — agrega una a mano, pégalas desde Excel o importa el archivo.</div></td></tr>`;
+    if (tfoot) tfoot.innerHTML = '';
     return;
   }
   tbody.innerHTML = _filasLosaActual.map((f, i) => _filaProduccionHTML(f, i, l, esVigueta)).join('');
+  if (tfoot) tfoot.innerHTML = esProduccion ? _pieAvanceProduccionHTML() : '';
+}
+
+// Fila de avance al pie de la tabla, solo en modo producción (2026-10-15, a pedido del
+// usuario: "pongamos al final... una fila de porcentaje de avance, donde el avance y el
+// faltante sea ponderado, no por unidad (osea, longitud por unidades)") — pondera cada fila por
+// su longitud total (dimensión × cantidad), no por cantidad de piezas sueltas: una fila con
+// pocas piezas muy largas pesa en el avance tanto como corresponde a sus metros reales, no
+// menos que una fila con muchas piezas cortas.
+function _pieAvanceProduccionHTML() {
+  let totalPonderado = 0, avancePonderado = 0;
+  _filasLosaActual.forEach(f => {
+    const dim = Number(f.dimension) || 0;
+    const cant = Number(f.cantidad) || 0;
+    const fabricadas = cant - _pendienteProduccionFila(f);
+    totalPonderado += dim * cant;
+    avancePonderado += dim * fabricadas;
+  });
+  const pctAvance = totalPonderado > 0 ? (avancePonderado / totalPonderado) * 100 : 0;
+  const pctFaltante = 100 - pctAvance;
+  const numCols = document.querySelectorAll('#filas-produccion-thead th').length || 1;
+  return `<tr style="background:var(--azul-suave);font-weight:700">
+    <td colspan="${numCols}" style="padding:10px;text-align:center;color:var(--azul)">
+      📊 Avance de producción (ponderado por longitud): ${pctAvance.toFixed(1)}% avance · ${pctFaltante.toFixed(1)}% faltante
+    </td>
+  </tr>`;
 }
 // En modo 'lista' (Ingeniería) las celdas base son editables; en modo 'produccion'
 // (Planta/Logística) se muestran de solo lectura — esa zona solo puede REGISTRAR avance
@@ -499,7 +535,6 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     </div>`;
   };
   return `<tr>
-    ${_MODO_FLUJO_LOSA === 'produccion' ? `<td><input type="checkbox" class="chk-fila-print" data-idx="${i}"></td>` : ''}
     <td>${i + 1}</td>
     <td>${txt(f.cuadro, 'cuadro', 40)}</td>
     <td>${par(f.ejesEntre, 'ejesEntre')}</td>
@@ -517,15 +552,13 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     <td id="fp-longtotal-${i}" style="text-align:right">${longTotal.toFixed(2)}</td>
     <td id="fp-peso-${i}" style="text-align:right">${peso.toFixed(1)}</td>
     ${esLista ? '' : (_MODO_FLUJO_LOSA === 'produccion'
-      ? `<td id="fp-pendprod-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProd}</td>`
+      ? `<td style="text-align:right">${(Number(f.cantidad) || 0) - pendProd}</td><td id="fp-pendprod-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProd}</td>`
       : `<td id="fp-penddesp-${i}" style="text-align:right;font-weight:600;color:${pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendDesp}</td>`)}
     <td>${txt(f.observaciones, 'observaciones', 90)}</td>
     <td style="white-space:nowrap">
       ${esLista
         ? `<button class="btn btn-rojo btn-xs" onclick="_filasLosaActual.splice(${i},1);renderFilasProduccion()">✕</button>`
-        : (_MODO_FLUJO_LOSA === 'produccion'
-          ? `<button class="btn btn-secundario btn-xs" onclick="abrirModalProduccionFila(${i})" title="Registrar producción">🏗️</button>`
-          : '')}
+        : ''}
     </td>
   </tr>`;
 }
@@ -672,30 +705,24 @@ function guardarListaProduccion() {
   alert('Lista de producción guardada.');
 }
 
-function _toggleSeleccionTodasFilas(marcar) {
-  document.querySelectorAll('.chk-fila-print').forEach(chk => { chk.checked = marcar; });
-}
-
 // Imprimible para pasar a planta (2026-10-13, a pedido del usuario: "agregamos un botón de
-// imprimir listas de producción, donde se pueda seleccionar las filas y de esto me salga un
-// imprimible para pasar a planta y puedan ellos fabricar lo que se necesita"). Reescrito
-// 2026-10-15 ("revisa el formato de imprimible de diseño de mezcla para que manejemos el mismo
-// lenguaje gráfico") para seguir el mismo molde que `verFormatoProduccionAjuste()`
-// (js/calidad-ajuste-mezcla.js) y `descargarPDF()` (js/pdf.js, la cotización): membrete
-// (`membrete-top.jpg`) + `.preview-doc`/`.preview-content`/`.preview-membrete-footer` (clases
-// compartidas, css/estilos.css) en vez de un header/footer con estilo inline propio — mismo
-// lenguaje gráfico en todos los documentos oficiales de la empresa, no uno distinto por módulo.
+// imprimir listas de producción... y de esto me salga un imprimible para pasar a planta y
+// puedan ellos fabricar lo que se necesita"). Reescrito 2026-10-15 ("revisa el formato de
+// imprimible de diseño de mezcla para que manejemos el mismo lenguaje gráfico") para seguir el
+// mismo molde que `verFormatoProduccionAjuste()` (js/calidad-ajuste-mezcla.js) y
+// `descargarPDF()` (js/pdf.js, la cotización): membrete (`membrete-top.jpg`) +
+// `.preview-doc`/`.preview-content`/`.preview-membrete-footer` (clases compartidas,
+// css/estilos.css) en vez de un header/footer con estilo inline propio — mismo lenguaje
+// gráfico en todos los documentos oficiales de la empresa, no uno distinto por módulo.
+// Imprime SIEMPRE todas las filas (2026-10-15, a pedido del usuario: "quitemos mejor el
+// seleccionable de la primera columna") — ya no hay selección de filas por checkbox.
 function imprimirListaProduccion() {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   if (!l) return;
   const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
   const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
   const esVigueta = l.sistema === 'vigueta_bovedilla';
-  const seleccionadas = Array.from(document.querySelectorAll('.chk-fila-print:checked')).map(chk => parseInt(chk.dataset.idx, 10));
-  // Si no se marcó ninguna fila, se imprimen todas — más amigable que bloquear con una alerta
-  // pidiendo que marques algo primero.
-  const indices = seleccionadas.length ? seleccionadas : _filasLosaActual.map((_, i) => i);
-  const filas = indices.map(i => _filasLosaActual[i]).filter(Boolean);
+  const filas = _filasLosaActual;
   if (!filas.length) { alert('No hay filas para imprimir.'); return; }
 
   // Sin columna de Peso (2026-10-15, a pedido del usuario: "en este, no es necesario incluir la
@@ -848,41 +875,159 @@ async function descargarPDFListaProduccion() {
   }
 }
 
-// Persiste la Losa completa (filas + despachos + bovedilla) de una sola vez — mismo criterio
-// que el resto de la app: un solo upsert del registro completo, nunca escrituras parciales.
+// Persiste la Losa completa (filas + despachos + bovedilla + producciones programadas) de una
+// sola vez — mismo criterio que el resto de la app: un solo upsert del registro completo, nunca
+// escrituras parciales.
 function _guardarLosaActual() {
   const idx = LOSAS_PROYECTO.findIndex(x => x.id === _LOSA_ACTIVA_ID);
   if (idx < 0) return;
-  const l = { ...LOSAS_PROYECTO[idx], filas: _filasLosaActual, despachos: _despachosLosaActual, bovedilla: _bovedillaLosaActual };
+  const l = { ...LOSAS_PROYECTO[idx], filas: _filasLosaActual, despachos: _despachosLosaActual, bovedilla: _bovedillaLosaActual, produccionesProgramadas: _programacionesLosaActual };
   LOSAS_PROYECTO[idx] = l;
   sb.from('losas_proyecto').upsert({ id: l.id, datos: l, modificado: new Date().toISOString() }, { onConflict: 'id' })
     .then(({ error }) => { if (error) { console.error('Error guardando losa:', error.message); alert('No se pudo guardar: ' + error.message); } });
 }
 
-// ── Control de Producción (por fila) ──
-let _FILA_PRODUCCION_INDEX = null;
-function abrirModalProduccionFila(i) {
-  _FILA_PRODUCCION_INDEX = i;
-  const f = _filasLosaActual[i];
-  document.getElementById('mpf-fecha').value = _fmtISO(new Date());
-  document.getElementById('mpf-cantidad').value = '';
-  document.getElementById('mpf-tipo').value = 'Vaciado';
-  document.getElementById('modal-produccion-fila-titulo').textContent = `🏗️ Registrar producción — Cuadro ${f?.cuadro || ''}`;
-  document.getElementById('modal-produccion-fila').classList.add('abierto');
+// ── Control de Producción — flujo de dos pasos (2026-10-15, a pedido del usuario, reemplaza el
+// registro rápido por fila que había antes): "+ Programar producción" arma el lote de lo que se
+// va a fabricar (qué filas, cuánto); "+ Cargar producción" confirma, línea por línea, lo que
+// REALMENTE se fabricó frente a lo programado — "de esta entrada es que ingresamos la
+// producción", es la única puerta de entrada a `fila.produccion[]`. Mismo molde que
+// `despachos[]`/`abrirModalDespachoLosa()`: un lote con `lineas[]` que referencian cada fila por
+// `filaId`, precargado solo con las filas que tienen saldo pendiente.
+function abrirModalProgramarProduccion() {
+  const conPendiente = _filasLosaActual.filter(f => _pendienteProduccionFila(f) > 0);
+  document.getElementById('mpp-fecha').value = _fmtISO(new Date());
+  document.getElementById('mpp-observaciones').value = '';
+  const tbody = document.getElementById('mpp-filas-body');
+  if (!conPendiente.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--gris-medio);padding:10px">No hay filas con saldo pendiente de producción.</td></tr>`;
+  } else {
+    tbody.innerHTML = conPendiente.map(f => {
+      const pend = _pendienteProduccionFila(f);
+      return `<tr>
+        <td>${_esc(f.cuadro || '')}</td>
+        <td>${f.dimension || 0} m</td>
+        <td>${pend}</td>
+        <td><input type="number" min="0" max="${pend}" value="0" data-fila-id="${_escAttr(f.id)}" style="width:70px"></td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('modal-programar-produccion').classList.add('abierto');
 }
-function guardarProduccionFila() {
-  if (_FILA_PRODUCCION_INDEX == null) return;
-  const cantidad = parseFloat(document.getElementById('mpf-cantidad').value) || 0;
-  if (cantidad <= 0) { alert('Ingresa una cantidad mayor a cero.'); return; }
-  const fecha = document.getElementById('mpf-fecha').value;
+function guardarProgramacionProduccion() {
+  const fecha = document.getElementById('mpp-fecha').value;
   if (!fecha) { alert('Elige una fecha.'); return; }
-  const f = _filasLosaActual[_FILA_PRODUCCION_INDEX];
-  if (!f) return;
-  f.produccion = f.produccion || [];
-  f.produccion.push({ fecha, cantidad, tipo: document.getElementById('mpf-tipo').value });
+  const inputs = document.querySelectorAll('#mpp-filas-body input[data-fila-id]');
+  const lineas = [];
+  inputs.forEach(inp => {
+    const cantidadProgramada = parseFloat(inp.value) || 0;
+    if (cantidadProgramada > 0) lineas.push({ filaId: inp.dataset.filaId, cantidadProgramada, cantidadReal: null });
+  });
+  if (!lineas.length) { alert('Ingresa al menos una cantidad a programar.'); return; }
+  _programacionesLosaActual.push({ id: String(Date.now()), fecha, observaciones: document.getElementById('mpp-observaciones').value.trim(), lineas });
   _guardarLosaActual();
-  cerrarModal('modal-produccion-fila');
+  cerrarModal('modal-programar-produccion');
+  alert('Producción programada guardada. Cuando se fabrique, regístrala con "+ Cargar producción".');
+}
+
+// "Cargar producción" — elige una programación con líneas pendientes de cargar y, frente a
+// cada "teórico programado", deja digitar lo que realmente se produjo. Una línea ya cargada
+// (`cantidadReal != null`) queda de solo lectura — no se puede volver a cargar ni duplicar.
+function abrirModalCargarProduccion() {
+  const pendientes = _programacionesLosaActual.filter(p => (p.lineas || []).some(l => l.cantidadReal == null));
+  const select = document.getElementById('mcp-select-programacion');
+  document.getElementById('mcp-sin-programaciones').style.display = pendientes.length ? 'none' : '';
+  if (!pendientes.length) {
+    select.innerHTML = '';
+    document.getElementById('mcp-contenido').style.display = 'none';
+    document.getElementById('mcp-btn-guardar').style.display = 'none';
+  } else {
+    select.innerHTML = pendientes.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(p => {
+      const totalProgramado = (p.lineas || []).reduce((s, l) => s + (Number(l.cantidadProgramada) || 0), 0);
+      const porCargar = (p.lineas || []).filter(l => l.cantidadReal == null).length;
+      const fechaTxt = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—';
+      return `<option value="${_escAttr(p.id)}">${fechaTxt} — ${(p.lineas || []).length} fila(s), ${totalProgramado} piezas programadas (${porCargar} por cargar)</option>`;
+    }).join('');
+    _renderLineasCargarProduccion();
+  }
+  document.getElementById('modal-cargar-produccion').classList.add('abierto');
+}
+function _renderLineasCargarProduccion() {
+  const select = document.getElementById('mcp-select-programacion');
+  const p = _programacionesLosaActual.find(x => x.id === select.value);
+  const tbody = document.getElementById('mcp-filas-body');
+  if (!p) { document.getElementById('mcp-contenido').style.display = 'none'; document.getElementById('mcp-btn-guardar').style.display = 'none'; return; }
+  document.getElementById('mcp-contenido').style.display = '';
+  document.getElementById('mcp-btn-guardar').style.display = '';
+  tbody.innerHTML = (p.lineas || []).map((linea, li) => {
+    const f = _filasLosaActual.find(x => x.id === linea.filaId);
+    const cargada = linea.cantidadReal != null;
+    return `<tr>
+      <td>${_esc(f?.cuadro || '—')}</td>
+      <td>${linea.cantidadProgramada}</td>
+      <td>${cargada
+        ? `<span style="color:var(--verde);font-weight:600">✓ ${linea.cantidadReal}</span>`
+        : `<input type="number" min="0" value="${linea.cantidadProgramada}" data-linea-idx="${li}" style="width:70px">`}</td>
+    </tr>`;
+  }).join('');
+}
+function guardarCargaProduccion() {
+  const select = document.getElementById('mcp-select-programacion');
+  const p = _programacionesLosaActual.find(x => x.id === select.value);
+  if (!p) return;
+  const inputs = document.querySelectorAll('#mcp-filas-body input[data-linea-idx]');
+  let huboAlguna = false;
+  inputs.forEach(inp => {
+    if (inp.value === '') return; // se deja en blanco a propósito: sigue pendiente para otro día
+    const idx = parseInt(inp.dataset.lineaIdx, 10);
+    const linea = p.lineas[idx];
+    if (!linea || linea.cantidadReal != null) return;
+    const cantidadReal = parseFloat(inp.value) || 0;
+    linea.cantidadReal = cantidadReal;
+    huboAlguna = true;
+    if (cantidadReal > 0) {
+      const f = _filasLosaActual.find(x => x.id === linea.filaId);
+      if (f) { f.produccion = f.produccion || []; f.produccion.push({ fecha: p.fecha, cantidad: cantidadReal, tipo: 'Vaciado', programacionId: p.id }); }
+    }
+  });
+  if (!huboAlguna) { alert('Ingresa al menos una cantidad producida.'); return; }
+  _guardarLosaActual();
+  cerrarModal('modal-cargar-produccion');
   renderFilasProduccion();
+  alert('Producción cargada.');
+}
+
+// "Ver producción diaria" — matriz fila × fecha, mismo formato que los Excel reales
+// compartidos por el usuario (una columna por día de producción).
+function abrirMatrizProduccionDiaria() {
+  const fechasSet = new Set();
+  _filasLosaActual.forEach(f => (f.produccion || []).forEach(e => { if (e.fecha) fechasSet.add(e.fecha); }));
+  const fechas = Array.from(fechasSet).sort();
+  const thead = document.getElementById('pd-thead');
+  const tbody = document.getElementById('pd-tbody');
+  const tfoot = document.getElementById('pd-tfoot');
+  if (!fechas.length) {
+    thead.innerHTML = '<tr><th>Cuadro</th></tr>';
+    tbody.innerHTML = '<tr><td style="text-align:center;color:var(--gris-medio);padding:14px">No hay producción registrada todavía.</td></tr>';
+    tfoot.innerHTML = '';
+  } else {
+    thead.innerHTML = `<tr><th>Cuadro</th>${fechas.map(fe => `<th style="text-align:center">${new Date(fe + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' })}</th>`).join('')}<th style="text-align:center">Total</th></tr>`;
+    const totalesPorFecha = fechas.map(() => 0);
+    let granTotal = 0;
+    tbody.innerHTML = _filasLosaActual.map(f => {
+      let filaTotal = 0;
+      const celdas = fechas.map((fe, fi) => {
+        const cant = (f.produccion || []).filter(e => e.fecha === fe).reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
+        filaTotal += cant;
+        totalesPorFecha[fi] += cant;
+        return `<td style="text-align:center">${cant || ''}</td>`;
+      }).join('');
+      granTotal += filaTotal;
+      return `<tr><td>${_esc(f.cuadro) || '—'}</td>${celdas}<td style="text-align:center;font-weight:700">${filaTotal || ''}</td></tr>`;
+    }).join('');
+    tfoot.innerHTML = `<tr style="background:var(--azul-suave);font-weight:700"><td>Total día</td>${totalesPorFecha.map(t => `<td style="text-align:center">${t || ''}</td>`).join('')}<td style="text-align:center">${granTotal}</td></tr>`;
+  }
+  document.getElementById('modal-produccion-diaria').classList.add('abierto');
 }
 
 // ── Control de Despacho (a nivel Losa, con líneas — una remisión real cubre varias filas a

@@ -59,8 +59,8 @@ cada una con su propia carpeta.
   | | `lista` (Ingeniería) | `produccion` (Planta) | `despacho` (Logística) |
   |---|---|---|---|
   | `pantalla-proyecto-losas` | "+ Nueva Losa", ✏️ Editar, 🗑️ Eliminar visibles | Solo "🏗️ Ver producción" | Solo "📦 Ver despachos" |
-  | Filas de la lista | Celdas editables, botón ✕ eliminar fila, barra de Agregar/Pegar/Importar/Guardar | Celdas de **solo lectura**, botón 🏗️ para registrar producción | Celdas de **solo lectura**, sin acción por fila (el despacho se registra multi-fila con el botón de arriba) |
-  | Botón "Registrar despacho" / historial de despachos | Ocultos | Ocultos | Visibles |
+  | Filas de la lista | Celdas editables, botón ✕ eliminar fila, barra de Agregar/Pegar/Importar/Guardar | Celdas de **solo lectura**, sin acción por fila (la producción se registra en lote con "+ Programar"/"+ Cargar producción", ver sección propia más abajo) | Celdas de **solo lectura**, sin acción por fila (el despacho se registra multi-fila con el botón de arriba) |
+  | Botones "+ Programar"/"+ Cargar producción"/"📊 Producción diaria" / "Registrar despacho" + historial | Ocultos | Los 3 de producción visibles | Solo "Registrar despacho" + historial visibles |
   | Bovedilla | `tipo`/`cantidadRequerida` editables, sin seguimiento | Solo lectura + SOLO columna "Entradas (producción)" | Solo lectura + SOLO columna "Salidas (despacho)" |
 
   Lo que Ingeniería define (cuadro, dimensión, cantidad, tipo/cantidad de bovedilla) nunca se
@@ -238,6 +238,52 @@ fila suelta, la Losa completa es la unidad natural de guardado/sincronización.
   líneas cuyo `filaId` sea esta fila)`.
 - Mismo cálculo para Bovedilla, con `cantidadRequerida` en vez de `cantidad` por fila.
 
+### Control de Producción — flujo de dos pasos (2026-10-15, a pedido del usuario, reemplaza el
+### registro rápido por fila que había antes)
+
+El registro original (botón 🏗️ por fila, `abrirModalProduccionFila()`) se reemplazó por completo
+por un flujo de **Programar → Cargar**, igual al que usa la planta en la práctica: primero se
+define qué se va a fabricar, después se confirma qué se fabricó de verdad.
+
+- **`losa.produccionesProgramadas[]`** — mismo molde que `despachos[]`: un lote
+  `{id, fecha, observaciones, lineas: [{filaId, cantidadProgramada, cantidadReal}]}`.
+  `cantidadReal: null` significa que esa línea todavía no se cargó. Vive en memoria mientras se
+  edita la Losa (`_programacionesLosaActual`, cargada/guardada junto con `filas`/`despachos`/
+  `bovedilla` en `abrirLosaDetalle()`/`_guardarLosaActual()`) — mismo criterio que el resto de
+  sub-entidades de una Losa.
+- **"+ Programar producción"** (`abrirModalProgramarProduccion()`/`guardarProgramacionProduccion()`)
+  — modal con solo las filas que tienen saldo pendiente de producción (mismo filtro y misma UI
+  que "📦 Registrar despacho": cantidad por fila, 0 = no se incluye), más fecha y observaciones.
+  Crea una entrada nueva en `produccionesProgramadas[]` con todas sus líneas en
+  `cantidadReal: null`.
+- **"+ Cargar producción"** (`abrirModalCargarProduccion()`/`_renderLineasCargarProduccion()`/
+  `guardarCargaProduccion()`) — selector de las programaciones que todavía tienen alguna línea
+  sin cargar; al elegir una, cada línea muestra "lo teórico programado" justo al lado de un
+  campo para digitar lo que realmente se produjo (precargado con el valor programado, editable
+  por si difiere). **Esta es la única puerta de entrada real a `fila.produccion[]`** — al
+  guardar, cada línea con un valor digitado fija su `cantidadReal` (ya no se puede volver a
+  cargar ni duplicar) y empuja `{fecha: <fecha de la programación>, cantidad, tipo:'Vaciado',
+  programacionId}` a la fila correspondiente. Se puede cargar parcial (dejar algunas líneas en
+  blanco para otro día) — las que se dejan en blanco siguen ofreciéndose la próxima vez.
+- **Columna "Unidades fabricadas"** (`_filaProduccionHTML()`, justo antes de "Pend.
+  Producción", solo en modo producción) = `cantidad − pendienteProducción` — mismo origen que el
+  pendiente, solo mostrado desde el otro lado.
+- **Pie de "Avance de producción" ponderado por longitud** (`_pieAvanceProduccionHTML()`, fila
+  nueva al final de la tabla, solo en modo producción): el avance NO es "filas completas / filas
+  totales" ni "piezas hechas / piezas totales" — cada fila pesa según sus metros reales
+  (`dimensión × cantidad`), igual que ya usa el imprimible para el total de metros lineales. Una
+  fila con pocas piezas muy largas cuenta tanto como le corresponde en metros, no menos que una
+  fila con muchas piezas cortas. `% avance = Σ(dimensión×fabricadas) / Σ(dimensión×cantidad)`,
+  `% faltante = 100 − % avance`.
+- **"📊 Producción diaria"** (`abrirMatrizProduccionDiaria()`) — matriz fila × fecha, mismo
+  formato que los Excel reales del usuario (una columna por día de producción, con el total de
+  esa fila y el total de ese día). Las fechas salen de `fila.produccion[].fecha` de toda la
+  Losa, sin pasar por `produccionesProgramadas` (así también refleja cualquier producción
+  antigua que ya existiera antes de este flujo).
+- **Selección de filas por checkbox, eliminada** (2026-10-15, a pedido del usuario: "quitemos
+  mejor el seleccionable de la primera columna") — existía solo para elegir qué imprimir;
+  `imprimirListaProduccion()` ahora imprime siempre todas las filas de la Losa.
+
 ### Peso — regresión verificada contra los 2 Excel reales
 
 - Prelosa/Placa Alveolar: `(ancho/100) × dimensión × (espesorCm/100) × densidadKgM3 × cantidad`
@@ -280,7 +326,8 @@ sección "Carpetas de un proyecto..." más arriba).
 **Realtime**: `pantalla-proyecto-losas` sí se refresca automáticamente
 (`rerenderPantallaActiva()`); `pantalla-losa-detalle` **a propósito no** — esa pantalla trabaja
 sobre arreglos de edición en memoria (`_filasLosaActual`/`_despachosLosaActual`/
-`_bovedillaLosaActual`) y recargarlos automáticamente en medio de una edición en curso borraría
+`_bovedillaLosaActual`/`_programacionesLosaActual`) y recargarlos automáticamente en medio de
+una edición en curso borraría
 cambios sin guardar — mismo criterio ya aceptado en Ajustes de Mezcla (valores "congelados"
 mientras se edita).
 
