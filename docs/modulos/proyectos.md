@@ -256,6 +256,34 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
   que "📦 Registrar despacho": cantidad por fila, 0 = no se incluye), más fecha y observaciones.
   Crea una entrada nueva en `produccionesProgramadas[]` con todas sus líneas en
   `cantidadReal: null`.
+  - **Casilla por fila que autocompleta el pendiente** (`_marcarFilaProgramar()`, 2026-10-15, a
+    pedido del usuario: "pueda seleccionar una fila, y automáticamente se programen las
+    cantidades pendientes de esa fila, pues por lo general siempre se funden juntas") —
+    marcarla pone en "A programar" el pendiente completo de esa fila; desmarcarla lo vuelve a
+    dejar en 0. El campo sigue editable a mano aparte, para programar solo una parte. Un
+    checkbox "marcar todas" en el encabezado (`_marcarTodasFilasProgramar()`) hace lo mismo con
+    todas las filas visibles de una vez.
+  - **Filtro "Desde cuadro / Hasta cuadro"** (`_aplicarFiltroCuadroProgramar()`, 2026-10-15, a
+    pedido del usuario) — en Losas grandes (Boreal real tuvo 247 filas) acota la tabla a un
+    rango contiguo de cuadros. Oculta filas con `display:none` en vez de volver a renderizar la
+    tabla, para no perder cantidades ya digitadas en filas que quedan fuera del rango al
+    filtrar. Un `cuadro` no numérico queda oculto mientras el filtro esté activo. "Marcar
+    todas" respeta el filtro — solo toca las filas visibles.
+  - **"🖨️ Imprimir" dentro del propio modal** (`imprimirProgramacionProduccion()`/
+    `descargarPDFProgramacionProduccion()`, 2026-10-15, a pedido del usuario: "la idea es poder
+    imprimir lo que se espera producir, osea la programación de producción que damos con el
+    primer botón" — antes el único botón de imprimir sacaba la Lista de Producción completa,
+    no lo que se iba a programar ese día) — a la misma altura de "Guardar programación". Lee lo
+    que esté digitado en el modal EN ESE MOMENTO (no hace falta haber guardado antes). Mismo
+    lenguaje gráfico que `imprimirListaProduccion()` (membrete + clases compartidas), pero
+    titulado "PROGRAMACIÓN DE PRODUCCIÓN", con solo cuadro/ejes/dimensión/cantidad a programar
+    — es un plan, no lleva pendientes ni unidades fabricadas. Antes de mostrar la vista previa
+    cierra el modal (`cerrarModal('modal-programar-produccion')`) — si no, el fondo oscuro del
+    modal (`z-index` más alto) tapa la vista previa por completo. El PDF usa el helper
+    compartido `_descargarPDFConMembrete()` (factorizado de `descargarPDFListaProduccion()` en
+    esta misma vuelta — ambos imprimibles comparten el 100% de la lógica de paginación con
+    membrete, solo cambia qué contenido se captura y el nombre del archivo), con el nombre
+    `Programacion_Produccion_<Losa>_<fecha programada>.pdf`.
 - **"+ Cargar producción"** (`abrirModalCargarProduccion()`/`_renderLineasCargarProduccion()`/
   `guardarCargaProduccion()`) — selector de las programaciones que todavía tienen alguna línea
   sin cargar; al elegir una, cada línea muestra "lo teórico programado" justo al lado de un

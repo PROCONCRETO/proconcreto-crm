@@ -815,9 +815,11 @@ function imprimirListaProduccion() {
 // Genera el PDF con el mismo membrete (cabecera repetida + pie con arco/datos de contacto) y la
 // misma paginación con corte en fila blanca que el resto de documentos oficiales — mismo
 // cuerpo exacto que `descargarFormatoProduccionAjuste()` (js/calidad-ajuste-mezcla.js).
-async function descargarPDFListaProduccion() {
-  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
-  const btn = document.getElementById('btn-pdf-lista');
+// Compartido entre `descargarPDFListaProduccion()` y `descargarPDFProgramacionProduccion()`
+// (2026-10-15) — ambos imprimibles usan el mismo membrete/paginación, solo cambia qué
+// contenido/pie se captura y el nombre del archivo.
+async function _descargarPDFConMembrete(contentElId, footerElId, nombreArchivo, btnId) {
+  const btn = document.getElementById(btnId);
   if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
   try {
     const { jsPDF } = window.jspdf;
@@ -826,12 +828,12 @@ async function descargarPDFListaProduccion() {
     const topImg = await cargarImagen('membrete-top.jpg');
     const headerH = pageW * (topImg.naturalHeight / topImg.naturalWidth);
 
-    const contentEl = document.getElementById('lp-preview-content');
+    const contentEl = document.getElementById(contentElId);
     const contentCanvas = await html2canvas(contentEl, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false });
     const pxToMm = pageW / contentCanvas.width;
     const contentH_px = _alturaContenidoReal(contentCanvas);
 
-    const footerEl = document.getElementById('lp-preview-footer');
+    const footerEl = document.getElementById(footerElId);
     const footerCanvas = await html2canvas(footerEl, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false });
     const footerH = footerCanvas.height * pxToMm;
 
@@ -867,12 +869,16 @@ async function descargarPDFListaProduccion() {
       pageIndex++;
     }
 
-    const fecha = new Date().toISOString().split('T')[0].replace(/-/g, '_');
-    const nombreLosa = (l?.nombre || 'losa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '_');
-    pdf.save(`Lista_Produccion_${nombreLosa}_${fecha}.pdf`);
+    pdf.save(nombreArchivo);
   } finally {
     if (btn) { btn.textContent = '⬇️ Descargar PDF'; btn.disabled = false; }
   }
+}
+async function descargarPDFListaProduccion() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const fecha = new Date().toISOString().split('T')[0].replace(/-/g, '_');
+  const nombreLosa = (l?.nombre || 'losa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '_');
+  await _descargarPDFConMembrete('lp-preview-content', 'lp-preview-footer', `Lista_Produccion_${nombreLosa}_${fecha}.pdf`, 'btn-pdf-lista');
 }
 
 // Persiste la Losa completa (filas + despachos + bovedilla + producciones programadas) de una
@@ -898,21 +904,63 @@ function abrirModalProgramarProduccion() {
   const conPendiente = _filasLosaActual.filter(f => _pendienteProduccionFila(f) > 0);
   document.getElementById('mpp-fecha').value = _fmtISO(new Date());
   document.getElementById('mpp-observaciones').value = '';
+  document.getElementById('mpp-filtro-desde').value = '';
+  document.getElementById('mpp-filtro-hasta').value = '';
   const tbody = document.getElementById('mpp-filas-body');
   if (!conPendiente.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--gris-medio);padding:10px">No hay filas con saldo pendiente de producción.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gris-medio);padding:10px">No hay filas con saldo pendiente de producción.</td></tr>`;
   } else {
+    // Casilla a la izquierda (2026-10-15, a pedido del usuario: "pueda seleccionar una fila, y
+    // automáticamente se programen las cantidades pendientes de esa fila, pues por lo general
+    // siempre se funden juntas") — marcar la fila precarga "A programar" con el pendiente
+    // completo; desmarcarla lo vuelve a dejar en 0. El campo sigue editable a mano aparte, por
+    // si se quiere programar solo una parte. `data-cuadro` alimenta el filtro de rango de abajo.
     tbody.innerHTML = conPendiente.map(f => {
       const pend = _pendienteProduccionFila(f);
-      return `<tr>
+      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}">
+        <td><input type="checkbox" class="mpp-chk-fila" onchange="_marcarFilaProgramar(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
         <td>${f.dimension || 0} m</td>
         <td>${pend}</td>
-        <td><input type="number" min="0" max="${pend}" value="0" data-fila-id="${_escAttr(f.id)}" style="width:70px"></td>
+        <td><input type="number" min="0" max="${pend}" value="0" data-fila-id="${_escAttr(f.id)}" data-pendiente="${pend}" style="width:70px"></td>
       </tr>`;
     }).join('');
   }
   document.getElementById('modal-programar-produccion').classList.add('abierto');
+}
+function _marcarFilaProgramar(checkbox) {
+  const input = checkbox.closest('tr').querySelector('input[data-fila-id]');
+  if (input) input.value = checkbox.checked ? input.dataset.pendiente : 0;
+}
+// "Marcar todas" solo actúa sobre las filas visibles — si hay un filtro de rango de cuadro
+// activo, respeta ese recorte (coincide con lo que el usuario está viendo, no con la lista
+// completa escondida detrás del filtro).
+function _marcarTodasFilasProgramar(marcar) {
+  document.querySelectorAll('#mpp-filas-body tr').forEach(tr => {
+    if (tr.style.display === 'none') return;
+    const chk = tr.querySelector('.mpp-chk-fila');
+    if (!chk) return;
+    chk.checked = marcar;
+    _marcarFilaProgramar(chk);
+  });
+}
+// Filtro "Desde cuadro / Hasta cuadro" (2026-10-15, a pedido del usuario) — en proyectos
+// grandes (Boreal real tuvo 247 filas en una sola Losa) acota la tabla a un rango contiguo de
+// cuadros en vez de tener que buscarlos a mano. Oculta filas con display:none en vez de
+// volver a renderizar la tabla, para no perder cantidades ya digitadas en filas que quedan
+// fuera del rango. `cuadro` no numérico queda oculto mientras el filtro esté activo (no hay
+// forma de ubicarlo en un rango numérico) — sin filtro, se ve todo sin importar el formato.
+function _aplicarFiltroCuadroProgramar() {
+  const desdeRaw = document.getElementById('mpp-filtro-desde').value;
+  const hastaRaw = document.getElementById('mpp-filtro-hasta').value;
+  const desde = desdeRaw === '' ? null : parseFloat(desdeRaw);
+  const hasta = hastaRaw === '' ? null : parseFloat(hastaRaw);
+  document.querySelectorAll('#mpp-filas-body tr[data-cuadro]').forEach(tr => {
+    if (desde == null && hasta == null) { tr.style.display = ''; return; }
+    const cuadroNum = parseFloat(tr.dataset.cuadro);
+    const dentro = !isNaN(cuadroNum) && (desde == null || cuadroNum >= desde) && (hasta == null || cuadroNum <= hasta);
+    tr.style.display = dentro ? '' : 'none';
+  });
 }
 function guardarProgramacionProduccion() {
   const fecha = document.getElementById('mpp-fecha').value;
@@ -928,6 +976,113 @@ function guardarProgramacionProduccion() {
   _guardarLosaActual();
   cerrarModal('modal-programar-produccion');
   alert('Producción programada guardada. Cuando se fabrique, regístrala con "+ Cargar producción".');
+}
+
+// Imprimible de la PROGRAMACIÓN, no de la lista completa (2026-10-15, a pedido del usuario: "la
+// idea es poder imprimir lo que se espera producir, osea la programación de producción que
+// damos con el primer botón" — vive dentro del propio modal "+ Programar producción", a la
+// misma altura de "Guardar programación"). Lee lo que esté digitado en ese momento en el modal
+// — no hace falta haber guardado antes. Mismo lenguaje gráfico que `imprimirListaProduccion()`
+// (membrete + clases compartidas), pero con solo las filas/cantidades programadas: es un plan a
+// futuro, no lleva pendientes ni unidades fabricadas.
+let _fechaProgramacionImpresa = null;
+function imprimirProgramacionProduccion() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  if (!l) return;
+  const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
+  const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
+  const fecha = document.getElementById('mpp-fecha').value;
+  const observaciones = document.getElementById('mpp-observaciones').value.trim();
+  const lineas = [];
+  document.querySelectorAll('#mpp-filas-body input[data-fila-id]').forEach(inp => {
+    const cantidad = parseFloat(inp.value) || 0;
+    if (cantidad <= 0) return;
+    const f = _filasLosaActual.find(x => x.id === inp.dataset.filaId);
+    if (f) lineas.push({ f, cantidad });
+  });
+  if (!lineas.length) { alert('Ingresa al menos una cantidad a programar antes de imprimir.'); return; }
+  _fechaProgramacionImpresa = fecha || new Date().toISOString().split('T')[0];
+
+  let totalPiezas = 0, totalMetros = 0;
+  const filasHTML = lineas.map(({ f, cantidad }, n) => {
+    const longTotal = (Number(f.dimension) || 0) * cantidad;
+    totalPiezas += cantidad;
+    totalMetros += longTotal;
+    return `<tr>
+      <td style="color:#888">${n + 1}</td>
+      <td style="font-weight:600">${_esc(f.cuadro) || '—'}</td>
+      <td>${_esc(f.ejesEntre) || '—'}</td>
+      <td>${_esc(f.laterales) || '—'}</td>
+      <td style="text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>
+      <td style="text-align:center;font-weight:700">${cantidad}</td>
+      <td style="text-align:right">${longTotal.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `
+    <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
+      <span style="font-weight:700">Programación de Producción — ${_esc(l.nombre)}</span>
+      <div style="flex:1"></div>
+      <button onclick="descargarPDFProgramacionProduccion()" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-programacion">⬇️ Descargar PDF</button>
+      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+    </div>
+    <div class="preview-doc" id="pp-preview-doc">
+      <div class="preview-membrete-header"><img src="membrete-top.jpg" alt=""></div>
+      <div class="preview-content" id="pp-preview-content" style="padding-top:6px">
+        <div style="text-align:center;font-size:12px;font-weight:700;color:#003F7F;letter-spacing:0.03em;margin-bottom:8px">PROGRAMACIÓN DE PRODUCCIÓN</div>
+        <div style="padding-bottom:6px;border-bottom:1px solid #eee;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <div style="font-size:14px;font-weight:700;color:#003F7F">${_esc(l.nombre)}${l.ubicacion ? ' — ' + _esc(l.ubicacion) : ''}</div>
+            <div style="font-size:11px;color:#555">${fecha ? new Date(fecha + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}</div>
+          </div>
+          <div style="font-size:12px;font-weight:600;margin-top:2px">${_esc(p?.nombre) || '—'}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px;font-size:10.5px">
+            <div><b>SISTEMA:</b> ${sis ? _esc(sis.etiqueta) : '—'}</div>
+            <div><b>PIEZAS A PROGRAMAR:</b> ${totalPiezas} piezas en ${lineas.length} fila${lineas.length === 1 ? '' : 's'}</div>
+          </div>
+          ${observaciones ? `<div style="margin-top:4px;font-size:10.5px"><b>OBSERVACIONES:</b> ${_esc(observaciones)}</div>` : ''}
+        </div>
+        <table class="preview-tabla">
+          <thead><tr>
+            <th>#</th><th>Cuadro</th><th>Ejes num.</th><th>Ejes alfa.</th>
+            <th>Dim. (m)</th><th>Cant. a programar</th><th>Long. tot. (m)</th>
+          </tr></thead>
+          <tbody>${filasHTML}</tbody>
+          <tfoot><tr class="total-row">
+            <td colspan="5" style="text-align:right">TOTALES</td>
+            <td style="text-align:center">${totalPiezas}</td>
+            <td style="text-align:right">${totalMetros.toFixed(2)}</td>
+          </tr></tfoot>
+        </table>
+        <div class="preview-firma" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Programado por</div>
+          <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Recibido en planta</div>
+        </div>
+      </div>
+      <div class="preview-membrete-footer" id="pp-preview-footer">
+        <div class="pf-arco"></div>
+        <div class="pf-datos">
+          <div class="pf-col"><span class="pf-icon">📞</span><span>+57 314 620 1650<br>+57 311 408 2285</span></div>
+          <div class="pf-col"><span class="pf-icon">🏠</span><span>Autopista del Café Km2<br>Vía Chinchiná – Santa Rosa</span></div>
+          <div class="pf-col"><span class="pf-icon">🌐</span><span>www.proconcreto.com.co</span></div>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('contenido-preview').innerHTML = html;
+  // El modal queda tapado por el fondo oscuro de #vista-previa si no se cierra primero (el
+  // z-index de los modales es mayor al de #vista-previa) — mismo motivo por el que "← Volver"
+  // reactiva pantalla-losa-detalle en vez de reabrir el modal.
+  cerrarModal('modal-programar-produccion');
+  document.getElementById('vista-previa').style.display = 'block';
+  document.querySelectorAll('.pantalla').forEach(p2 => p2.classList.remove('activa'));
+  window.scrollTo(0, 0);
+}
+async function descargarPDFProgramacionProduccion() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const fecha = (_fechaProgramacionImpresa || new Date().toISOString().split('T')[0]).replace(/-/g, '_');
+  const nombreLosa = (l?.nombre || 'losa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '_');
+  await _descargarPDFConMembrete('pp-preview-content', 'pp-preview-footer', `Programacion_Produccion_${nombreLosa}_${fecha}.pdf`, 'btn-pdf-programacion');
 }
 
 // "Cargar producción" — elige una programación con líneas pendientes de cargar y, frente a
