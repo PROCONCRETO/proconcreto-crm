@@ -96,6 +96,19 @@ function _despachadoFila(filaId, despachos) {
 function _pendienteDespachoFila(fila, despachos) {
   return Math.max(0, (Number(fila.cantidad) || 0) - _despachadoFila(fila.id, despachos));
 }
+function _fabricadoFila(fila) {
+  return (fila.produccion || []).reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
+}
+// "Disponible para despacho" (2026-10-19, a pedido del usuario: "incluir una columna... de
+// disponible para despacho, que será arrastrada de la ventana de producción. Condicionar la
+// programación de despachos solo para elementos que estén disponibles para despacho") — a
+// diferencia de "Pend. Despacho" (`cantidad − despachado`, lo que TODAVÍA SE DEBE despachar en
+// total, sin importar si ya se fabricó), esto es lo que de verdad se puede subir a un camión
+// HOY: lo ya fabricado menos lo que ya salió. Nunca puede ser mayor que el pendiente de
+// despacho (si los datos están sanos, fabricado ≤ cantidad siempre).
+function _disponibleDespachoFila(fila, despachos) {
+  return Math.max(0, _fabricadoFila(fila) - _despachadoFila(fila.id, despachos));
+}
 // Peso — prelosa/placa alveolar: ancho × longitud × espesor × densidad del concreto (mismo
 // cálculo visto en el Excel real de Boreal: área × 0,05m × 2400 kg/m³). Vigueta: longitud ×
 // un factor kg/metro lineal propio del tipo de vigueta (ej. H11 = 21,5 kg/ml, visto en el
@@ -515,7 +528,7 @@ function renderFilasProduccion() {
     <th>#</th><th>Cuadro</th><th>Ejes numéricos</th><th>Ejes alfabéticos</th>
     ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
     <th>Dimensión (m)</th><th>Cantidad</th><th>Long. total (m)</th>${esVigueta ? '' : '<th>m²</th>'}<th>Peso (kg)</th>
-    ${esLista ? '' : (esProduccion ? '<th>Unidades fabricadas</th><th>Pend. Producción</th>' : '<th>Pend. Despacho</th>')}
+    ${esLista ? '' : (esProduccion ? '<th>Unidades fabricadas</th><th>Pend. Producción</th>' : '<th>Disponible despacho</th><th>Pend. Despacho</th>')}
     <th>Observaciones</th><th></th>
   </tr>`;
   const tbody = document.getElementById('filas-produccion-body');
@@ -558,12 +571,12 @@ function _pieTotalesHTML(l) {
   // # + Cuadro + Ejes num. + Ejes alfa. = 4, + columnas propias del sistema (3 vigueta / 2
   // prelosa), + Dimensión (m) = 1.
   const colspanInicial = 4 + (esVigueta ? 3 : 2) + 1;
-  // Unidades fabricadas/Pend. Producción (2) o Pend. Despacho (1) o nada en Lista (0), +
-  // Observaciones = 1, + columna de acciones = 1 — todo lo que queda DESPUÉS de Peso (kg), que
-  // ahora (2026-10-18, a pedido del usuario: "en el total de la última fila de los cuadros,
-  // incluyamos también el total del peso") lleva su propia celda de total, igual que
-  // Cantidad/Long. total/m².
-  const colspanFinal = (esLista ? 0 : (esProduccion ? 2 : 1)) + 1 + 1;
+  // Unidades fabricadas/Pend. Producción (2) o Disponible despacho/Pend. Despacho (2, desde
+  // 2026-10-19) o nada en Lista (0), + Observaciones = 1, + columna de acciones = 1 — todo lo
+  // que queda DESPUÉS de Peso (kg), que ahora (2026-10-18, a pedido del usuario: "en el total
+  // de la última fila de los cuadros, incluyamos también el total del peso") lleva su propia
+  // celda de total, igual que Cantidad/Long. total/m².
+  const colspanFinal = (esLista ? 0 : 2) + 1 + 1;
   return `<tr style="background:var(--azul-suave);font-weight:700">
     <td colspan="${colspanInicial}" style="padding:10px;text-align:right;color:var(--azul)">📐 TOTALES</td>
     <td style="padding:10px;text-align:center;color:var(--azul)">${totalUnidades}</td>
@@ -603,7 +616,7 @@ function exportarFilasLosaExcel() {
     'Dimensión (m)', 'Cantidad', 'Long. total (m)',
     ...(esVigueta ? [] : ['m²']),
     'Peso (kg)',
-    ...(esLista ? [] : (esProduccion ? ['Unidades fabricadas', 'Pend. Producción'] : ['Pend. Despacho'])),
+    ...(esLista ? [] : (esProduccion ? ['Unidades fabricadas', 'Pend. Producción'] : ['Disponible despacho', 'Pend. Despacho'])),
     'Observaciones',
   ];
 
@@ -617,13 +630,14 @@ function exportarFilasLosaExcel() {
     totalUnidades += cant; totalMetros += longTotal; totalM2 += m2; totalPeso += peso;
     const pendProd = _pendienteProduccionFila(f);
     const pendDesp = _pendienteDespachoFila(f, _despachosLosaActual);
+    const dispDesp = _disponibleDespachoFila(f, _despachosLosaActual);
     return [
       i + 1, f.cuadro || '', f.ejesEntre || '', f.laterales || '',
       ...(esVigueta ? [f.tipoVigueta || '', Number(f.hilosAbajo) || 0, Number(f.hilosArriba) || 0] : [Number(f.ancho) || 0, Number(f.hilos) || 0]),
       dim, cant, longTotal,
       ...(esVigueta ? [] : [m2]),
       peso,
-      ...(esLista ? [] : (esProduccion ? [cant - pendProd, pendProd] : [pendDesp])),
+      ...(esLista ? [] : (esProduccion ? [cant - pendProd, pendProd] : [dispDesp, pendDesp])),
       f.observaciones || '',
     ];
   });
@@ -635,7 +649,7 @@ function exportarFilasLosaExcel() {
     '', totalUnidades, totalMetros,
     ...(esVigueta ? [] : [totalM2]),
     totalPeso,
-    ...(esLista ? [] : (esProduccion ? ['', ''] : [''])),
+    ...(esLista ? [] : ['', '']),
     '',
   ];
 
@@ -697,6 +711,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
   const peso = _pesoFila(f, l);
   const pendProd = _pendienteProduccionFila(f);
   const pendDesp = _pendienteDespachoFila(f, _despachosLosaActual);
+  const dispDesp = _disponibleDespachoFila(f, _despachosLosaActual);
   const esLista = _MODO_FLUJO_LOSA === 'lista';
   const txt = (valor, campo, ancho) => esLista
     ? `<input type="text" value="${_escAttr(valor || '')}" oninput="_filasLosaActual[${i}].${campo}=this.value" style="width:${ancho}px">`
@@ -746,7 +761,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     <td id="fp-peso-${i}" style="text-align:right">${peso.toFixed(1)}</td>
     ${esLista ? '' : (_MODO_FLUJO_LOSA === 'produccion'
       ? `<td style="text-align:right">${(Number(f.cantidad) || 0) - pendProd}</td><td id="fp-pendprod-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProd}</td>`
-      : `<td id="fp-penddesp-${i}" style="text-align:right;font-weight:600;color:${pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendDesp}</td>`)}
+      : `<td id="fp-dispdesp-${i}" style="text-align:right;font-weight:600;color:${dispDesp > 0 ? 'var(--verde)' : 'var(--gris-medio)'}">${dispDesp}</td><td id="fp-penddesp-${i}" style="text-align:right;font-weight:600;color:${pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendDesp}</td>`)}
     <td>${txt(f.observaciones, 'observaciones', 90)}</td>
     <td style="white-space:nowrap">
       ${esLista
@@ -785,10 +800,12 @@ function _actualizarFilaProduccion(i) {
   const peso = _pesoFila(f, l);
   const pendProd = _pendienteProduccionFila(f);
   const pendDesp = _pendienteDespachoFila(f, _despachosLosaActual);
+  const dispDesp = _disponibleDespachoFila(f, _despachosLosaActual);
   const elLong = document.getElementById(`fp-longtotal-${i}`); if (elLong) elLong.textContent = longTotal.toFixed(2);
   const elM2 = document.getElementById(`fp-m2-${i}`); if (elM2) elM2.textContent = m2.toFixed(2);
   const elPeso = document.getElementById(`fp-peso-${i}`); if (elPeso) elPeso.textContent = peso.toFixed(1);
   const elPP = document.getElementById(`fp-pendprod-${i}`); if (elPP) { elPP.textContent = pendProd; elPP.style.color = pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'; }
+  const elDD = document.getElementById(`fp-dispdesp-${i}`); if (elDD) { elDD.textContent = dispDesp; elDD.style.color = dispDesp > 0 ? 'var(--verde)' : 'var(--gris-medio)'; }
   const elPD = document.getElementById(`fp-penddesp-${i}`); if (elPD) { elPD.textContent = pendDesp; elPD.style.color = pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'; }
   // La fila de TOTALES depende de TODAS las filas, no solo de esta — se refresca aparte (sin
   // tocar el <tbody>, así no se pierde el foco de ningún input a mitad de tecleo).
@@ -1023,7 +1040,7 @@ function abrirModalProgramarProduccion() {
   document.getElementById('mpp-filtros-lista').innerHTML = '';
   const tbody = document.getElementById('mpp-filas-body');
   if (!conPendiente.length) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gris-medio);padding:10px">No hay filas con saldo pendiente de producción.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--gris-medio);padding:10px">No hay filas con saldo pendiente de producción.</td></tr>`;
   } else {
     // Casilla a la izquierda (2026-10-15, a pedido del usuario: "pueda seleccionar una fila, y
     // automáticamente se programen las cantidades pendientes de esa fila, pues por lo general
@@ -1031,23 +1048,80 @@ function abrirModalProgramarProduccion() {
     // completo; desmarcarla lo vuelve a dejar en 0. El campo sigue editable a mano aparte, por
     // si se quiere programar solo una parte. Los `data-*` alimentan los filtros de abajo (2026-
     // 10-15, a pedido del usuario: "hagamos que pueda uno seleccionar el tipo de filtro a
-    // aplicar" — cuadro, ejes numéricos/alfabéticos, ancho, hilos).
+    // aplicar" — cuadro, ejes numéricos/alfabéticos, ancho, hilos). `oninput` recalcula el
+    // resumen de bancos de prelosa (2026-10-19, ver `_actualizarResumenBancosPrelosa()`).
+    // Columnas "Ejes num."/"Ejes alfa." (2026-10-19, a pedido del usuario: "agreguemos
+    // nuevamente los ejes numéricos y alfabéticos en el cuadro que se abre de programación de
+    // despachos y de producción") — de solo lectura, mismo valor crudo que ya alimenta el
+    // filtro por ejes (`data-eje-num`/`data-eje-alfa`), para poder verificar a simple vista qué
+    // cuadro cae en qué eje sin tener que adivinar.
     tbody.innerHTML = conPendiente.map(f => {
       const pend = _pendienteProduccionFila(f);
       return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}">
         <td><input type="checkbox" class="mpp-chk-fila" onchange="_marcarFilaProgramar(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
+        <td>${_esc(f.ejesEntre) || '—'}</td>
+        <td>${_esc(f.laterales) || '—'}</td>
         <td>${f.dimension || 0} m</td>
         <td>${pend}</td>
-        <td><input type="number" min="0" max="${pend}" value="0" data-fila-id="${_escAttr(f.id)}" data-pendiente="${pend}" style="width:70px"></td>
+        <td><input type="number" min="0" max="${pend}" value="0" data-fila-id="${_escAttr(f.id)}" data-pendiente="${pend}" oninput="_actualizarResumenBancosPrelosa()" style="width:70px"></td>
       </tr>`;
     }).join('');
   }
   document.getElementById('modal-programar-produccion').classList.add('abierto');
+  _actualizarResumenBancosPrelosa();
 }
 function _marcarFilaProgramar(checkbox) {
   const input = checkbox.closest('tr').querySelector('input[data-fila-id]');
   if (input) input.value = checkbox.checked ? input.dataset.pendiente : 0;
+  _actualizarResumenBancosPrelosa();
+}
+// Bancos de producción de prelosa (2026-10-19, a pedido del usuario: "los bancos de producción
+// de prelosa son dos cintas de 96 metros útiles por cinta. Lo más común es programar un banco
+// (las dos cintas) de 50cm de ancho... en otras ocasiones se programa una cinta de 50cm y otra
+// de 20, 30 o 40cm... condicionemos para que sean máximo 96 metros por cinta, en función del
+// ancho. Programemos también para que se puedan programar solo dos anchos") — cada cinta
+// fabrica un único ancho a la vez, así que el límite físico real es: como mucho 2 anchos
+// distintos en toda la programación del día (una cinta por ancho), y la suma de metros lineales
+// (dimensión × cantidad) de cada ancho no puede superar los 96 m útiles de su cinta. Solo
+// aplica a PRELOSA — Placa Alveolar y Vigueta y Bovedilla no se fabrican en estas cintas, el
+// usuario habló específicamente de "bancos de producción de prelosa".
+const BANCO_PRELOSA_METROS_UTILES = 96;
+const BANCO_PRELOSA_MAX_ANCHOS = 2;
+function _metrosPorAnchoProgramar(prefijo) {
+  const porAncho = new Map();
+  document.querySelectorAll(`#${prefijo}-filas-body input[data-fila-id]`).forEach(inp => {
+    const cantidad = parseFloat(inp.value) || 0;
+    if (cantidad <= 0) return;
+    const f = _filasLosaActual.find(x => x.id === inp.dataset.filaId);
+    if (!f) return;
+    const ancho = Number(f.ancho) || 0;
+    const metros = (Number(f.dimension) || 0) * cantidad;
+    porAncho.set(ancho, (porAncho.get(ancho) || 0) + metros);
+  });
+  return porAncho;
+}
+function _actualizarResumenBancosPrelosa() {
+  const cont = document.getElementById('mpp-resumen-bancos');
+  if (!cont) return;
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  if (!l || l.sistema !== 'prelosa') { cont.innerHTML = ''; return; }
+  const porAncho = _metrosPorAnchoProgramar('mpp');
+  if (!porAncho.size) { cont.innerHTML = ''; return; }
+  const anchos = Array.from(porAncho.keys()).sort((a, b) => a - b);
+  const excesoAnchos = anchos.length > BANCO_PRELOSA_MAX_ANCHOS;
+  const filasHTML = anchos.map(a => {
+    const m = porAncho.get(a);
+    const excedido = m > BANCO_PRELOSA_METROS_UTILES;
+    return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2px 0;color:${excedido ? 'var(--rojo)' : 'var(--gris-texto)'}">
+      <span>Cinta de ${a} cm</span><span style="font-weight:700">${m.toFixed(2)} / ${BANCO_PRELOSA_METROS_UTILES} m${excedido ? ' ⚠️' : ''}</span>
+    </div>`;
+  }).join('');
+  cont.innerHTML = `<div style="margin:4px 0 8px;padding:8px 10px;background:var(--gris-fondo);border-radius:var(--radio)">
+    <div style="font-size:11px;font-weight:700;color:var(--gris-medio);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px">Bancos de producción (2 cintas de 96 m c/u)</div>
+    ${filasHTML}
+    ${excesoAnchos ? `<div style="font-size:11.5px;color:var(--rojo);font-weight:600;margin-top:4px">⚠️ Solo se pueden programar ${BANCO_PRELOSA_MAX_ANCHOS} anchos distintos por día (una cinta por ancho) — hay ${anchos.length}.</div>` : ''}
+  </div>`;
 }
 // "Marcar todas" solo actúa sobre las filas visibles — si hay un filtro de rango de cuadro
 // activo, respeta ese recorte (coincide con lo que el usuario está viendo, no con la lista
@@ -1071,24 +1145,53 @@ function _marcarTodasFilasProgramar(marcar) {
 // (prefijo 'mpp') y Programar despacho ('mpd'). Oculta filas con display:none en vez de volver
 // a renderizar la tabla, para no perder cantidades ya digitadas en filas fuera del filtro.
 // "Ancho de prelosa"/"Número de hilos" solo aparecen si el sistema no es vigueta (esos campos
-// no existen ahí). Ejes numéricos/alfabéticos: el valor de la fila ya es en sí un RANGO
-// ("1-2", "A-B" — ver `par()` en `_filaProduccionHTML`), así que "pasa el filtro" si ese rango
-// se CRUZA con el rango pedido (no solo si coincide exacto) — así "entre ejes 3 y 4" también
-// trae un cuadro que va de eje 2 a eje 5, porque sí pasa por esa zona del plano.
+// no existen ahí) y usan un solo desplegable de VALOR EXACTO (`soloValorUnico`, 2026-10-19, a
+// pedido del usuario: "se nos debe habilitar solamente una casilla para las opciones de número
+// de hilos y ancho, que sea un desplegable con los anchos y número de hilos que hay disponibles
+// en la lista") — a diferencia de Desde/Hasta, son valores estandarizados (20/30/40/50cm, pocos
+// hilos distintos), así que elegir de una lista de los que de verdad existen en esta Losa evita
+// escribir un número que no aplica a ningún cuadro. Ejes numéricos/alfabéticos: el valor de la
+// fila ya es en sí un RANGO ("1-2", "A-B" — ver `par()` en `_filaProduccionHTML`); "pasa el
+// filtro" si ese rango queda CONTENIDO dentro del rango pedido (2026-10-19, corregido — antes
+// pasaba con que solo se CRUZARAN, y el usuario reportó el bug real: "cuando aplico los
+// filtros de los ejes numéricos y alfabéticos, me está mostrando cuadros que no pertenecen a
+// dichos ejes" — un cuadro que va de eje 2 a eje 5 ya NO aparece al filtrar "entre eje 3 y 4",
+// porque se sale de ese rango; solo entran cuadros cuyo rango completo cae adentro, igual
+// criterio que ya usan cuadro/ancho/hilos — más consistente y menos sorprendente).
 const TIPOS_FILTRO_PROGRAMAR = [
   { id: 'cuadro', label: 'Entre cuadros' },
   { id: 'ejeNum', label: 'Entre ejes numéricos' },
   { id: 'ejeAlfa', label: 'Entre ejes alfabéticos' },
-  { id: 'ancho', label: 'Ancho de prelosa', soloConAncho: true },
-  { id: 'hilos', label: 'Número de hilos', soloConAncho: true },
+  { id: 'ancho', label: 'Ancho de prelosa', soloConAncho: true, soloValorUnico: true },
+  { id: 'hilos', label: 'Número de hilos', soloConAncho: true, soloValorUnico: true },
 ];
+function _valoresDisponiblesFiltro(tipo) {
+  const set = new Set();
+  _filasLosaActual.forEach(f => {
+    const v = Number(f[tipo]);
+    if (!isNaN(v) && v !== 0) set.add(v);
+  });
+  return Array.from(set).sort((a, b) => a - b);
+}
+function _filtroValorAreaHTML(tipo, prefijo) {
+  const t = TIPOS_FILTRO_PROGRAMAR.find(x => x.id === tipo);
+  if (t && t.soloValorUnico) {
+    const valores = _valoresDisponiblesFiltro(tipo);
+    const opciones = valores.map(v => `<option value="${v}">${v}</option>`).join('');
+    return `<select data-rol="valor" onchange="_aplicarFiltrosProgramar('${prefijo}')" style="width:170px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:12px">
+      <option value="">Todos</option>${opciones}
+    </select>`;
+  }
+  const esAlfa = tipo === 'ejeAlfa';
+  return `<input type="${esAlfa ? 'text' : 'number'}" placeholder="Desde" data-rol="desde" oninput="_aplicarFiltrosProgramar('${prefijo}')" style="width:80px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio)">
+    <input type="${esAlfa ? 'text' : 'number'}" placeholder="Hasta" data-rol="hasta" oninput="_aplicarFiltrosProgramar('${prefijo}')" style="width:80px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio)">`;
+}
 function _filaFiltroProgramarHTML(prefijo, esVigueta) {
   const opciones = TIPOS_FILTRO_PROGRAMAR.filter(t => !t.soloConAncho || !esVigueta)
     .map(t => `<option value="${t.id}">${t.label}</option>`).join('');
   return `<div class="filtro-programar-fila" style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
     <select data-tipo onchange="_cambiarTipoFiltroProgramar(this,'${prefijo}')" style="flex:1;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:12px">${opciones}</select>
-    <input type="number" placeholder="Desde" data-rol="desde" oninput="_aplicarFiltrosProgramar('${prefijo}')" style="width:80px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio)">
-    <input type="number" placeholder="Hasta" data-rol="hasta" oninput="_aplicarFiltrosProgramar('${prefijo}')" style="width:80px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio)">
+    <span class="filtro-valor-area" style="display:flex;gap:6px">${_filtroValorAreaHTML('cuadro', prefijo)}</span>
     <button type="button" class="btn btn-rojo btn-xs" onclick="this.closest('.filtro-programar-fila').remove();_aplicarFiltrosProgramar('${prefijo}')">✕</button>
   </div>`;
 }
@@ -1098,11 +1201,7 @@ function _agregarFiltroProgramar(prefijo) {
   document.getElementById(`${prefijo}-filtros-lista`).insertAdjacentHTML('beforeend', _filaFiltroProgramarHTML(prefijo, esVigueta));
 }
 function _cambiarTipoFiltroProgramar(select, prefijo) {
-  const esAlfa = select.value === 'ejeAlfa';
-  select.closest('.filtro-programar-fila').querySelectorAll('input[data-rol]').forEach(inp => {
-    inp.type = esAlfa ? 'text' : 'number';
-    inp.value = '';
-  });
+  select.closest('.filtro-programar-fila').querySelector('.filtro-valor-area').innerHTML = _filtroValorAreaHTML(select.value, prefijo);
   _aplicarFiltrosProgramar(prefijo);
 }
 function _parRangoFiltro(valor, numerico) {
@@ -1119,18 +1218,29 @@ function _parRangoFiltro(valor, numerico) {
   return pa <= pb ? [pa, pb] : [pb, pa];
 }
 function _filaPasaFiltroProgramar(tr, filtro) {
-  const { tipo, desde, hasta } = filtro;
-  if (tipo === 'cuadro' || tipo === 'ancho' || tipo === 'hilos') {
+  const { tipo, desde, hasta, valorUnico } = filtro;
+  if (tipo === 'ancho' || tipo === 'hilos') {
     const v = parseFloat(tr.dataset[tipo]);
+    return !isNaN(v) && v === valorUnico;
+  }
+  if (tipo === 'cuadro') {
+    const v = parseFloat(tr.dataset.cuadro);
     return !isNaN(v) && (desde == null || v >= desde) && (hasta == null || v <= hasta);
   }
   const rango = _parRangoFiltro(tipo === 'ejeNum' ? tr.dataset.ejeNum : tr.dataset.ejeAlfa, tipo === 'ejeNum');
   if (!rango) return false;
-  return (hasta == null || rango[0] <= hasta) && (desde == null || rango[1] >= desde);
+  // CONTENIDO dentro del rango pedido, no solo cruzado (ver nota más arriba) — el rango de la
+  // fila debe caer completo adentro de [desde, hasta].
+  return (desde == null || rango[0] >= desde) && (hasta == null || rango[1] <= hasta);
 }
 function _aplicarFiltrosProgramar(prefijo) {
   const filtros = Array.from(document.querySelectorAll(`#${prefijo}-filtros-lista .filtro-programar-fila`)).map(fila => {
     const tipo = fila.querySelector('[data-tipo]').value;
+    const t = TIPOS_FILTRO_PROGRAMAR.find(x => x.id === tipo);
+    if (t && t.soloValorUnico) {
+      const valorRaw = fila.querySelector('[data-rol="valor"]').value;
+      return { tipo, valorUnico: valorRaw === '' ? null : parseFloat(valorRaw) };
+    }
     const esAlfa = tipo === 'ejeAlfa';
     const desdeRaw = fila.querySelector('[data-rol="desde"]').value.trim();
     const hastaRaw = fila.querySelector('[data-rol="hasta"]').value.trim();
@@ -1139,7 +1249,7 @@ function _aplicarFiltrosProgramar(prefijo) {
       desde: desdeRaw === '' ? null : (esAlfa ? desdeRaw.toUpperCase() : parseFloat(desdeRaw)),
       hasta: hastaRaw === '' ? null : (esAlfa ? hastaRaw.toUpperCase() : parseFloat(hastaRaw)),
     };
-  }).filter(f => f.desde != null || f.hasta != null);
+  }).filter(f => f.desde != null || f.hasta != null || f.valorUnico != null);
   document.querySelectorAll(`#${prefijo}-filas-body tr[data-cuadro]`).forEach(tr => {
     tr.style.display = filtros.every(f => _filaPasaFiltroProgramar(tr, f)) ? '' : 'none';
   });
@@ -1147,6 +1257,7 @@ function _aplicarFiltrosProgramar(prefijo) {
 function guardarProgramacionProduccion() {
   const fecha = document.getElementById('mpp-fecha').value;
   if (!fecha) { alert('Elige una fecha.'); return; }
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   const inputs = document.querySelectorAll('#mpp-filas-body input[data-fila-id]');
   const lineas = [];
   inputs.forEach(inp => {
@@ -1154,6 +1265,29 @@ function guardarProgramacionProduccion() {
     if (cantidadProgramada > 0) lineas.push({ filaId: inp.dataset.filaId, cantidadProgramada, cantidadReal: null });
   });
   if (!lineas.length) { alert('Ingresa al menos una cantidad a programar.'); return; }
+  // Tope duro de bancos de prelosa (2026-10-19) — mismo cálculo que
+  // `_actualizarResumenBancosPrelosa()`, pero recalculado contra `lineas` (lo que de verdad se
+  // va a guardar) en vez de confiar en lo que se veía en pantalla.
+  if (l && l.sistema === 'prelosa') {
+    const porAncho = new Map();
+    lineas.forEach(ln => {
+      const f = _filasLosaActual.find(x => x.id === ln.filaId);
+      if (!f) return;
+      const ancho = Number(f.ancho) || 0;
+      const metros = (Number(f.dimension) || 0) * ln.cantidadProgramada;
+      porAncho.set(ancho, (porAncho.get(ancho) || 0) + metros);
+    });
+    if (porAncho.size > BANCO_PRELOSA_MAX_ANCHOS) {
+      alert(`Solo se pueden programar ${BANCO_PRELOSA_MAX_ANCHOS} anchos distintos por día (una cinta por ancho) — esta programación tiene ${porAncho.size}: ${Array.from(porAncho.keys()).sort((a, b) => a - b).join(', ')} cm. Quita cantidades de alguno de los anchos antes de guardar.`);
+      return;
+    }
+    for (const [ancho, metros] of porAncho) {
+      if (metros > BANCO_PRELOSA_METROS_UTILES) {
+        alert(`El ancho ${ancho} cm suma ${metros.toFixed(2)} m, pero una cinta solo tiene ${BANCO_PRELOSA_METROS_UTILES} m útiles — reduce las cantidades programadas de ese ancho antes de guardar.`);
+        return;
+      }
+    }
+  }
   _programacionesLosaActual.push({ id: String(Date.now()), fecha, observaciones: document.getElementById('mpp-observaciones').value.trim(), lineas });
   _guardarLosaActual();
   cerrarModal('modal-programar-produccion');
@@ -1181,12 +1315,19 @@ function guardarProgramacionProduccion() {
 // `imprimirProgramacionDespacho()`.
 function _resumenPorMedidasHTML(lineas, l) {
   const esVigueta = l.sistema === 'vigueta_bovedilla';
+  // "Hilos" (2026-10-19, a pedido del usuario: "incluir una columna con el número de hilos") —
+  // entra también en la CLAVE de agrupación, no solo como columna — dos líneas del mismo
+  // ancho/vigueta y dimensión pero con distinto número de hilos NO son la misma pieza
+  // (distinto refuerzo), así que agruparlas bajo un solo número de hilos sería engañoso.
+  // Vigueta no tiene un único campo "hilos" (son dos: Abajo/Arriba) — se muestra combinado
+  // "2+1", mismo formato corto que ya se usa en el resto de la pantalla para esos dos campos.
   const grupos = new Map();
   lineas.forEach(({ f, cantidad }) => {
     const dim = Number(f.dimension) || 0;
     const medida = esVigueta ? (f.tipoVigueta || '—') : (Number(f.ancho) || 0);
-    const clave = `${medida}__${dim.toFixed(2)}`;
-    if (!grupos.has(clave)) grupos.set(clave, { medida, dim, cantidad: 0, peso: 0 });
+    const hilosTxt = esVigueta ? `${Number(f.hilosAbajo) || 0}+${Number(f.hilosArriba) || 0}` : String(Number(f.hilos) || 0);
+    const clave = `${medida}__${hilosTxt}__${dim.toFixed(2)}`;
+    if (!grupos.has(clave)) grupos.set(clave, { medida, hilosTxt, dim, cantidad: 0, peso: 0 });
     const g = grupos.get(clave);
     g.cantidad += cantidad;
     // Mismo peso por unidad para todas las líneas de un mismo grupo (comparten ancho/vigueta y
@@ -1203,6 +1344,7 @@ function _resumenPorMedidasHTML(lineas, l) {
     totalPeso += g.peso;
     return `<tr>
       <td>${esVigueta ? _esc(g.medida) : g.medida + ' cm'}</td>
+      <td style="text-align:center">${g.hilosTxt}</td>
       <td style="text-align:right">${g.dim.toFixed(2)}</td>
       <td style="text-align:center;font-weight:700">${g.cantidad}</td>
       <td style="text-align:right">${longTotal.toFixed(2)}</td>
@@ -1214,11 +1356,11 @@ function _resumenPorMedidasHTML(lineas, l) {
       <div style="font-size:11px;font-weight:700;color:#003F7F;margin-bottom:4px;letter-spacing:0.03em">RESUMEN POR MEDIDAS</div>
       <table class="preview-tabla">
         <thead><tr>
-          <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Largo (m)</th><th>Cantidad</th><th>Long. tot. (m)</th><th>Peso (kg)</th>
+          <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Hilos</th><th>Largo (m)</th><th>Cantidad</th><th>Long. tot. (m)</th><th>Peso (kg)</th>
         </tr></thead>
         <tbody>${filasHTML}</tbody>
         <tfoot><tr class="total-row">
-          <td colspan="2" style="text-align:right">TOTALES</td>
+          <td colspan="3" style="text-align:right">TOTALES</td>
           <td style="text-align:center">${totalCantidad}</td>
           <td style="text-align:right">${totalMetros.toFixed(2)}</td>
           <td style="text-align:right">${totalPeso.toFixed(1)}</td>
@@ -1265,12 +1407,20 @@ function imprimirProgramacionProduccion() {
     </tr>`;
   }).join('');
 
+  // "← Volver" reabre el modal en vez de solo mostrar la pantalla de atrás (2026-10-19, a
+  // pedido del usuario: "cuando le doy imprimir y luego le doy volver, se me cierra la ventana
+  // de programar producción... garanticemos que cuando le demos volver, volvamos a la ventana
+  // como la teníamos digitada") — `cerrarModal()` (llamado más abajo antes de mostrar la vista
+  // previa, para que el fondo oscuro del modal no la tape) solo quita la clase `.abierto`, no
+  // borra nada del DOM ni de los valores de los `<input>`/`<select>` — así que todo lo digitado
+  // (cantidades, filtros) seguía intacto todo este tiempo, solo escondido. Re-agregar `.abierto`
+  // al volver lo muestra exactamente como se dejó, sin tener que guardar/restaurar nada aparte.
   const html = `
     <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
       <span style="font-weight:700">Programación de Producción — ${_esc(l.nombre)}</span>
       <div style="flex:1"></div>
       <button onclick="descargarPDFProgramacionProduccion()" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-programacion">⬇️ Descargar PDF</button>
-      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa');document.getElementById('modal-programar-produccion').classList.add('abierto')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
     </div>
     <div class="preview-doc" id="pp-preview-doc">
       <div class="preview-membrete-header"><img src="membrete-top.jpg" alt=""></div>
@@ -1598,31 +1748,83 @@ function abrirMatrizProduccionDiaria() {
 // (`_despachosLosaActual`) sigue siendo el libro real — sin cambios en su forma ni en
 // `_pendienteDespachoFila()` — "Cargar despacho" lo alimenta (find-or-create por
 // `despachoProgramadoId`) en vez de que el usuario lo arme directo como antes.
+// Filtrado por DISPONIBLE, no por pendiente (2026-10-19, a pedido del usuario: "incluir una
+// columna... de disponible para despacho, que será arrastrada de la ventana de producción.
+// Condicionar la programación de despachos solo para elementos que estén disponibles para
+// despacho") — antes se ofrecía programar hasta el pendiente TOTAL de despacho
+// (`cantidad − despachado`), sin importar si ya se había fabricado o no; ahora solo se ofrecen
+// (y se puede programar hasta) las piezas que YA existen físicamente en planta
+// (`_disponibleDespachoFila()` = fabricado − despachado). Una fila con pendiente de despacho
+// pero nada fabricado todavía simplemente no aparece acá.
 function abrirModalProgramarDespacho() {
-  const conPendiente = _filasLosaActual.filter(f => _pendienteDespachoFila(f, _despachosLosaActual) > 0);
+  const conDisponible = _filasLosaActual.filter(f => _disponibleDespachoFila(f, _despachosLosaActual) > 0);
   document.getElementById('mpd-fecha').value = _fmtISO(new Date());
   document.getElementById('mpd-observaciones').value = '';
   document.getElementById('mpd-filtros-lista').innerHTML = '';
   const tbody = document.getElementById('mpd-filas-body');
-  if (!conPendiente.length) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gris-medio);padding:10px">No hay filas con saldo pendiente de despacho.</td></tr>`;
+  if (!conDisponible.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--gris-medio);padding:10px">No hay piezas disponibles para despacho todavía (nada fabricado pendiente de despachar).</td></tr>`;
   } else {
-    tbody.innerHTML = conPendiente.map(f => {
-      const pend = _pendienteDespachoFila(f, _despachosLosaActual);
+    // Columnas "Ejes num."/"Ejes alfa." (2026-10-19, ver nota en `abrirModalProgramarProduccion()`).
+    tbody.innerHTML = conDisponible.map(f => {
+      const disp = _disponibleDespachoFila(f, _despachosLosaActual);
       return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}">
         <td><input type="checkbox" class="mpd-chk-fila" onchange="_marcarFilaProgramarDespacho(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
+        <td>${_esc(f.ejesEntre) || '—'}</td>
+        <td>${_esc(f.laterales) || '—'}</td>
         <td>${f.dimension || 0} m</td>
-        <td>${pend}</td>
-        <td><input type="number" min="0" max="${pend}" value="0" data-fila-id="${_escAttr(f.id)}" data-pendiente="${pend}" style="width:70px"></td>
+        <td>${disp}</td>
+        <td><input type="number" min="0" max="${disp}" value="0" data-fila-id="${_escAttr(f.id)}" data-disponible="${disp}" oninput="_actualizarResumenPesoDespacho()" style="width:70px"></td>
       </tr>`;
     }).join('');
   }
+  _poblarSelectVehiculoDespacho();
   document.getElementById('modal-programar-despacho').classList.add('abierto');
+  _actualizarResumenPesoDespacho();
 }
 function _marcarFilaProgramarDespacho(checkbox) {
   const input = checkbox.closest('tr').querySelector('input[data-fila-id]');
-  if (input) input.value = checkbox.checked ? input.dataset.pendiente : 0;
+  if (input) input.value = checkbox.checked ? input.dataset.disponible : 0;
+  _actualizarResumenPesoDespacho();
+}
+// Peso del despacho vs. capacidad del vehículo (2026-10-19, a pedido del usuario: "condicionemos
+// también el peso del despacho a la capacidad que tenemos de los vehículos sencillos como lo
+// tenemos codificado actualmente en la ventana de logística. podríamos poner un desplegable para
+// escoger el tipo de vehículo y en función de este, programar el peso máximo") — reutiliza
+// `CAPACIDAD_VEHICULO` (toneladas) de `js/logistica.js` tal cual, sin duplicar el catálogo de
+// vehículos: si la flota cambia ahí, acá se actualiza sola. `logistica.js` carga antes que este
+// archivo (ver orden de `<script>` en cotizaciones.html), así que la `const` ya existe como
+// variable global de nivel superior cuando se usa acá (mismo mecanismo que ya usa toda la app
+// con `sb` de `js/config.js` — ver memoria de sesión sobre por qué esto SÍ funciona aunque sea
+// `const`, a diferencia de intentar engancharlo vía `window.X`).
+function _poblarSelectVehiculoDespacho() {
+  const select = document.getElementById('mpd-vehiculo');
+  if (!select) return;
+  select.innerHTML = '<option value="">Selecciona un vehículo...</option>' +
+    Object.keys(CAPACIDAD_VEHICULO).map(v => `<option value="${_escAttr(v)}">${_esc(v)} (${CAPACIDAD_VEHICULO[v]} ton)</option>`).join('');
+  select.value = '';
+}
+function _pesoProgramadoDespacho() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  if (!l) return 0;
+  let totalKg = 0;
+  document.querySelectorAll('#mpd-filas-body input[data-fila-id]').forEach(inp => {
+    const cantidad = parseFloat(inp.value) || 0;
+    if (cantidad <= 0) return;
+    const f = _filasLosaActual.find(x => x.id === inp.dataset.filaId);
+    if (f) totalKg += _pesoFila({ ...f, cantidad }, l);
+  });
+  return totalKg;
+}
+function _actualizarResumenPesoDespacho() {
+  const cont = document.getElementById('mpd-resumen-peso');
+  if (!cont) return;
+  const totalKg = _pesoProgramadoDespacho();
+  const vehiculo = document.getElementById('mpd-vehiculo')?.value;
+  const capacidadTon = vehiculo ? CAPACIDAD_VEHICULO[vehiculo] : null;
+  const excedido = capacidadTon && totalKg > capacidadTon * 1000;
+  cont.innerHTML = `<span style="color:${excedido ? 'var(--rojo)' : 'var(--gris-texto)'};font-weight:700">${(totalKg / 1000).toFixed(2)} ton${capacidadTon ? ' / ' + capacidadTon + ' ton' : ''}${excedido ? ' ⚠️ supera la capacidad' : ''}</span>`;
 }
 function _marcarTodasFilasProgramarDespacho(marcar) {
   document.querySelectorAll('#mpd-filas-body tr').forEach(tr => {
@@ -1636,14 +1838,39 @@ function _marcarTodasFilasProgramarDespacho(marcar) {
 function guardarProgramacionDespacho() {
   const fecha = document.getElementById('mpd-fecha').value;
   if (!fecha) { alert('Elige una fecha.'); return; }
+  const vehiculo = document.getElementById('mpd-vehiculo').value;
+  if (!vehiculo) { alert('Selecciona el vehículo que va a cargar este despacho — el peso máximo se calcula según su capacidad.'); return; }
   const inputs = document.querySelectorAll('#mpd-filas-body input[data-fila-id]');
   const lineas = [];
-  inputs.forEach(inp => {
+  // Tope duro contra lo DISPONIBLE (2026-10-19) — el `max` del <input> es solo una sugerencia
+  // visual (no impide escribir un número mayor a mano), así que se vuelve a comprobar acá contra
+  // el disponible real de cada fila en este momento antes de guardar, no solo contra el atributo
+  // `data-disponible` que quedó congelado al abrir el modal.
+  for (const inp of inputs) {
     const cantidadProgramada = parseFloat(inp.value) || 0;
-    if (cantidadProgramada > 0) lineas.push({ filaId: inp.dataset.filaId, cantidadProgramada, cantidadReal: null });
-  });
+    if (cantidadProgramada <= 0) continue;
+    const f = _filasLosaActual.find(x => x.id === inp.dataset.filaId);
+    const disp = f ? _disponibleDespachoFila(f, _despachosLosaActual) : 0;
+    if (cantidadProgramada > disp) {
+      alert(`El cuadro "${f?.cuadro || '—'}" solo tiene ${disp} unidad(es) disponible(s) para despacho (lo fabricado menos lo ya despachado) — corrige la cantidad a programar antes de guardar.`);
+      return;
+    }
+    lineas.push({ filaId: inp.dataset.filaId, cantidadProgramada, cantidadReal: null });
+  }
   if (!lineas.length) { alert('Ingresa al menos una cantidad a programar.'); return; }
-  _despachosProgramadosLosaActual.push({ id: String(Date.now()), fecha, observaciones: document.getElementById('mpd-observaciones').value.trim(), lineas });
+  // Tope duro de capacidad del vehículo (2026-10-19) — recalculado contra `lineas` (lo que de
+  // verdad se va a guardar), no contra lo que se veía en pantalla.
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const totalKg = lineas.reduce((s, ln) => {
+    const f = _filasLosaActual.find(x => x.id === ln.filaId);
+    return s + (f && l ? _pesoFila({ ...f, cantidad: ln.cantidadProgramada }, l) : 0);
+  }, 0);
+  const capacidadTon = CAPACIDAD_VEHICULO[vehiculo] || 0;
+  if (capacidadTon && totalKg > capacidadTon * 1000) {
+    alert(`El peso programado (${(totalKg / 1000).toFixed(2)} ton) supera la capacidad de "${vehiculo}" (${capacidadTon} ton) — reduce las cantidades o elige otro vehículo.`);
+    return;
+  }
+  _despachosProgramadosLosaActual.push({ id: String(Date.now()), fecha, observaciones: document.getElementById('mpd-observaciones').value.trim(), vehiculo, lineas });
   _guardarLosaActual();
   cerrarModal('modal-programar-despacho');
   alert('Despacho programado guardado. Cuando salga el camión, regístralo con "+ Cargar despacho".');
@@ -1663,6 +1890,7 @@ function imprimirProgramacionDespacho() {
   const esVigueta = l.sistema === 'vigueta_bovedilla';
   const fecha = document.getElementById('mpd-fecha').value;
   const observaciones = document.getElementById('mpd-observaciones').value.trim();
+  const vehiculo = document.getElementById('mpd-vehiculo').value;
   const lineas = [];
   document.querySelectorAll('#mpd-filas-body input[data-fila-id]').forEach(inp => {
     const cantidad = parseFloat(inp.value) || 0;
@@ -1702,12 +1930,14 @@ function imprimirProgramacionDespacho() {
     </tr>`;
   }).join('');
 
+  // "← Volver" reabre el modal — ver la nota junto al mismo botón en
+  // `imprimirProgramacionProduccion()`, mismo motivo exacto.
   const html = `
     <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
       <span style="font-weight:700">Programación de Despacho — ${_esc(l.nombre)}</span>
       <div style="flex:1"></div>
       <button onclick="descargarPDFProgramacionDespacho()" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-programacion-despacho">⬇️ Descargar PDF</button>
-      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa');document.getElementById('modal-programar-despacho').classList.add('abierto')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
     </div>
     <div class="preview-doc" id="pd-prog-preview-doc">
       <div class="preview-membrete-header"><img src="membrete-top.jpg" alt=""></div>
@@ -1719,9 +1949,10 @@ function imprimirProgramacionDespacho() {
             <div style="font-size:11px;color:#555">${fecha ? new Date(fecha + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}</div>
           </div>
           <div style="font-size:12px;font-weight:600;margin-top:2px">${_esc(p?.nombre) || '—'}</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:6px;text-align:center">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-top:6px;text-align:center">
             <div><div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.04em">Sistema</div><div style="font-size:12px;font-weight:700;color:#003F7F;margin-top:2px">${sis ? _esc(sis.etiqueta) : '—'}</div></div>
             <div><div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.04em">Piezas a programar</div><div style="font-size:12px;font-weight:700;color:#003F7F;margin-top:2px">${totalPiezas} piezas en ${lineas.length} fila${lineas.length === 1 ? '' : 's'}</div></div>
+            <div><div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.04em">Vehículo (${(totalPeso / 1000).toFixed(2)} ton)</div><div style="font-size:12px;font-weight:700;color:#003F7F;margin-top:2px">${_esc(vehiculo) || '—'}</div></div>
           </div>
           ${observaciones ? `<div style="margin-top:6px;font-size:10.5px"><b>OBSERVACIONES:</b> ${_esc(observaciones)}</div>` : ''}
         </div>

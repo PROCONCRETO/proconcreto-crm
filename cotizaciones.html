@@ -1407,8 +1407,9 @@
     </div>
     <div style="font-size:12px;color:var(--gris-medio);margin-bottom:6px">Cuánto de cada fila se va a programar (se precargaron solo las filas con saldo pendiente de producción):</div>
     <div style="max-height:320px;overflow-y:auto">
-      <table class="tabla-cots"><thead><tr><th style="width:28px"><input type="checkbox" onchange="_marcarTodasFilasProgramar(this.checked)"></th><th>Cuadro</th><th>Dimensión</th><th>Pendiente</th><th>A programar</th></tr></thead><tbody id="mpp-filas-body"></tbody></table>
+      <table class="tabla-cots"><thead><tr><th style="width:28px"><input type="checkbox" onchange="_marcarTodasFilasProgramar(this.checked)"></th><th>Cuadro</th><th>Ejes num.</th><th>Ejes alfa.</th><th>Dimensión</th><th>Pendiente</th><th>A programar</th></tr></thead><tbody id="mpp-filas-body"></tbody></table>
     </div>
+    <div id="mpp-resumen-bancos"></div>
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-programar-produccion')">Cancelar</button>
       <button class="btn btn-secundario" onclick="imprimirProgramacionProduccion()">🖨️ Imprimir</button>
@@ -1477,6 +1478,16 @@
       <div class="form-grupo"><label>Fecha programada</label><input type="date" id="mpd-fecha"></div>
       <div class="form-grupo"><label>Observaciones</label><input type="text" id="mpd-observaciones"></div>
     </div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo">
+        <label>Vehículo</label>
+        <select id="mpd-vehiculo" onchange="_actualizarResumenPesoDespacho()" style="padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px"></select>
+      </div>
+      <div class="form-grupo">
+        <label>Peso programado</label>
+        <div id="mpd-resumen-peso" style="padding:8px 0;font-size:13px"></div>
+      </div>
+    </div>
     <div style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <label style="font-size:12px;font-weight:600;color:var(--gris-medio)">FILTROS (opcional)</label>
@@ -1484,9 +1495,9 @@
       </div>
       <div id="mpd-filtros-lista"></div>
     </div>
-    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:6px">Cuánto de cada fila se va a programar para despacho (se precargaron solo las filas con saldo pendiente):</div>
+    <div style="font-size:12px;color:var(--gris-medio);margin-bottom:6px">Cuánto de cada fila se va a programar para despacho (se precargaron solo las filas con piezas disponibles — ya fabricadas y sin despachar):</div>
     <div style="max-height:320px;overflow-y:auto">
-      <table class="tabla-cots"><thead><tr><th style="width:28px"><input type="checkbox" onchange="_marcarTodasFilasProgramarDespacho(this.checked)"></th><th>Cuadro</th><th>Dimensión</th><th>Pendiente</th><th>A programar</th></tr></thead><tbody id="mpd-filas-body"></tbody></table>
+      <table class="tabla-cots"><thead><tr><th style="width:28px"><input type="checkbox" onchange="_marcarTodasFilasProgramarDespacho(this.checked)"></th><th>Cuadro</th><th>Ejes num.</th><th>Ejes alfa.</th><th>Dimensión</th><th>Disponible</th><th>A programar</th></tr></thead><tbody id="mpd-filas-body"></tbody></table>
     </div>
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-programar-despacho')">Cancelar</button>
@@ -3337,7 +3348,7 @@
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
 <script src="js/proyectos.js?v=20261016b"></script>
-<script src="js/losas-proyecto.js?v=20261018c"></script>
+<script src="js/losas-proyecto.js?v=20261019b"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20261013a"></script>
 <script src="js/cotizador.js?v=20261007a"></script>

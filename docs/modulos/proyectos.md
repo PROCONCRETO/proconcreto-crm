@@ -256,16 +256,61 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     vez de buscar a mano. Botón "+ Agregar filtro" agrega una fila con: selector de tipo
     (Entre cuadros / Entre ejes numéricos / Entre ejes alfabéticos / Ancho de prelosa / Número
     de hilos — estas dos últimas solo aparecen si el sistema no es vigueta, no existen ahí) +
-    Desde/Hasta + botón ✕ para quitarla. Se pueden agregar varios filtros de tipos distintos a
-    la vez, combinados con Y (una fila solo se ve si pasa TODOS los filtros activos). Ejes
-    numéricos/alfabéticos: el valor de la fila ya es en sí un rango ("1-2", "A-B"), así que
-    "pasa el filtro" si ese rango se CRUZA con el rango pedido (no solo si coincide exacto) —
-    un cuadro que va de eje 2 a eje 5 sí aparece al filtrar "entre eje 3 y 4", porque pasa por
-    esa zona del plano; un rango de fila al revés ("C-A") se normaliza antes de comparar. Oculta
-    filas con `display:none` en vez de volver a renderizar la tabla, para no perder cantidades
-    ya digitadas en filas que quedan fuera del filtro. "Marcar todas" respeta el filtro — solo
-    toca las filas visibles. Misma lógica exacta en Programar despacho (prefijo `mpd` en vez de
-    `mpp`, funciones compartidas).
+    un área de valor que cambia según el tipo elegido + botón ✕ para quitarla. Se pueden agregar
+    varios filtros de tipos distintos a la vez, combinados con Y (una fila solo se ve si pasa
+    TODOS los filtros activos). Oculta filas con `display:none` en vez de volver a renderizar la
+    tabla, para no perder cantidades ya digitadas en filas que quedan fuera del filtro. "Marcar
+    todas" respeta el filtro — solo toca las filas visibles. Misma lógica exacta en Programar
+    despacho (prefijo `mpd` en vez de `mpp`, funciones compartidas).
+    - **Ejes numéricos/alfabéticos: Desde/Hasta, por CONTENCIÓN** — el valor de la fila ya es en
+      sí un rango ("1-2", "A-B"); "pasa el filtro" si ese rango queda COMPLETO dentro del rango
+      pedido (`_parRangoFiltro()` + comparación en `_filaPasaFiltroProgramar()`); un rango de
+      fila al revés ("C-A") se normaliza antes de comparar. **Corregido 2026-10-19** — la
+      primera versión (2026-10-15) usaba CRUCE en vez de contención ("un cuadro que va de eje 2
+      a eje 5 sí aparece al filtrar 'entre eje 3 y 4', porque pasa por esa zona del plano"); el
+      usuario reportó el bug real: "cuando aplico los filtros de los ejes numéricos y
+      alfabéticos, me está mostrando cuadros que no pertenecen a dichos ejes" — un cuadro que
+      solo TOCA el borde del rango pedido (ej. "2-3" al filtrar "3 a 4") no "pertenece" a ese
+      rango para el usuario, aunque técnicamente se cruce con él. Ahora usa el mismo criterio que
+      ya tenían cuadro/ancho/hilos (contención simple), más consistente y menos sorprendente.
+    - **Ancho de prelosa / Número de hilos: UN SOLO desplegable de valor exacto** (`soloValorUnico`
+      en `TIPOS_FILTRO_PROGRAMAR`, `_valoresDisponiblesFiltro()`, 2026-10-19, a pedido del
+      usuario: "se nos debe habilitar solamente una casilla para las opciones de número de
+      hilos y ancho, que sea un desplegable con los anchos y número de hilos que hay disponibles
+      en la lista") — a diferencia de Desde/Hasta, estos dos campos no son un rango libre sino
+      valores estandarizados y pocos (20/30/40/50cm de ancho, unos pocos conteos de hilos), así
+      que el filtro muestra UN desplegable con "Todos" + los valores que de verdad existen entre
+      las filas de esa Losa en ese momento (no una lista fija) — elegir compara por IGUALDAD
+      exacta, no por rango. Cambiar el tipo de filtro reconstruye el área de valor
+      (`_cambiarTipoFiltroProgramar()`/`_filtroValorAreaHTML()`) — Desde/Hasta para
+      cuadro/ejes, el desplegable de valor único para ancho/hilos, en cualquier dirección.
+  - **Columnas "Ejes num."/"Ejes alfa." en la tabla del propio modal** (2026-10-19, a pedido del
+    usuario: "agreguemos nuevamente los ejes numéricos y alfabéticos en el cuadro que se abre de
+    programación de despachos y de producción") — de solo lectura, junto a "Cuadro", mismo valor
+    crudo que ya alimenta el filtro por ejes — deja verificar a simple vista qué cuadro cae en
+    qué eje, sin tener que adivinar o cruzar con la pantalla principal. Mismas columnas en los
+    dos modales (`mpp`/`mpd`).
+  - **Bancos de producción de prelosa** (`BANCO_PRELOSA_METROS_UTILES = 96`,
+    `BANCO_PRELOSA_MAX_ANCHOS = 2`, `_actualizarResumenBancosPrelosa()`, 2026-10-19, a pedido
+    del usuario: "los bancos de producción de prelosa son dos cintas de 96 metros útiles por
+    cinta. Lo más común es programar un banco (las dos cintas) de 50cm de ancho... en otras
+    ocasiones se programa una cinta de 50cm y otra de 20, 30 o 40cm... condicionemos para que
+    sean máximo 96 metros por cinta, en función del ancho. Programemos también para que se
+    puedan programar solo dos anchos") — cada cinta fabrica un único ancho a la vez, así que el
+    límite físico real es: como mucho 2 anchos distintos en toda la programación del día (una
+    cinta por ancho), y la suma de metros lineales (`dimensión × cantidad`) de cada ancho no
+    puede superar los 96 m útiles de su cinta. **Solo aplica a PRELOSA** — Placa Alveolar y
+    Vigueta y Bovedilla no se fabrican en estas cintas, el usuario habló específicamente de
+    "bancos de producción de prelosa" (si en el futuro se confirma que Placa Alveolar comparte
+    el mismo banco físico, extender la condición de `l.sistema === 'prelosa'`). Caja de resumen
+    en vivo (`#mpp-resumen-bancos`, debajo de la tabla) que se recalcula con cada tecla
+    (`oninput` en "A programar" y tras cada clic de la casilla de autocompletar): una línea por
+    ancho en uso ("Cinta de 50 cm: 42.30 / 96 m"), en rojo con ⚠️ si se pasa de 96 m, más un
+    aviso aparte si hay más de 2 anchos a la vez. **Tope duro al guardar**
+    (`guardarProgramacionProduccion()`) — mismo cálculo que el resumen en vivo pero recalculado
+    contra `lineas` (lo que de verdad se va a guardar, no lo que se veía en pantalla); rechaza
+    con un mensaje específico (cuántos anchos hay, o cuánto suma el ancho que se pasó) si se
+    incumple cualquiera de las dos reglas.
   - **"🖨️ Imprimir" dentro del propio modal** (`imprimirProgramacionProduccion()`/
     `descargarPDFProgramacionProduccion()`, 2026-10-15, a pedido del usuario: "la idea es poder
     imprimir lo que se espera producir, osea la programación de producción que damos con el
@@ -281,6 +326,16 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     esta misma vuelta — ambos imprimibles comparten el 100% de la lógica de paginación con
     membrete, solo cambia qué contenido se captura y el nombre del archivo), con el nombre
     `Programacion_Produccion_<Losa>_<fecha programada>.pdf`.
+    - **"← Volver" reabre el modal, no solo la pantalla de atrás** (2026-10-19, bug real
+      reportado por el usuario: "cuando le doy imprimir y luego le doy volver, se me cierra la
+      ventana de programar producción y/o programar despachos. Garanticemos que cuando le demos
+      volver, volvamos a la ventana como la teníamos digitada") — `cerrarModal()` solo quita la
+      clase `.abierto` (no borra nada del DOM ni de los valores de los `<input>`/`<select>`), así
+      que todo lo digitado (cantidades, filtros, fecha, observaciones, vehículo) seguía intacto
+      todo el tiempo, solo escondido detrás de la vista previa. El botón "← Volver" ahora
+      re-agrega `.abierto` al modal correspondiente además de reactivar `pantalla-losa-detalle`,
+      mostrándolo exactamente como se dejó — sin guardar/restaurar nada aparte. Mismo arreglo en
+      Programar despacho.
   - **"RESUMEN POR MEDIDAS" al pie del imprimible** (`_resumenPorMedidasHTML()`, 2026-10-17, a
     pedido del usuario: "incluyamos un resumen, que muestre la cantidad por medidas, esto
     porque en ocasiones la medida es la misma para varios cuadros en el plano... y termina
@@ -298,6 +353,11 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     pieza — así que sumar línea por línea da lo mismo que peso-por-unidad × cantidad total del
     grupo). Función compartida entre `imprimirProgramacionProduccion()` e
     `imprimirProgramacionDespacho()` — ambos imprimibles la llevan igual.
+    - **Columna "Hilos"** (2026-10-19, a pedido del usuario: "incluir una columna con el número
+      de hilos") — entra también en la CLAVE de agrupación, no solo como columna: dos líneas del
+      mismo ancho/vigueta y dimensión pero con distinto número de hilos NO son la misma pieza
+      (distinto refuerzo), agruparlas bajo un solo valor de hilos sería engañoso. Vigueta no
+      tiene un único campo "hilos" (son dos: Abajo/Arriba) — se muestra combinado "2+1".
   - **Columnas de la tabla principal** (2026-10-17, dos ajustes a pedido del usuario): "Dim."
     pasó a decir **"Largo"** en las dos tablas de cada imprimible (la principal y el resumen por
     medidas) — más claro para planta/logística que la abreviatura. La columna
@@ -512,12 +572,42 @@ la vez) en vez de `fila.produccion[]` **por fila** — esa asimetría ya existí
 conservó a propósito (mismo espíritu que `viaje.entregas[].productos[]` en Logística).
 
 - **"+ Programar despacho"** (`abrirModalProgramarDespacho()`/`guardarProgramacionDespacho()`)
-  — idéntico a "+ Programar producción": filas con saldo pendiente de despacho
-  (`_pendienteDespachoFila()`, sin cambios), casilla por fila que autocompleta el pendiente
+  — idéntico a "+ Programar producción" en estructura: casilla por fila que autocompleta
   (`_marcarFilaProgramarDespacho()`/`_marcarTodasFilasProgramarDespacho()`), filtros por tipo
   combinables (`_agregarFiltroProgramar('mpd')`/`_aplicarFiltrosProgramar('mpd')` — mismas
   funciones compartidas que usa Programar producción, ver bullet correspondiente más arriba).
   Crea una entrada en `despachosProgramados[]` con todas sus líneas en `cantidadReal: null`.
+  - **Filtrado por DISPONIBLE, no por pendiente** (2026-10-19, a pedido del usuario: "incluir
+    una columna... de disponible para despacho, que será arrastrada de la ventana de
+    producción. Condicionar la programación de despachos solo para elementos que estén
+    disponibles para despacho") — antes ofrecía programar hasta el pendiente TOTAL de despacho
+    (`cantidad − despachado`), sin importar si ya se había fabricado o no. Ahora
+    (`_disponibleDespachoFila()` = `_fabricadoFila()` [Σ `fila.produccion[]`] − despachado) solo
+    se ofrecen, y solo se puede programar hasta, las piezas que YA existen físicamente en
+    planta — una fila con pendiente de despacho pero nada fabricado todavía ni siquiera
+    aparece en el modal. Columna nueva **"Disponible despacho"** en la tabla de filas de la
+    pantalla (modo despacho, junto a "Pend. Despacho", que sigue existiendo — una es "cuánto
+    debo despachar en total" y la otra "cuánto puedo despachar hoy"). Tope duro al guardar:
+    `guardarProgramacionDespacho()` recalcula `_disponibleDespachoFila()` por línea contra el
+    estado real (no contra el `max` del `<input>`, que solo es una sugerencia visual) y rechaza
+    si alguna línea lo supera.
+  - **Vehículo y peso máximo** (2026-10-19, a pedido del usuario: "condicionemos también el
+    peso del despacho a la capacidad que tenemos de los vehículos sencillos como lo tenemos
+    codificado actualmente en la ventana de logística. podríamos poner un desplegable para
+    escoger el tipo de vehículo y en función de este, programar el peso máximo") — desplegable
+    `#mpd-vehiculo` (`_poblarSelectVehiculoDespacho()`) poblado directamente desde
+    `CAPACIDAD_VEHICULO` (`js/logistica.js`, toneladas) — sin duplicar el catálogo de
+    vehículos: si la flota cambia en Logística, acá se actualiza solo. Funciona porque
+    `logistica.js` carga antes que `losas-proyecto.js` (incluso siendo ambas una `const` de
+    nivel superior — mismo mecanismo que ya usa `sb` de `config.js` en toda la app). Resumen de
+    peso en vivo (`_actualizarResumenPesoDespacho()`, Σ `_pesoFila()` de lo programado) junto al
+    desplegable, con ⚠️ si supera la capacidad. **Elegir vehículo es obligatorio** para guardar
+    — sin eso no hay peso máximo contra qué validar; `guardarProgramacionDespacho()` recalcula
+    el peso total contra `lineas` (lo que de verdad se va a guardar) y rechaza si supera la
+    capacidad × 1000 (kg). El vehículo elegido queda guardado en la programación
+    (`despachosProgramados[].vehiculo`) y se muestra también en el imprimible
+    (`imprimirProgramacionDespacho()`, tercera columna del recuadro de info junto a
+    Sistema/Piezas a programar, con el peso total en toneladas en la etiqueta).
   - **"🖨️ Imprimir" dentro del propio modal** (`imprimirProgramacionDespacho()`/
     `descargarPDFProgramacionDespacho()`, 2026-10-17, a pedido del usuario: "incluyamos el
     botón de imprimir, para poder pasar el impreso de lo que se debe organizar y cargar en el
