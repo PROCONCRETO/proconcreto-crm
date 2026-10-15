@@ -490,18 +490,21 @@ function renderFilasProduccion() {
   // producido/despachado todavía.
   const esLista = _MODO_FLUJO_LOSA === 'lista';
   const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
-  // Encabezado fijo al bajar — SOLO en Producción/Despacho (2026-10-17, a pedido del usuario:
-  // "bloquea las primeras filas como ya lo hicimos en otras partes del aplicativo, pues al
-  // bajar se pierden los títulos"). En Lista NO se activa a propósito: es la misma tabla, pero
-  // ahí es un formulario donde se van agregando/editando filas, y `.tabla-cots` (encabezado
-  // `position:sticky`) ya causó ahí mismo un bug real una vez (una fila nueva terminaba
-  // tapada detrás del encabezado pegado) — ver docs/01-arquitectura-tecnica.md. Producción y
-  // Despacho son de solo lectura (no se agregan filas), así que ahí sí es seguro. Clase
-  // ADITIVA `.tabla-items.fija-al-bajar` (css/estilos.css) en vez de cambiar a `.tabla-cots`
-  // entero — esa trae su propio estilo de encabezado (fondo blanco, texto gris) distinto al
-  // azul de `.tabla-items`, que no se pidió cambiar.
+  // Encabezado fijo al bajar — en las TRES vistas, incluida Lista (2026-10-18, a pedido del
+  // usuario: "no está bloqueando la fila de títulos en la ventana de listas de producción,
+  // bloquéala también"; hasta ahora Lista se dejaba afuera a propósito, por un bug real que un
+  // encabezado `position:sticky` causó una vez en otra `.tabla-items` — un formulario largo
+  // donde la tabla era solo una sección más, y al bajar por el resto del formulario el
+  // encabezado se quedaba pegado tapando la única fila de producto, ver
+  // docs/01-arquitectura-tecnica.md — pero se probó de nuevo con la tabla real de Lista
+  // (bloque de Bovedilla debajo, en sistema vigueta) sin reproducirse: acá sí se scrollea la
+  // tabla en sí misma, tiene muchas filas en los casos reales (Boreal: 247), y el encabezado se
+  // suelta en cuanto se pasa de largo la tabla completa, dejando pasar el resto del formulario
+  // sin taparlo). Clase ADITIVA `.tabla-items.fija-al-bajar` (css/estilos.css) en vez de cambiar
+  // a `.tabla-cots` entero — esa trae su propio estilo de encabezado (fondo blanco, texto gris)
+  // distinto al azul de `.tabla-items`, que no se pidió cambiar.
   const tabla = document.getElementById('tabla-filas-produccion');
-  if (tabla) tabla.className = esLista ? 'tabla-items' : 'tabla-items fija-al-bajar';
+  if (tabla) tabla.className = 'tabla-items fija-al-bajar';
   const thead = document.getElementById('filas-produccion-thead');
   // "Unidades fabricadas" (2026-10-15, a pedido del usuario), justo antes de "Pend.
   // Producción" — solo en modo producción, igual que el resto de columnas de seguimiento.
@@ -1333,26 +1336,69 @@ function guardarCargaProduccion() {
 // línea cargada (`cantidadReal != null`) — una programación sin nada cargado todavía no es
 // "producción", es solo un plan, no aparece acá (si está 100% pendiente, vive en "+ Cargar
 // producción"). "Contenido" cuenta solo lo REALMENTE fabricado, no lo programado.
+// Columna ACCIONES (2026-10-18, a pedido del usuario: "manejemos la misma lógica de la ventana
+// que tenemos por ejemplo en ajuste diario de mezclas, con las acciones en el lado derecho
+// teniendo las mismas tres, del formato, editar y borrar") — reemplaza el clic sobre la fila
+// (que abría el detalle de solo lectura) por tres botones explícitos, mismo patrón visual EXACTO
+// que `renderAjustesMezcla()` en `js/calidad-ajuste-mezcla.js`: 🖨️ Formato (el mismo detalle de
+// solo lectura que antes abría el clic en la fila), ✏️ Editar (abre "+ Cargar producción" con
+// esta programación ya seleccionada — reutiliza la edición in-situ que ya existía ahí) y
+// 🗑️ Borrar (elimina la programación completa, con confirmación).
 function renderProduccionRegistrada() {
   const tbody = document.getElementById('produccion-registrada-body');
   if (!tbody) return;
   const conCarga = _programacionesLosaActual.filter(p => (p.lineas || []).some(l => l.cantidadReal != null));
   if (!conCarga.length) {
-    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--gris-medio);padding:10px">No hay producción cargada todavía.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--gris-medio);padding:10px">No hay producción cargada todavía.</td></tr>`;
     return;
   }
   tbody.innerHTML = conCarga.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(p => {
     const cargadas = (p.lineas || []).filter(l => l.cantidadReal != null);
     const pendientes = (p.lineas || []).length - cargadas.length;
     const totalFabricado = cargadas.reduce((s, l) => s + (Number(l.cantidadReal) || 0), 0);
-    return `<tr onclick="verDetalleProduccionRegistrada('${_escAttr(p.id)}')" style="cursor:pointer">
+    return `<tr>
       <td>${p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
       <td>${cargadas.length} fila(s), ${totalFabricado} piezas fabricadas${pendientes > 0 ? ` (${pendientes} por cargar)` : ''}</td>
       <td>${_esc(p.observaciones) || '—'}</td>
+      <td>
+        <div class="flex-gap">
+          <button class="btn btn-secundario btn-xs" onclick="verDetalleProduccionRegistrada('${_escAttr(p.id)}')">🖨️ Formato</button>
+          <button class="btn btn-primario btn-xs" onclick="editarProduccionRegistrada('${_escAttr(p.id)}')">✏️ Editar</button>
+          <button class="btn btn-rojo btn-xs" onclick="eliminarProduccionRegistrada('${_escAttr(p.id)}')">🗑️</button>
+        </div>
+      </td>
     </tr>`;
   }).join('');
 }
-// Detalle de solo lectura al seleccionar una fila de "Producciones registradas" — mismo
+// "✏️ Editar" (2026-10-18) — abre "+ Cargar producción" con esta programación ya seleccionada
+// en el combo, en vez de que el usuario tenga que volver a buscarla. La edición en sí ya existía
+// (ver `guardarCargaProduccion()`, corrige in-situ la entrada de `fila.produccion[]` en vez de
+// duplicarla) — esto solo evita el paso manual de selección.
+function editarProduccionRegistrada(id) {
+  abrirModalCargarProduccion();
+  const select = document.getElementById('mcp-select-programacion');
+  if (select) { select.value = id; _renderLineasCargarProduccion(); }
+}
+// "🗑️ Borrar" (2026-10-18) — elimina la programación completa (plan + lo cargado), no solo la
+// carga: coincide con el mismo criterio de `eliminarAjusteMezcla()` (el botón borra el registro
+// entero). Deshace también el crédito real en `fila.produccion[]` de cada línea que haya sido
+// cargada, para que el pendiente de producción de esas filas vuelva a subir — si no se hiciera,
+// la fila quedaría con piezas "fabricadas" fantasma que ya no tienen ninguna programación detrás.
+function eliminarProduccionRegistrada(id) {
+  const p = _programacionesLosaActual.find(x => x.id === id);
+  if (!p) return;
+  const fechaTxt = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : 'sin fecha';
+  if (!confirm(`¿Eliminar la producción registrada del ${fechaTxt}? Se borra la programación completa y las cantidades fabricadas que tenía cargadas — el pendiente de producción de esas filas vuelve a subir.`)) return;
+  (p.lineas || []).forEach(linea => {
+    const f = _filasLosaActual.find(x => x.id === linea.filaId);
+    if (f && f.produccion) f.produccion = f.produccion.filter(e => e.programacionId !== p.id);
+  });
+  _programacionesLosaActual = _programacionesLosaActual.filter(x => x.id !== id);
+  _guardarLosaActual();
+  renderFilasProduccion();
+  renderProduccionRegistrada();
+}
+// Detalle de solo lectura ("🖨️ Formato") — mismo
 // contenido que ve "+ Cargar producción" (Cuadro / Programado / Producido), pero sin inputs:
 // es historial, no una carga en curso.
 function verDetalleProduccionRegistrada(id) {
@@ -1735,28 +1781,60 @@ function guardarCargaDespacho() {
 // todo para volver al mismo patrón de tarjeta que Producción). Lista las
 // `despachosProgramados[]` que ya tienen AL MENOS una línea cargada; "Contenido" cuenta solo
 // lo REALMENTE despachado, no lo programado.
+// Columna ACCIONES — misma lógica EXACTA que "🏗️ Producciones registradas" (2026-10-18, a
+// pedido del usuario: ver nota junto a `renderProduccionRegistrada()`).
 function renderDespachosRegistrados() {
   const tbody = document.getElementById('despachos-registrados-body');
   if (!tbody) return;
   const conCarga = _despachosProgramadosLosaActual.filter(p => (p.lineas || []).some(l => l.cantidadReal != null));
   if (!conCarga.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--gris-medio);padding:10px">No hay despachos cargados todavía.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gris-medio);padding:10px">No hay despachos cargados todavía.</td></tr>`;
     return;
   }
   tbody.innerHTML = conCarga.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(p => {
     const cargadas = (p.lineas || []).filter(l => l.cantidadReal != null);
     const pendientes = (p.lineas || []).length - cargadas.length;
     const totalDespachado = cargadas.reduce((s, l) => s + (Number(l.cantidadReal) || 0), 0);
-    return `<tr onclick="verDetalleDespachoRegistrado('${_escAttr(p.id)}')" style="cursor:pointer">
+    return `<tr>
       <td>${_esc(p.remision) || '—'}</td>
       <td>${p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
       <td>${cargadas.length} fila(s), ${totalDespachado} piezas despachadas${pendientes > 0 ? ` (${pendientes} por cargar)` : ''}</td>
       <td>${_esc(p.observaciones) || '—'}</td>
+      <td>
+        <div class="flex-gap">
+          <button class="btn btn-secundario btn-xs" onclick="verDetalleDespachoRegistrado('${_escAttr(p.id)}')">🖨️ Formato</button>
+          <button class="btn btn-primario btn-xs" onclick="editarDespachoRegistrado('${_escAttr(p.id)}')">✏️ Editar</button>
+          <button class="btn btn-rojo btn-xs" onclick="eliminarDespachoRegistrado('${_escAttr(p.id)}')">🗑️</button>
+        </div>
+      </td>
     </tr>`;
   }).join('');
 }
-// Detalle de solo lectura al seleccionar una fila del historial — mismo contenido que ve "+
-// Cargar despacho" (Cuadro / Programado / Despachado), sin inputs: es historial.
+// "✏️ Editar" — abre "+ Cargar despacho" con esta programación ya seleccionada.
+function editarDespachoRegistrado(id) {
+  abrirModalCargarDespacho();
+  const select = document.getElementById('mcd-select-programacion');
+  if (select) { select.value = id; _renderLineasCargarDespacho(); }
+}
+// "🗑️ Borrar" — elimina la programación completa (plan + lo cargado), igual que
+// `eliminarProduccionRegistrada()`, y ADEMÁS quita la entrada correspondiente del libro real
+// `despachos[]` (`despachoProgramadoId === p.id`) — a diferencia de Producción, acá sí hay un
+// segundo lugar donde queda la carga (`guardarCargaDespacho()` lo crea aparte, por remisión), y
+// si no se borrara también de ahí, el peso/los totales de despacho seguirían contando piezas
+// que ya no tienen ninguna programación detrás.
+function eliminarDespachoRegistrado(id) {
+  const p = _despachosProgramadosLosaActual.find(x => x.id === id);
+  if (!p) return;
+  const fechaTxt = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : 'sin fecha';
+  if (!confirm(`¿Eliminar el despacho registrado (remisión ${p.remision || '—'}, ${fechaTxt})? Se borra la programación completa y las cantidades despachadas que tenía cargadas — el pendiente de despacho de esas filas vuelve a subir.`)) return;
+  _despachosLosaActual = _despachosLosaActual.filter(d => d.despachoProgramadoId !== p.id);
+  _despachosProgramadosLosaActual = _despachosProgramadosLosaActual.filter(x => x.id !== id);
+  _guardarLosaActual();
+  renderFilasProduccion();
+  renderDespachosRegistrados();
+}
+// Detalle de solo lectura ("🖨️ Formato") — mismo contenido que ve "+ Cargar despacho" (Cuadro /
+// Programado / Despachado), sin inputs: es historial.
 function verDetalleDespachoRegistrado(id) {
   const p = _despachosProgramadosLosaActual.find(x => x.id === id);
   if (!p) return;

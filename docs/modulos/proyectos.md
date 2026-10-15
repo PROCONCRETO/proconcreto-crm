@@ -361,12 +361,28 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
   línea cargada (`cantidadReal != null`) — una programación 100% sin cargar todavía no es
   "producción", es solo un plan, no aparece acá (sigue ofreciéndose completa en "+ Cargar
   producción"). La columna "Contenido" cuenta solo lo REALMENTE fabricado (`Σ cantidadReal`), no
-  lo programado, y avisa si a esa programación todavía le faltan líneas por cargar. Cada fila es
-  clicable y abre `#modal-detalle-produccion`: mismo contenido que ve "+ Cargar producción"
-  (Cuadro / Programado / Producido) pero de **solo lectura** — es historial, no una carga en
-  curso; una línea sin cargar se muestra como "Pendiente" en vez de un número. (Esta tarjeta fue
-  el molde que se replicó para Despachos el 2026-10-16, ver sección propia más abajo — ahí quedó
-  como modal en vez de tarjeta siempre visible, a pedido del usuario.)
+  lo programado, y avisa si a esa programación todavía le faltan líneas por cargar. (Esta
+  tarjeta fue el molde que se replicó para Despachos el 2026-10-16, ver sección propia más
+  abajo.)
+  - **Columna "Acciones"** (2026-10-18, a pedido del usuario: "manejemos la misma lógica de la
+    ventana que tenemos por ejemplo en ajuste diario de mezclas, con las acciones en el lado
+    derecho teniendo las mismas tres, del formato, editar y borrar") — reemplaza el clic sobre
+    la fila por tres botones, mismo patrón visual EXACTO que `renderAjustesMezcla()`
+    (`js/calidad-ajuste-mezcla.js`):
+    - **"🖨️ Formato"** = lo que antes abría el clic en la fila: `#modal-detalle-produccion`
+      (Cuadro / Programado / Producido, de solo lectura) — se mantiene tal cual, solo cambia
+      cómo se dispara.
+    - **"✏️ Editar"** (`editarProduccionRegistrada()`) = abre "+ Cargar producción" con esta
+      programación ya elegida en el combo (`_renderLineasCargarProduccion()`), en vez de que el
+      usuario tenga que volver a buscarla — la edición in-situ en sí ya existía desde el
+      2026-10-16 (corrige la entrada existente de `fila.produccion[]`, no la duplica).
+    - **"🗑️ Borrar"** (`eliminarProduccionRegistrada()`) = con `confirm()` de por medio, elimina
+      la PROGRAMACIÓN COMPLETA (plan + lo cargado), mismo criterio que `eliminarAjusteMezcla()`
+      (el botón borra el registro entero, no solo "lo cargado"). También recorre las líneas de
+      esa programación y quita de `fila.produccion[]` la entrada que le correspondía a cada una
+      (`entrada.programacionId === p.id`) — si no se hiciera, la fila quedaría con piezas
+      "fabricadas" fantasma sin ninguna programación detrás, y su pendiente de producción no
+      subiría de vuelta.
 - **Columna "Unidades fabricadas"** (`_filaProduccionHTML()`, justo antes de "Pend.
   Producción", solo en modo producción) = `cantidad − pendienteProducción` — mismo origen que el
   pendiente, solo mostrado desde el otro lado.
@@ -397,19 +413,25 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
   no tiene ningún `<input>` adentro, reemplazar su `innerHTML` no le quita el foco a nada. El pie
   de "Avance de producción" de abajo sigue siendo un banner de ancho completo (no se pidió
   alinearlo por columna).
-- **Encabezado fijo al bajar, solo en Producción/Despacho** (clase `.tabla-items.fija-al-bajar`,
+- **Encabezado fijo al bajar, en las TRES vistas** (clase `.tabla-items.fija-al-bajar`,
   `css/estilos.css`, 2026-10-17, a pedido del usuario: "bloquea las primeras filas... pues al
   bajar se pierden los títulos y no sabe uno qué está viendo") — `renderFilasProduccion()`
-  cambia el `className` de `#tabla-filas-produccion` según el modo: en Lista se queda en
-  `tabla-items` tal cual (sin encabezado fijo — es un formulario donde se van agregando filas, y
-  `.tabla-cots`/encabezado `position:sticky` ya causó ahí mismo un bug real una vez: una fila
-  nueva terminaba tapada detrás del encabezado pegado, ver el bullet de "Lista de Producción"
-  más abajo); en Producción/Despacho (de solo lectura, no se agregan filas) pasa a
-  `tabla-items fija-al-bajar`, que agrega `position:sticky` manteniendo el mismo fondo azul de
-  siempre — se usa una clase ADITIVA nueva en vez de cambiar directamente a `.tabla-cots`,
-  porque esa trae su propio estilo de encabezado (fondo blanco, texto gris) que no se pidió
-  cambiar. Mismo `top:94px` que `.tabla-cots` (una sola `.nav` de 44px bajo el `.nav-top` de
-  50px, sea la fija del módulo o la dinámica de Proyectos).
+  pone siempre `tabla-filas-produccion` como `tabla-items fija-al-bajar`, que agrega
+  `position:sticky` manteniendo el mismo fondo azul de siempre — se usa una clase ADITIVA nueva
+  en vez de cambiar directamente a `.tabla-cots`, porque esa trae su propio estilo de
+  encabezado (fondo blanco, texto gris) que no se pidió cambiar. Mismo `top:94px` que
+  `.tabla-cots` (una sola `.nav` de 44px bajo el `.nav-top` de 50px, sea la fija del módulo o la
+  dinámica de Proyectos). **Al principio (2026-10-17) se dejó afuera de Lista a propósito**, por
+  el mismo motivo documentado junto a `.tabla-items` en `css/estilos.css` (el bug real de una
+  fila nueva tapada detrás del encabezado pegado, visto una vez en el formulario de Costeo de
+  Producto); se volvió a pedir expresamente el 2026-10-18 ("no está bloqueando la fila de
+  títulos en la ventana de listas de producción, bloquéala también") y, probado con una tabla
+  corta (2 filas) + el bloque de Bovedilla justo debajo (el caso real más parecido al que causó
+  el bug original: otra sección después de una tabla corta), no se reprodujo — se verificó con
+  `getBoundingClientRect()` en varias posiciones de scroll que el `<thead>` nunca se solapa con
+  el bloque de Bovedilla. Acá la tabla SÍ es el contenido que se scrollea (igual que
+  `.tabla-cots`, con muchas filas en los casos reales: Boreal tuvo 247), así que el encabezado
+  se suelta en cuanto se pasa de largo la tabla completa.
   - **Bug real encontrado al probarlo (2026-10-18, reportado por el usuario: "no se están
     bloqueando las filas de los títulos... incluso en el de producción, está quedando montado")**
     — la clase estaba bien puesta, pero la `<div class="card">` que envuelve la tabla
@@ -514,9 +536,18 @@ conservó a propósito (mismo espíritu que `viaje.entregas[].productos[]` en Lo
   esconde. Se quitó el botón "📜 Historial de despachos" y su modal por completo; la tarjeta
   quedó en el mismo lugar que ocupaba la antigua "📦 Despachos registrados" (debajo de la tabla
   de filas, junto a "🏗️ Producciones registradas"). Lista las `despachosProgramados[]` con AL
-  MENOS una línea cargada; "Contenido" cuenta solo lo REALMENTE despachado. Cada fila abre
-  `#modal-detalle-despacho` (Remisión / Fecha / Observaciones + Cuadro / Programado / Despachado
-  por línea, solo lectura) — ese modal de detalle no cambió, solo cómo se llega a él.
+  MENOS una línea cargada; "Contenido" cuenta solo lo REALMENTE despachado.
+  - **Columna "Acciones"** (2026-10-18) — misma lógica EXACTA que la de "🏗️ Producciones
+    registradas" (ver bullet correspondiente más arriba): **"🖨️ Formato"** abre
+    `#modal-detalle-despacho` (Remisión / Fecha / Observaciones + Cuadro / Programado /
+    Despachado por línea, solo lectura — no cambió, solo cómo se llega a él); **"✏️ Editar"**
+    (`editarDespachoRegistrado()`) abre "+ Cargar despacho" con esta programación ya elegida;
+    **"🗑️ Borrar"** (`eliminarDespachoRegistrado()`) elimina la programación completa Y,
+    a diferencia de Producción, también quita la entrada correspondiente del libro real
+    `despachos[]` (`despachoProgramadoId === p.id`) — acá sí hay un segundo lugar donde queda la
+    carga (`guardarCargaDespacho()` lo crea aparte, por remisión), y si no se borrara también de
+    ahí, el peso y los totales de despacho seguirían contando piezas sin ninguna programación
+    detrás.
 - **El antiguo "📦 Registrar despacho" de un solo paso se eliminó del todo**
   (`abrirModalDespachoLosa()`/`guardarDespachoLosa()`/`renderDespachosLosa()`/
   `#modal-despacho-losa`) — reemplazado enteramente por Programar/Cargar, igual que ya se había

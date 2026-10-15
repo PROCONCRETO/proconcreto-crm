@@ -140,17 +140,25 @@
      largo) por lo que tampoco quedan fijas ahí. */
   .tabla-items { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
   .tabla-items th { background: var(--azul); color: white; padding: 8px 10px; text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
-  /* Encabezado fijo opcional para una .tabla-items de SOLO LECTURA (2026-10-17, a pedido del
-     usuario: "bloquea las primeras filas... pues al bajar se pierden los títulos") — clase
-     aparte en vez de cambiar a .tabla-cots entero, porque .tabla-cots trae su propio estilo de
-     encabezado (fondo blanco, texto gris mayúscula) distinto al azul de .tabla-items; esto solo
-     agrega el `position:sticky`, sin tocar nada más. Mismo `top:94px` que .tabla-cots (ver la
-     nota junto a esa clase) — asume la misma pila fija de siempre (.nav-top 50px + una sola
-     .nav 44px debajo, sea la fija de cada módulo o la dinámica de Proyectos). Se activa SOLO
-     en pantallas de solo lectura (nunca donde se van agregando filas) — las filas de la Losa en
-     modo Lista (editable, con alta de filas) siguen sin esta clase, mismo motivo que ya tiene
-     documentado .tabla-items arriba: ahí si ya causó una vez el bug real de una fila nueva
-     tapada detrás del encabezado pegado. */
+  /* Encabezado fijo opcional para una .tabla-items (2026-10-17, a pedido del usuario: "bloquea
+     las primeras filas... pues al bajar se pierden los títulos") — clase aparte en vez de
+     cambiar a .tabla-cots entero, porque .tabla-cots trae su propio estilo de encabezado (fondo
+     blanco, texto gris mayúscula) distinto al azul de .tabla-items; esto solo agrega el
+     `position:sticky`, sin tocar nada más. Mismo `top:94px` que .tabla-cots (ver la nota junto a
+     esa clase) — asume la misma pila fija de siempre (.nav-top 50px + una sola .nav 44px debajo,
+     sea la fija de cada módulo o la dinámica de Proyectos). Usada por la tabla de filas de Losa
+     en las TRES vistas (lista/producción/despacho, `js/losas-proyecto.js`,
+     `renderFilasProduccion()`) — al principio (2026-10-17) se dejó afuera de Lista a propósito,
+     por el mismo motivo documentado arriba junto a .tabla-items (el bug real de la fila nueva
+     tapada en el formulario de Costeo de Producto); se volvió a pedir expresamente el
+     2026-10-18 ("no está bloqueando la fila de títulos en la ventana de listas de producción,
+     bloquéala también") y, probado de nuevo con el bloque de Bovedilla debajo de la tabla (el
+     caso real más parecido al de Costeo de Producto: otra sección después de la tabla), no se
+     reprodujo — acá la tabla SÍ es el contenido que se scrollea (igual que .tabla-cots, con
+     muchas filas en los casos reales), así que el encabezado se suelta en cuanto se pasa de
+     largo la tabla completa. Si en el futuro vuelve a aparecer el mismo bug en una `.tabla-items`
+     nueva, revisar primero si esa tabla es una sección corta dentro de un formulario más largo
+     (el patrón que sí lo causa) antes de activar esta clase ahí. */
   .tabla-items.fija-al-bajar th { position: sticky; top: 94px; z-index: 5; }
   .tabla-items td { padding: 8px 10px; border-bottom: 1px solid #EDF2F7; vertical-align: middle; }
   .tabla-items tr:hover td { background: var(--azul-suave); }
