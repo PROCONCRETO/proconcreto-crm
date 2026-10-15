@@ -686,6 +686,23 @@ Capturarlas una por una sería impracticable (Boreal tuvo 247 filas en una sola 
 `guardarListaProduccion()` solo descarta filas 100% vacías (mismo criterio que
 `guardarDespieceAcero()`), nunca las parcialmente llenas.
 
+- **Números cortados en los campos angostos** (2026-10-19, reportado por el usuario con una
+  captura real de "PISO 6": "no se ve con claridad los números digitados... aparecen cortados
+  en algunos casos" — el campo de Ancho mostraba "50" como "5C") — causa real: las flechitas
+  nativas de subir/bajar de `<input type="number">` ocupan ~20px fijos, que en un campo de
+  40-50px (la fila tiene muchas columnas, no sobra espacio) son casi la mitad del ancho
+  disponible, recortando visualmente el número. **Arreglo** en dos partes: (1)
+  `css/estilos.css`, se ocultan esas flechitas para todo `.tabla-items input[type="number"]`
+  (`-webkit-appearance:none` en los pseudo-elementos de Chrome/Safari +
+  `-moz-appearance:textfield` para Firefox) — nadie las usaba para escribir un ancho o un
+  número de hilos, siempre se teclea directo; (2) se amplió el `width` en píxeles de los campos
+  más angostos en `_filaProduccionHTML()` (Cuadro 40→48, Ancho/Vigueta 44→54, Hilos
+  Abajo/Arriba/Hilos 38→44, Dimensión 50→58, Cantidad 42→50, los dos cuadritos de Ejes
+  numéricos/alfabéticos 24→28 cada uno). Verificado con una captura de pantalla real del
+  arnés de pruebas (no solo revisión de código) — el `document.styleSheets`/`cssRules` del
+  arnés no deja inspeccionar la hoja de estilos cargada por `file://` (CORS), así que la
+  verificación de esta regla específica fue visual, no por aserción de DOM.
+
 ### Navegación — pantalla nueva, no un patrón ya existente
 
 No existe en la app ningún patrón de "pantalla completa con alcance a un registro padre"

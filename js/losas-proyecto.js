@@ -730,32 +730,37 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
   // reales ("1-1´", "I-G": un eje de inicio y uno de fin), pero sigue guardándose como un solo
   // string (`ejesEntre`/`laterales`, sin cambiar el modelo de datos ni el mapeo de Importar/
   // Pegar, que ya traían ese valor combinado en una sola celda).
+  // Anchos de campo ampliados (2026-10-19, reportado por el usuario con una captura real: "no
+  // se ve con claridad los números digitados... aparecen cortados" — ej. "50" se veía como
+  // "5C", recortado por las flechitas nativas del <input type="number"> en un campo angosto).
+  // Junto con quitar esas flechitas (`css/estilos.css`), se les da más aire a los campos más
+  // apretados para que un número de 2 cifras quepa cómodo.
   const par = (valor, campo) => {
     if (!esLista) return _esc(valor || '—');
     const idx = (valor || '').indexOf('-');
     const a = idx >= 0 ? valor.slice(0, idx) : (valor || '');
     const b = idx >= 0 ? valor.slice(idx + 1) : '';
     return `<div style="display:flex;align-items:center;gap:2px">
-      <input type="text" value="${_escAttr(a)}" oninput="_actualizarParEje(${i},'${campo}',0,this.value)" style="width:24px;text-align:center;padding:4px 2px">
+      <input type="text" value="${_escAttr(a)}" oninput="_actualizarParEje(${i},'${campo}',0,this.value)" style="width:28px;text-align:center;padding:4px 2px">
       <span style="color:var(--gris-medio)">-</span>
-      <input type="text" value="${_escAttr(b)}" oninput="_actualizarParEje(${i},'${campo}',1,this.value)" style="width:24px;text-align:center;padding:4px 2px">
+      <input type="text" value="${_escAttr(b)}" oninput="_actualizarParEje(${i},'${campo}',1,this.value)" style="width:28px;text-align:center;padding:4px 2px">
     </div>`;
   };
   return `<tr>
     <td>${i + 1}</td>
-    <td>${txt(f.cuadro, 'cuadro', 40)}</td>
+    <td>${txt(f.cuadro, 'cuadro', 48)}</td>
     <td>${par(f.ejesEntre, 'ejesEntre')}</td>
     <td>${par(f.laterales, 'laterales')}</td>
     ${esVigueta ? `
-    <td>${txt(f.tipoVigueta, 'tipoVigueta', 48)}</td>
-    <td>${num(f.hilosAbajo, 'hilosAbajo', 38, false)}</td>
-    <td>${num(f.hilosArriba, 'hilosArriba', 38, false)}</td>
+    <td>${txt(f.tipoVigueta, 'tipoVigueta', 54)}</td>
+    <td>${num(f.hilosAbajo, 'hilosAbajo', 44, false)}</td>
+    <td>${num(f.hilosArriba, 'hilosArriba', 44, false)}</td>
     ` : `
-    <td>${num(f.ancho, 'ancho', 44, true, l.sistema === 'prelosa' ? `_validarAnchoPrelosa(${i})` : '')}</td>
-    <td>${num(f.hilos, 'hilos', 38, false)}</td>
+    <td>${num(f.ancho, 'ancho', 54, true, l.sistema === 'prelosa' ? `_validarAnchoPrelosa(${i})` : '')}</td>
+    <td>${num(f.hilos, 'hilos', 44, false)}</td>
     `}
-    <td>${num(f.dimension, 'dimension', 50, true)}</td>
-    <td>${num(f.cantidad, 'cantidad', 42, true)}</td>
+    <td>${num(f.dimension, 'dimension', 58, true)}</td>
+    <td>${num(f.cantidad, 'cantidad', 50, true)}</td>
     <td id="fp-longtotal-${i}" style="text-align:right">${longTotal.toFixed(2)}</td>
     ${esVigueta ? '' : `<td id="fp-m2-${i}" style="text-align:right">${m2.toFixed(2)}</td>`}
     <td id="fp-peso-${i}" style="text-align:right">${peso.toFixed(1)}</td>

@@ -164,6 +164,17 @@
   .tabla-items tr:hover td { background: var(--azul-suave); }
   .tabla-items input { border: 1px solid var(--gris-borde); border-radius: 4px; padding: 5px 7px; font-size: 13px; width: 100%; }
   .tabla-items select { border: 1px solid var(--gris-borde); border-radius: 4px; padding: 5px 7px; font-size: 12px; width: 100%; }
+  /* Quita las flechitas nativas de subir/bajar de los <input type="number"> dentro de la Losa
+     (2026-10-19, reportado por el usuario con una captura real: "no se ve con claridad los
+     números digitados... aparecen cortados" — ej. "50" se veía como "5C") — esos campos son
+     bastante angostos (la fila completa tiene muchas columnas) y las flechas nativas del
+     navegador le quitan ~20px de ancho real al número, que en un campo de 40-50px es casi la
+     mitad del espacio; nadie usa esas flechitas para escribir un ancho o un número de hilos,
+     siempre se teclea directo. Doble regla porque Firefox y Chrome/Safari las esconden de forma
+     distinta. */
+  .tabla-items input[type="number"]::-webkit-outer-spin-button,
+  .tabla-items input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .tabla-items input[type="number"] { -moz-appearance: textfield; }
 
   /* ── TOTALES ── */
   .totales-box { background: var(--azul-suave); border: 1px solid #90CAF9; border-radius: var(--radio); padding: 14px 18px; min-width: 300px; }
