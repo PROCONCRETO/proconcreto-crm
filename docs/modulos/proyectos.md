@@ -60,7 +60,8 @@ cada una con su propia carpeta.
   |---|---|---|---|
   | `pantalla-proyecto-losas` | "+ Nueva Losa", ✏️ Editar, 🗑️ Eliminar visibles | Solo "🏗️ Ver producción" | Solo "📦 Ver despachos" |
   | Filas de la lista | Celdas editables, botón ✕ eliminar fila, barra de Agregar/Pegar/Importar/Guardar | Celdas de **solo lectura**, sin acción por fila (la producción se registra en lote con "+ Programar"/"+ Cargar producción", ver sección propia más abajo) | Celdas de **solo lectura**, sin acción por fila (el despacho se registra en lote con "+ Programar"/"+ Cargar despacho", mismo patrón que Producción, ver sección propia más abajo) |
-  | Botones "+ Programar"/"+ Cargar producción"/"📊 Producción diaria" / "+ Programar"/"+ Cargar despacho"/"📜 Historial de despachos" | Ocultos | Los 3 de producción visibles | Los 3 de despacho visibles |
+  | Botones "+ Programar"/"+ Cargar producción"/"📊 Producción diaria" / "+ Programar"/"+ Cargar despacho" | Ocultos | Los 3 de producción visibles | Los 2 de despacho visibles |
+  | Tarjeta "🏗️ Producciones registradas" / "📦 Despachos registrados" (siempre visible, no un botón) | Ocultas | Solo "Producciones registradas" | Solo "Despachos registrados" |
   | Bovedilla | `tipo`/`cantidadRequerida` editables, sin seguimiento | Solo lectura + SOLO columna "Entradas (producción)" | Solo lectura + SOLO columna "Salidas (despacho)" |
 
   Lo que Ingeniería define (cuadro, dimensión, cantidad, tipo/cantidad de bovedilla) nunca se
@@ -276,7 +277,13 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     en vigueta, Vigueta (tipo) + Dimensión — el tipo de vigueta es parte de la medida, no un
     dato aparte, así que dos viguetas del mismo largo pero de tipo distinto NO se agrupan.
     Tabla aparte debajo de la tabla de filas (antes de la firma), con su propia fila de
-    totales. Función compartida entre `imprimirProgramacionProduccion()` e
+    totales — incluye **columna de Peso (kg)** (2026-10-17, a pedido del usuario: "incluyamos
+    también en ambos imprimibles en el cuadro inferior, la columna de peso" — a diferencia de
+    la tabla principal, donde Peso es solo del lado de despacho, en este resumen va en LOS DOS
+    imprimibles; peso por grupo = Σ `_pesoFila()` de cada línea que cae en ese grupo, válido
+    porque todas comparten el mismo ancho/vigueta y dimensión — lo que determina el peso por
+    pieza — así que sumar línea por línea da lo mismo que peso-por-unidad × cantidad total del
+    grupo). Función compartida entre `imprimirProgramacionProduccion()` e
     `imprimirProgramacionDespacho()` — ambos imprimibles la llevan igual.
   - **Columnas de la tabla principal** (2026-10-17, dos ajustes a pedido del usuario): "Dim."
     pasó a decir **"Largo"** en las dos tablas de cada imprimible (la principal y el resumen por
@@ -296,15 +303,16 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     "ETIQUETA: valor" en una sola línea dentro de una grilla de 2 columnas muy anchas, pasó a
     ser una etiqueta chica en mayúsculas arriba y el valor centrado debajo, mismo estilo en los
     dos imprimibles.
-  - **Columna de Peso — SOLO en el imprimible de despacho, no en el de producción**
-    (2026-10-17, a pedido del usuario: "en el imprimible de despachos, a diferencia del de
-    producción, es muy importante incluir el peso como otra columna adicional" — logística
-    necesita saber cuánto va a pesar cada viaje; producción no lo necesita en SU imprimible, por
-    eso se había quitado antes del que sacaba la lista completa). Va después de "Long. tot.
-    (m)". Reusa `_pesoFila()` (mismo cálculo de la pantalla normal), pero evaluado sobre la
-    **cantidad que se está imprimiendo** (`{...f, cantidad}`), no sobre `f.cantidad` — si solo
-    se programa una parte de una fila, el peso impreso corresponde a esa parte, no a la fila
-    completa.
+  - **Columna de Peso en la tabla PRINCIPAL — SOLO en el imprimible de despacho, no en el de
+    producción** (2026-10-17, a pedido del usuario: "en el imprimible de despachos, a
+    diferencia del de producción, es muy importante incluir el peso como otra columna
+    adicional" — logística necesita saber cuánto va a pesar cada viaje; producción no lo
+    necesita en SU imprimible, por eso se había quitado antes del que sacaba la lista
+    completa). Va después de "Long. tot. (m)". Reusa `_pesoFila()` (mismo cálculo de la
+    pantalla normal), pero evaluado sobre la **cantidad que se está imprimiendo** (`{...f,
+    cantidad}`), no sobre `f.cantidad` — si solo se programa una parte de una fila, el peso
+    impreso corresponde a esa parte, no a la fila completa. La columna de Peso del RESUMEN POR
+    MEDIDAS (ver bullet más arriba) es aparte — esa sí la llevan los DOS imprimibles.
   - **Columna de Observaciones (cant. real) — en los dos imprimibles, última columna**
     (2026-10-17, a pedido del usuario: "incluyamos una columna a mano derecha de
     observaciones, donde el personal pueda registrar a mano cuántas unidades se produjeron o se
@@ -421,14 +429,21 @@ conservó a propósito (mismo espíritu que `viaje.entregas[].productos[]` en Lo
   a partir de TODAS las líneas ya cargadas de ese plan en ese momento — nunca parcial ni
   duplicado. `_pendienteDespachoFila()` sigue funcionando exactamente igual que siempre, sin
   tocar su fórmula ni su firma.
-- **"📜 Historial de despachos"** (`abrirHistorialDespachos()`/`verDetalleDespachoRegistrado()`)
-  — mismo patrón que "🏗️ Producciones registradas", pero como **modal** (a pedido explícito del
-  usuario, tras preguntarle si prefería una lista clicable como Producciones registradas o una
-  matriz día × fila como Producción diaria) en vez de tarjeta siempre visible — reemplaza del
-  todo la tarjeta "📦 Despachos registrados" que había antes. Lista las `despachosProgramados[]`
-  con AL MENOS una línea cargada; "Contenido" cuenta solo lo REALMENTE despachado. Cada fila
-  abre `#modal-detalle-despacho` (Remisión / Fecha / Observaciones + Cuadro / Programado /
-  Despachado por línea, solo lectura).
+- **"📦 Despachos registrados"** (`renderDespachosRegistrados()`/`verDetalleDespachoRegistrado()`)
+  — tarjeta SIEMPRE VISIBLE debajo de la tabla de filas, misma lógica EXACTA que "🏗️
+  Producciones registradas". Pasó por dos vueltas: primero se preguntó explícitamente si debía
+  ser una lista clicable (como Producciones registradas) o una matriz día × fila (como
+  Producción diaria) — el usuario eligió "lista clicable como Producciones registradas" — pero
+  se implementó por error como un botón+modal ("📜 Historial de despachos"); el usuario corrigió
+  (2026-10-17): "eliminaste el segundo cuadro que mostraba el resumen de despachos... inclúyelo
+  nuevamente, con la misma lógica que tiene en la ventana de producción, el segundo cuadro de
+  Producciones registradas" — es decir, quería la tarjeta SIEMPRE VISIBLE, no un botón que la
+  esconde. Se quitó el botón "📜 Historial de despachos" y su modal por completo; la tarjeta
+  quedó en el mismo lugar que ocupaba la antigua "📦 Despachos registrados" (debajo de la tabla
+  de filas, junto a "🏗️ Producciones registradas"). Lista las `despachosProgramados[]` con AL
+  MENOS una línea cargada; "Contenido" cuenta solo lo REALMENTE despachado. Cada fila abre
+  `#modal-detalle-despacho` (Remisión / Fecha / Observaciones + Cuadro / Programado / Despachado
+  por línea, solo lectura) — ese modal de detalle no cambió, solo cómo se llega a él.
 - **El antiguo "📦 Registrar despacho" de un solo paso se eliminó del todo**
   (`abrirModalDespachoLosa()`/`guardarDespachoLosa()`/`renderDespachosLosa()`/
   `#modal-despacho-losa`) — reemplazado enteramente por Programar/Cargar, igual que ya se había

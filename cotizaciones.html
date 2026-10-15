@@ -1335,7 +1335,6 @@
       <button id="losa-btn-produccion-diaria" class="btn btn-secundario btn-sm" onclick="abrirMatrizProduccionDiaria()" style="display:none">📊 Producción diaria</button>
       <button id="losa-btn-programar-despacho" class="btn btn-primario btn-sm" onclick="abrirModalProgramarDespacho()" style="display:none">+ Programar despacho</button>
       <button id="losa-btn-cargar-despacho" class="btn btn-primario btn-sm" onclick="abrirModalCargarDespacho()" style="display:none">+ Cargar despacho</button>
-      <button id="losa-btn-historial-despachos" class="btn btn-secundario btn-sm" onclick="abrirHistorialDespachos()" style="display:none">📜 Historial de despachos</button>
     </div>
   </div>
 
@@ -1362,6 +1361,11 @@
   <div id="losa-card-produccion-registrada" class="card" style="margin-top:16px;display:none">
     <div style="font-size:15px;font-weight:700;color:var(--azul);margin-bottom:10px">🏗️ Producciones registradas</div>
     <table class="tabla-cots"><thead><tr><th>Fecha</th><th>Contenido</th><th>Observaciones</th></tr></thead><tbody id="produccion-registrada-body"></tbody></table>
+  </div>
+
+  <div id="losa-card-despachos-registrados" class="card" style="margin-top:16px;display:none">
+    <div style="font-size:15px;font-weight:700;color:var(--azul);margin-bottom:10px">📦 Despachos registrados</div>
+    <table class="tabla-cots"><thead><tr><th>Remisión</th><th>Fecha</th><th>Contenido</th><th>Observaciones</th></tr></thead><tbody id="despachos-registrados-body"></tbody></table>
   </div>
 
   <div id="losa-detalle-bloque-bovedilla" class="card" style="margin-top:16px">
@@ -1506,18 +1510,6 @@
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-cargar-despacho')">Cancelar</button>
       <button class="btn btn-primario" id="mcd-btn-guardar" onclick="guardarCargaDespacho()" style="display:none">Guardar despacho cargado</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="modal-historial-despachos">
-  <div class="modal" style="width:680px;max-width:95vw">
-    <div class="modal-titulo">📜 Historial de despachos</div>
-    <div style="max-height:400px;overflow-y:auto">
-      <table class="tabla-cots"><thead><tr><th>Remisión</th><th>Fecha</th><th>Contenido</th><th>Observaciones</th></tr></thead><tbody id="hd-filas-body"></tbody></table>
-    </div>
-    <div class="modal-acciones">
-      <button class="btn btn-secundario" onclick="cerrarModal('modal-historial-despachos')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3338,7 +3330,7 @@
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
 <script src="js/proyectos.js?v=20261016b"></script>
-<script src="js/losas-proyecto.js?v=20261017d"></script>
+<script src="js/losas-proyecto.js?v=20261017f"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20261013a"></script>
 <script src="js/cotizador.js?v=20261007a"></script>

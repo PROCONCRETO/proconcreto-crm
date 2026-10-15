@@ -467,12 +467,13 @@ function renderLosaDetalle() {
   document.getElementById('losa-btn-produccion-diaria').style.display = esProduccion ? '' : 'none';
   document.getElementById('losa-btn-programar-despacho').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-btn-cargar-despacho').style.display = esDespacho ? '' : 'none';
-  document.getElementById('losa-btn-historial-despachos').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-card-produccion-registrada').style.display = esProduccion ? '' : 'none';
+  document.getElementById('losa-card-despachos-registrados').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-detalle-bloque-bovedilla').style.display = l.sistema === 'vigueta_bovedilla' ? '' : 'none';
   renderFilasProduccion();
   if (l.sistema === 'vigueta_bovedilla') renderBovedillaLosa();
   if (esProduccion) renderProduccionRegistrada();
+  if (esDespacho) renderDespachosRegistrados();
 }
 
 // ── Filas de producción — columnas según sistema (Prelosa/Placa Alveolar: ancho+hilos;
@@ -955,20 +956,27 @@ function _resumenPorMedidasHTML(lineas, l) {
     const dim = Number(f.dimension) || 0;
     const medida = esVigueta ? (f.tipoVigueta || '—') : (Number(f.ancho) || 0);
     const clave = `${medida}__${dim.toFixed(2)}`;
-    if (!grupos.has(clave)) grupos.set(clave, { medida, dim, cantidad: 0 });
-    grupos.get(clave).cantidad += cantidad;
+    if (!grupos.has(clave)) grupos.set(clave, { medida, dim, cantidad: 0, peso: 0 });
+    const g = grupos.get(clave);
+    g.cantidad += cantidad;
+    // Mismo peso por unidad para todas las líneas de un mismo grupo (comparten ancho/vigueta y
+    // dimensión, que es justo lo que determina el peso por pieza) — sumar `_pesoFila()` línea
+    // por línea da el mismo resultado que peso-por-unidad × cantidad total del grupo.
+    g.peso += _pesoFila({ ...f, cantidad }, l);
   });
   const filas = Array.from(grupos.values()).sort((a, b) => a.dim - b.dim || String(a.medida).localeCompare(String(b.medida)));
-  let totalCantidad = 0, totalMetros = 0;
+  let totalCantidad = 0, totalMetros = 0, totalPeso = 0;
   const filasHTML = filas.map(g => {
     totalCantidad += g.cantidad;
     const longTotal = g.dim * g.cantidad;
     totalMetros += longTotal;
+    totalPeso += g.peso;
     return `<tr>
       <td>${esVigueta ? _esc(g.medida) : g.medida + ' cm'}</td>
       <td style="text-align:right">${g.dim.toFixed(2)}</td>
       <td style="text-align:center;font-weight:700">${g.cantidad}</td>
       <td style="text-align:right">${longTotal.toFixed(2)}</td>
+      <td style="text-align:right">${g.peso.toFixed(1)}</td>
     </tr>`;
   }).join('');
   return `
@@ -976,13 +984,14 @@ function _resumenPorMedidasHTML(lineas, l) {
       <div style="font-size:11px;font-weight:700;color:#003F7F;margin-bottom:4px;letter-spacing:0.03em">RESUMEN POR MEDIDAS</div>
       <table class="preview-tabla">
         <thead><tr>
-          <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Largo (m)</th><th>Cantidad</th><th>Long. tot. (m)</th>
+          <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Largo (m)</th><th>Cantidad</th><th>Long. tot. (m)</th><th>Peso (kg)</th>
         </tr></thead>
         <tbody>${filasHTML}</tbody>
         <tfoot><tr class="total-row">
           <td colspan="2" style="text-align:right">TOTALES</td>
           <td style="text-align:center">${totalCantidad}</td>
           <td style="text-align:right">${totalMetros.toFixed(2)}</td>
+          <td style="text-align:right">${totalPeso.toFixed(1)}</td>
         </tr></tfoot>
       </table>
     </div>`;
@@ -1584,33 +1593,38 @@ function guardarCargaDespacho() {
   _guardarLosaActual();
   cerrarModal('modal-cargar-despacho');
   renderFilasProduccion();
+  renderDespachosRegistrados();
   alert('Despacho cargado.');
 }
 
-// "Historial de despachos" — mismo patrón que "🏗️ Producciones registradas" de Producción,
-// como modal (a pedido del usuario) en vez de tarjeta siempre visible — reemplaza la tarjeta
-// "📦 Despachos registrados" que había antes. Lista las `despachosProgramados[]` que ya tienen
-// AL MENOS una línea cargada; "Contenido" cuenta solo lo REALMENTE despachado, no lo
-// programado.
-function abrirHistorialDespachos() {
-  const tbody = document.getElementById('hd-filas-body');
+// "Despachos registrados" — misma lógica EXACTA que "🏗️ Producciones registradas" de
+// Producción (2026-10-17, a pedido del usuario: "en la ventana de despachos, eliminaste el
+// segundo cuadro que mostraba el resumen de despachos... inclúyelo nuevamente, con la misma
+// lógica que tiene en la ventana de producción, el segundo cuadro de Producciones
+// registradas") — tarjeta SIEMPRE VISIBLE debajo de la tabla de filas (no modal: el intento
+// anterior lo había puesto detrás de un botón "📜 Historial de despachos", que se quitó del
+// todo para volver al mismo patrón de tarjeta que Producción). Lista las
+// `despachosProgramados[]` que ya tienen AL MENOS una línea cargada; "Contenido" cuenta solo
+// lo REALMENTE despachado, no lo programado.
+function renderDespachosRegistrados() {
+  const tbody = document.getElementById('despachos-registrados-body');
+  if (!tbody) return;
   const conCarga = _despachosProgramadosLosaActual.filter(p => (p.lineas || []).some(l => l.cantidadReal != null));
   if (!conCarga.length) {
     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--gris-medio);padding:10px">No hay despachos cargados todavía.</td></tr>`;
-  } else {
-    tbody.innerHTML = conCarga.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(p => {
-      const cargadas = (p.lineas || []).filter(l => l.cantidadReal != null);
-      const pendientes = (p.lineas || []).length - cargadas.length;
-      const totalDespachado = cargadas.reduce((s, l) => s + (Number(l.cantidadReal) || 0), 0);
-      return `<tr onclick="verDetalleDespachoRegistrado('${_escAttr(p.id)}')" style="cursor:pointer">
-        <td>${_esc(p.remision) || '—'}</td>
-        <td>${p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
-        <td>${cargadas.length} fila(s), ${totalDespachado} piezas despachadas${pendientes > 0 ? ` (${pendientes} por cargar)` : ''}</td>
-        <td>${_esc(p.observaciones) || '—'}</td>
-      </tr>`;
-    }).join('');
+    return;
   }
-  document.getElementById('modal-historial-despachos').classList.add('abierto');
+  tbody.innerHTML = conCarga.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(p => {
+    const cargadas = (p.lineas || []).filter(l => l.cantidadReal != null);
+    const pendientes = (p.lineas || []).length - cargadas.length;
+    const totalDespachado = cargadas.reduce((s, l) => s + (Number(l.cantidadReal) || 0), 0);
+    return `<tr onclick="verDetalleDespachoRegistrado('${_escAttr(p.id)}')" style="cursor:pointer">
+      <td>${_esc(p.remision) || '—'}</td>
+      <td>${p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
+      <td>${cargadas.length} fila(s), ${totalDespachado} piezas despachadas${pendientes > 0 ? ` (${pendientes} por cargar)` : ''}</td>
+      <td>${_esc(p.observaciones) || '—'}</td>
+    </tr>`;
+  }).join('');
 }
 // Detalle de solo lectura al seleccionar una fila del historial — mismo contenido que ve "+
 // Cargar despacho" (Cuadro / Programado / Despachado), sin inputs: es historial.
