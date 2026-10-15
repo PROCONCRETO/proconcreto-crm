@@ -574,6 +574,91 @@ function _pieTotalesHTML(l) {
   </tr>`;
 }
 
+// Exportar a Excel (2026-10-18, a pedido del usuario: "y si incluimos un botón para descargar
+// en excel la tabla, y te la paso y comparas?" — surgió de una diferencia real reportada entre
+// la suma manual del usuario y el total de metros lineales que mostraba ProSuite para una Losa
+// real: 1376.05 vs 1425.16 — una tabla con muchas filas no cabe completa en una captura de
+// pantalla para auditarla fila por fila). Mismo patrón ya establecido en
+// `exportarEstadisticasProduccionExcel()` (`js/estadisticas-produccion.js`): aoa_to_sheet →
+// book_new → book_append_sheet → writeFile. Exporta EXACTAMENTE las mismas columnas que se ven
+// en pantalla en el modo activo (Lista/Producción/Despacho) — mismos cálculos de
+// `_filaProduccionHTML()` por fila, sin redondear antes de sumar — más una fila de TOTALES al
+// final que replica la misma fórmula de `_pieTotalesHTML()`, para que una diferencia entre lo
+// que alguien suma a mano y lo que muestra la pantalla quede auditable fila por fila en el
+// mismo archivo.
+function exportarFilasLosaExcel() {
+  if (typeof XLSX === 'undefined') { alert('La librería de Excel no cargó. Verifica tu conexión.'); return; }
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  if (!l) return;
+  if (!_filasLosaActual.length) { alert('No hay filas para exportar.'); return; }
+  const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const esLista = _MODO_FLUJO_LOSA === 'lista';
+  const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
+  const proy = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
+  const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
+
+  const encabezado = [
+    '#', 'Cuadro', 'Ejes numéricos', 'Ejes alfabéticos',
+    ...(esVigueta ? ['Vigueta', 'Hilos Abajo', 'Hilos Arriba'] : ['Ancho (cm)', 'Hilos']),
+    'Dimensión (m)', 'Cantidad', 'Long. total (m)',
+    ...(esVigueta ? [] : ['m²']),
+    'Peso (kg)',
+    ...(esLista ? [] : (esProduccion ? ['Unidades fabricadas', 'Pend. Producción'] : ['Pend. Despacho'])),
+    'Observaciones',
+  ];
+
+  let totalUnidades = 0, totalMetros = 0, totalM2 = 0, totalPeso = 0;
+  const filas = _filasLosaActual.map((f, i) => {
+    const dim = Number(f.dimension) || 0;
+    const cant = Number(f.cantidad) || 0;
+    const longTotal = dim * cant;
+    const m2 = esVigueta ? 0 : (Number(f.ancho) || 0) / 100 * dim * cant;
+    const peso = _pesoFila(f, l);
+    totalUnidades += cant; totalMetros += longTotal; totalM2 += m2; totalPeso += peso;
+    const pendProd = _pendienteProduccionFila(f);
+    const pendDesp = _pendienteDespachoFila(f, _despachosLosaActual);
+    return [
+      i + 1, f.cuadro || '', f.ejesEntre || '', f.laterales || '',
+      ...(esVigueta ? [f.tipoVigueta || '', Number(f.hilosAbajo) || 0, Number(f.hilosArriba) || 0] : [Number(f.ancho) || 0, Number(f.hilos) || 0]),
+      dim, cant, longTotal,
+      ...(esVigueta ? [] : [m2]),
+      peso,
+      ...(esLista ? [] : (esProduccion ? [cant - pendProd, pendProd] : [pendDesp])),
+      f.observaciones || '',
+    ];
+  });
+
+  const filaTotales = [
+    'TOTALES', '', '',
+    '',
+    ...(esVigueta ? ['', '', ''] : ['', '']),
+    '', totalUnidades, totalMetros,
+    ...(esVigueta ? [] : [totalM2]),
+    totalPeso,
+    ...(esLista ? [] : (esProduccion ? ['', ''] : [''])),
+    '',
+  ];
+
+  const modoTxt = esLista ? 'Lista de producción' : (esProduccion ? 'Producción' : 'Despacho');
+  const rows = [
+    [`${l.nombre}${l.ubicacion ? ' — ' + l.ubicacion : ''} (${sis ? sis.etiqueta : ''})`],
+    ['Proyecto:', proy?.nombre || '—'],
+    ['Vista:', modoTxt],
+    ['Generado:', new Date().toLocaleString('es-CO')],
+    [],
+    encabezado,
+    ...filas,
+    filaTotales,
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Filas');
+  const fecha = new Date().toISOString().slice(0, 10);
+  const nombreLosa = (l.nombre || 'losa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '_');
+  XLSX.writeFile(wb, `Losa_${nombreLosa}_${modoTxt.replace(/\s+/g, '_')}_${fecha}.xlsx`);
+}
+
 // Fila de avance al pie de la tabla, solo en modo producción (2026-10-15, a pedido del
 // usuario: "pongamos al final... una fila de porcentaje de avance, donde el avance y el
 // faltante sea ponderado, no por unidad (osea, longitud por unidades)") — pondera cada fila por

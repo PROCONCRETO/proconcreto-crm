@@ -451,6 +451,19 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     que el resto); si la tabla no cabe en pantallas angostas, ahora desborda hacia la página
     completa (mismo comportamiento que ya toleran los demás listados anchos de la app) en vez de
     atraparse en un scroll propio que rompía el sticky.
+- **"⬇️ Exportar Excel"** (`exportarFilasLosaExcel()`, botón siempre visible junto a los demás
+  botones de arriba de la tabla, en las TRES vistas — 2026-10-18, a pedido del usuario: surgió de
+  una diferencia real que reportó entre su suma manual y el total de metros lineales de ProSuite
+  para la Losa "PISO 6" de Torres de la Francia (1376.05 vs 1425.16) — "la tabla tiene muchas
+  filas y no caben en la foto", así que en vez de mandar una captura se exporta la tabla completa
+  para auditarla fila por fila) — mismo patrón ya establecido en
+  `exportarEstadisticasProduccionExcel()` (`js/estadisticas-produccion.js`): `aoa_to_sheet` →
+  `book_new` → `book_append_sheet` → `writeFile` (SheetJS, ya cargado en la app). Exporta
+  EXACTAMENTE las mismas columnas que se ven en pantalla en el modo activo en ese momento (mismos
+  cálculos por fila que `_filaProduccionHTML()`, sin redondear antes de sumar), más una fila de
+  TOTALES al final con la misma fórmula de `_pieTotalesHTML()` — para que una diferencia entre lo
+  que alguien suma a mano y lo que muestra la pantalla quede auditable en el mismo archivo.
+  Archivo `Losa_<nombre>_<vista>_<fecha>.xlsx`.
 - **Pie de "Avance de producción" ponderado por longitud** (`_pieAvanceProduccionHTML()`, fila
   nueva al final de la tabla, solo en modo producción): el avance NO es "filas completas / filas
   totales" ni "piezas hechas / piezas totales" — cada fila pesa según sus metros reales
