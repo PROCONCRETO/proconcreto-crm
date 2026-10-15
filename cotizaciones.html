@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ProSuite — Proconcreto</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect x='1' y='1' width='38' height='38' rx='10' fill='%23003F7F'/%3E%3Ctext x='9' y='29' font-family='Arial, sans-serif' font-weight='900' font-size='24' fill='%23FFFFFF'%3EP%3C/text%3E%3Crect x='21' y='21' width='15' height='15' rx='4' fill='%238BC53F'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="css/estilos.css?v=20261007b">
+<link rel="stylesheet" href="css/estilos.css?v=20261017h">
 </head>
 <body>
 
@@ -1351,7 +1351,7 @@
   </div>
 
   <div class="card" style="padding:0;overflow-x:auto" onpaste="onPasteFilasProduccion(event)" tabindex="0">
-    <table class="tabla-items" style="min-width:980px">
+    <table id="tabla-filas-produccion" class="tabla-items" style="min-width:980px">
       <thead id="filas-produccion-thead"></thead>
       <tbody id="filas-produccion-body"></tbody>
       <tfoot id="filas-produccion-tfoot"></tfoot>
@@ -1397,9 +1397,12 @@
       <div class="form-grupo"><label>Fecha programada</label><input type="date" id="mpp-fecha"></div>
       <div class="form-grupo"><label>Observaciones</label><input type="text" id="mpp-observaciones"></div>
     </div>
-    <div class="form-grid" style="margin-bottom:10px">
-      <div class="form-grupo"><label>Desde cuadro</label><input type="number" id="mpp-filtro-desde" placeholder="Ej: 1" oninput="_aplicarFiltroCuadroProgramar()"></div>
-      <div class="form-grupo"><label>Hasta cuadro</label><input type="number" id="mpp-filtro-hasta" placeholder="Ej: 20" oninput="_aplicarFiltroCuadroProgramar()"></div>
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <label style="font-size:12px;font-weight:600;color:var(--gris-medio)">FILTROS (opcional)</label>
+        <button type="button" class="btn btn-secundario btn-xs" onclick="_agregarFiltroProgramar('mpp')">+ Agregar filtro</button>
+      </div>
+      <div id="mpp-filtros-lista"></div>
     </div>
     <div style="font-size:12px;color:var(--gris-medio);margin-bottom:6px">Cuánto de cada fila se va a programar (se precargaron solo las filas con saldo pendiente de producción):</div>
     <div style="max-height:320px;overflow-y:auto">
@@ -1473,9 +1476,12 @@
       <div class="form-grupo"><label>Fecha programada</label><input type="date" id="mpd-fecha"></div>
       <div class="form-grupo"><label>Observaciones</label><input type="text" id="mpd-observaciones"></div>
     </div>
-    <div class="form-grid" style="margin-bottom:10px">
-      <div class="form-grupo"><label>Desde cuadro</label><input type="number" id="mpd-filtro-desde" placeholder="Ej: 1" oninput="_aplicarFiltroCuadroProgramarDespacho()"></div>
-      <div class="form-grupo"><label>Hasta cuadro</label><input type="number" id="mpd-filtro-hasta" placeholder="Ej: 20" oninput="_aplicarFiltroCuadroProgramarDespacho()"></div>
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <label style="font-size:12px;font-weight:600;color:var(--gris-medio)">FILTROS (opcional)</label>
+        <button type="button" class="btn btn-secundario btn-xs" onclick="_agregarFiltroProgramar('mpd')">+ Agregar filtro</button>
+      </div>
+      <div id="mpd-filtros-lista"></div>
     </div>
     <div style="font-size:12px;color:var(--gris-medio);margin-bottom:6px">Cuánto de cada fila se va a programar para despacho (se precargaron solo las filas con saldo pendiente):</div>
     <div style="max-height:320px;overflow-y:auto">
@@ -3330,7 +3336,7 @@
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
 <script src="js/proyectos.js?v=20261016b"></script>
-<script src="js/losas-proyecto.js?v=20261017g"></script>
+<script src="js/losas-proyecto.js?v=20261017h"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20261013a"></script>
 <script src="js/cotizador.js?v=20261007a"></script>

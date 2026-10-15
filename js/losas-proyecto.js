@@ -490,6 +490,18 @@ function renderFilasProduccion() {
   // producido/despachado todavía.
   const esLista = _MODO_FLUJO_LOSA === 'lista';
   const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
+  // Encabezado fijo al bajar — SOLO en Producción/Despacho (2026-10-17, a pedido del usuario:
+  // "bloquea las primeras filas como ya lo hicimos en otras partes del aplicativo, pues al
+  // bajar se pierden los títulos"). En Lista NO se activa a propósito: es la misma tabla, pero
+  // ahí es un formulario donde se van agregando/editando filas, y `.tabla-cots` (encabezado
+  // `position:sticky`) ya causó ahí mismo un bug real una vez (una fila nueva terminaba
+  // tapada detrás del encabezado pegado) — ver docs/01-arquitectura-tecnica.md. Producción y
+  // Despacho son de solo lectura (no se agregan filas), así que ahí sí es seguro. Clase
+  // ADITIVA `.tabla-items.fija-al-bajar` (css/estilos.css) en vez de cambiar a `.tabla-cots`
+  // entero — esa trae su propio estilo de encabezado (fondo blanco, texto gris) distinto al
+  // azul de `.tabla-items`, que no se pidió cambiar.
+  const tabla = document.getElementById('tabla-filas-produccion');
+  if (tabla) tabla.className = esLista ? 'tabla-items' : 'tabla-items fija-al-bajar';
   const thead = document.getElementById('filas-produccion-thead');
   // "Unidades fabricadas" (2026-10-15, a pedido del usuario), justo antes de "Pend.
   // Producción" — solo en modo producción, igual que el resto de columnas de seguimiento.
@@ -518,8 +530,19 @@ function renderFilasProduccion() {
   if (tfoot) tfoot.innerHTML = _pieTotalesHTML(l) + (esProduccion ? _pieAvanceProduccionHTML() : '');
 }
 
+// Fila de TOTALES alineada debajo de su propia columna (2026-10-17, a pedido del usuario:
+// "cuadra los totales para que queden debajo de cada columna" — la primera versión era un
+// solo banner de texto, de ancho completo, más fácil de armar pero más difícil de leer de un
+// vistazo). El colspan de la celda "TOTALES" cubre exactamente las columnas antes de
+// "Cantidad" (# + Cuadro + Ejes num. + Ejes alfa. + las 2 o 3 columnas propias del sistema +
+// Dimensión), y las celdas de total van justo debajo de "Cantidad"/"Long. total (m)"/"m²" —
+// mismo criterio que ya usa el colspan de la fila TOTALES de los imprimibles. El resto de
+// columnas a la derecha (Peso, Pend./Fabricadas, Observaciones, la de acciones) quedan vacías
+// en un último `<td colspan>`.
 function _pieTotalesHTML(l) {
   const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const esLista = _MODO_FLUJO_LOSA === 'lista';
+  const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
   let totalUnidades = 0, totalMetros = 0, totalM2 = 0;
   _filasLosaActual.forEach(f => {
     const dim = Number(f.dimension) || 0;
@@ -528,11 +551,18 @@ function _pieTotalesHTML(l) {
     totalMetros += dim * cant;
     if (!esVigueta) totalM2 += (Number(f.ancho) || 0) / 100 * dim * cant;
   });
-  const numCols = document.querySelectorAll('#filas-produccion-thead th').length || 1;
+  // # + Cuadro + Ejes num. + Ejes alfa. = 4, + columnas propias del sistema (3 vigueta / 2
+  // prelosa), + Dimensión (m) = 1.
+  const colspanInicial = 4 + (esVigueta ? 3 : 2) + 1;
+  // Peso (kg) = 1, + Unidades fabricadas/Pend. Producción (2) o Pend. Despacho (1) o nada en
+  // Lista (0), + Observaciones = 1, + columna de acciones = 1.
+  const colspanFinal = 1 + (esLista ? 0 : (esProduccion ? 2 : 1)) + 1 + 1;
   return `<tr style="background:var(--azul-suave);font-weight:700">
-    <td colspan="${numCols}" style="padding:10px;text-align:center;color:var(--azul)">
-      📐 TOTALES: ${totalUnidades} unidades · ${totalMetros.toFixed(2)} m lineales${esVigueta ? '' : ` · ${totalM2.toFixed(2)} m²`}
-    </td>
+    <td colspan="${colspanInicial}" style="padding:10px;text-align:right;color:var(--azul)">📐 TOTALES</td>
+    <td style="padding:10px;text-align:center;color:var(--azul)">${totalUnidades}</td>
+    <td style="padding:10px;text-align:right;color:var(--azul)">${totalMetros.toFixed(2)}</td>
+    ${esVigueta ? '' : `<td style="padding:10px;text-align:right;color:var(--azul)">${totalM2.toFixed(2)}</td>`}
+    <td colspan="${colspanFinal}"></td>
   </tr>`;
 }
 
@@ -897,8 +927,7 @@ function abrirModalProgramarProduccion() {
   const conPendiente = _filasLosaActual.filter(f => _pendienteProduccionFila(f) > 0);
   document.getElementById('mpp-fecha').value = _fmtISO(new Date());
   document.getElementById('mpp-observaciones').value = '';
-  document.getElementById('mpp-filtro-desde').value = '';
-  document.getElementById('mpp-filtro-hasta').value = '';
+  document.getElementById('mpp-filtros-lista').innerHTML = '';
   const tbody = document.getElementById('mpp-filas-body');
   if (!conPendiente.length) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gris-medio);padding:10px">No hay filas con saldo pendiente de producción.</td></tr>`;
@@ -907,10 +936,12 @@ function abrirModalProgramarProduccion() {
     // automáticamente se programen las cantidades pendientes de esa fila, pues por lo general
     // siempre se funden juntas") — marcar la fila precarga "A programar" con el pendiente
     // completo; desmarcarla lo vuelve a dejar en 0. El campo sigue editable a mano aparte, por
-    // si se quiere programar solo una parte. `data-cuadro` alimenta el filtro de rango de abajo.
+    // si se quiere programar solo una parte. Los `data-*` alimentan los filtros de abajo (2026-
+    // 10-15, a pedido del usuario: "hagamos que pueda uno seleccionar el tipo de filtro a
+    // aplicar" — cuadro, ejes numéricos/alfabéticos, ancho, hilos).
     tbody.innerHTML = conPendiente.map(f => {
       const pend = _pendienteProduccionFila(f);
-      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}">
+      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}">
         <td><input type="checkbox" class="mpp-chk-fila" onchange="_marcarFilaProgramar(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
         <td>${f.dimension || 0} m</td>
@@ -937,22 +968,87 @@ function _marcarTodasFilasProgramar(marcar) {
     _marcarFilaProgramar(chk);
   });
 }
-// Filtro "Desde cuadro / Hasta cuadro" (2026-10-15, a pedido del usuario) — en proyectos
-// grandes (Boreal real tuvo 247 filas en una sola Losa) acota la tabla a un rango contiguo de
-// cuadros en vez de tener que buscarlos a mano. Oculta filas con display:none en vez de
-// volver a renderizar la tabla, para no perder cantidades ya digitadas en filas que quedan
-// fuera del rango. `cuadro` no numérico queda oculto mientras el filtro esté activo (no hay
-// forma de ubicarlo en un rango numérico) — sin filtro, se ve todo sin importar el formato.
-function _aplicarFiltroCuadroProgramar() {
-  const desdeRaw = document.getElementById('mpp-filtro-desde').value;
-  const hastaRaw = document.getElementById('mpp-filtro-hasta').value;
-  const desde = desdeRaw === '' ? null : parseFloat(desdeRaw);
-  const hasta = hastaRaw === '' ? null : parseFloat(hastaRaw);
-  document.querySelectorAll('#mpp-filas-body tr[data-cuadro]').forEach(tr => {
-    if (desde == null && hasta == null) { tr.style.display = ''; return; }
-    const cuadroNum = parseFloat(tr.dataset.cuadro);
-    const dentro = !isNaN(cuadroNum) && (desde == null || cuadroNum >= desde) && (hasta == null || cuadroNum <= hasta);
-    tr.style.display = dentro ? '' : 'none';
+// Filtros por tipo, combinables (2026-10-15, a pedido del usuario: "hagamos que pueda uno
+// seleccionar el tipo de filtro a aplicar... permite agregar filtros adicionales, de forma
+// tal que pueda yo por ejemplo acotar entre ejes A y C y ejes 3 y 4... o entre los cuadros 10
+// al 30, de 50cm de ancho") — reemplaza el filtro fijo de "Desde/Hasta cuadro" (en proyectos
+// grandes, Boreal real tuvo 247 filas en una sola Losa) por una lista de filtros que el
+// usuario arma a su gusto, cada uno de un tipo distinto, combinados con Y (una fila solo se ve
+// si pasa TODOS los filtros activos a la vez). Compartido tal cual entre Programar producción
+// (prefijo 'mpp') y Programar despacho ('mpd'). Oculta filas con display:none en vez de volver
+// a renderizar la tabla, para no perder cantidades ya digitadas en filas fuera del filtro.
+// "Ancho de prelosa"/"Número de hilos" solo aparecen si el sistema no es vigueta (esos campos
+// no existen ahí). Ejes numéricos/alfabéticos: el valor de la fila ya es en sí un RANGO
+// ("1-2", "A-B" — ver `par()` en `_filaProduccionHTML`), así que "pasa el filtro" si ese rango
+// se CRUZA con el rango pedido (no solo si coincide exacto) — así "entre ejes 3 y 4" también
+// trae un cuadro que va de eje 2 a eje 5, porque sí pasa por esa zona del plano.
+const TIPOS_FILTRO_PROGRAMAR = [
+  { id: 'cuadro', label: 'Entre cuadros' },
+  { id: 'ejeNum', label: 'Entre ejes numéricos' },
+  { id: 'ejeAlfa', label: 'Entre ejes alfabéticos' },
+  { id: 'ancho', label: 'Ancho de prelosa', soloConAncho: true },
+  { id: 'hilos', label: 'Número de hilos', soloConAncho: true },
+];
+function _filaFiltroProgramarHTML(prefijo, esVigueta) {
+  const opciones = TIPOS_FILTRO_PROGRAMAR.filter(t => !t.soloConAncho || !esVigueta)
+    .map(t => `<option value="${t.id}">${t.label}</option>`).join('');
+  return `<div class="filtro-programar-fila" style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+    <select data-tipo onchange="_cambiarTipoFiltroProgramar(this,'${prefijo}')" style="flex:1;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:12px">${opciones}</select>
+    <input type="number" placeholder="Desde" data-rol="desde" oninput="_aplicarFiltrosProgramar('${prefijo}')" style="width:80px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio)">
+    <input type="number" placeholder="Hasta" data-rol="hasta" oninput="_aplicarFiltrosProgramar('${prefijo}')" style="width:80px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio)">
+    <button type="button" class="btn btn-rojo btn-xs" onclick="this.closest('.filtro-programar-fila').remove();_aplicarFiltrosProgramar('${prefijo}')">✕</button>
+  </div>`;
+}
+function _agregarFiltroProgramar(prefijo) {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
+  document.getElementById(`${prefijo}-filtros-lista`).insertAdjacentHTML('beforeend', _filaFiltroProgramarHTML(prefijo, esVigueta));
+}
+function _cambiarTipoFiltroProgramar(select, prefijo) {
+  const esAlfa = select.value === 'ejeAlfa';
+  select.closest('.filtro-programar-fila').querySelectorAll('input[data-rol]').forEach(inp => {
+    inp.type = esAlfa ? 'text' : 'number';
+    inp.value = '';
+  });
+  _aplicarFiltrosProgramar(prefijo);
+}
+function _parRangoFiltro(valor, numerico) {
+  const idx = (valor || '').indexOf('-');
+  const a = (idx >= 0 ? valor.slice(0, idx) : (valor || '')).trim();
+  const b = (idx >= 0 ? valor.slice(idx + 1) : '').trim();
+  const pa = numerico ? parseFloat(a) : a.toUpperCase();
+  const pb = numerico ? parseFloat(b) : b.toUpperCase();
+  const va = numerico ? !isNaN(pa) : !!pa;
+  const vb = numerico ? !isNaN(pb) : !!pb;
+  if (!va && !vb) return null;
+  if (!vb) return [pa, pa];
+  if (!va) return [pb, pb];
+  return pa <= pb ? [pa, pb] : [pb, pa];
+}
+function _filaPasaFiltroProgramar(tr, filtro) {
+  const { tipo, desde, hasta } = filtro;
+  if (tipo === 'cuadro' || tipo === 'ancho' || tipo === 'hilos') {
+    const v = parseFloat(tr.dataset[tipo]);
+    return !isNaN(v) && (desde == null || v >= desde) && (hasta == null || v <= hasta);
+  }
+  const rango = _parRangoFiltro(tipo === 'ejeNum' ? tr.dataset.ejeNum : tr.dataset.ejeAlfa, tipo === 'ejeNum');
+  if (!rango) return false;
+  return (hasta == null || rango[0] <= hasta) && (desde == null || rango[1] >= desde);
+}
+function _aplicarFiltrosProgramar(prefijo) {
+  const filtros = Array.from(document.querySelectorAll(`#${prefijo}-filtros-lista .filtro-programar-fila`)).map(fila => {
+    const tipo = fila.querySelector('[data-tipo]').value;
+    const esAlfa = tipo === 'ejeAlfa';
+    const desdeRaw = fila.querySelector('[data-rol="desde"]').value.trim();
+    const hastaRaw = fila.querySelector('[data-rol="hasta"]').value.trim();
+    return {
+      tipo,
+      desde: desdeRaw === '' ? null : (esAlfa ? desdeRaw.toUpperCase() : parseFloat(desdeRaw)),
+      hasta: hastaRaw === '' ? null : (esAlfa ? hastaRaw.toUpperCase() : parseFloat(hastaRaw)),
+    };
+  }).filter(f => f.desde != null || f.hasta != null);
+  document.querySelectorAll(`#${prefijo}-filas-body tr[data-cuadro]`).forEach(tr => {
+    tr.style.display = filtros.every(f => _filaPasaFiltroProgramar(tr, f)) ? '' : 'none';
   });
 }
 function guardarProgramacionProduccion() {
@@ -1370,15 +1466,14 @@ function abrirModalProgramarDespacho() {
   const conPendiente = _filasLosaActual.filter(f => _pendienteDespachoFila(f, _despachosLosaActual) > 0);
   document.getElementById('mpd-fecha').value = _fmtISO(new Date());
   document.getElementById('mpd-observaciones').value = '';
-  document.getElementById('mpd-filtro-desde').value = '';
-  document.getElementById('mpd-filtro-hasta').value = '';
+  document.getElementById('mpd-filtros-lista').innerHTML = '';
   const tbody = document.getElementById('mpd-filas-body');
   if (!conPendiente.length) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gris-medio);padding:10px">No hay filas con saldo pendiente de despacho.</td></tr>`;
   } else {
     tbody.innerHTML = conPendiente.map(f => {
       const pend = _pendienteDespachoFila(f, _despachosLosaActual);
-      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}">
+      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}">
         <td><input type="checkbox" class="mpd-chk-fila" onchange="_marcarFilaProgramarDespacho(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
         <td>${f.dimension || 0} m</td>
@@ -1400,18 +1495,6 @@ function _marcarTodasFilasProgramarDespacho(marcar) {
     if (!chk) return;
     chk.checked = marcar;
     _marcarFilaProgramarDespacho(chk);
-  });
-}
-function _aplicarFiltroCuadroProgramarDespacho() {
-  const desdeRaw = document.getElementById('mpd-filtro-desde').value;
-  const hastaRaw = document.getElementById('mpd-filtro-hasta').value;
-  const desde = desdeRaw === '' ? null : parseFloat(desdeRaw);
-  const hasta = hastaRaw === '' ? null : parseFloat(hastaRaw);
-  document.querySelectorAll('#mpd-filas-body tr[data-cuadro]').forEach(tr => {
-    if (desde == null && hasta == null) { tr.style.display = ''; return; }
-    const cuadroNum = parseFloat(tr.dataset.cuadro);
-    const dentro = !isNaN(cuadroNum) && (desde == null || cuadroNum >= desde) && (hasta == null || cuadroNum <= hasta);
-    tr.style.display = dentro ? '' : 'none';
   });
 }
 function guardarProgramacionDespacho() {

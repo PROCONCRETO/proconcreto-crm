@@ -247,12 +247,25 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     dejar en 0. El campo sigue editable a mano aparte, para programar solo una parte. Un
     checkbox "marcar todas" en el encabezado (`_marcarTodasFilasProgramar()`) hace lo mismo con
     todas las filas visibles de una vez.
-  - **Filtro "Desde cuadro / Hasta cuadro"** (`_aplicarFiltroCuadroProgramar()`, 2026-10-15, a
-    pedido del usuario) — en Losas grandes (Boreal real tuvo 247 filas) acota la tabla a un
-    rango contiguo de cuadros. Oculta filas con `display:none` en vez de volver a renderizar la
-    tabla, para no perder cantidades ya digitadas en filas que quedan fuera del rango al
-    filtrar. Un `cuadro` no numérico queda oculto mientras el filtro esté activo. "Marcar
-    todas" respeta el filtro — solo toca las filas visibles.
+  - **Filtros por tipo, combinables** (`TIPOS_FILTRO_PROGRAMAR`, `_agregarFiltroProgramar()`,
+    `_aplicarFiltrosProgramar()`, 2026-10-15, a pedido del usuario: "hagamos que pueda uno
+    seleccionar el tipo de filtro a aplicar... permite agregar filtros adicionales, de forma
+    tal que pueda yo por ejemplo acotar entre ejes A y C y ejes 3 y 4... o entre los cuadros 10
+    al 30, de 50cm de ancho" — sustituye el filtro fijo original de "Desde/Hasta cuadro") — en
+    Losas grandes (Boreal real tuvo 247 filas) acota la tabla por el criterio que haga falta en
+    vez de buscar a mano. Botón "+ Agregar filtro" agrega una fila con: selector de tipo
+    (Entre cuadros / Entre ejes numéricos / Entre ejes alfabéticos / Ancho de prelosa / Número
+    de hilos — estas dos últimas solo aparecen si el sistema no es vigueta, no existen ahí) +
+    Desde/Hasta + botón ✕ para quitarla. Se pueden agregar varios filtros de tipos distintos a
+    la vez, combinados con Y (una fila solo se ve si pasa TODOS los filtros activos). Ejes
+    numéricos/alfabéticos: el valor de la fila ya es en sí un rango ("1-2", "A-B"), así que
+    "pasa el filtro" si ese rango se CRUZA con el rango pedido (no solo si coincide exacto) —
+    un cuadro que va de eje 2 a eje 5 sí aparece al filtrar "entre eje 3 y 4", porque pasa por
+    esa zona del plano; un rango de fila al revés ("C-A") se normaliza antes de comparar. Oculta
+    filas con `display:none` en vez de volver a renderizar la tabla, para no perder cantidades
+    ya digitadas en filas que quedan fuera del filtro. "Marcar todas" respeta el filtro — solo
+    toca las filas visibles. Misma lógica exacta en Programar despacho (prefijo `mpd` en vez de
+    `mpp`, funciones compartidas).
   - **"🖨️ Imprimir" dentro del propio modal** (`imprimirProgramacionProduccion()`/
     `descargarPDFProgramacionProduccion()`, 2026-10-15, a pedido del usuario: "la idea es poder
     imprimir lo que se espera producir, osea la programación de producción que damos con el
@@ -368,13 +381,33 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
   final del cuadro... una fila de totales, donde totalicemos unidades, los metros lineales como
   los metros cuadrados") — en las TRES vistas, a diferencia del avance ponderado de abajo, que
   sigue siendo solo de producción; en producción quedan las DOS filas de pie, una debajo de la
-  otra. `Σ cantidad`, `Σ (dimensión×cantidad)` y, si no es vigueta, `Σ m2` — mismo banner
-  centrado de ancho completo que ya usa el avance (`colspan` dinámico según el número de
-  columnas visibles del `thead` en ese momento, para no desalinearse entre modos/sistemas).
-  `_actualizarFilaProduccion(i)` (la actualización quirúrgica al escribir en modo lista) también
-  refresca esta fila completa en cada tecla — depende de TODAS las filas, no solo de la que se
-  está editando, así que no se puede actualizar celda por celda como las demás; como no tiene
-  ningún `<input>` adentro, reemplazar su `innerHTML` no le quita el foco a nada.
+  otra. `Σ cantidad`, `Σ (dimensión×cantidad)` y, si no es vigueta, `Σ m2`. **Alineada debajo de
+  su propia columna** (2026-10-17, a pedido del usuario: "cuadra los totales para que queden
+  debajo de cada columna" — la primera versión era un solo banner de texto de ancho completo,
+  más fácil de armar pero más difícil de leer de un vistazo): la celda "📐 TOTALES" lleva un
+  `colspan` calculado que cubre exactamente las columnas antes de "Cantidad" (# + Cuadro + Ejes
+  num. + Ejes alfa. + las columnas propias del sistema + Dimensión), luego los totales van en
+  celdas reales justo debajo de "Cantidad"/"Long. total (m)"/"m²", y un último `colspan` cubre
+  el resto (Peso, Pend./Fabricadas, Observaciones, acciones) — mismo criterio que ya usa el
+  `colspan` de la fila TOTALES de los imprimibles. `_actualizarFilaProduccion(i)` (la
+  actualización quirúrgica al escribir en modo lista) también refresca esta fila completa en
+  cada tecla — depende de TODAS las filas, no solo de la que se está editando, así que no se
+  puede actualizar celda por celda como las demás; como no tiene ningún `<input>` adentro,
+  reemplazar su `innerHTML` no le quita el foco a nada. El pie de "Avance de producción" de abajo
+  sigue siendo un banner de ancho completo (no se pidió alinearlo por columna).
+- **Encabezado fijo al bajar, solo en Producción/Despacho** (clase `.tabla-items.fija-al-bajar`,
+  `css/estilos.css`, 2026-10-17, a pedido del usuario: "bloquea las primeras filas... pues al
+  bajar se pierden los títulos y no sabe uno qué está viendo") — `renderFilasProduccion()`
+  cambia el `className` de `#tabla-filas-produccion` según el modo: en Lista se queda en
+  `tabla-items` tal cual (sin encabezado fijo — es un formulario donde se van agregando filas, y
+  `.tabla-cots`/encabezado `position:sticky` ya causó ahí mismo un bug real una vez: una fila
+  nueva terminaba tapada detrás del encabezado pegado, ver el bullet de "Lista de Producción"
+  más abajo); en Producción/Despacho (de solo lectura, no se agregan filas) pasa a
+  `tabla-items fija-al-bajar`, que agrega `position:sticky` manteniendo el mismo fondo azul de
+  siempre — se usa una clase ADITIVA nueva en vez de cambiar directamente a `.tabla-cots`,
+  porque esa trae su propio estilo de encabezado (fondo blanco, texto gris) que no se pidió
+  cambiar. Mismo `top:94px` que `.tabla-cots` (una sola `.nav` de 44px bajo el `.nav-top` de
+  50px, sea la fija del módulo o la dinámica de Proyectos).
 - **Pie de "Avance de producción" ponderado por longitud** (`_pieAvanceProduccionHTML()`, fila
   nueva al final de la tabla, solo en modo producción): el avance NO es "filas completas / filas
   totales" ni "piezas hechas / piezas totales" — cada fila pesa según sus metros reales
@@ -425,9 +458,10 @@ conservó a propósito (mismo espíritu que `viaje.entregas[].productos[]` en Lo
 - **"+ Programar despacho"** (`abrirModalProgramarDespacho()`/`guardarProgramacionDespacho()`)
   — idéntico a "+ Programar producción": filas con saldo pendiente de despacho
   (`_pendienteDespachoFila()`, sin cambios), casilla por fila que autocompleta el pendiente
-  (`_marcarFilaProgramarDespacho()`/`_marcarTodasFilasProgramarDespacho()`), filtro "Desde
-  cuadro / Hasta cuadro" (`_aplicarFiltroCuadroProgramarDespacho()`). Crea una entrada en
-  `despachosProgramados[]` con todas sus líneas en `cantidadReal: null`.
+  (`_marcarFilaProgramarDespacho()`/`_marcarTodasFilasProgramarDespacho()`), filtros por tipo
+  combinables (`_agregarFiltroProgramar('mpd')`/`_aplicarFiltrosProgramar('mpd')` — mismas
+  funciones compartidas que usa Programar producción, ver bullet correspondiente más arriba).
+  Crea una entrada en `despachosProgramados[]` con todas sus líneas en `cantidadReal: null`.
   - **"🖨️ Imprimir" dentro del propio modal** (`imprimirProgramacionDespacho()`/
     `descargarPDFProgramacionDespacho()`, 2026-10-17, a pedido del usuario: "incluyamos el
     botón de imprimir, para poder pasar el impreso de lo que se debe organizar y cargar en el
