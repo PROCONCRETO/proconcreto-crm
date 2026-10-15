@@ -493,22 +493,47 @@ function renderFilasProduccion() {
   const thead = document.getElementById('filas-produccion-thead');
   // "Unidades fabricadas" (2026-10-15, a pedido del usuario), justo antes de "Pend.
   // Producción" — solo en modo producción, igual que el resto de columnas de seguimiento.
+  // "m²" (2026-10-17, a pedido del usuario: "incluyamos una nueva fila de m2, que es el
+  // resultado de multiplicar el largo por el ancho") — solo en prelosa/placa alveolar, vigueta
+  // no tiene un "ancho" real (se mide en metros lineales, no en área) así que no aplica.
   thead.innerHTML = `<tr>
     <th>#</th><th>Cuadro</th><th>Ejes numéricos</th><th>Ejes alfabéticos</th>
     ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
-    <th>Dimensión (m)</th><th>Cantidad</th><th>Long. total (m)</th><th>Peso (kg)</th>
+    <th>Dimensión (m)</th><th>Cantidad</th><th>Long. total (m)</th>${esVigueta ? '' : '<th>m²</th>'}<th>Peso (kg)</th>
     ${esLista ? '' : (esProduccion ? '<th>Unidades fabricadas</th><th>Pend. Producción</th>' : '<th>Pend. Despacho</th>')}
     <th>Observaciones</th><th></th>
   </tr>`;
   const tbody = document.getElementById('filas-produccion-body');
   const tfoot = document.getElementById('filas-produccion-tfoot');
   if (!_filasLosaActual.length) {
-    tbody.innerHTML = `<tr><td colspan="15" class="empty-state"><div class="icono">📋</div><div>No hay filas todavía — agrega una a mano, pégalas desde Excel o importa el archivo.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="16" class="empty-state"><div class="icono">📋</div><div>No hay filas todavía — agrega una a mano, pégalas desde Excel o importa el archivo.</div></td></tr>`;
     if (tfoot) tfoot.innerHTML = '';
     return;
   }
   tbody.innerHTML = _filasLosaActual.map((f, i) => _filaProduccionHTML(f, i, l, esVigueta)).join('');
-  if (tfoot) tfoot.innerHTML = esProduccion ? _pieAvanceProduccionHTML() : '';
+  // Fila de TOTALES (2026-10-17, a pedido del usuario: "incluyamos al final del cuadro... una
+  // fila de totales, donde totalicemos unidades, los metros lineales como los metros
+  // cuadrados") — en las TRES vistas (lista/producción/despacho), a diferencia del avance
+  // ponderado de abajo, que sigue siendo solo de producción.
+  if (tfoot) tfoot.innerHTML = _pieTotalesHTML(l) + (esProduccion ? _pieAvanceProduccionHTML() : '');
+}
+
+function _pieTotalesHTML(l) {
+  const esVigueta = l.sistema === 'vigueta_bovedilla';
+  let totalUnidades = 0, totalMetros = 0, totalM2 = 0;
+  _filasLosaActual.forEach(f => {
+    const dim = Number(f.dimension) || 0;
+    const cant = Number(f.cantidad) || 0;
+    totalUnidades += cant;
+    totalMetros += dim * cant;
+    if (!esVigueta) totalM2 += (Number(f.ancho) || 0) / 100 * dim * cant;
+  });
+  const numCols = document.querySelectorAll('#filas-produccion-thead th').length || 1;
+  return `<tr style="background:var(--azul-suave);font-weight:700">
+    <td colspan="${numCols}" style="padding:10px;text-align:center;color:var(--azul)">
+      📐 TOTALES: ${totalUnidades} unidades · ${totalMetros.toFixed(2)} m lineales${esVigueta ? '' : ` · ${totalM2.toFixed(2)} m²`}
+    </td>
+  </tr>`;
 }
 
 // Fila de avance al pie de la tabla, solo en modo producción (2026-10-15, a pedido del
@@ -541,6 +566,11 @@ function _pieAvanceProduccionHTML() {
 // el insumo que recibe de Ingeniería.
 function _filaProduccionHTML(f, i, l, esVigueta) {
   const longTotal = (Number(f.dimension) || 0) * (Number(f.cantidad) || 0);
+  // m² (2026-10-17, a pedido del usuario) = ancho(m) × largo × cantidad — mismo patrón que
+  // "Long. total (m)" (multiplica por cantidad, no es un valor por unidad), para que sumarla
+  // en la fila de TOTALES dé directamente los m² reales de toda la Losa. Solo aplica a
+  // prelosa/placa alveolar — vigueta no tiene un "ancho" real.
+  const m2 = esVigueta ? 0 : (Number(f.ancho) || 0) / 100 * (Number(f.dimension) || 0) * (Number(f.cantidad) || 0);
   const peso = _pesoFila(f, l);
   const pendProd = _pendienteProduccionFila(f);
   const pendDesp = _pendienteDespachoFila(f, _despachosLosaActual);
@@ -589,6 +619,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     <td>${num(f.dimension, 'dimension', 50, true)}</td>
     <td>${num(f.cantidad, 'cantidad', 42, true)}</td>
     <td id="fp-longtotal-${i}" style="text-align:right">${longTotal.toFixed(2)}</td>
+    ${esVigueta ? '' : `<td id="fp-m2-${i}" style="text-align:right">${m2.toFixed(2)}</td>`}
     <td id="fp-peso-${i}" style="text-align:right">${peso.toFixed(1)}</td>
     ${esLista ? '' : (_MODO_FLUJO_LOSA === 'produccion'
       ? `<td style="text-align:right">${(Number(f.cantidad) || 0) - pendProd}</td><td id="fp-pendprod-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProd}</td>`
@@ -625,14 +656,24 @@ function _actualizarFilaProduccion(i) {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   const f = _filasLosaActual[i];
   if (!l || !f) return;
+  const esVigueta = l.sistema === 'vigueta_bovedilla';
   const longTotal = (Number(f.dimension) || 0) * (Number(f.cantidad) || 0);
+  const m2 = esVigueta ? 0 : (Number(f.ancho) || 0) / 100 * (Number(f.dimension) || 0) * (Number(f.cantidad) || 0);
   const peso = _pesoFila(f, l);
   const pendProd = _pendienteProduccionFila(f);
   const pendDesp = _pendienteDespachoFila(f, _despachosLosaActual);
   const elLong = document.getElementById(`fp-longtotal-${i}`); if (elLong) elLong.textContent = longTotal.toFixed(2);
+  const elM2 = document.getElementById(`fp-m2-${i}`); if (elM2) elM2.textContent = m2.toFixed(2);
   const elPeso = document.getElementById(`fp-peso-${i}`); if (elPeso) elPeso.textContent = peso.toFixed(1);
   const elPP = document.getElementById(`fp-pendprod-${i}`); if (elPP) { elPP.textContent = pendProd; elPP.style.color = pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'; }
   const elPD = document.getElementById(`fp-penddesp-${i}`); if (elPD) { elPD.textContent = pendDesp; elPD.style.color = pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'; }
+  // La fila de TOTALES depende de TODAS las filas, no solo de esta — se refresca aparte (sin
+  // tocar el <tbody>, así no se pierde el foco de ningún input a mitad de tecleo).
+  const tfoot = document.getElementById('filas-produccion-tfoot');
+  if (tfoot) {
+    const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
+    tfoot.innerHTML = _pieTotalesHTML(l) + (esProduccion ? _pieAvanceProduccionHTML() : '');
+  }
 }
 
 // Recompone el valor combinado ("1-1´", "I-G"...) de Ejes numéricos/Ejes alfabéticos a partir

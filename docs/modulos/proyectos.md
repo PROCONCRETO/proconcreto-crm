@@ -357,6 +357,24 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
 - **Columna "Unidades fabricadas"** (`_filaProduccionHTML()`, justo antes de "Pend.
   Producción", solo en modo producción) = `cantidad − pendienteProducción` — mismo origen que el
   pendiente, solo mostrado desde el otro lado.
+- **Columna "m²"** (`_filaProduccionHTML()`, justo después de "Long. total (m)", 2026-10-17, a
+  pedido del usuario: "incluyamos una nueva fila de m2, que es el resultado de multiplicar el
+  largo por el ancho") — en las TRES vistas (lista/producción/despacho), solo en
+  prelosa/placa alveolar. `m2 = (ancho/100) × dimensión × cantidad` — mismo patrón que "Long.
+  total (m)" (multiplica por `cantidad`, no es un valor por unidad), para que sumarla en la fila
+  de TOTALES dé directamente los m² reales de la Losa sin necesitar ponderar nada aparte.
+  Vigueta no la lleva — no tiene un "ancho" real, se mide en metros lineales, no en área.
+- **Fila de "TOTALES"** (`_pieTotalesHTML()`, 2026-10-17, a pedido del usuario: "incluyamos al
+  final del cuadro... una fila de totales, donde totalicemos unidades, los metros lineales como
+  los metros cuadrados") — en las TRES vistas, a diferencia del avance ponderado de abajo, que
+  sigue siendo solo de producción; en producción quedan las DOS filas de pie, una debajo de la
+  otra. `Σ cantidad`, `Σ (dimensión×cantidad)` y, si no es vigueta, `Σ m2` — mismo banner
+  centrado de ancho completo que ya usa el avance (`colspan` dinámico según el número de
+  columnas visibles del `thead` en ese momento, para no desalinearse entre modos/sistemas).
+  `_actualizarFilaProduccion(i)` (la actualización quirúrgica al escribir en modo lista) también
+  refresca esta fila completa en cada tecla — depende de TODAS las filas, no solo de la que se
+  está editando, así que no se puede actualizar celda por celda como las demás; como no tiene
+  ningún `<input>` adentro, reemplazar su `innerHTML` no le quita el foco a nada.
 - **Pie de "Avance de producción" ponderado por longitud** (`_pieAvanceProduccionHTML()`, fila
   nueva al final de la tabla, solo en modo producción): el avance NO es "filas completas / filas
   totales" ni "piezas hechas / piezas totales" — cada fila pesa según sus metros reales
