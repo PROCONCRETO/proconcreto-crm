@@ -543,25 +543,30 @@ function _pieTotalesHTML(l) {
   const esVigueta = l.sistema === 'vigueta_bovedilla';
   const esLista = _MODO_FLUJO_LOSA === 'lista';
   const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
-  let totalUnidades = 0, totalMetros = 0, totalM2 = 0;
+  let totalUnidades = 0, totalMetros = 0, totalM2 = 0, totalPeso = 0;
   _filasLosaActual.forEach(f => {
     const dim = Number(f.dimension) || 0;
     const cant = Number(f.cantidad) || 0;
     totalUnidades += cant;
     totalMetros += dim * cant;
     if (!esVigueta) totalM2 += (Number(f.ancho) || 0) / 100 * dim * cant;
+    totalPeso += _pesoFila(f, l);
   });
   // # + Cuadro + Ejes num. + Ejes alfa. = 4, + columnas propias del sistema (3 vigueta / 2
   // prelosa), + Dimensión (m) = 1.
   const colspanInicial = 4 + (esVigueta ? 3 : 2) + 1;
-  // Peso (kg) = 1, + Unidades fabricadas/Pend. Producción (2) o Pend. Despacho (1) o nada en
-  // Lista (0), + Observaciones = 1, + columna de acciones = 1.
-  const colspanFinal = 1 + (esLista ? 0 : (esProduccion ? 2 : 1)) + 1 + 1;
+  // Unidades fabricadas/Pend. Producción (2) o Pend. Despacho (1) o nada en Lista (0), +
+  // Observaciones = 1, + columna de acciones = 1 — todo lo que queda DESPUÉS de Peso (kg), que
+  // ahora (2026-10-18, a pedido del usuario: "en el total de la última fila de los cuadros,
+  // incluyamos también el total del peso") lleva su propia celda de total, igual que
+  // Cantidad/Long. total/m².
+  const colspanFinal = (esLista ? 0 : (esProduccion ? 2 : 1)) + 1 + 1;
   return `<tr style="background:var(--azul-suave);font-weight:700">
     <td colspan="${colspanInicial}" style="padding:10px;text-align:right;color:var(--azul)">📐 TOTALES</td>
     <td style="padding:10px;text-align:center;color:var(--azul)">${totalUnidades}</td>
     <td style="padding:10px;text-align:right;color:var(--azul)">${totalMetros.toFixed(2)}</td>
     ${esVigueta ? '' : `<td style="padding:10px;text-align:right;color:var(--azul)">${totalM2.toFixed(2)}</td>`}
+    <td style="padding:10px;text-align:right;color:var(--azul)">${totalPeso.toFixed(1)}</td>
     <td colspan="${colspanFinal}"></td>
   </tr>`;
 }

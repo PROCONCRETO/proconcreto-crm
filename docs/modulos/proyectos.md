@@ -381,20 +381,22 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
   final del cuadro... una fila de totales, donde totalicemos unidades, los metros lineales como
   los metros cuadrados") — en las TRES vistas, a diferencia del avance ponderado de abajo, que
   sigue siendo solo de producción; en producción quedan las DOS filas de pie, una debajo de la
-  otra. `Σ cantidad`, `Σ (dimensión×cantidad)` y, si no es vigueta, `Σ m2`. **Alineada debajo de
-  su propia columna** (2026-10-17, a pedido del usuario: "cuadra los totales para que queden
-  debajo de cada columna" — la primera versión era un solo banner de texto de ancho completo,
-  más fácil de armar pero más difícil de leer de un vistazo): la celda "📐 TOTALES" lleva un
-  `colspan` calculado que cubre exactamente las columnas antes de "Cantidad" (# + Cuadro + Ejes
-  num. + Ejes alfa. + las columnas propias del sistema + Dimensión), luego los totales van en
-  celdas reales justo debajo de "Cantidad"/"Long. total (m)"/"m²", y un último `colspan` cubre
-  el resto (Peso, Pend./Fabricadas, Observaciones, acciones) — mismo criterio que ya usa el
-  `colspan` de la fila TOTALES de los imprimibles. `_actualizarFilaProduccion(i)` (la
-  actualización quirúrgica al escribir en modo lista) también refresca esta fila completa en
-  cada tecla — depende de TODAS las filas, no solo de la que se está editando, así que no se
-  puede actualizar celda por celda como las demás; como no tiene ningún `<input>` adentro,
-  reemplazar su `innerHTML` no le quita el foco a nada. El pie de "Avance de producción" de abajo
-  sigue siendo un banner de ancho completo (no se pidió alinearlo por columna).
+  otra. `Σ cantidad`, `Σ (dimensión×cantidad)`, si no es vigueta `Σ m2`, y (2026-10-18, a pedido
+  del usuario: "en el total de la última fila de los cuadros, incluyamos también el total del
+  peso") `Σ _pesoFila(f,l)`. **Alineada debajo de su propia columna** (2026-10-17, a pedido del
+  usuario: "cuadra los totales para que queden debajo de cada columna" — la primera versión era
+  un solo banner de texto de ancho completo, más fácil de armar pero más difícil de leer de un
+  vistazo): la celda "📐 TOTALES" lleva un `colspan` calculado que cubre exactamente las
+  columnas antes de "Cantidad" (# + Cuadro + Ejes num. + Ejes alfa. + las columnas propias del
+  sistema + Dimensión), luego los totales van en celdas reales justo debajo de "Cantidad"/"Long.
+  total (m)"/"m²"/"Peso (kg)", y un último `colspan` cubre el resto (Pend./Fabricadas,
+  Observaciones, acciones) — mismo criterio que ya usa el `colspan` de la fila TOTALES de los
+  imprimibles. `_actualizarFilaProduccion(i)` (la actualización quirúrgica al escribir en modo
+  lista) también refresca esta fila completa en cada tecla — depende de TODAS las filas, no solo
+  de la que se está editando, así que no se puede actualizar celda por celda como las demás; como
+  no tiene ningún `<input>` adentro, reemplazar su `innerHTML` no le quita el foco a nada. El pie
+  de "Avance de producción" de abajo sigue siendo un banner de ancho completo (no se pidió
+  alinearlo por columna).
 - **Encabezado fijo al bajar, solo en Producción/Despacho** (clase `.tabla-items.fija-al-bajar`,
   `css/estilos.css`, 2026-10-17, a pedido del usuario: "bloquea las primeras filas... pues al
   bajar se pierden los títulos y no sabe uno qué está viendo") — `renderFilasProduccion()`
@@ -408,6 +410,25 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
   porque esa trae su propio estilo de encabezado (fondo blanco, texto gris) que no se pidió
   cambiar. Mismo `top:94px` que `.tabla-cots` (una sola `.nav` de 44px bajo el `.nav-top` de
   50px, sea la fija del módulo o la dinámica de Proyectos).
+  - **Bug real encontrado al probarlo (2026-10-18, reportado por el usuario: "no se están
+    bloqueando las filas de los títulos... incluso en el de producción, está quedando montado")**
+    — la clase estaba bien puesta, pero la `<div class="card">` que envuelve la tabla
+    (`cotizaciones.html`) traía `style="padding:0;overflow-x:auto"` para permitir scroll
+    horizontal (la tabla es ancha: `min-width:980px`). Cualquier ancestro con `overflow`
+    distinto de `visible` se vuelve el límite real del `position:sticky` — y por una regla real
+    de CSS, `overflow-x:auto` con `overflow-y` sin especificar NO deja a `overflow-y` en
+    `visible`: el navegador la sube a `auto` también (no se puede evitar declarando
+    `overflow-y:visible` a mano, la regla igual aplica). Como esa tarjeta nunca scrollea por sí
+    sola (solo scrollea la página), el encabezado terminaba sin pegarse a ningún lado — mismo
+    diagnóstico que ya está documentado junto a `.tabla-cots` en `css/estilos.css` para el resto
+    de listados de la app ("Las tablas que viven en una tarjeta... dejaron de tener ese
+    overflow:hidden... porque rompe position:sticky"), pero esta tarjeta en particular se había
+    quedado afuera de ese ajuste porque es nueva (Losas de Proyecto) y necesitaba scroll
+    horizontal, algo que ninguna otra `.tabla-cots`/`.tabla-items` de la app necesitó antes.
+    **Arreglo**: se quitó el `overflow-x:auto` de la tarjeta (ahora es `style="padding:0"`, igual
+    que el resto); si la tabla no cabe en pantallas angostas, ahora desborda hacia la página
+    completa (mismo comportamiento que ya toleran los demás listados anchos de la app) en vez de
+    atraparse en un scroll propio que rompía el sticky.
 - **Pie de "Avance de producción" ponderado por longitud** (`_pieAvanceProduccionHTML()`, fila
   nueva al final de la tabla, solo en modo producción): el avance NO es "filas completas / filas
   totales" ni "piezas hechas / piezas totales" — cada fila pesa según sus metros reales
