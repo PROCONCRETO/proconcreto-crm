@@ -291,26 +291,34 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     qué eje, sin tener que adivinar o cruzar con la pantalla principal. Mismas columnas en los
     dos modales (`mpp`/`mpd`).
   - **Bancos de producción de prelosa** (`BANCO_PRELOSA_METROS_UTILES = 96`,
-    `BANCO_PRELOSA_MAX_ANCHOS = 2`, `_actualizarResumenBancosPrelosa()`, 2026-10-19, a pedido
-    del usuario: "los bancos de producción de prelosa son dos cintas de 96 metros útiles por
-    cinta. Lo más común es programar un banco (las dos cintas) de 50cm de ancho... en otras
-    ocasiones se programa una cinta de 50cm y otra de 20, 30 o 40cm... condicionemos para que
-    sean máximo 96 metros por cinta, en función del ancho. Programemos también para que se
-    puedan programar solo dos anchos") — cada cinta fabrica un único ancho a la vez, así que el
-    límite físico real es: como mucho 2 anchos distintos en toda la programación del día (una
-    cinta por ancho), y la suma de metros lineales (`dimensión × cantidad`) de cada ancho no
-    puede superar los 96 m útiles de su cinta. **Solo aplica a PRELOSA** — Placa Alveolar y
-    Vigueta y Bovedilla no se fabrican en estas cintas, el usuario habló específicamente de
-    "bancos de producción de prelosa" (si en el futuro se confirma que Placa Alveolar comparte
-    el mismo banco físico, extender la condición de `l.sistema === 'prelosa'`). Caja de resumen
-    en vivo (`#mpp-resumen-bancos`, debajo de la tabla) que se recalcula con cada tecla
-    (`oninput` en "A programar" y tras cada clic de la casilla de autocompletar): una línea por
-    ancho en uso ("Cinta de 50 cm: 42.30 / 96 m"), en rojo con ⚠️ si se pasa de 96 m, más un
-    aviso aparte si hay más de 2 anchos a la vez. **Tope duro al guardar**
-    (`guardarProgramacionProduccion()`) — mismo cálculo que el resumen en vivo pero recalculado
-    contra `lineas` (lo que de verdad se va a guardar, no lo que se veía en pantalla); rechaza
-    con un mensaje específico (cuántos anchos hay, o cuánto suma el ancho que se pasó) si se
-    incumple cualquiera de las dos reglas.
+    `BANCO_PRELOSA_NUM_CINTAS = 2`, `BANCO_PRELOSA_MAX_ANCHOS = 2`, `_topeMetrosBanco()`,
+    `_actualizarResumenBancosPrelosa()`, 2026-10-19, a pedido del usuario: "los bancos de
+    producción de prelosa son dos cintas de 96 metros útiles por cinta. Lo más común es
+    programar un banco (las dos cintas) de 50cm de ancho... en otras ocasiones se programa una
+    cinta de 50cm y otra de 20, 30 o 40cm... condicionemos para que sean máximo 96 metros por
+    cinta, en función del ancho. Programemos también para que se puedan programar solo dos
+    anchos") — cada cinta fabrica un único ancho a la vez, y como mucho 2 anchos distintos en
+    toda la programación del día (una cinta por ancho). **Solo aplica a PRELOSA** — Placa
+    Alveolar y Vigueta y Bovedilla no se fabrican en estas cintas, el usuario habló
+    específicamente de "bancos de producción de prelosa" (si en el futuro se confirma que Placa
+    Alveolar comparte el mismo banco físico, extender la condición de `l.sistema === 'prelosa'`).
+    - **El tope por ancho es dinámico, no siempre 96 m (corregido 2026-10-20, a pedido del
+      usuario: "estamos limitando a 96 metros que es lo de una cinta, pero en realidad debe ser
+      eso por 2, en el caso que se programe todo de 50cm de ancho, o todo de 40 o 30 o 20")** —
+      el límite de 96 m es por CINTA, no por ancho: una cinta no se puede repartir entre dos
+      anchos distintos a la vez (es una tira continua, configurada para un solo ancho por
+      corrida), así que el tope real de un ancho depende de CUÁNTAS cintas le tocan ese día.
+      `_topeMetrosBanco(cantidadAnchos)`: si la programación usa **un solo ancho**, ese ancho
+      tiene las 2 cintas completas para él (`96 × 2 = 192` m); si usa **2 anchos distintos**,
+      cada uno queda con una sola cinta (`96` m cada uno — no se puede "prestar" cinta de un
+      ancho a otro aunque la suma total no llegue a 192). El resumen en vivo
+      (`#mpp-resumen-bancos`) recalcula este tope con cada tecla, según cuántos anchos distintos
+      haya en ese momento ("50 cm (2 cintas): 180.00 / 192 m" con un solo ancho; "50 cm (1
+      cinta): 80.00 / 96 m" con dos). **Tope duro al guardar**
+      (`guardarProgramacionProduccion()`) — mismo cálculo recalculado contra `lineas` (lo que de
+      verdad se va a guardar), con un mensaje que explica el porqué del tope en ese caso
+      concreto ("usa las 2 cintas completas" / "solo tiene disponible 1 cinta... hay otro ancho
+      programado ese día").
   - **"🖨️ Imprimir" dentro del propio modal** (`imprimirProgramacionProduccion()`/
     `descargarPDFProgramacionProduccion()`, 2026-10-15, a pedido del usuario: "la idea es poder
     imprimir lo que se espera producir, osea la programación de producción que damos con el
@@ -413,6 +421,47 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     `fila.produccion[]` (identificada por `programacionId`) y la ACTUALIZA en el lugar — nunca
     empuja una segunda entrada, así nunca se duplica el conteo. Si el valor no cambió frente al
     ya guardado, esa línea se ignora (no hay nada que corregir).
+- **"📋 Producciones programadas"** (`renderProduccionProgramada()`, tarjeta nueva entre la
+  tabla de filas y "🏗️ Producciones registradas", solo en modo producción — 2026-10-21, a
+  pedido del usuario: "metamos otro cuadro intermedio, entre el cuadro general y el cuadro de
+  producciones registradas, donde incluyamos las producciones programadas. de esta manera
+  podemos hacer varias programaciones, editarlas e imprimirlas luego de su programación
+  inicial. cuando se carga la producción asociada a una programación, esta programación baja al
+  cuadro de producciones registradas") — lista las `produccionesProgramadas[]` que TODAVÍA no
+  tienen NINGUNA línea cargada (`every(l => l.cantidadReal == null)`), el complemento exacto del
+  filtro de "Producciones registradas" (`some(...)`, ver bullet siguiente): en cuanto se carga
+  la primera línea de una programación, desaparece de acá y aparece allá, automáticamente, sin
+  ningún dato duplicado ni ninguna lógica extra — las dos tarjetas leen del mismo
+  `_programacionesLosaActual[]`, solo cambia el filtro. Antes de esto, una programación sin
+  nada cargado todavía era invisible en la pantalla principal (solo se veía dentro del
+  desplegable de "+ Cargar producción"), así que no había forma de ver de un vistazo, editar ni
+  reimprimir varias programaciones hechas de antemano.
+  - **Mismas tres acciones** (Formato/Editar/Borrar, mismo patrón visual que el resto de
+    tarjetas de esta pantalla):
+    - **"✏️ Editar"** (`editarProgramacionProduccion()`) → reabre "+ Programar producción"
+      (`abrirModalProgramarProduccion(programacionId)`, ahora acepta un id opcional) en modo
+      edición: título cambia a "✏️ Editar programación de producción", `#mpp-id` guarda qué
+      programación se está editando, y la fecha/observaciones/cantidades ya digitadas se
+      precargan (`editando.lineas.find(l => l.filaId === f.id)?.cantidadProgramada`, por fila).
+      Una programación sin cargar no resta nada del pendiente de producción (eso solo lo hace
+      `fila.produccion[]`, vía "+ Cargar producción") — así que la lista de filas ofrecidas es
+      la misma de siempre, sin ninguna lógica de "liberar cupo" al editar.
+      `guardarProgramacionProduccion()` ahora revisa `#mpp-id`: si trae un id, ACTUALIZA esa
+      entrada en `_programacionesLosaActual` en vez de empujar una nueva.
+    - **"🖨️ Formato"** (`imprimirProgramacionProduccionGuardada(id)`) → imprime la programación
+      guardada directo, sin pasar por el modal. El imprimible mismo se factorizó en
+      `_htmlProgramacionProduccion(l, p, sis, esVigueta, fecha, observaciones, lineas, origen)`
+      — tanto esta función como la ya existente `imprimirProgramacionProduccion()` (la que lee
+      en vivo del modal abierto) arman `lineas` a su manera y le pasan el resto a este HTML
+      compartido; `origen` ('modal' | 'tarjeta') solo decide a dónde vuelve el botón "← Volver"
+      (reabre el modal si se venía de ahí, o solo regresa a la pantalla de la Losa si se
+      imprimió directo desde la tarjeta, donde nunca hubo ningún modal abierto que reabrir). El
+      ancho/dimensión/peso de cada línea se siguen leyendo EN VIVO de `_filasLosaActual` en los
+      dos casos — nunca se congela nada en la programación misma.
+    - **"🗑️ Borrar"** (`eliminarProgramacionProduccion()`) → a diferencia de
+      `eliminarProduccionRegistrada()` (más abajo), acá NUNCA hay nada que deshacer en
+      `fila.produccion[]`: una programación solo vive en esta tarjeta mientras nada se ha
+      cargado, así que borrarla no mueve ningún pendiente.
 - **"🏗️ Producciones registradas"** (`renderProduccionRegistrada()`/
   `verDetalleProduccionRegistrada()`, tarjeta nueva debajo de la tabla de filas, solo en modo
   producción — 2026-10-15, a pedido del usuario: "algo similar a lo que tenemos en Despachos de
@@ -627,6 +676,18 @@ conservó a propósito (mismo espíritu que `viaje.entregas[].productos[]` en Lo
   a partir de TODAS las líneas ya cargadas de ese plan en ese momento — nunca parcial ni
   duplicado. `_pendienteDespachoFila()` sigue funcionando exactamente igual que siempre, sin
   tocar su fórmula ni su firma.
+- **"📋 Despachos programados"** (`renderDespachoProgramado()`, 2026-10-21) — misma lógica
+  EXACTA que "📋 Producciones programadas" (ver bullet propio más arriba), del lado de
+  Despacho: tarjeta entre la tabla de filas y "📦 Despachos registrados", lista las
+  `despachosProgramados[]` sin ninguna línea cargada todavía, con las mismas tres acciones
+  (`editarProgramacionDespacho()` → `abrirModalProgramarDespacho(despachoProgramadoId)`, ahora
+  también acepta id opcional en modo edición — incluye restaurar el **vehículo** elegido
+  (`editando.vehiculo`) además de fecha/observaciones/cantidades;
+  `imprimirProgramacionDespachoGuardada()` → `_htmlProgramacionDespacho(...)`, mismo HTML
+  factorizado que usa `imprimirProgramacionDespacho()` desde el modal;
+  `eliminarProgramacionDespacho()`, sin nada que deshacer). Columna propia **"Vehículo"** (acá
+  sí vale la pena verlo de un vistazo en la tarjeta, a diferencia de Producción, que no tiene un
+  dato equivalente).
 - **"📦 Despachos registrados"** (`renderDespachosRegistrados()`/`verDetalleDespachoRegistrado()`)
   — tarjeta SIEMPRE VISIBLE debajo de la tabla de filas, misma lógica EXACTA que "🏗️
   Producciones registradas". Pasó por dos vueltas: primero se preguntó explícitamente si debía

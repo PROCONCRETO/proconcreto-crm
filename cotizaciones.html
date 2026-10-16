@@ -1359,9 +1359,19 @@
     </table>
   </div>
 
+  <div id="losa-card-produccion-programada" class="card" style="margin-top:16px;display:none">
+    <div style="font-size:15px;font-weight:700;color:var(--azul);margin-bottom:10px">📋 Producciones programadas</div>
+    <table class="tabla-cots"><thead><tr><th>Fecha</th><th>Contenido</th><th>Observaciones</th><th>Acciones</th></tr></thead><tbody id="produccion-programada-body"></tbody></table>
+  </div>
+
   <div id="losa-card-produccion-registrada" class="card" style="margin-top:16px;display:none">
     <div style="font-size:15px;font-weight:700;color:var(--azul);margin-bottom:10px">🏗️ Producciones registradas</div>
     <table class="tabla-cots"><thead><tr><th>Fecha</th><th>Contenido</th><th>Observaciones</th><th>Acciones</th></tr></thead><tbody id="produccion-registrada-body"></tbody></table>
+  </div>
+
+  <div id="losa-card-despacho-programado" class="card" style="margin-top:16px;display:none">
+    <div style="font-size:15px;font-weight:700;color:var(--azul);margin-bottom:10px">📋 Despachos programados</div>
+    <table class="tabla-cots"><thead><tr><th>Fecha</th><th>Contenido</th><th>Vehículo</th><th>Observaciones</th><th>Acciones</th></tr></thead><tbody id="despacho-programado-body"></tbody></table>
   </div>
 
   <div id="losa-card-despachos-registrados" class="card" style="margin-top:16px;display:none">
@@ -1393,7 +1403,8 @@
 
 <div class="modal-overlay" id="modal-programar-produccion">
   <div class="modal" style="width:680px;max-width:95vw">
-    <div class="modal-titulo">📋 Programar producción</div>
+    <input type="hidden" id="mpp-id">
+    <div class="modal-titulo" id="modal-programar-produccion-titulo">📋 Programar producción</div>
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Fecha programada</label><input type="date" id="mpp-fecha"></div>
       <div class="form-grupo"><label>Observaciones</label><input type="text" id="mpp-observaciones"></div>
@@ -1473,7 +1484,8 @@
 
 <div class="modal-overlay" id="modal-programar-despacho">
   <div class="modal" style="width:680px;max-width:95vw">
-    <div class="modal-titulo">📋 Programar despacho</div>
+    <input type="hidden" id="mpd-id">
+    <div class="modal-titulo" id="modal-programar-despacho-titulo">📋 Programar despacho</div>
     <div class="form-grid" style="margin-bottom:10px">
       <div class="form-grupo"><label>Fecha programada</label><input type="date" id="mpd-fecha"></div>
       <div class="form-grupo"><label>Observaciones</label><input type="text" id="mpd-observaciones"></div>
@@ -3348,7 +3360,7 @@
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
 <script src="js/proyectos.js?v=20261016b"></script>
-<script src="js/losas-proyecto.js?v=20261020c"></script>
+<script src="js/losas-proyecto.js?v=20261021b"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20261013a"></script>
 <script src="js/cotizador.js?v=20261007a"></script>

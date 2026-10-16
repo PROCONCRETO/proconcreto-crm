@@ -480,13 +480,15 @@ function renderLosaDetalle() {
   document.getElementById('losa-btn-produccion-diaria').style.display = esProduccion ? '' : 'none';
   document.getElementById('losa-btn-programar-despacho').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-btn-cargar-despacho').style.display = esDespacho ? '' : 'none';
+  document.getElementById('losa-card-produccion-programada').style.display = esProduccion ? '' : 'none';
   document.getElementById('losa-card-produccion-registrada').style.display = esProduccion ? '' : 'none';
+  document.getElementById('losa-card-despacho-programado').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-card-despachos-registrados').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-detalle-bloque-bovedilla').style.display = l.sistema === 'vigueta_bovedilla' ? '' : 'none';
   renderFilasProduccion();
   if (l.sistema === 'vigueta_bovedilla') renderBovedillaLosa();
-  if (esProduccion) renderProduccionRegistrada();
-  if (esDespacho) renderDespachosRegistrados();
+  if (esProduccion) { renderProduccionProgramada(); renderProduccionRegistrada(); }
+  if (esDespacho) { renderDespachoProgramado(); renderDespachosRegistrados(); }
 }
 
 // ── Filas de producción — columnas según sistema (Prelosa/Placa Alveolar: ancho+hilos;
@@ -1132,10 +1134,23 @@ function _guardarLosaActual() {
 // producción", es la única puerta de entrada a `fila.produccion[]`. Mismo molde que
 // `despachos[]`: un lote con `lineas[]` que referencian cada fila por `filaId`, precargado solo
 // con las filas que tienen saldo pendiente.
-function abrirModalProgramarProduccion() {
+// `programacionId` opcional (2026-10-21, a pedido del usuario: "metamos otro cuadro
+// intermedio... donde incluyamos las producciones programadas. de esta manera podemos hacer
+// varias programaciones, editarlas e imprimirlas luego de su programación inicial") — si se
+// pasa, reabre este mismo modal en modo EDICIÓN sobre una programación ya guardada (ver
+// `editarProgramacionProduccion()`), precargando fecha/observaciones/cantidades ya digitadas en
+// vez de arrancar en blanco. Sin el parámetro, se comporta exactamente igual que siempre (nueva
+// programación). Las filas que se ofrecen siguen siendo las de saldo pendiente de producción —
+// una programación todavía sin cargar NO resta nada del pendiente (eso solo lo hace
+// `fila.produccion[]`, que se alimenta en "+ Cargar producción"), así que no hace falta ninguna
+// lógica especial para "liberar" lo que esta programación ya traía reservado.
+function abrirModalProgramarProduccion(programacionId) {
+  const editando = programacionId ? _programacionesLosaActual.find(x => x.id === programacionId) : null;
+  document.getElementById('mpp-id').value = editando ? editando.id : '';
+  document.getElementById('modal-programar-produccion-titulo').textContent = editando ? '✏️ Editar programación de producción' : '📋 Programar producción';
   const conPendiente = _filasLosaActual.filter(f => _pendienteProduccionFila(f) > 0);
-  document.getElementById('mpp-fecha').value = _fmtISO(new Date());
-  document.getElementById('mpp-observaciones').value = '';
+  document.getElementById('mpp-fecha').value = editando ? (editando.fecha || _fmtISO(new Date())) : _fmtISO(new Date());
+  document.getElementById('mpp-observaciones').value = editando ? (editando.observaciones || '') : '';
   document.getElementById('mpp-filtros-lista').innerHTML = '';
   const tbody = document.getElementById('mpp-filas-body');
   if (!conPendiente.length) {
@@ -1156,6 +1171,8 @@ function abrirModalProgramarProduccion() {
     // cuadro cae en qué eje sin tener que adivinar.
     tbody.innerHTML = conPendiente.map(f => {
       const pend = _pendienteProduccionFila(f);
+      const lineaExistente = editando ? (editando.lineas || []).find(l => l.filaId === f.id) : null;
+      const valorInicial = lineaExistente ? lineaExistente.cantidadProgramada : 0;
       return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}">
         <td><input type="checkbox" class="mpp-chk-fila" onchange="_marcarFilaProgramar(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
@@ -1163,7 +1180,7 @@ function abrirModalProgramarProduccion() {
         <td>${_esc(f.laterales) || '—'}</td>
         <td>${f.dimension || 0} m</td>
         <td>${pend}</td>
-        <td><input type="number" min="0" max="${pend}" value="0" data-fila-id="${_escAttr(f.id)}" data-pendiente="${pend}" oninput="_actualizarResumenBancosPrelosa()" style="width:70px"></td>
+        <td><input type="number" min="0" max="${pend}" value="${valorInicial}" data-fila-id="${_escAttr(f.id)}" data-pendiente="${pend}" oninput="_actualizarResumenBancosPrelosa()" style="width:70px"></td>
       </tr>`;
     }).join('');
   }
@@ -1180,13 +1197,23 @@ function _marcarFilaProgramar(checkbox) {
 // (las dos cintas) de 50cm de ancho... en otras ocasiones se programa una cinta de 50cm y otra
 // de 20, 30 o 40cm... condicionemos para que sean máximo 96 metros por cinta, en función del
 // ancho. Programemos también para que se puedan programar solo dos anchos") — cada cinta
-// fabrica un único ancho a la vez, así que el límite físico real es: como mucho 2 anchos
-// distintos en toda la programación del día (una cinta por ancho), y la suma de metros lineales
-// (dimensión × cantidad) de cada ancho no puede superar los 96 m útiles de su cinta. Solo
-// aplica a PRELOSA — Placa Alveolar y Vigueta y Bovedilla no se fabrican en estas cintas, el
-// usuario habló específicamente de "bancos de producción de prelosa".
+// fabrica un único ancho a la vez, y como mucho 2 anchos distintos en toda la programación del
+// día (una cinta por ancho). Solo aplica a PRELOSA — Placa Alveolar y Vigueta y Bovedilla no se
+// fabrican en estas cintas, el usuario habló específicamente de "bancos de producción de
+// prelosa".
+// **Tope por ancho, corregido (2026-10-20, a pedido del usuario: "estamos limitando a 96
+// metros que es lo de una cinta, pero en realidad debe ser eso por 2, en el caso que se
+// programe todo de 50cm de ancho, o todo de 40 o 30 o 20")** — el tope de 96 m es por CINTA,
+// no por ancho: si el día se programa con un solo ancho, ese ancho usa las 2 cintas completas
+// (96×2 = 192 m); si se programan 2 anchos distintos, cada uno usa solo UNA cinta (96 m cada
+// uno, porque una cinta no se puede repartir entre dos anchos a la vez). `_topeMetrosBanco()`
+// calcula el tope según cuántos anchos distintos hay en ese momento en la programación.
 const BANCO_PRELOSA_METROS_UTILES = 96;
+const BANCO_PRELOSA_NUM_CINTAS = 2;
 const BANCO_PRELOSA_MAX_ANCHOS = 2;
+function _topeMetrosBanco(cantidadAnchos) {
+  return cantidadAnchos <= 1 ? BANCO_PRELOSA_METROS_UTILES * BANCO_PRELOSA_NUM_CINTAS : BANCO_PRELOSA_METROS_UTILES;
+}
 function _metrosPorAnchoProgramar(prefijo) {
   const porAncho = new Map();
   document.querySelectorAll(`#${prefijo}-filas-body input[data-fila-id]`).forEach(inp => {
@@ -1209,11 +1236,12 @@ function _actualizarResumenBancosPrelosa() {
   if (!porAncho.size) { cont.innerHTML = ''; return; }
   const anchos = Array.from(porAncho.keys()).sort((a, b) => a - b);
   const excesoAnchos = anchos.length > BANCO_PRELOSA_MAX_ANCHOS;
+  const tope = _topeMetrosBanco(anchos.length);
   const filasHTML = anchos.map(a => {
     const m = porAncho.get(a);
-    const excedido = m > BANCO_PRELOSA_METROS_UTILES;
+    const excedido = m > tope;
     return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2px 0;color:${excedido ? 'var(--rojo)' : 'var(--gris-texto)'}">
-      <span>Cinta de ${a} cm</span><span style="font-weight:700">${m.toFixed(2)} / ${BANCO_PRELOSA_METROS_UTILES} m${excedido ? ' ⚠️' : ''}</span>
+      <span>${a} cm${anchos.length <= 1 ? ' (2 cintas)' : ' (1 cinta)'}</span><span style="font-weight:700">${m.toFixed(2)} / ${tope} m${excedido ? ' ⚠️' : ''}</span>
     </div>`;
   }).join('');
   cont.innerHTML = `<div style="margin:4px 0 8px;padding:8px 10px;background:var(--gris-fondo);border-radius:var(--radio)">
@@ -1380,17 +1408,34 @@ function guardarProgramacionProduccion() {
       alert(`Solo se pueden programar ${BANCO_PRELOSA_MAX_ANCHOS} anchos distintos por día (una cinta por ancho) — esta programación tiene ${porAncho.size}: ${Array.from(porAncho.keys()).sort((a, b) => a - b).join(', ')} cm. Quita cantidades de alguno de los anchos antes de guardar.`);
       return;
     }
+    const tope = _topeMetrosBanco(porAncho.size);
     for (const [ancho, metros] of porAncho) {
-      if (metros > BANCO_PRELOSA_METROS_UTILES) {
-        alert(`El ancho ${ancho} cm suma ${metros.toFixed(2)} m, pero una cinta solo tiene ${BANCO_PRELOSA_METROS_UTILES} m útiles — reduce las cantidades programadas de ese ancho antes de guardar.`);
+      if (metros > tope) {
+        const explicacion = porAncho.size <= 1
+          ? `usa las 2 cintas completas (2 × ${BANCO_PRELOSA_METROS_UTILES} = ${tope} m)`
+          : `solo tiene disponible 1 cinta de ${BANCO_PRELOSA_METROS_UTILES} m útiles (hay otro ancho programado ese día, cada uno usa una sola cinta)`;
+        alert(`El ancho ${ancho} cm suma ${metros.toFixed(2)} m, pero ${explicacion} — reduce las cantidades programadas de ese ancho antes de guardar.`);
         return;
       }
     }
   }
-  _programacionesLosaActual.push({ id: String(Date.now()), fecha, observaciones: document.getElementById('mpp-observaciones').value.trim(), lineas });
+  // Edita in-situ si `#mpp-id` trae una programación existente (ver
+  // `abrirModalProgramarProduccion(programacionId)`/`editarProgramacionProduccion()`), en vez
+  // de crear una nueva — ninguna línea de esa programación puede tener `cantidadReal` todavía
+  // (si lo tuviera, ya no aparecería en la tarjeta "Producciones programadas" desde donde se
+  // llega a editar), así que reconstruir `lineas` desde cero acá es seguro.
+  const editId = document.getElementById('mpp-id').value;
+  const observaciones = document.getElementById('mpp-observaciones').value.trim();
+  if (editId) {
+    const idx = _programacionesLosaActual.findIndex(x => x.id === editId);
+    if (idx >= 0) _programacionesLosaActual[idx] = { ..._programacionesLosaActual[idx], fecha, observaciones, lineas };
+  } else {
+    _programacionesLosaActual.push({ id: String(Date.now()), fecha, observaciones, lineas });
+  }
   _guardarLosaActual();
   cerrarModal('modal-programar-produccion');
-  alert('Producción programada guardada. Cuando se fabrique, regístrala con "+ Cargar producción".');
+  renderProduccionProgramada();
+  alert(editId ? 'Programación de producción actualizada.' : 'Producción programada guardada. Cuando se fabrique, regístrala con "+ Cargar producción".');
 }
 
 // Imprimible de la PROGRAMACIÓN (2026-10-15, a pedido del usuario: "la idea es poder imprimir
@@ -1469,24 +1514,18 @@ function _resumenPorMedidasHTML(lineas, l) {
 }
 
 let _fechaProgramacionImpresa = null;
-function imprimirProgramacionProduccion() {
-  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
-  if (!l) return;
-  const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
-  const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
-  const esVigueta = l.sistema === 'vigueta_bovedilla';
-  const fecha = document.getElementById('mpp-fecha').value;
-  const observaciones = document.getElementById('mpp-observaciones').value.trim();
-  const lineas = [];
-  document.querySelectorAll('#mpp-filas-body input[data-fila-id]').forEach(inp => {
-    const cantidad = parseFloat(inp.value) || 0;
-    if (cantidad <= 0) return;
-    const f = _filasLosaActual.find(x => x.id === inp.dataset.filaId);
-    if (f) lineas.push({ f, cantidad });
-  });
-  if (!lineas.length) { alert('Ingresa al menos una cantidad a programar antes de imprimir.'); return; }
-  _fechaProgramacionImpresa = fecha || new Date().toISOString().split('T')[0];
-
+// HTML del imprimible de Programación de Producción, factorizado (2026-10-21, a pedido del
+// usuario: "metamos otro cuadro intermedio... donde incluyamos las producciones programadas...
+// podamos editarlas e imprimirlas luego de su programación inicial") — antes solo existía
+// `imprimirProgramacionProduccion()`, que arma `lineas` leyendo EN VIVO los `<input>` del modal
+// abierto; ahora también hace falta imprimir una programación YA GUARDADA directo desde la
+// tarjeta "Producciones programadas", sin pasar por el modal (`imprimirProgramacionProduccionGuardada()`,
+// más abajo). Las dos arman `lineas` a su manera y le pasan el resto a esta función, que
+// construye el HTML idéntico en ambos casos. `origen` ('modal' | 'tarjeta') solo cambia a dónde
+// vuelve el botón "← Volver": si se imprimió desde el modal abierto, reabre ese modal (ver nota
+// 2026-10-19 más abajo); si se imprimió directo desde la tarjeta, no había ningún modal abierto
+// que reabrir, así que solo regresa a la pantalla de la Losa.
+function _htmlProgramacionProduccion(l, p, sis, esVigueta, fecha, observaciones, lineas, origen) {
   let totalPiezas = 0, totalMetros = 0;
   const filasHTML = lineas.map(({ f, cantidad }, n) => {
     const longTotal = (Number(f.dimension) || 0) * cantidad;
@@ -1514,12 +1553,16 @@ function imprimirProgramacionProduccion() {
   // borra nada del DOM ni de los valores de los `<input>`/`<select>` — así que todo lo digitado
   // (cantidades, filtros) seguía intacto todo este tiempo, solo escondido. Re-agregar `.abierto`
   // al volver lo muestra exactamente como se dejó, sin tener que guardar/restaurar nada aparte.
-  const html = `
+  // Solo aplica si `origen === 'modal'` — imprimir directo desde la tarjeta nunca abrió el modal.
+  const volverOnclick = origen === 'modal'
+    ? "document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa');document.getElementById('modal-programar-produccion').classList.add('abierto')"
+    : "document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa')";
+  return `
     <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
       <span style="font-weight:700">Programación de Producción — ${_esc(l.nombre)}</span>
       <div style="flex:1"></div>
       <button onclick="descargarPDFProgramacionProduccion()" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-programacion">⬇️ Descargar PDF</button>
-      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa');document.getElementById('modal-programar-produccion').classList.add('abierto')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+      <button onclick="${volverOnclick}" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
     </div>
     <div class="preview-doc" id="pp-preview-doc">
       <div class="preview-membrete-header"><img src="membrete-top.jpg" alt=""></div>
@@ -1565,12 +1608,56 @@ function imprimirProgramacionProduccion() {
         </div>
       </div>
     </div>`;
-
-  document.getElementById('contenido-preview').innerHTML = html;
+}
+function imprimirProgramacionProduccion() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  if (!l) return;
+  const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
+  const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
+  const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const fecha = document.getElementById('mpp-fecha').value;
+  const observaciones = document.getElementById('mpp-observaciones').value.trim();
+  const lineas = [];
+  document.querySelectorAll('#mpp-filas-body input[data-fila-id]').forEach(inp => {
+    const cantidad = parseFloat(inp.value) || 0;
+    if (cantidad <= 0) return;
+    const f = _filasLosaActual.find(x => x.id === inp.dataset.filaId);
+    if (f) lineas.push({ f, cantidad });
+  });
+  if (!lineas.length) { alert('Ingresa al menos una cantidad a programar antes de imprimir.'); return; }
+  _fechaProgramacionImpresa = fecha || new Date().toISOString().split('T')[0];
+  document.getElementById('contenido-preview').innerHTML = _htmlProgramacionProduccion(l, p, sis, esVigueta, fecha, observaciones, lineas, 'modal');
   // El modal queda tapado por el fondo oscuro de #vista-previa si no se cierra primero (el
   // z-index de los modales es mayor al de #vista-previa) — mismo motivo por el que "← Volver"
   // reactiva pantalla-losa-detalle en vez de reabrir el modal.
   cerrarModal('modal-programar-produccion');
+  document.getElementById('vista-previa').style.display = 'block';
+  document.querySelectorAll('.pantalla').forEach(p2 => p2.classList.remove('activa'));
+  window.scrollTo(0, 0);
+}
+// "🖨️ Formato" directo desde la tarjeta "Producciones programadas" (2026-10-21) — imprime una
+// programación ya guardada sin necesidad de abrir el modal primero. `lineas` se arma desde
+// `prog.lineas[].cantidadProgramada` cruzado con `_filasLosaActual` EN VIVO (el ancho/dimensión/
+// peso de cada fila nunca se congelan en ningún lado de esta pantalla, siempre se leen
+// actuales — mismo criterio que toda la Losa).
+function imprimirProgramacionProduccionGuardada(id) {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  if (!l) return;
+  const prog = _programacionesLosaActual.find(x => x.id === id);
+  if (!prog) return;
+  const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
+  const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
+  const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const lineas = [];
+  (prog.lineas || []).forEach(ln => {
+    const cantidad = Number(ln.cantidadProgramada) || 0;
+    if (cantidad <= 0) return;
+    const f = _filasLosaActual.find(x => x.id === ln.filaId);
+    if (f) lineas.push({ f, cantidad });
+  });
+  if (!lineas.length) { alert('Esta programación no tiene líneas para imprimir.'); return; }
+  _fechaProgramacionImpresa = prog.fecha || new Date().toISOString().split('T')[0];
+  document.getElementById('contenido-preview').innerHTML = _htmlProgramacionProduccion(l, p, sis, esVigueta, prog.fecha, prog.observaciones || '', lineas, 'tarjeta');
   document.getElementById('vista-previa').style.display = 'block';
   document.querySelectorAll('.pantalla').forEach(p2 => p2.classList.remove('activa'));
   window.scrollTo(0, 0);
@@ -1659,8 +1746,65 @@ function guardarCargaProduccion() {
   _guardarLosaActual();
   cerrarModal('modal-cargar-produccion');
   renderFilasProduccion();
+  // La programación recién cargada puede dejar de tener TODAS sus líneas en null (pasa de
+  // "programada" a "registrada") — se refrescan ambas tarjetas juntas, siempre.
+  renderProduccionProgramada();
   renderProduccionRegistrada();
   alert('Producción cargada.');
+}
+
+// "Producciones programadas" (2026-10-21, a pedido del usuario: "metamos otro cuadro
+// intermedio, entre el cuadro general y el cuadro de producciones registradas, donde
+// incluyamos las producciones programadas. de esta manera podemos hacer varias
+// programaciones, editarlas e imprimirlas luego de su programación inicial. cuando se carga la
+// producción asociada a una programación, esta programación baja al cuadro de producciones
+// registradas") — tarjeta SIEMPRE VISIBLE (modo producción), entre la tabla de filas y
+// "Producciones registradas". Lista las programaciones que TODAVÍA no tienen NINGUNA línea
+// cargada (`every(l => l.cantidadReal == null)`) — el complemento exacto del filtro de
+// "Producciones registradas" (`some(...)`, más abajo): en cuanto se carga la primera línea de
+// una programación, desaparece de acá y aparece allá, sin tocar nada aparte ni duplicar
+// ningún dato. Mismas tres acciones (Formato/Editar/Borrar) que el resto de tarjetas de esta
+// pantalla.
+function renderProduccionProgramada() {
+  const tbody = document.getElementById('produccion-programada-body');
+  if (!tbody) return;
+  const sinCargar = _programacionesLosaActual.filter(p => (p.lineas || []).every(l => l.cantidadReal == null));
+  if (!sinCargar.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--gris-medio);padding:10px">No hay producciones programadas todavía.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = sinCargar.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(p => {
+    const totalProgramado = (p.lineas || []).reduce((s, l) => s + (Number(l.cantidadProgramada) || 0), 0);
+    return `<tr>
+      <td>${p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
+      <td>${(p.lineas || []).length} fila(s), ${totalProgramado} piezas programadas</td>
+      <td>${_esc(p.observaciones) || '—'}</td>
+      <td>
+        <div class="flex-gap">
+          <button class="btn btn-secundario btn-xs" onclick="imprimirProgramacionProduccionGuardada('${_escAttr(p.id)}')">🖨️ Formato</button>
+          <button class="btn btn-primario btn-xs" onclick="editarProgramacionProduccion('${_escAttr(p.id)}')">✏️ Editar</button>
+          <button class="btn btn-rojo btn-xs" onclick="eliminarProgramacionProduccion('${_escAttr(p.id)}')">🗑️</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+// "✏️ Editar" — reabre "+ Programar producción" en modo edición sobre esta programación (ver
+// `abrirModalProgramarProduccion(programacionId)`).
+function editarProgramacionProduccion(id) {
+  abrirModalProgramarProduccion(id);
+}
+// "🗑️ Borrar" — a diferencia de `eliminarProduccionRegistrada()`, acá NUNCA hay nada que
+// deshacer en `fila.produccion[]`: una programación solo aparece en esta tarjeta mientras
+// ninguna de sus líneas tiene `cantidadReal`, así que borrarla no mueve ningún pendiente.
+function eliminarProgramacionProduccion(id) {
+  const p = _programacionesLosaActual.find(x => x.id === id);
+  if (!p) return;
+  const fechaTxt = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : 'sin fecha';
+  if (!confirm(`¿Eliminar la programación de producción del ${fechaTxt}? Todavía no tiene nada cargado, así que no afecta ningún pendiente.`)) return;
+  _programacionesLosaActual = _programacionesLosaActual.filter(x => x.id !== id);
+  _guardarLosaActual();
+  renderProduccionProgramada();
 }
 
 // "Producciones registradas" — mismo espíritu que "📦 Despachos registrados", pero del lado de
@@ -1855,10 +1999,18 @@ function abrirMatrizProduccionDiaria() {
 // (y se puede programar hasta) las piezas que YA existen físicamente en planta
 // (`_disponibleDespachoFila()` = fabricado − despachado). Una fila con pendiente de despacho
 // pero nada fabricado todavía simplemente no aparece acá.
-function abrirModalProgramarDespacho() {
+// `despachoProgramadoId` opcional (2026-10-21) — mismo mecanismo de edición que
+// `abrirModalProgramarProduccion(programacionId)`, ver esa nota para el porqué. Una
+// programación de despacho sin cargar no resta nada de lo disponible (solo lo hace
+// `guardarCargaDespacho()`, vía `despachos[]`), así que la lista de filas ofrecidas no
+// necesita ningún ajuste especial en modo edición.
+function abrirModalProgramarDespacho(despachoProgramadoId) {
+  const editando = despachoProgramadoId ? _despachosProgramadosLosaActual.find(x => x.id === despachoProgramadoId) : null;
+  document.getElementById('mpd-id').value = editando ? editando.id : '';
+  document.getElementById('modal-programar-despacho-titulo').textContent = editando ? '✏️ Editar programación de despacho' : '📋 Programar despacho';
   const conDisponible = _filasLosaActual.filter(f => _disponibleDespachoFila(f, _despachosLosaActual) > 0);
-  document.getElementById('mpd-fecha').value = _fmtISO(new Date());
-  document.getElementById('mpd-observaciones').value = '';
+  document.getElementById('mpd-fecha').value = editando ? (editando.fecha || _fmtISO(new Date())) : _fmtISO(new Date());
+  document.getElementById('mpd-observaciones').value = editando ? (editando.observaciones || '') : '';
   document.getElementById('mpd-filtros-lista').innerHTML = '';
   const tbody = document.getElementById('mpd-filas-body');
   if (!conDisponible.length) {
@@ -1867,6 +2019,8 @@ function abrirModalProgramarDespacho() {
     // Columnas "Ejes num."/"Ejes alfa." (2026-10-19, ver nota en `abrirModalProgramarProduccion()`).
     tbody.innerHTML = conDisponible.map(f => {
       const disp = _disponibleDespachoFila(f, _despachosLosaActual);
+      const lineaExistente = editando ? (editando.lineas || []).find(l => l.filaId === f.id) : null;
+      const valorInicial = lineaExistente ? lineaExistente.cantidadProgramada : 0;
       return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}">
         <td><input type="checkbox" class="mpd-chk-fila" onchange="_marcarFilaProgramarDespacho(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
@@ -1874,11 +2028,12 @@ function abrirModalProgramarDespacho() {
         <td>${_esc(f.laterales) || '—'}</td>
         <td>${f.dimension || 0} m</td>
         <td>${disp}</td>
-        <td><input type="number" min="0" max="${disp}" value="0" data-fila-id="${_escAttr(f.id)}" data-disponible="${disp}" oninput="_actualizarResumenPesoDespacho()" style="width:70px"></td>
+        <td><input type="number" min="0" max="${disp}" value="${valorInicial}" data-fila-id="${_escAttr(f.id)}" data-disponible="${disp}" oninput="_actualizarResumenPesoDespacho()" style="width:70px"></td>
       </tr>`;
     }).join('');
   }
   _poblarSelectVehiculoDespacho();
+  if (editando && editando.vehiculo) document.getElementById('mpd-vehiculo').value = editando.vehiculo;
   document.getElementById('modal-programar-despacho').classList.add('abierto');
   _actualizarResumenPesoDespacho();
 }
@@ -1969,10 +2124,20 @@ function guardarProgramacionDespacho() {
     alert(`El peso programado (${(totalKg / 1000).toFixed(2)} ton) supera la capacidad de "${vehiculo}" (${capacidadTon} ton) — reduce las cantidades o elige otro vehículo.`);
     return;
   }
-  _despachosProgramadosLosaActual.push({ id: String(Date.now()), fecha, observaciones: document.getElementById('mpd-observaciones').value.trim(), vehiculo, lineas });
+  // Edita in-situ si `#mpd-id` trae una programación existente — ver la misma nota en
+  // `guardarProgramacionProduccion()`.
+  const editId = document.getElementById('mpd-id').value;
+  const observaciones = document.getElementById('mpd-observaciones').value.trim();
+  if (editId) {
+    const idx = _despachosProgramadosLosaActual.findIndex(x => x.id === editId);
+    if (idx >= 0) _despachosProgramadosLosaActual[idx] = { ..._despachosProgramadosLosaActual[idx], fecha, observaciones, vehiculo, lineas };
+  } else {
+    _despachosProgramadosLosaActual.push({ id: String(Date.now()), fecha, observaciones, vehiculo, lineas });
+  }
   _guardarLosaActual();
   cerrarModal('modal-programar-despacho');
-  alert('Despacho programado guardado. Cuando salga el camión, regístralo con "+ Cargar despacho".');
+  renderDespachoProgramado();
+  alert(editId ? 'Programación de despacho actualizada.' : 'Despacho programado guardado. Cuando salga el camión, regístralo con "+ Cargar despacho".');
 }
 
 // Imprimible de la PROGRAMACIÓN DE DESPACHO (2026-10-17, a pedido del usuario: "en la
@@ -1981,25 +2146,11 @@ function guardarProgramacionDespacho() {
 // `imprimirProgramacionProduccion()` (membrete + clases compartidas, resumen por medidas al
 // pie), con dos diferencias: título/firmas propios de despacho, y SIN remisión (esa se captura
 // recién en "+ Cargar despacho" — acá todavía es solo un plan, el camión ni ha llegado).
-function imprimirProgramacionDespacho() {
-  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
-  if (!l) return;
-  const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
-  const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
-  const esVigueta = l.sistema === 'vigueta_bovedilla';
-  const fecha = document.getElementById('mpd-fecha').value;
-  const observaciones = document.getElementById('mpd-observaciones').value.trim();
-  const vehiculo = document.getElementById('mpd-vehiculo').value;
-  const lineas = [];
-  document.querySelectorAll('#mpd-filas-body input[data-fila-id]').forEach(inp => {
-    const cantidad = parseFloat(inp.value) || 0;
-    if (cantidad <= 0) return;
-    const f = _filasLosaActual.find(x => x.id === inp.dataset.filaId);
-    if (f) lineas.push({ f, cantidad });
-  });
-  if (!lineas.length) { alert('Ingresa al menos una cantidad a programar antes de imprimir.'); return; }
-  _fechaProgramacionImpresa = fecha || new Date().toISOString().split('T')[0];
-
+// Factorizada en `_htmlProgramacionDespacho()` (2026-10-21) — mismo motivo exacto que
+// `_htmlProgramacionProduccion()`: hace falta imprimir también una programación YA GUARDADA
+// directo desde la tarjeta "Despachos programados", sin abrir el modal
+// (`imprimirProgramacionDespachoGuardada()`, más abajo).
+function _htmlProgramacionDespacho(l, p, sis, esVigueta, fecha, observaciones, vehiculo, lineas, origen) {
   // Peso como columna adicional (2026-10-17, a pedido del usuario: "en el imprimible de
   // despachos, a diferencia del de producción, es muy importante incluir el peso... " —
   // logística necesita saber cuánto pesa lo que va en cada viaje, a producción no le hace
@@ -2030,13 +2181,16 @@ function imprimirProgramacionDespacho() {
   }).join('');
 
   // "← Volver" reabre el modal — ver la nota junto al mismo botón en
-  // `imprimirProgramacionProduccion()`, mismo motivo exacto.
-  const html = `
+  // `_htmlProgramacionProduccion()`, mismo motivo exacto. Solo si `origen === 'modal'`.
+  const volverOnclick = origen === 'modal'
+    ? "document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa');document.getElementById('modal-programar-despacho').classList.add('abierto')"
+    : "document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa')";
+  return `
     <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
       <span style="font-weight:700">Programación de Despacho — ${_esc(l.nombre)}</span>
       <div style="flex:1"></div>
       <button onclick="descargarPDFProgramacionDespacho()" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-programacion-despacho">⬇️ Descargar PDF</button>
-      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa');document.getElementById('modal-programar-despacho').classList.add('abierto')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+      <button onclick="${volverOnclick}" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
     </div>
     <div class="preview-doc" id="pd-prog-preview-doc">
       <div class="preview-membrete-header"><img src="membrete-top.jpg" alt=""></div>
@@ -2084,11 +2238,53 @@ function imprimirProgramacionDespacho() {
         </div>
       </div>
     </div>`;
-
-  document.getElementById('contenido-preview').innerHTML = html;
+}
+function imprimirProgramacionDespacho() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  if (!l) return;
+  const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
+  const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
+  const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const fecha = document.getElementById('mpd-fecha').value;
+  const observaciones = document.getElementById('mpd-observaciones').value.trim();
+  const vehiculo = document.getElementById('mpd-vehiculo').value;
+  const lineas = [];
+  document.querySelectorAll('#mpd-filas-body input[data-fila-id]').forEach(inp => {
+    const cantidad = parseFloat(inp.value) || 0;
+    if (cantidad <= 0) return;
+    const f = _filasLosaActual.find(x => x.id === inp.dataset.filaId);
+    if (f) lineas.push({ f, cantidad });
+  });
+  if (!lineas.length) { alert('Ingresa al menos una cantidad a programar antes de imprimir.'); return; }
+  _fechaProgramacionImpresa = fecha || new Date().toISOString().split('T')[0];
+  document.getElementById('contenido-preview').innerHTML = _htmlProgramacionDespacho(l, p, sis, esVigueta, fecha, observaciones, vehiculo, lineas, 'modal');
   // El modal queda tapado por el fondo oscuro de #vista-previa si no se cierra primero (el
   // z-index de los modales es mayor al de #vista-previa).
   cerrarModal('modal-programar-despacho');
+  document.getElementById('vista-previa').style.display = 'block';
+  document.querySelectorAll('.pantalla').forEach(p2 => p2.classList.remove('activa'));
+  window.scrollTo(0, 0);
+}
+// "🖨️ Formato" directo desde la tarjeta "Despachos programados" (2026-10-21) — ver
+// `imprimirProgramacionProduccionGuardada()`, mismo patrón exacto.
+function imprimirProgramacionDespachoGuardada(id) {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  if (!l) return;
+  const prog = _despachosProgramadosLosaActual.find(x => x.id === id);
+  if (!prog) return;
+  const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
+  const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
+  const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const lineas = [];
+  (prog.lineas || []).forEach(ln => {
+    const cantidad = Number(ln.cantidadProgramada) || 0;
+    if (cantidad <= 0) return;
+    const f = _filasLosaActual.find(x => x.id === ln.filaId);
+    if (f) lineas.push({ f, cantidad });
+  });
+  if (!lineas.length) { alert('Esta programación no tiene líneas para imprimir.'); return; }
+  _fechaProgramacionImpresa = prog.fecha || new Date().toISOString().split('T')[0];
+  document.getElementById('contenido-preview').innerHTML = _htmlProgramacionDespacho(l, p, sis, esVigueta, prog.fecha, prog.observaciones || '', prog.vehiculo || '', lineas, 'tarjeta');
   document.getElementById('vista-previa').style.display = 'block';
   document.querySelectorAll('.pantalla').forEach(p2 => p2.classList.remove('activa'));
   window.scrollTo(0, 0);
@@ -2183,8 +2379,53 @@ function guardarCargaDespacho() {
   _guardarLosaActual();
   cerrarModal('modal-cargar-despacho');
   renderFilasProduccion();
+  // Misma razón que en `guardarCargaProduccion()`: la programación recién cargada puede pasar
+  // de "programada" a "registrada" — se refrescan las dos tarjetas juntas, siempre.
+  renderDespachoProgramado();
   renderDespachosRegistrados();
   alert('Despacho cargado.');
+}
+
+// "Despachos programados" (2026-10-21) — misma lógica EXACTA que "Producciones programadas"
+// (ver esa nota junto a `renderProduccionProgramada()`), del lado de Despacho. Trae además la
+// columna "Vehículo" (acá sí hay un dato propio de la programación que vale la pena ver de un
+// vistazo, a diferencia de Producción).
+function renderDespachoProgramado() {
+  const tbody = document.getElementById('despacho-programado-body');
+  if (!tbody) return;
+  const sinCargar = _despachosProgramadosLosaActual.filter(p => (p.lineas || []).every(l => l.cantidadReal == null));
+  if (!sinCargar.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gris-medio);padding:10px">No hay despachos programados todavía.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = sinCargar.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(p => {
+    const totalProgramado = (p.lineas || []).reduce((s, l) => s + (Number(l.cantidadProgramada) || 0), 0);
+    return `<tr>
+      <td>${p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
+      <td>${(p.lineas || []).length} fila(s), ${totalProgramado} piezas programadas</td>
+      <td>${_esc(p.vehiculo) || '—'}</td>
+      <td>${_esc(p.observaciones) || '—'}</td>
+      <td>
+        <div class="flex-gap">
+          <button class="btn btn-secundario btn-xs" onclick="imprimirProgramacionDespachoGuardada('${_escAttr(p.id)}')">🖨️ Formato</button>
+          <button class="btn btn-primario btn-xs" onclick="editarProgramacionDespacho('${_escAttr(p.id)}')">✏️ Editar</button>
+          <button class="btn btn-rojo btn-xs" onclick="eliminarProgramacionDespacho('${_escAttr(p.id)}')">🗑️</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+function editarProgramacionDespacho(id) {
+  abrirModalProgramarDespacho(id);
+}
+function eliminarProgramacionDespacho(id) {
+  const p = _despachosProgramadosLosaActual.find(x => x.id === id);
+  if (!p) return;
+  const fechaTxt = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : 'sin fecha';
+  if (!confirm(`¿Eliminar la programación de despacho del ${fechaTxt}? Todavía no tiene nada cargado, así que no afecta ningún pendiente.`)) return;
+  _despachosProgramadosLosaActual = _despachosProgramadosLosaActual.filter(x => x.id !== id);
+  _guardarLosaActual();
+  renderDespachoProgramado();
 }
 
 // "Despachos registrados" — misma lógica EXACTA que "🏗️ Producciones registradas" de
