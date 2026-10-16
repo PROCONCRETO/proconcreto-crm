@@ -881,6 +881,18 @@ Capturarlas una por una sería impracticable (Boreal tuvo 247 filas en una sola 
   `renderFilasProduccion()`**, que se repite constantemente durante la sesión (cada guardado,
   cada carga): si se reiniciara ahí, cualquier acción sin relación volvería a cerrar la tabla
   aunque el usuario la hubiera abierto a propósito un momento antes.
+  - **Colapsar esconde solo las filas individuales, no el resumen** (corregido 2026-10-16, a
+    pedido del usuario: "mostremosla... para ver el resumen sin tener que abrir el cuadro" —
+    la primera versión escondía la tabla ENTERA con `tablaWrap.style.display='none'`, lo que de
+    paso tapaba la fila de TOTALES y el avance ponderado justo cuando más se necesita una
+    mirada rápida). Ahora `#losa-filas-tabla-wrap` siempre queda visible; lo único que se
+    esconde con `_filasColapsadas` es el `<tbody>` (`#filas-produccion-body`) — el `<thead>` y
+    el `<tfoot>` (`_pieTotalesHTML()` + `_pieAvanceProduccionHTML()`) se siguen armando y
+    mostrando igual que siempre. Resultado: colapsada, la tarjeta queda reducida a encabezado +
+    fila "📐 TOTALES" + "📊 Avance de producción", sin una sola fila individual — exactamente lo
+    que se ve siempre en el pie de la tabla expandida, solo que ahora también disponible sin
+    desplegarla. El caso sin filas (estado vacío, "No hay filas todavía...") y el modo Lista
+    ignoran `_filasColapsadas` por completo — ahí el `<tbody>` siempre se ve.
 
 ### Navegación — pantalla nueva, no un patrón ya existente
 
@@ -912,10 +924,10 @@ realidad pedía era una fila de sub-navegación igual a la que ya tienen los dem
 pantalla fija: muestra el **nombre del proyecto activo** y sirve para **salir** de él ("al
 costado izquierdo de la fila podemos nombrar el proyecto... si quiero salir del proyecto, pincho
 el botón del nombre del proyecto y de ahí me manda a la ventana donde me muestra los iconos de
-todos los proyectos"). La pantalla de Carpetas (el "inicio" de cada proyecto, con sus 5
-tarjetas-ícono) **no se eliminó** — el usuario fue explícito: "sin eliminar la ventana de inicio
-de cada proyecto". La sub-nav es un atajo ADICIONAL para moverse entre secciones sin tener que
-volver a Carpetas primero, no un reemplazo.
+todos los proyectos"). La pantalla de Carpetas (el "inicio" de cada proyecto, con sus tarjetas-
+ícono) **no se eliminó** — el usuario fue explícito: "sin eliminar la ventana de inicio de cada
+proyecto". La sub-nav es un atajo ADICIONAL para moverse entre secciones sin tener que volver a
+Carpetas primero, no un reemplazo.
 
 - **`#subnav-proyecto-activo`** (`cotizaciones.html`, junto a las otras 5 filas `<nav class="nav"
   id="subnav-*">` que arma `js/navegacion.js`) — mismas clases `.nav`/`.nav-btn` que las demás
@@ -923,18 +935,19 @@ volver a Carpetas primero, no un reemplazo.
   idéntica. A diferencia de esas 5, que son listas de botones 100% fijas en el HTML (confirmado
   explorando el código: no existe en toda la app ningún otro precedente de una fila de
   sub-navegación cuyo contenido dependa del estado — esto es la primera), el HTML de esta trae
-  los 5 botones de sección fijos (sus etiquetas no cambian), más el primer botón
-  (`#subnav-proyecto-nombre-btn`) vacío, que `_sincronizarSubnavProyecto()` llena con el nombre
-  del proyecto activo.
+  los botones de sección fijos (sus etiquetas no cambian; son 6 desde que se agregó "📊 Resumen
+  general", ver más abajo), más el primer botón (`#subnav-proyecto-nombre-btn`) vacío, que
+  `_sincronizarSubnavProyecto()` llena con el nombre del proyecto activo.
 - **`_sincronizarSubnavProyecto(seccion)`** (`js/losas-proyecto.js`) — la única función que
   decide todo sobre esta fila: si `_PROYECTO_ACTIVO_ID` no apunta a un proyecto real, la
   esconde; si sí, la muestra, pone `🏛️ <nombre>` en el primer botón, y resalta (`.activo`) el
   botón cuya `data-seccion-proyecto` sea igual al parámetro `seccion` (`null` = ninguno
   resaltado, para cuando se está viendo la propia pantalla de Carpetas). Se llama al final de
   **todas** las funciones de navegación dentro de Proyectos: `abrirCarpetasProyecto()` (`null`),
-  `abrirDocumentosProyecto(tipo)` (`tipo`), `abrirLosasDeProyecto(modo)`/`abrirLosaDetalle(id)`/
-  `volverALosasProyecto()` (`modo`/`_MODO_FLUJO_LOSA`), `volverACarpetasProyecto()` (`null`),
-  `volverAProyectos()` (`null`, la esconde porque ya no hay `_PROYECTO_ACTIVO_ID`).
+  `abrirResumenProyecto()` (`'resumen'`), `abrirDocumentosProyecto(tipo)` (`tipo`),
+  `abrirLosasDeProyecto(modo)`/`abrirLosaDetalle(id)`/`volverALosasProyecto()`
+  (`modo`/`_MODO_FLUJO_LOSA`), `volverACarpetasProyecto()` (`null`), `volverAProyectos()` (`null`,
+  la esconde porque ya no hay `_PROYECTO_ACTIVO_ID`).
 - **Botón del nombre del proyecto = "salir"**: `onclick="volverAProyectos()"` directo — mismo
   destino que ya usaba el único botón "← Volver a Proyectos" que existía en Carpetas, ahora
   también alcanzable desde cualquier sección sin tener que pasar primero por Carpetas.
@@ -947,6 +960,74 @@ volver a Carpetas primero, no un reemplazo.
   sin ese `_sincronizarSubnavProyecto(null)` ahí, la fila se quedaba pegada mostrando el
   proyecto anterior, porque esa rama no pasa por el `if (modulo !== 'proyectos')` que esconde
   las demás).
+
+### Resumen general de un Proyecto (2026-10-16, a pedido del usuario: "hagamos una ventana
+### nueva en proyectos de resumen general, donde mostremos en términos absolutos y porcentuales
+### y de manera gráfica el tamaño del proyecto, y el avance en producción y despachos
+### (considerando todas las losas)")
+
+Nueva pantalla (`#pantalla-proyecto-resumen`, `abrirResumenProyecto()`/`renderResumenProyecto()`,
+`js/losas-proyecto.js`) — tarjeta nueva en Carpetas del proyecto y botón nuevo ("📊 Resumen
+general") en el sub-nav, el primero después del nombre del proyecto. A diferencia de TODAS las
+demás pantallas de Losas, esta no trabaja sobre una sola Losa abierta: agrega **todas las Losas
+del proyecto activo a la vez**, leyendo directo de `LOSAS_PROYECTO` (los datos ya persistidos,
+no las variables "_actual" de edición de una sola Losa) — por eso el resumen es correcto aunque
+el usuario nunca haya entrado al detalle de ninguna Losa en la sesión, y por eso sí se refresca
+automáticamente con realtime (`rerenderPantallaActiva()`, `js/datos-realtime.js`), a diferencia
+de `pantalla-losa-detalle`.
+
+- **`_agregadosResumenProyecto(losas)`** — la función central, pura (sin tocar el DOM), que
+  recorre TODAS las filas de TODAS las Losas del proyecto una sola vez y devuelve los agregados.
+  Mismo criterio de "pendiente/avance = total − Σeventos, recalculado siempre en vivo" ya usado
+  en toda la app (Logística, Órdenes de Producción, y cada Losa individual) — nada se cachea ni
+  se guarda aparte.
+  - **Tamaño del proyecto (términos absolutos)**: número de Losas, piezas planeadas (Σ
+    `cantidad`), metros lineales (Σ `dimension × cantidad`), peso total (Σ `_pesoFila(f, l)` —
+    reutiliza tal cual el cálculo por fila ya usado en cada Losa individual, que ya sabe
+    distinguir prelosa/placa alveolar de vigueta, así que el total agrega correctamente aunque
+    el proyecto mezcle sistemas distintos entre sus Losas), convertido a toneladas para que el
+    número sea legible en proyectos grandes. **m² solo se muestra si al menos una Losa no es
+    vigueta_bovedilla** (`hayM2`) — vigueta no tiene un "ancho" real, mostrar "0 m²" cuando en
+    realidad es "no aplica" sería engañoso.
+  - **Avance de producción/despacho, ponderado por longitud**: mismo criterio exacto que
+    `_pieAvanceProduccionHTML()` de cada Losa (una fila con pocas piezas muy largas pesa en el
+    avance lo que corresponde a sus metros reales, no menos que una fila con muchas piezas
+    cortas), pero sumado sobre TODAS las filas de TODAS las Losas antes de sacar el porcentaje
+    — no es un promedio de porcentajes por Losa (eso subestimaría/sobreestimaría según el tamaño
+    relativo de cada Losa), es `Σ(dim×fabricadas) / Σ(dim×cantidad)` de una sola vez. El
+    despacho usa `_pendienteDespachoFila(f, l.despachos)` — el `despachos[]` de CADA Losa
+    (`l.despachos`), no `_despachosLosaActual` (esa variable solo tiene datos de la Losa que
+    esté abierta en ese momento en `pantalla-losa-detalle`, que acá no aplica).
+  - **Bovedilla**: agregado aparte, por CANTIDAD (no ponderado por longitud, igual que cada Losa
+    individual — "como fabricar un bloque de cemento", no tiene filas) — solo suma las Losas
+    `vigueta_bovedilla` que ya tengan el bloque `bovedilla` definido. La tarjeta completa se
+    esconde si ninguna Losa del proyecto tiene bovedilla todavía.
+- **Gráficas (de manera gráfica, a pedido explícito del usuario)**: dos donas de Chart.js
+  (`_chartResumenAvance()`, Producción y Despacho), con el % en el centro vía un plugin local a
+  cada instancia (`afterDraw`, no registrado globalmente) — más fácil de leer de un vistazo que
+  una leyenda para un solo número, a diferencia de `_chartCumplimiento()` en Logística que sí
+  necesita leyenda por tener varias categorías. **Bug real encontrado y corregido en la primera
+  prueba visual**: las donas salían completamente NEGRAS en vez de con el color del semáforo —
+  `_colorSemaforo()` (ya usado en los dashboards de Logística/Producción) devuelve una variable
+  CSS (`'var(--naranja)'`), que el motor de CSS del DOM sí resuelve en un `style="color:..."` de
+  un `<div>` normal, pero que el contexto 2D de un `<canvas>` (Chart.js) **no resuelve** — un
+  `backgroundColor`/`fillStyle` con una variable CSS sin resolver queda en negro por defecto,
+  sin ningún error visible en consola, así que solo se detectó mirando la captura de pantalla
+  real, no por lectura de código. Se agregó `_colorSemaforoHex()`, los mismos umbrales que
+  `_colorSemaforo()` pero devolviendo hex literal (`#2E7D32`/`#E65100`/`#C62828`), usado SOLO
+  para lo que dibuja un `<canvas>` (la dona y el texto del centro) — `_colorSemaforo()` se sigue
+  usando tal cual para todo lo que es DOM normal (tarjetas KPI, barras de la tabla "Avance por
+  Losa"), donde sí resuelve bien.
+- **Tabla "Avance por Losa"** (`_barraAvanceLosaHTML()`) — debajo de las donas, una fila por
+  Losa con una barra de progreso en línea (no Chart.js, una tabla con hasta 28 Losas reales en
+  un proyecto grande se lee mejor en tabla que en un gráfico de barras) para Avance producción y
+  Avance despacho por separado, mismo color semáforo que el resto de la pantalla — para que un
+  proyecto con varias Losas (SYMA Andes llegó a 28) deje ver de un vistazo cuáles van atrasadas,
+  sin tener que entrar una por una.
+- **`.stat-card`/`_tarjetaKPI()`/`_colorSemaforo()`** (`js/estadisticas-logistica.js`, cargado
+  antes que `js/losas-proyecto.js` en `cotizaciones.html` — mismo mecanismo de scope compartido
+  ya documentado para `CAPACIDAD_VEHICULO`) — se reutilizan tal cual, sin duplicar el componente
+  de tarjeta KPI que ya usan los dashboards de Logística/Producción.
 
 ### Fuera de alcance en esta vuelta (conocido, no es un olvido)
 

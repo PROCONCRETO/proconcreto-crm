@@ -182,6 +182,11 @@ function renderCarpetasProyecto() {
   const nMemorias = losas.filter(l => l.memoriaCalculoPath).length;
   const nPlanos = losas.filter(l => l.planoPath).length;
   grid.innerHTML = `
+    <div class="inicio-modulo" onclick="abrirResumenProyecto()">
+      <span class="inicio-modulo-icono">📊</span>
+      <span class="inicio-modulo-nombre">Resumen general</span>
+      <span style="font-size:11.5px;color:var(--gris-medio)">${losas.length} losa${losas.length === 1 ? '' : 's'}</span>
+    </div>
     <div class="inicio-modulo" onclick="abrirDocumentosProyecto('memoria')">
       <span class="inicio-modulo-icono">📐</span>
       <span class="inicio-modulo-nombre">Memorias de Cálculo</span>
@@ -220,6 +225,208 @@ function volverACarpetasProyecto() {
   document.getElementById('pantalla-proyecto-carpetas').classList.add('activa');
   renderCarpetasProyecto();
   _sincronizarSubnavProyecto(null);
+}
+
+// ── Resumen general de un Proyecto (2026-10-16, a pedido del usuario: "hagamos una ventana
+// nueva en proyectos de resumen general, donde mostremos en términos absolutos y porcentuales y
+// de manera gráfica el tamaño del proyecto, y el avance en producción y despachos (considerando
+// todas las losas)") — a diferencia del resto de pantallas de Losas, esta NO trabaja sobre una
+// sola Losa abierta (`_LOSA_ACTIVA_ID`/`_filasLosaActual`/...): agrega TODAS las Losas del
+// proyecto activo, leyendo directo de `LOSAS_PROYECTO` (los datos ya cargados/persistidos), para
+// que el resumen sea correcto aunque el usuario nunca haya entrado al detalle de alguna Losa en
+// esta sesión.
+function abrirResumenProyecto() {
+  const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
+  document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
+  document.getElementById('pantalla-proyecto-resumen').classList.add('activa');
+  document.getElementById('proyecto-resumen-titulo').textContent = `📊 Resumen general${p ? ' — ' + p.nombre : ''}`;
+  renderResumenProyecto();
+  _sincronizarSubnavProyecto('resumen');
+}
+
+// Agrega el tamaño del proyecto y el avance ponderado por longitud (mismo criterio que
+// `_pieAvanceProduccionHTML()` por Losa — ver su nota: una fila con pocas piezas muy largas pesa
+// en el avance lo que corresponde a sus metros reales, no menos que una fila con muchas piezas
+// cortas) SOBRE TODAS LAS FILAS DE TODAS LAS LOSAS a la vez, en vez de una Losa sola.
+function _agregadosResumenProyecto(losas) {
+  let totalPiezas = 0, totalMetros = 0, totalM2 = 0, totalPesoKg = 0;
+  let piezasFabricadas = 0, metrosFabricados = 0;
+  let piezasDespachadas = 0, metrosDespachados = 0;
+  let hayM2 = false;
+  losas.forEach(l => {
+    const esVigueta = l.sistema === 'vigueta_bovedilla';
+    if (!esVigueta && (l.filas || []).length) hayM2 = true;
+    (l.filas || []).forEach(f => {
+      const dim = Number(f.dimension) || 0;
+      const cant = Number(f.cantidad) || 0;
+      const fabricadas = cant - _pendienteProduccionFila(f);
+      const despachadas = cant - _pendienteDespachoFila(f, l.despachos);
+      totalPiezas += cant;
+      totalMetros += dim * cant;
+      if (!esVigueta) totalM2 += (Number(f.ancho) || 0) / 100 * dim * cant;
+      totalPesoKg += _pesoFila(f, l);
+      piezasFabricadas += fabricadas;
+      metrosFabricados += dim * fabricadas;
+      piezasDespachadas += despachadas;
+      metrosDespachados += dim * despachadas;
+    });
+  });
+  const pctProduccion = totalMetros > 0 ? (metrosFabricados / totalMetros) * 100 : 0;
+  const pctDespacho = totalMetros > 0 ? (metrosDespachados / totalMetros) * 100 : 0;
+
+  // Bovedilla — conteo simple por cantidad, no ponderado por longitud (no tiene filas, ver nota
+  // junto al modelo de datos: "como fabricar un bloque de cemento") — solo losas vigueta_bovedilla
+  // que ya tengan el bloque definido.
+  let bovRequerida = 0, bovProducida = 0, bovDespachada = 0, hayBovedilla = false;
+  losas.forEach(l => {
+    if (l.sistema !== 'vigueta_bovedilla' || !l.bovedilla) return;
+    hayBovedilla = true;
+    bovRequerida += Number(l.bovedilla.cantidadRequerida) || 0;
+    bovProducida += (l.bovedilla.produccion || []).reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
+    bovDespachada += (l.bovedilla.despacho || []).reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
+  });
+
+  return {
+    nLosas: losas.length, totalPiezas, totalMetros, totalM2, totalPesoKg, hayM2,
+    piezasFabricadas, metrosFabricados, pctProduccion,
+    piezasDespachadas, metrosDespachados, pctDespacho,
+    hayBovedilla, bovRequerida, bovProducida, bovDespachada,
+    pctBovProduccion: bovRequerida > 0 ? (bovProducida / bovRequerida) * 100 : 0,
+    pctBovDespacho: bovRequerida > 0 ? (bovDespachada / bovRequerida) * 100 : 0,
+  };
+}
+
+// Barra de avance en línea para la tabla "Avance por Losa" — mismo color semáforo
+// (`_colorSemaforo()`, ya usado en los dashboards de Logística/Producción) que la tarjeta KPI
+// del resumen general, para que el color signifique lo mismo en toda la pantalla.
+function _barraAvanceLosaHTML(pct) {
+  const color = _colorSemaforo(pct);
+  return `<div style="display:flex;align-items:center;gap:8px;min-width:120px">
+    <div style="flex:1;height:8px;background:var(--gris-claro);border-radius:4px;overflow:hidden">
+      <div style="width:${Math.min(100, Math.max(0, pct)).toFixed(1)}%;height:100%;background:${color}"></div>
+    </div>
+    <span style="font-size:12px;font-weight:600;color:${color};white-space:nowrap">${pct.toFixed(1)}%</span>
+  </div>`;
+}
+
+// Mismos umbrales que `_colorSemaforo()`, pero en hex literal — el `<canvas>` de Chart.js NO
+// resuelve `var(--naranja)` (eso solo lo resuelve el motor de CSS del DOM, no el contexto 2D de
+// un canvas: un `fillStyle`/`backgroundColor` con una variable CSS sin resolver queda en negro
+// por defecto, sin error visible — se detectó así, de un vistazo, en la captura de prueba real:
+// las donas salían negras en vez de naranja/rojo). `_colorSemaforo()` se sigue usando tal cual
+// en el resto de la pantalla (tarjetas KPI, barras de la tabla), donde SÍ es un `<div>` normal.
+function _colorSemaforoHex(pct, buenoDesde = 80, regularDesde = 50) {
+  if (pct >= buenoDesde) return '#2E7D32';
+  if (pct >= regularDesde) return '#E65100';
+  return '#C62828';
+}
+
+let _chartsResumenProyecto = {};
+// Dona con el % en el centro (plugin local a esta instancia, no registrado globalmente) — más
+// fácil de leer de un vistazo que una leyenda, para un solo número de avance (a diferencia de
+// `_chartCumplimiento()` en Logística, que sí necesita leyenda por tener varias categorías).
+function _chartResumenAvance(canvasId, pct) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  if (_chartsResumenProyecto[canvasId]) _chartsResumenProyecto[canvasId].destroy();
+  const avance = Math.min(100, Math.max(0, pct));
+  const color = _colorSemaforoHex(pct);
+  _chartsResumenProyecto[canvasId] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Avance', 'Pendiente'],
+      datasets: [{ data: [avance, 100 - avance], backgroundColor: [color, '#E2E8F0'], borderColor: '#fcfcfb', borderWidth: 2 }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => ` ${c.label}: ${c.parsed.toFixed(1)}%` } },
+      },
+    },
+    plugins: [{
+      id: 'centroTexto_' + canvasId,
+      afterDraw(chart) {
+        const { ctx: c, chartArea: { left, right, top, bottom } } = chart;
+        c.save();
+        c.font = '700 22px Segoe UI, Arial, sans-serif';
+        c.fillStyle = color;
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText(`${pct.toFixed(1)}%`, (left + right) / 2, (top + bottom) / 2);
+        c.restore();
+      },
+    }],
+  });
+}
+
+function renderResumenProyecto() {
+  const losas = LOSAS_PROYECTO.filter(l => l.proyectoId === _PROYECTO_ACTIVO_ID);
+  const a = _agregadosResumenProyecto(losas);
+
+  document.getElementById('resumen-proy-tamano').innerHTML = [
+    _tarjetaKPI(a.nLosas.toLocaleString('es-CO'), 'Losas'),
+    _tarjetaKPI(a.totalPiezas.toLocaleString('es-CO'), 'Piezas planeadas'),
+    _tarjetaKPI(a.totalMetros.toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' m', 'Metros lineales'),
+    _tarjetaKPI((a.totalPesoKg / 1000).toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' ton', 'Peso total'),
+    a.hayM2 ? _tarjetaKPI(a.totalM2.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' m²', 'Área (prelosa/placa alveolar)') : '',
+  ].join('');
+
+  document.getElementById('resumen-proy-kpi-produccion').innerHTML = [
+    _tarjetaKPI(`${a.piezasFabricadas.toLocaleString('es-CO')} / ${a.totalPiezas.toLocaleString('es-CO')}`, 'Piezas fabricadas', null, `${a.metrosFabricados.toFixed(2)} / ${a.totalMetros.toFixed(2)} m`),
+    _tarjetaKPI(`${a.pctProduccion.toFixed(1)}%`, 'Avance ponderado (por longitud)', _colorSemaforo(a.pctProduccion)),
+  ].join('');
+  document.getElementById('resumen-proy-kpi-despacho').innerHTML = [
+    _tarjetaKPI(`${a.piezasDespachadas.toLocaleString('es-CO')} / ${a.totalPiezas.toLocaleString('es-CO')}`, 'Piezas despachadas', null, `${a.metrosDespachados.toFixed(2)} / ${a.totalMetros.toFixed(2)} m`),
+    _tarjetaKPI(`${a.pctDespacho.toFixed(1)}%`, 'Avance ponderado (por longitud)', _colorSemaforo(a.pctDespacho)),
+  ].join('');
+
+  const bovCard = document.getElementById('resumen-proy-bovedilla-card');
+  if (a.hayBovedilla) {
+    bovCard.style.display = '';
+    document.getElementById('resumen-proy-kpi-bovedilla').innerHTML = [
+      _tarjetaKPI(a.bovRequerida.toLocaleString('es-CO'), 'Requerida'),
+      _tarjetaKPI(`${a.pctBovProduccion.toFixed(1)}%`, 'Avance producción', _colorSemaforo(a.pctBovProduccion), `${a.bovProducida.toLocaleString('es-CO')} / ${a.bovRequerida.toLocaleString('es-CO')}`),
+      _tarjetaKPI(`${a.pctBovDespacho.toFixed(1)}%`, 'Avance despacho', _colorSemaforo(a.pctBovDespacho), `${a.bovDespachada.toLocaleString('es-CO')} / ${a.bovRequerida.toLocaleString('es-CO')}`),
+    ].join('');
+  } else {
+    bovCard.style.display = 'none';
+  }
+
+  _chartResumenAvance('chart-resumen-produccion', a.pctProduccion);
+  _chartResumenAvance('chart-resumen-despacho', a.pctDespacho);
+
+  const tbody = document.getElementById('resumen-proy-tabla-losas-body');
+  if (!losas.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">📋</div><div>No hay losas registradas todavía.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = losas.map(l => {
+    const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
+    const col = _COLOR_ESTADO_LOSA[l.estado] || { bg: '#EEE', fg: '#555' };
+    let metrosTot = 0, metrosProd = 0, metrosDesp = 0, piezasTot = 0;
+    (l.filas || []).forEach(f => {
+      const dim = Number(f.dimension) || 0;
+      const cant = Number(f.cantidad) || 0;
+      piezasTot += cant;
+      metrosTot += dim * cant;
+      metrosProd += dim * (cant - _pendienteProduccionFila(f));
+      metrosDesp += dim * (cant - _pendienteDespachoFila(f, l.despachos));
+    });
+    const pctP = metrosTot > 0 ? (metrosProd / metrosTot) * 100 : 0;
+    const pctD = metrosTot > 0 ? (metrosDesp / metrosTot) * 100 : 0;
+    return `<tr>
+      <td style="font-weight:600">${_esc(l.nombre)}</td>
+      <td>${_esc(l.ubicacion) || '—'}</td>
+      <td>${sis ? _esc(sis.etiqueta) : '—'}</td>
+      <td><span class="badge" style="background:${col.bg};color:${col.fg}">${_esc(l.estado)}</span></td>
+      <td>${piezasTot.toLocaleString('es-CO')}</td>
+      <td>${_barraAvanceLosaHTML(pctP)}</td>
+      <td>${_barraAvanceLosaHTML(pctD)}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ── Memorias de Cálculo / Planos de Producción — junta en un solo lugar los PDF que ya se
@@ -547,15 +754,22 @@ function renderFilasProduccion() {
   // carga, aunque el usuario la hubiera abierto a propósito).
   const togglePanel = document.getElementById('losa-filas-toggle');
   const tablaWrap = document.getElementById('losa-filas-tabla-wrap');
-  if (togglePanel && tablaWrap) {
+  // Colapsado = esconde solo las filas individuales (`<tbody>`), no la tabla entera (corregido
+  // 2026-10-16, a pedido del usuario: "mostremosla... para ver el resumen sin tener que abrir
+  // el cuadro" — antes `tablaWrap.style.display='none'` escondía TODO, incluido el `<tfoot>`
+  // con la fila de TOTALES y el avance ponderado, así que colapsar dejaba a ciegas justo el
+  // resumen que más se necesita para una mirada rápida). Ahora `tablaWrap` siempre se ve;
+  // `<thead>` y `<tfoot>` quedan siempre visibles, y solo el `<tbody>` (línea por línea, la
+  // parte larga que motivó el colapsable) se esconde — el toggle visualmente baja a solo
+  // encabezado + fila de TOTALES + avance, igual que se ve siempre en Lista.
+  tablaWrap.style.display = '';
+  if (togglePanel) {
     togglePanel.style.display = esLista ? 'none' : 'flex';
     if (!esLista) {
-      tablaWrap.style.display = _filasColapsadas ? 'none' : '';
       document.getElementById('losa-filas-toggle-texto').textContent =
         `${_filasColapsadas ? '▶' : '▼'} ${_filasColapsadas ? 'Ver' : 'Ocultar'} tabla de ${esProduccion ? 'producción' : 'despacho'} (${_filasLosaActual.length} fila${_filasLosaActual.length === 1 ? '' : 's'})`;
     }
   }
-  if (esLista) tablaWrap.style.display = '';
   const thead = document.getElementById('filas-produccion-thead');
   // "Unidades fabricadas" (2026-10-15, a pedido del usuario), justo antes de "Pend.
   // Producción" — solo en modo producción, igual que el resto de columnas de seguimiento.
@@ -572,10 +786,14 @@ function renderFilasProduccion() {
   const tbody = document.getElementById('filas-produccion-body');
   const tfoot = document.getElementById('filas-produccion-tfoot');
   if (!_filasLosaActual.length) {
+    tbody.style.display = '';
     tbody.innerHTML = `<tr><td colspan="16" class="empty-state"><div class="icono">📋</div><div>No hay filas todavía — agrega una a mano, pégalas desde Excel o importa el archivo.</div></td></tr>`;
     if (tfoot) tfoot.innerHTML = '';
     return;
   }
+  // Colapsado = solo se esconde el `<tbody>` (ver nota junto a `tablaWrap` más arriba) —
+  // `<thead>`/`<tfoot>` quedan siempre visibles.
+  tbody.style.display = (!esLista && _filasColapsadas) ? 'none' : '';
   tbody.innerHTML = _filasLosaActual.map((f, i) => _filaProduccionHTML(f, i, l, esVigueta)).join('');
   // Fila de TOTALES (2026-10-17, a pedido del usuario: "incluyamos al final del cuadro... una
   // fila de totales, donde totalicemos unidades, los metros lineales como los metros

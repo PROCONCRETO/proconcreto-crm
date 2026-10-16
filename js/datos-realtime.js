@@ -140,6 +140,11 @@ function rerenderPantallaActiva() {
     case 'pantalla-proyecto-carpetas': renderCarpetasProyecto(); break;
     case 'pantalla-proyecto-documentos': renderDocumentosProyecto(); break;
     case 'pantalla-proyecto-losas': renderLosasProyecto(); break;
+    // 'pantalla-proyecto-resumen' (2026-10-16) SÍ se refresca automáticamente — a diferencia de
+    // 'pantalla-losa-detalle', esta agrega datos de TODAS las Losas leyendo directo de
+    // LOSAS_PROYECTO, sin arreglos de edición en memoria que perder (nada que se esté editando
+    // ahí mismo).
+    case 'pantalla-proyecto-resumen': renderResumenProyecto(); break;
     // 'pantalla-losa-detalle' NO tiene caso acá a propósito: esa pantalla trabaja sobre
     // arreglos de edición en memoria (_filasLosaActual/_despachosLosaActual/
     // _bovedillaLosaActual, ver js/losas-proyecto.js) — recargarlos automáticamente en medio

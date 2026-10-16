@@ -139,6 +139,7 @@
      es un atajo adicional para moverse entre secciones sin volver a Carpetas primero. -->
 <nav class="nav" id="subnav-proyecto-activo" style="display:none">
   <button class="nav-btn" id="subnav-proyecto-nombre-btn" onclick="volverAProyectos()" style="font-weight:700"></button>
+  <button class="nav-btn" data-seccion-proyecto="resumen" onclick="abrirResumenProyecto()">📊 Resumen general</button>
   <button class="nav-btn" data-seccion-proyecto="memoria" onclick="abrirDocumentosProyecto('memoria')">📐 Memorias de Cálculo</button>
   <button class="nav-btn" data-seccion-proyecto="plano" onclick="abrirDocumentosProyecto('plano')">📋 Planos</button>
   <button class="nav-btn" data-seccion-proyecto="lista" onclick="abrirLosasDeProyecto('lista')">📄 Listas de Producción</button>
@@ -1225,6 +1226,52 @@
     </div>
   </div>
   <div id="grid-carpetas-proyecto" class="inicio-grid"></div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA: RESUMEN GENERAL DE UN PROYECTO (2026-10-16, a pedido del usuario: "hagamos una
+     ventana nueva en proyectos de resumen general, donde mostremos en términos absolutos y
+     porcentuales y de manera gráfica el tamaño del proyecto, y el avance en producción y
+     despachos (considerando todas las losas)") — a diferencia del resto de pantallas de Losas,
+     esta agrega TODAS las Losas del proyecto a la vez, leyendo directo de `LOSAS_PROYECTO` (no
+     de las variables "_actual" de una sola Losa abierta, que no aplican acá).
+═══════════════════════════════════════ -->
+<div id="pantalla-proyecto-resumen" class="pantalla">
+  <div class="acciones-row">
+    <div class="flex-gap" style="align-items:center">
+      <button class="btn btn-secundario btn-sm" onclick="volverACarpetasProyecto()">← Volver</button>
+      <div id="proyecto-resumen-titulo" style="font-size:18px;font-weight:700;color:var(--azul)">📊 Resumen general</div>
+    </div>
+  </div>
+
+  <div class="card-titulo">📐 Tamaño del proyecto</div>
+  <div class="stats-grid" id="resumen-proy-tamano" style="margin-bottom:20px"></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+    <div class="card">
+      <div class="card-titulo">🏗️ Avance de producción (todas las losas)</div>
+      <div class="stats-grid" id="resumen-proy-kpi-produccion" style="grid-template-columns:1fr 1fr;margin-bottom:14px"></div>
+      <div style="height:220px;position:relative"><canvas id="chart-resumen-produccion"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-titulo">📦 Avance de despachos (todas las losas)</div>
+      <div class="stats-grid" id="resumen-proy-kpi-despacho" style="grid-template-columns:1fr 1fr;margin-bottom:14px"></div>
+      <div style="height:220px;position:relative"><canvas id="chart-resumen-despacho"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card" id="resumen-proy-bovedilla-card" style="display:none;margin-bottom:20px">
+    <div class="card-titulo">🧱 Bovedilla (todas las losas de vigueta y bovedilla)</div>
+    <div class="stats-grid" id="resumen-proy-kpi-bovedilla"></div>
+  </div>
+
+  <div class="card" style="padding:0">
+    <div class="card-titulo" style="padding:16px 16px 0">📋 Avance por Losa</div>
+    <table class="tabla-cots">
+      <thead><tr><th>Losa</th><th>Ubicación</th><th>Sistema</th><th>Estado</th><th>Piezas</th><th>Avance producción</th><th>Avance despacho</th></tr></thead>
+      <tbody id="resumen-proy-tabla-losas-body"></tbody>
+    </table>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════
@@ -3365,9 +3412,9 @@
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
 <script src="js/proyectos.js?v=20261016b"></script>
-<script src="js/losas-proyecto.js?v=20261022c"></script>
+<script src="js/losas-proyecto.js?v=20261022e"></script>
 <script src="js/auth.js?v=20260804a"></script>
-<script src="js/datos-realtime.js?v=20261013a"></script>
+<script src="js/datos-realtime.js?v=20261016a"></script>
 <script src="js/cotizador.js?v=20261007a"></script>
 <script src="js/historico-clientes-stats.js?v=20261011c"></script>
 <script src="js/retenciones.js?v=20260809c"></script>
