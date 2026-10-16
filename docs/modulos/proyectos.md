@@ -703,6 +703,43 @@ Capturarlas una por una sería impracticable (Boreal tuvo 247 filas en una sola 
   arnés no deja inspeccionar la hoja de estilos cargada por `file://` (CORS), así que la
   verificación de esta regla específica fue visual, no por aserción de DOM.
 
+- **Candado de medidas ya fabricadas** (2026-10-20, a pedido del usuario: "me preocupa que se
+  modifique la lista y se cambie algo que ya está fabricado o despachado... el ancho, largo,
+  cantidad y número de hilos... deberíamos congelar también la fila en la lista de producción,
+  para indicarle a quien vaya a modificar que dicho material ya se fabricó") — antes de esto, el
+  Peso/m²/Long. total de una fila se recalculaban siempre en vivo desde `ancho`/`dimension`/
+  `cantidad` de la fila (`_pesoFila()`, etc.), así que corregir la medida de una fila que YA
+  tenía piezas fabricadas o despachadas corría ese número "por arte de magia" sin que las piezas
+  físicas cambiaran — ni se notaba en pantalla que había pasado.
+  - **Qué se bloquea** (`_filaProduccionHTML()`, modo Lista): en cuanto una fila tiene AL MENOS
+    una unidad fabricada (`_fabricadoFila(f) > 0` — la misma función que ya usa "Disponible
+    despacho"), su **ancho, dimensión (largo) e hilos** (o **tipo de vigueta, Hilos Abajo,
+    Hilos Arriba, dimensión** en sistema vigueta) pasan a verse como `<input disabled>` con un
+    `title` explicativo ("🔒 Ya tiene unidades fabricadas... agrega una fila nueva") — ya no hay
+    forma de "corregirlos" editando, porque lo físico ya existe con esa medida. El botón ✕ de
+    borrar fila también se reemplaza por un ícono 🔒 (no se puede borrar una fila con historial).
+    **La Cantidad es la única "importante" que sigue editable** (decisión explícita del usuario,
+    tras preguntarle: "la cantidad... la editemos hasta el piso de lo ya fabricado" — es normal
+    que cambie el total planeado sin que eso tenga que ver con lo ya hecho), con un piso = lo ya
+    fabricado (`_validarCantidadMinima(i)`, valida en caliente al salir del campo —
+    `onchange`, mismo patrón que `_validarAnchoPrelosa()`). Cuadro/Ejes/Observaciones NO se
+    bloquean (no afectan ningún cálculo, son administrativos).
+  - **Por qué no hace falta "congelar" nada en los registros de producción/despacho aparte**:
+    una vez el ancho/dimensión/hilos no pueden cambiar más (candado activo), el valor que lee
+    `_pesoFila()` en vivo desde la fila YA ES, de hecho, el valor congelado — no puede haber
+    drift porque la edición está bloqueada desde el primer momento en que existe producción. Más
+    simple y con menos superficie de cambio que agregar una copia aparte por cada línea de
+    `fila.produccion[]`/`despachos[].lineas[]` (alternativa que se consideró y se descartó por
+    innecesaria, justo por este motivo).
+  - **Tope real al guardar, no solo visual** (`guardarListaProduccion()`) — cubre Pegar/Importar
+    y cualquier mutación directa de `_filasLosaActual` que no pase por los `<input>` bloqueados
+    de la UI (igual que ya hacía la estandarización de ancho de prelosa, mismo patrón). Compara
+    cada fila contra la ÚLTIMA versión persistida de la Losa (`l.filas`, no lo que haya en
+    memoria en ese momento) para detectar si un campo bloqueado de verdad cambió en la sesión de
+    edición; si una fila con historial desaparece de la lista (por ejemplo, al pegar un bloque
+    que reemplaza filas existentes), también se rechaza el guardado completo — perdería el
+    historial de producción/despacho que vive adentro de ella.
+
 ### Navegación — pantalla nueva, no un patrón ya existente
 
 No existe en la app ningún patrón de "pantalla completa con alcance a un registro padre"

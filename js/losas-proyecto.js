@@ -713,17 +713,44 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
   const pendDesp = _pendienteDespachoFila(f, _despachosLosaActual);
   const dispDesp = _disponibleDespachoFila(f, _despachosLosaActual);
   const esLista = _MODO_FLUJO_LOSA === 'lista';
-  const txt = (valor, campo, ancho) => esLista
-    ? `<input type="text" value="${_escAttr(valor || '')}" oninput="_filasLosaActual[${i}].${campo}=this.value" style="width:${ancho}px">`
-    : _esc(valor || '—');
+  // Candado de medidas ya fabricadas (2026-10-20, a pedido del usuario: "me preocupa que se
+  // modifique la lista y se cambie algo que ya está fabricado o despachado... el ancho, largo,
+  // cantidad y número de hilos... deberíamos congelar también la fila en la lista de
+  // producción, para indicarle a quien vaya a modificar que dicho material ya se fabricó") — en
+  // cuanto una fila tiene AL MENOS una unidad fabricada, su ancho/largo/hilos (o
+  // Vigueta/Hilos Abajo/Hilos Arriba) quedan de solo lectura en la Lista: ya no hay forma de
+  // "arreglarlos" editando, porque lo físico ya existe con esa medida — si de verdad hace falta
+  // una medida distinta, se agrega una fila nueva (no se reinterpreta esta). La Cantidad es la
+  // ÚNICA de las "importantes" que sigue editable (es normal que cambie el total planeado), con
+  // un piso = lo ya fabricado (`_validarCantidadMinima()`, más abajo). Como el ancho/largo/hilos
+  // ya no pueden cambiar una vez fabricados, el peso/m² que se calculan siempre en vivo desde la
+  // fila (`_pesoFila()`, etc.) dejan de poder "correrse por arte de magia" — no hace falta
+  // congelar nada en los registros de producción/despacho aparte, el candado de la Lista ya lo
+  // garantiza en el origen.
+  const fabricado = _fabricadoFila(f);
+  const bloqueado = fabricado > 0;
+  const TITULO_BLOQUEO = '🔒 Ya tiene unidades fabricadas — esta medida no se puede modificar. Si necesitas una medida distinta, agrega una fila nueva.';
+  const txt = (valor, campo, ancho, candado) => {
+    if (esLista && candado && bloqueado) {
+      return `<input type="text" value="${_escAttr(valor || '')}" disabled title="${TITULO_BLOQUEO}" style="width:${ancho}px;background:var(--gris-fondo);color:var(--gris-medio);cursor:not-allowed">`;
+    }
+    return esLista
+      ? `<input type="text" value="${_escAttr(valor || '')}" oninput="_filasLosaActual[${i}].${campo}=this.value" style="width:${ancho}px">`
+      : _esc(valor || '—');
+  };
   // Sin el "|| 0" en `value` (2026-10-14, a pedido del usuario: "deja todos los campos sin
   // datos, pues algunos están incluyendo ceros de entrada que me dificultan la digitación") —
   // una fila nueva arranca en 0 internamente (ver `agregarFilaProduccion()`), pero el campo se
   // ve vacío hasta que el usuario escribe; `parseFloat(this.value)||0` en el oninput sigue
   // guardando 0 si lo deja vacío, así que el dato no cambia, solo la comodidad de digitar.
-  const num = (valor, campo, ancho, recalcula, onchangeExtra) => esLista
-    ? `<input type="number" ${campo === 'dimension' ? 'step="0.01"' : ''} value="${valor || ''}" oninput="_filasLosaActual[${i}].${campo}=parseFloat(this.value)||0${recalcula ? `;_actualizarFilaProduccion(${i})` : ''}" ${onchangeExtra ? `onchange="${onchangeExtra}"` : ''} style="width:${ancho}px">`
-    : (valor || 0);
+  const num = (valor, campo, ancho, recalcula, onchangeExtra, candado) => {
+    if (esLista && candado && bloqueado) {
+      return `<input type="number" value="${valor || 0}" disabled title="${TITULO_BLOQUEO}" style="width:${ancho}px;background:var(--gris-fondo);color:var(--gris-medio);cursor:not-allowed">`;
+    }
+    return esLista
+      ? `<input type="number" ${campo === 'dimension' ? 'step="0.01"' : ''} value="${valor || ''}" oninput="_filasLosaActual[${i}].${campo}=parseFloat(this.value)||0${recalcula ? `;_actualizarFilaProduccion(${i})` : ''}" ${onchangeExtra ? `onchange="${onchangeExtra}"` : ''} style="width:${ancho}px">`
+      : (valor || 0);
+  };
   // "Ejes numéricos"/"Ejes alfabéticos" (2026-10-13, a pedido del usuario) — de entrada
   // aparecen como dos cuadros de texto chicos separados por un guion ("(cuadro) - (cuadro)"),
   // en vez de un solo campo de texto libre — coincide con cómo se ve el dato en los Excel
@@ -752,15 +779,15 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     <td>${par(f.ejesEntre, 'ejesEntre')}</td>
     <td>${par(f.laterales, 'laterales')}</td>
     ${esVigueta ? `
-    <td>${txt(f.tipoVigueta, 'tipoVigueta', 54)}</td>
-    <td>${num(f.hilosAbajo, 'hilosAbajo', 44, false)}</td>
-    <td>${num(f.hilosArriba, 'hilosArriba', 44, false)}</td>
+    <td>${txt(f.tipoVigueta, 'tipoVigueta', 54, true)}</td>
+    <td>${num(f.hilosAbajo, 'hilosAbajo', 44, false, '', true)}</td>
+    <td>${num(f.hilosArriba, 'hilosArriba', 44, false, '', true)}</td>
     ` : `
-    <td>${num(f.ancho, 'ancho', 54, true, l.sistema === 'prelosa' ? `_validarAnchoPrelosa(${i})` : '')}</td>
-    <td>${num(f.hilos, 'hilos', 44, false)}</td>
+    <td>${num(f.ancho, 'ancho', 54, true, l.sistema === 'prelosa' ? `_validarAnchoPrelosa(${i})` : '', true)}</td>
+    <td>${num(f.hilos, 'hilos', 44, false, '', true)}</td>
     `}
-    <td>${num(f.dimension, 'dimension', 58, true)}</td>
-    <td>${num(f.cantidad, 'cantidad', 50, true)}</td>
+    <td>${num(f.dimension, 'dimension', 58, true, '', true)}</td>
+    <td>${num(f.cantidad, 'cantidad', 50, true, `_validarCantidadMinima(${i})`)}</td>
     <td id="fp-longtotal-${i}" style="text-align:right">${longTotal.toFixed(2)}</td>
     ${esVigueta ? '' : `<td id="fp-m2-${i}" style="text-align:right">${m2.toFixed(2)}</td>`}
     <td id="fp-peso-${i}" style="text-align:right">${peso.toFixed(1)}</td>
@@ -770,7 +797,9 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     <td>${txt(f.observaciones, 'observaciones', 90)}</td>
     <td style="white-space:nowrap">
       ${esLista
-        ? `<button class="btn btn-rojo btn-xs" onclick="_filasLosaActual.splice(${i},1);renderFilasProduccion()">✕</button>`
+        ? (bloqueado
+          ? `<span title="${TITULO_BLOQUEO}" style="cursor:help">🔒</span>`
+          : `<button class="btn btn-rojo btn-xs" onclick="_filasLosaActual.splice(${i},1);renderFilasProduccion()">✕</button>`)
         : ''}
     </td>
   </tr>`;
@@ -787,6 +816,24 @@ function _validarAnchoPrelosa(i) {
   if (!ANCHOS_ESTANDAR_PRELOSA.includes(Number(f.ancho))) {
     alert(`El ancho de la prelosa debe ser 20, 30, 40 o 50 cm por estandarización — no se admiten medidas intermedias. Corrige el ancho de la fila "Cuadro ${f.cuadro || i + 1}".`);
     f.ancho = 0;
+    renderFilasProduccion();
+  }
+}
+// Piso de Cantidad = lo ya fabricado (2026-10-20, a pedido del usuario: "la cantidad... la
+// respuesta es que la editemos hasta el piso de lo ya fabricado") — a diferencia de
+// ancho/largo/hilos (bloqueados del todo una vez hay fabricación, ver `_filaProduccionHTML()`),
+// la Cantidad sí sigue editable después de fabricar algo: es normal que cambie el total
+// planeado (agregar o quitar unidades) sin que eso tenga nada que ver con las que ya se
+// hicieron — pero nunca puede quedar por debajo de lo que ya existe físicamente. Validación "en
+// caliente" (onchange); el bloqueo real que cubre también Pegar/Importar vive en
+// `guardarListaProduccion()`, más abajo.
+function _validarCantidadMinima(i) {
+  const f = _filasLosaActual[i];
+  if (!f) return;
+  const fabricado = _fabricadoFila(f);
+  if (fabricado > 0 && (Number(f.cantidad) || 0) < fabricado) {
+    alert(`La cantidad no puede quedar por debajo de ${fabricado}, que es lo que ya se fabricó del cuadro "${f.cuadro || i + 1}".`);
+    f.cantidad = fabricado;
     renderFilasProduccion();
   }
 }
@@ -949,6 +996,41 @@ function guardarListaProduccion() {
     const invalidas = _filasLosaActual.filter(f => !ANCHOS_ESTANDAR_PRELOSA.includes(Number(f.ancho)));
     if (invalidas.length) {
       alert(`El ancho de la prelosa debe ser 20, 30, 40 o 50 cm por estandarización. Corrige el ancho de: ${invalidas.map(f => f.cuadro || '(sin cuadro)').join(', ')}.`);
+      return;
+    }
+  }
+  // Bloqueo real de medidas ya fabricadas (2026-10-20) — cubre Pegar/Importar y cualquier otra
+  // vía que mute `_filasLosaActual` directo, además de la UI de solo lectura de
+  // `_filaProduccionHTML()` (que ya evita que se puedan tocar a mano). Compara contra la
+  // ÚLTIMA versión persistida de la Losa (`l.filas`, no lo que haya en memoria), para detectar
+  // si un campo bloqueado de verdad cambió en esta sesión de edición.
+  if (l) {
+    const esVigueta = l.sistema === 'vigueta_bovedilla';
+    const camposBloqueados = esVigueta ? ['dimension', 'tipoVigueta', 'hilosAbajo', 'hilosArriba'] : ['dimension', 'ancho', 'hilos'];
+    const ETIQUETA_CAMPO = { dimension: 'largo', ancho: 'ancho', hilos: 'número de hilos', tipoVigueta: 'tipo de vigueta', hilosAbajo: 'hilos abajo', hilosArriba: 'hilos arriba' };
+    const originales = l.filas || [];
+    for (const f of _filasLosaActual) {
+      const fabricado = _fabricadoFila(f);
+      if (fabricado <= 0) continue;
+      if ((Number(f.cantidad) || 0) < fabricado) {
+        alert(`El cuadro "${f.cuadro || '—'}" ya tiene ${fabricado} unidad(es) fabricada(s) — la cantidad no puede quedar por debajo de eso.`);
+        return;
+      }
+      const original = originales.find(x => x.id === f.id);
+      if (!original) continue;
+      const campoCambiado = camposBloqueados.find(c => String(f[c] ?? '') !== String(original[c] ?? ''));
+      if (campoCambiado) {
+        alert(`El cuadro "${f.cuadro || '—'}" ya tiene ${fabricado} unidad(es) fabricada(s) — no se puede cambiar su ${ETIQUETA_CAMPO[campoCambiado]}. Si necesitas una medida distinta, agrega una fila nueva con la medida correcta.`);
+        return;
+      }
+    }
+    // Una fila ya fabricada no puede desaparecer de la lista (por ejemplo, al pegar un bloque
+    // que reemplace filas existentes) — perdería el historial de producción/despacho que vive
+    // adentro de ella.
+    const idsActuales = new Set(_filasLosaActual.map(f => f.id));
+    const borradaConHistorial = originales.find(f => !idsActuales.has(f.id) && _fabricadoFila(f) > 0);
+    if (borradaConHistorial) {
+      alert(`El cuadro "${borradaConHistorial.cuadro || '—'}" ya tiene unidades fabricadas y no puede eliminarse de la lista.`);
       return;
     }
   }
