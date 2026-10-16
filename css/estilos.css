@@ -176,6 +176,15 @@
   .tabla-items input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .tabla-items input[type="number"] { -moz-appearance: textfield; }
 
+  /* "Diseño de mezcla asignado" del Ajuste Diario (2026-10-20, a pedido del usuario: "incluyamos
+     un 'producto' como NINGÚN PRODUCTO ASOCIADO, el cual me permita ver el desplegable de
+     diseños de mezcla y escoger el que se necesite") — este select pasó de ser SIEMPRE
+     deshabilitado (automático, solo lo llenaba el Producto elegido) a poder habilitarse cuando
+     el Producto es ese valor especial. El fondo gris que antes estaba fijo en el `style` inline
+     ahora solo aplica mientras sigue deshabilitado — habilitado se ve como cualquier otro campo
+     editable, para que no parezca que sigue bloqueado. */
+  #m-ajuste-diseno:disabled { background: #F7FAFC; color: var(--gris-medio); }
+
   /* ── TOTALES ── */
   .totales-box { background: var(--azul-suave); border: 1px solid #90CAF9; border-radius: var(--radio); padding: 14px 18px; min-width: 300px; }
   .totales-box .fila { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }

@@ -348,13 +348,23 @@ function renderAjustesMezcla() {
 
 function _textoProducto(p) { return `${p.codigo} — ${p.nombre}`; }
 
+// Valor especial del campo "Producto a fabricar" (2026-10-20, a pedido del usuario: "incluyamos
+// un 'producto' como NINGÚN PRODUCTO ASOCIADO, el cual me permita ver el desplegable de diseños
+// de mezcla y escoger el que se necesite") — normalmente el Diseño de Mezcla sale SOLO del
+// Producto elegido (`cargarDesdeProducto()`), y el ajuste siempre necesita un Producto real del
+// catálogo para guardarse. Este valor no es un producto real (no vive en `PRODUCTOS`): al
+// escribirlo, habilita el select de Diseño para elegirlo a mano, para ajustes que no van
+// atados a un producto comercial (ej. pruebas de diseño, calibración).
+const PRODUCTO_NINGUNO_AJUSTE = 'NINGÚN PRODUCTO ASOCIADO';
+
 // El catálogo tiene demasiados productos para un <select> plano, así que se usa un
-// <input> de texto libre con <datalist> — permite buscar por código o por nombre.
+// <input> de texto libre con <datalist> — permite buscar por código o por nombre. Incluye
+// también la opción especial `PRODUCTO_NINGUNO_AJUSTE` al final de la lista.
 function poblarDatalistProductos(datalistId) {
   const dl = document.getElementById(datalistId);
   if (!dl) return;
   const activos = [...PRODUCTOS].sort((a, b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre));
-  dl.innerHTML = activos.map(p => `<option value="${_textoProducto(p)}">`).join('');
+  dl.innerHTML = activos.map(p => `<option value="${_textoProducto(p)}">`).join('') + `<option value="${PRODUCTO_NINGUNO_AJUSTE}">`;
 }
 
 function _productoDesdeTextoAjuste(texto) {
@@ -378,7 +388,19 @@ function cargarDesdeProducto() {
   // Cambiar el producto principal invalida los productos adicionales que se
   // hubieran agregado (podían depender de un diseño de mezcla distinto).
   _productosAdicionalesAjuste = [];
-  const producto = _productoDesdeTextoAjuste(document.getElementById('m-ajuste-producto').value);
+  const textoProducto = document.getElementById('m-ajuste-producto').value.trim();
+  // "NINGÚN PRODUCTO ASOCIADO" (2026-10-20) — habilita el select en vez de dejarlo automático,
+  // para elegir el Diseño de Mezcla a mano; arranca limpio (sin diseño ni materiales de un
+  // producto anterior), igual que el resto de casos de esta función.
+  if (textoProducto === PRODUCTO_NINGUNO_AJUSTE) {
+    disenoSelect.disabled = false;
+    disenoSelect.value = '';
+    _limpiarCamposDisenoAjuste();
+    renderProductosAdicionalesAjuste();
+    return;
+  }
+  disenoSelect.disabled = true;
+  const producto = _productoDesdeTextoAjuste(textoProducto);
   if (!producto) { disenoSelect.value = ''; _limpiarCamposDisenoAjuste(); renderProductosAdicionalesAjuste(); return; }
   const codigoDiseno = producto.disenoMezcla;
   if (!codigoDiseno) {
@@ -498,6 +520,7 @@ function abrirModalAjusteMezcla() {
   poblarDatalistProductos('datalist-productos-ajuste');
   document.getElementById('m-ajuste-producto').value = '';
   document.getElementById('m-ajuste-diseno').value = '';
+  document.getElementById('m-ajuste-diseno').disabled = true; // por si quedó habilitado de un ajuste "sin producto" anterior
   _clientesAdicionalesAjuste = [];
   renderClientesAdicionalesAjuste();
   _productosAdicionalesAjuste = [];
@@ -521,10 +544,13 @@ function editarAjusteMezcla(id) {
   document.getElementById('m-ajuste-fecha').value = a.fecha || '';
   poblarSelectDisenos('m-ajuste-diseno');
   poblarDatalistProductos('datalist-productos-ajuste');
-  document.getElementById('m-ajuste-producto').value = a.productoCodigo
-    ? `${a.productoCodigo} — ${a.productoNombre || PRODUCTOS.find(p => p.codigo === a.productoCodigo)?.nombre || ''}`
-    : '';
+  document.getElementById('m-ajuste-producto').value = a.sinProductoAsociado
+    ? PRODUCTO_NINGUNO_AJUSTE
+    : (a.productoCodigo ? `${a.productoCodigo} — ${a.productoNombre || PRODUCTOS.find(p => p.codigo === a.productoCodigo)?.nombre || ''}` : '');
   document.getElementById('m-ajuste-diseno').value = a.disenoCodigo || '';
+  // "NINGÚN PRODUCTO ASOCIADO" (2026-10-20) — un ajuste guardado así necesita el select
+  // habilitado al reabrirlo para editar, igual que quedó al guardarlo la primera vez.
+  document.getElementById('m-ajuste-diseno').disabled = !a.sinProductoAsociado;
   document.getElementById('m-ajuste-cliente').value = a.cliente || a.clienteElemento || '';
   document.getElementById('m-ajuste-cliente').title = a.cliente || a.clienteElemento || '';
   poblarSelectProyectosDeCliente('m-ajuste-proyecto', a.cliente || a.clienteElemento || '');
@@ -560,9 +586,18 @@ function editarAjusteMezcla(id) {
 function guardarAjusteMezcla() {
   const cilindroNo = document.getElementById('m-ajuste-cilindro').value.trim();
   const fecha = document.getElementById('m-ajuste-fecha').value;
-  const producto = _productoDesdeTextoAjuste(document.getElementById('m-ajuste-producto').value);
-  if (!cilindroNo || !fecha || !producto) { alert('Completa los campos obligatorios: Cilindro N°, Fecha y Producto a fabricar (elige uno de la lista).'); return; }
-  if (!document.getElementById('m-ajuste-diseno').value) { alert('El producto seleccionado no tiene un Diseño de Mezcla asignado. Asígnalo en la ventana de Productos antes de guardar.'); return; }
+  const textoProducto = document.getElementById('m-ajuste-producto').value.trim();
+  // "NINGÚN PRODUCTO ASOCIADO" (2026-10-20) — es el único caso donde se guarda sin un producto
+  // real del catálogo; en ese caso el Diseño de Mezcla lo eligió la persona a mano (el select
+  // quedó habilitado por `cargarDesdeProducto()`), así que el mensaje de error de abajo cambia
+  // (no tiene sentido decir "el producto no tiene diseño asignado" si no hay producto).
+  const sinProducto = textoProducto === PRODUCTO_NINGUNO_AJUSTE;
+  const producto = sinProducto ? null : _productoDesdeTextoAjuste(textoProducto);
+  if (!cilindroNo || !fecha || (!producto && !sinProducto)) { alert('Completa los campos obligatorios: Cilindro N°, Fecha y Producto a fabricar (elige uno de la lista, o "NINGÚN PRODUCTO ASOCIADO" si no aplica).'); return; }
+  if (!document.getElementById('m-ajuste-diseno').value) {
+    alert(sinProducto ? 'Elige un Diseño de Mezcla antes de guardar.' : 'El producto seleccionado no tiene un Diseño de Mezcla asignado. Asígnalo en la ventana de Productos antes de guardar.');
+    return;
+  }
 
   const clientePrincipal = document.getElementById('m-ajuste-cliente').value.trim();
   if (!_clienteValidoAjuste(clientePrincipal)) {
@@ -608,8 +643,9 @@ function guardarAjusteMezcla() {
   const ajuste = {
     id: editId || String(Date.now()),
     cilindroNo, fecha,
-    productoCodigo: producto.codigo,
-    productoNombre: producto.nombre,
+    productoCodigo: producto ? producto.codigo : null,
+    productoNombre: producto ? producto.nombre : null,
+    sinProductoAsociado: sinProducto,
     productosAdicionales: productosAdicionalesResueltos,
     disenoCodigo: document.getElementById('m-ajuste-diseno').value,
     resistenciaDiseno: g('m-ajuste-resistencia'),

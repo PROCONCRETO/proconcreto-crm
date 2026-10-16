@@ -71,7 +71,44 @@ El diseño en sí se guarda con un `id` estable (`disenos_mezcla`, `onConflict: 
 - **`_renombrarCodigoDiseno(codigoViejo, codigoNuevo, afectados)`**: recorre las 4 listas ya filtradas, reasigna el campo de código en cada registro y hace upsert a su tabla correspondiente (`costeo_productos`, `productos`, `ensayos_calidad`, `ajustes_mezcla`). Se llama **antes** de `_revisarImpactoPrecios()` (el mecanismo existente de "Impacto en el catálogo", ver `docs/modulos/costeo.md`) — así, cuando ese impacto recalcula cada costeo afectado, ya encuentra el diseño con el código nuevo y el costo sale igual que antes (un rename puro no debería mover ningún precio); si se hiciera al revés, el impacto vería costeos con el código todavía huérfano y mostraría una caída de precio falsa.
 - Verificado ejecutando `guardarDiseno()` real (no solo revisión de código) contra 3 escenarios: rename confirmado (las 4 referencias + el diseño mismo quedan actualizados, exactamente 5 upserts a las 5 tablas correctas, sin duplicar el diseño), choque de código bloqueado (sin upserts, sin cambios), y rename cancelado en el aviso de impacto (nada se guarda, ni siquiera el diseño).
 
-## Cliente → Proyecto en Ajuste Diario
+## Producto → Diseño de Mezcla en Ajuste Diario, y "NINGÚN PRODUCTO ASOCIADO"
+
+El campo "Producto a fabricar" (`#m-ajuste-producto`, texto libre + `<datalist>` —
+`poblarDatalistProductos()`) determina normalmente, en automático, qué Diseño de Mezcla aplica:
+al elegir un producto real del catálogo, `cargarDesdeProducto()` lee `producto.disenoMezcla` y
+autocompleta el `<select id="m-ajuste-diseno">`, que por eso vive **deshabilitado** (etiqueta
+"(automático)") — nunca se elige a mano, solo se ve lo que trajo el producto.
+
+**"NINGÚN PRODUCTO ASOCIADO"** (2026-10-20, a pedido del usuario: "incluyamos un 'producto' como
+NINGÚN PRODUCTO ASOCIADO, el cual me permita ver el desplegable de diseños de mezcla y escoger
+el que se necesite") — un valor especial más en el mismo `<datalist>`
+(`PRODUCTO_NINGUNO_AJUSTE`, no es un producto real, no vive en `PRODUCTOS`), para ajustes que no
+van atados a ningún producto comercial (ej. pruebas de diseño, calibración). Al escribirlo,
+`cargarDesdeProducto()` toma una rama aparte: **habilita** el select de Diseño (ya viene
+poblado con todos los diseños activos desde que se abrió el modal, `poblarSelectDisenos()`) y lo
+deja vacío, para que la persona elija uno a mano — el `onchange` del select
+(`cargarBaseDesdeDiseno();renderProductosAdicionalesAjuste()`, agregado en esta misma vuelta,
+antes no existía porque el select nunca se tocaba a mano) carga sus materiales base igual que lo
+haría un producto real. Elegir cualquier producto REAL después vuelve a deshabilitar el select
+y a cargarlo en automático — el código ya hacía esto, solo faltaba el camino de ida y vuelta
+para la opción especial. `abrirModalAjusteMezcla()` (Nuevo Ajuste) siempre fuerza el select
+deshabilitado al abrir, por si el modal había quedado habilitado de una edición cancelada antes.
+
+- **Guardado** (`guardarAjusteMezcla()`): la validación de campos obligatorios ya no exige un
+  producto REAL, acepta también `PRODUCTO_NINGUNO_AJUSTE`; sigue exigiendo que haya ALGÚN
+  Diseño de Mezcla elegido (mensaje distinto según el caso: "no tiene un Diseño de Mezcla
+  asignado" para un producto real sin asignar, "Elige un Diseño de Mezcla antes de guardar" para
+  la opción especial). Se guarda `productoCodigo: null, productoNombre: null,
+  sinProductoAsociado: true` — ya existían varios lugares que leen `a.productoNombre`/
+  `a.productoCodigo` con `|| ''`/`?.`/`if (a.productoNombre)` (la lista, el PDF de Formato de
+  Producción, Estadísticas), así que todos muestran "—"/vacío sin cambios adicionales.
+- **Edición** (`editarAjusteMezcla()`): si `a.sinProductoAsociado`, el campo de producto vuelve
+  a mostrar el texto especial y el select de Diseño queda habilitado con el valor guardado — en
+  vez de intentar re-derivar nada desde `PRODUCTOS` (que nunca tendrá una entrada para este
+  caso).
+- El fondo gris fijo del select (`style="background:#F7FAFC"` inline) pasó a una regla CSS
+  `#m-ajuste-diseno:disabled` (`css/estilos.css`) — habilitado ahora se ve como cualquier otro
+  campo editable, en vez de seguir pareciendo bloqueado.
 
 ## Cliente → Proyecto en Ajuste Diario
 
