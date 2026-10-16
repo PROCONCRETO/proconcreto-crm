@@ -181,12 +181,12 @@ function renderCarpetasProyecto() {
   const losas = LOSAS_PROYECTO.filter(l => l.proyectoId === _PROYECTO_ACTIVO_ID);
   const nMemorias = losas.filter(l => l.memoriaCalculoPath).length;
   const nPlanos = losas.filter(l => l.planoPath).length;
+  // Orden de las tarjetas (2026-10-16, a pedido del usuario: "sube despacho a primera línea y
+  // ubica resumen general solo en segunda línea") — con 6 tarjetas de 190px en `.inicio-grid`
+  // (flex-wrap, sin columnas fijas) entran 5 por fila; "Resumen general" va al FINAL a propósito
+  // para que sea la que cae sola en la segunda fila, dejando Memorias/Planos/Listas/Producción/
+  // Despachos completas en la primera.
   grid.innerHTML = `
-    <div class="inicio-modulo" onclick="abrirResumenProyecto()">
-      <span class="inicio-modulo-icono">📊</span>
-      <span class="inicio-modulo-nombre">Resumen general</span>
-      <span style="font-size:11.5px;color:var(--gris-medio)">${losas.length} losa${losas.length === 1 ? '' : 's'}</span>
-    </div>
     <div class="inicio-modulo" onclick="abrirDocumentosProyecto('memoria')">
       <span class="inicio-modulo-icono">📐</span>
       <span class="inicio-modulo-nombre">Memorias de Cálculo</span>
@@ -210,6 +210,11 @@ function renderCarpetasProyecto() {
     <div class="inicio-modulo" onclick="abrirLosasDeProyecto('despacho')">
       <span class="inicio-modulo-icono">📦</span>
       <span class="inicio-modulo-nombre">Despachos</span>
+      <span style="font-size:11.5px;color:var(--gris-medio)">${losas.length} losa${losas.length === 1 ? '' : 's'}</span>
+    </div>
+    <div class="inicio-modulo" onclick="abrirResumenProyecto()">
+      <span class="inicio-modulo-icono">📊</span>
+      <span class="inicio-modulo-nombre">Resumen general</span>
       <span style="font-size:11.5px;color:var(--gris-medio)">${losas.length} losa${losas.length === 1 ? '' : 's'}</span>
     </div>`;
 }
@@ -366,13 +371,21 @@ function renderResumenProyecto() {
   const losas = LOSAS_PROYECTO.filter(l => l.proyectoId === _PROYECTO_ACTIVO_ID);
   const a = _agregadosResumenProyecto(losas);
 
-  document.getElementById('resumen-proy-tamano').innerHTML = [
+  // Columnas = cantidad real de tarjetas (4 o 5, según `hayM2`) — a propósito NO se reusa el
+  // `repeat(4, 1fr)` fijo de `.stats-grid` (2026-10-16, a pedido del usuario: "comprime esta
+  // fila en una sola" — con 5 tarjetas y 4 columnas fijas, la 5ta se iba sola a una segunda
+  // fila). Sobrescribir `grid-template-columns` inline en este contenedor puntual no afecta
+  // ningún otro `.stats-grid` de la app (Logística/Producción siguen con su `repeat(4, 1fr)`).
+  const tarjetasTamano = [
     _tarjetaKPI(a.nLosas.toLocaleString('es-CO'), 'Losas'),
     _tarjetaKPI(a.totalPiezas.toLocaleString('es-CO'), 'Piezas planeadas'),
     _tarjetaKPI(a.totalMetros.toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' m', 'Metros lineales'),
     _tarjetaKPI((a.totalPesoKg / 1000).toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' ton', 'Peso total'),
     a.hayM2 ? _tarjetaKPI(a.totalM2.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' m²', 'Área (prelosa/placa alveolar)') : '',
-  ].join('');
+  ].filter(Boolean);
+  const contTamano = document.getElementById('resumen-proy-tamano');
+  contTamano.style.gridTemplateColumns = `repeat(${tarjetasTamano.length}, 1fr)`;
+  contTamano.innerHTML = tarjetasTamano.join('');
 
   document.getElementById('resumen-proy-kpi-produccion').innerHTML = [
     _tarjetaKPI(`${a.piezasFabricadas.toLocaleString('es-CO')} / ${a.totalPiezas.toLocaleString('es-CO')}`, 'Piezas fabricadas', null, `${a.metrosFabricados.toFixed(2)} / ${a.totalMetros.toFixed(2)} m`),

@@ -976,6 +976,18 @@ el usuario nunca haya entrado al detalle de ninguna Losa en la sesión, y por es
 automáticamente con realtime (`rerenderPantallaActiva()`, `js/datos-realtime.js`), a diferencia
 de `pantalla-losa-detalle`.
 
+- **Orden de la tarjeta en Carpetas del proyecto** (corregido 2026-10-16, a pedido del usuario
+  tras ver la grilla real con 6 tarjetas: "sube despacho a primera línea y ubica resumen general
+  solo en segunda línea") — `.inicio-grid` es `flex-wrap` con tarjetas de 190px, sin columnas
+  fijas, así que con 6 tarjetas entran 5 por fila y la 6ta cae sola en una segunda fila. La
+  primera versión puso "Resumen general" PRIMERO, lo que empujaba "Despachos" (la última de las
+  6) a quedar sola abajo — se movió "Resumen general" al FINAL del arreglo en
+  `renderCarpetasProyecto()` para que sea esa la que cae sola, dejando Memorias/Planos/Listas de
+  Producción/Producción/Despachos completas en la primera fila. El botón del sub-nav NO se tocó
+  — ahí sigue siendo el primero después del nombre del proyecto, es una fila distinta con su
+  propio criterio de orden (atajo directo a cada sección, no depende de cuántas tarjetas quepan
+  por fila).
+
 - **`_agregadosResumenProyecto(losas)`** — la función central, pura (sin tocar el DOM), que
   recorre TODAS las filas de TODAS las Losas del proyecto una sola vez y devuelve los agregados.
   Mismo criterio de "pendiente/avance = total − Σeventos, recalculado siempre en vivo" ya usado
@@ -989,6 +1001,16 @@ de `pantalla-losa-detalle`.
     número sea legible en proyectos grandes. **m² solo se muestra si al menos una Losa no es
     vigueta_bovedilla** (`hayM2`) — vigueta no tiene un "ancho" real, mostrar "0 m²" cuando en
     realidad es "no aplica" sería engañoso.
+    - **Siempre en una sola fila** (corregido 2026-10-16, a pedido del usuario: "comprime esta
+      fila en una sola" — con el `repeat(4, 1fr)` fijo que trae `.stats-grid` en el resto de la
+      app, la 5ta tarjeta (m², cuando aplica) se iba sola a una segunda fila). `#resumen-proy-
+      tamano` sobrescribe `grid-template-columns` por JS, en línea, con la cantidad REAL de
+      tarjetas que se van a mostrar ese render (4 o 5, según `hayM2`) — nunca un número fijo —
+      para que encajen exactas en una sola fila sin dejar una columna vacía ni partir a una
+      segunda fila. Es una sobrescritura puntual de ESE contenedor nada más (`style.
+      gridTemplateColumns` por elemento, no una regla CSS nueva); el resto de `.stats-grid` de
+      la app (Logística/Producción, siempre con 4 tarjetas fijas) sigue con el `repeat(4, 1fr)`
+      de la hoja de estilos, sin tocar.
   - **Avance de producción/despacho, ponderado por longitud**: mismo criterio exacto que
     `_pieAvanceProduccionHTML()` de cada Losa (una fila con pocas piezas muy largas pesa en el
     avance lo que corresponde a sus metros reales, no menos que una fila con muchas piezas
