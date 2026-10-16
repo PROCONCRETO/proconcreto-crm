@@ -1190,13 +1190,24 @@ function abrirModalProgramarProduccion(programacionId) {
   const editando = programacionId ? _programacionesLosaActual.find(x => x.id === programacionId) : null;
   document.getElementById('mpp-id').value = editando ? editando.id : '';
   document.getElementById('modal-programar-produccion-titulo').textContent = editando ? '✏️ Editar programación de producción' : '📋 Programar producción';
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
   const conPendiente = _filasLosaActual.filter(f => _pendienteProduccionFila(f) > 0);
   document.getElementById('mpp-fecha').value = editando ? (editando.fecha || _fmtISO(new Date())) : _fmtISO(new Date());
   document.getElementById('mpp-observaciones').value = editando ? (editando.observaciones || '') : '';
   document.getElementById('mpp-filtros-lista').innerHTML = '';
+  // Encabezado dinámico: columnas de ancho/hilos cambian según el sistema, igual que la tabla
+  // principal (ver nota junto a las columnas más abajo).
+  document.getElementById('mpp-filas-thead').innerHTML = `<tr>
+    <th style="width:28px"><input type="checkbox" onchange="_marcarTodasFilasProgramar(this.checked)"></th>
+    <th>Cuadro</th><th>Ejes num.</th><th>Ejes alfa.</th>
+    ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
+    <th>Dimensión</th><th>Pendiente</th><th>A programar</th>
+  </tr>`;
   const tbody = document.getElementById('mpp-filas-body');
+  const colspanVacio = esVigueta ? 10 : 9;
   if (!conPendiente.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--gris-medio);padding:10px">No hay filas con saldo pendiente de producción.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${colspanVacio}" style="text-align:center;color:var(--gris-medio);padding:10px">No hay filas con saldo pendiente de producción.</td></tr>`;
   } else {
     // Casilla a la izquierda (2026-10-15, a pedido del usuario: "pueda seleccionar una fila, y
     // automáticamente se programen las cantidades pendientes de esa fila, pues por lo general
@@ -1208,18 +1219,26 @@ function abrirModalProgramarProduccion(programacionId) {
     // resumen de bancos de prelosa (2026-10-19, ver `_actualizarResumenBancosPrelosa()`).
     // Columnas "Ejes num."/"Ejes alfa." (2026-10-19, a pedido del usuario: "agreguemos
     // nuevamente los ejes numéricos y alfabéticos en el cuadro que se abre de programación de
-    // despachos y de producción") — de solo lectura, mismo valor crudo que ya alimenta el
-    // filtro por ejes (`data-eje-num`/`data-eje-alfa`), para poder verificar a simple vista qué
-    // cuadro cae en qué eje sin tener que adivinar.
+    // despachos y de producción") y "Ancho"/"Hilos" (o "Vigueta"/"Hilos Abajo"/"Hilos Arriba",
+    // 2026-10-22, a pedido del usuario: "incluyamos las filas de ancho y número de hilos") — de
+    // solo lectura, mismo valor crudo que ya alimenta los filtros (`data-eje-num`/`data-eje-alfa`/
+    // `data-ancho`/`data-hilos`), para poder verificar a simple vista qué cuadro cae en qué eje
+    // y qué medida tiene sin tener que adivinar — importante sobre todo para distinguir a mano
+    // los "bancos de producción de prelosa" (dos anchos como mucho por programación, ver
+    // `_topeMetrosBanco()`).
     tbody.innerHTML = conPendiente.map(f => {
       const pend = _pendienteProduccionFila(f);
-      const lineaExistente = editando ? (editando.lineas || []).find(l => l.filaId === f.id) : null;
+      const lineaExistente = editando ? (editando.lineas || []).find(l2 => l2.filaId === f.id) : null;
       const valorInicial = lineaExistente ? lineaExistente.cantidadProgramada : 0;
+      const colEspecifica = esVigueta
+        ? `<td>${_esc(f.tipoVigueta) || '—'}</td><td style="text-align:center">${f.hilosAbajo || 0}</td><td style="text-align:center">${f.hilosArriba || 0}</td>`
+        : `<td style="text-align:center">${f.ancho || 0}</td><td style="text-align:center">${f.hilos || 0}</td>`;
       return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}">
         <td><input type="checkbox" class="mpp-chk-fila" onchange="_marcarFilaProgramar(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
         <td>${_esc(f.ejesEntre) || '—'}</td>
         <td>${_esc(f.laterales) || '—'}</td>
+        ${colEspecifica}
         <td>${f.dimension || 0} m</td>
         <td>${pend}</td>
         <td><input type="number" min="0" max="${pend}" value="${valorInicial}" data-fila-id="${_escAttr(f.id)}" data-pendiente="${pend}" oninput="_actualizarResumenBancosPrelosa()" style="width:70px"></td>
@@ -1282,8 +1301,12 @@ function _actualizarResumenBancosPrelosa() {
   const filasHTML = anchos.map(a => {
     const m = porAncho.get(a);
     const excedido = m > tope;
-    return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2px 0;color:${excedido ? 'var(--rojo)' : 'var(--gris-texto)'}">
-      <span>${a} cm${anchos.length <= 1 ? ' (2 cintas)' : ' (1 cinta)'}</span><span style="font-weight:700">${m.toFixed(2)} / ${tope} m${excedido ? ' ⚠️' : ''}</span>
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;padding:2px 0;color:${excedido ? 'var(--rojo)' : 'var(--gris-texto)'}">
+      <span>${a} cm${anchos.length <= 1 ? ' (2 cintas)' : ' (1 cinta)'}</span>
+      <span style="display:flex;align-items:center;gap:6px">
+        <span style="font-weight:700">${m.toFixed(2)} / ${tope} m${excedido ? ' ⚠️' : ''}</span>
+        <button type="button" title="Quitar el ancho ${a} cm de esta programación (incluye filas escondidas por el filtro)" onclick="_quitarAnchoProgramar(${a})" style="border:none;background:none;color:var(--gris-medio);cursor:pointer;font-size:13px;line-height:1;padding:0 2px">✕</button>
+      </span>
     </div>`;
   }).join('');
   cont.innerHTML = `<div style="margin:4px 0 8px;padding:8px 10px;background:var(--gris-fondo);border-radius:var(--radio)">
@@ -1291,6 +1314,24 @@ function _actualizarResumenBancosPrelosa() {
     ${filasHTML}
     ${excesoAnchos ? `<div style="font-size:11.5px;color:var(--rojo);font-weight:600;margin-top:4px">⚠️ Solo se pueden programar ${BANCO_PRELOSA_MAX_ANCHOS} anchos distintos por día (una cinta por ancho) — hay ${anchos.length}.</div>` : ''}
   </div>`;
+}
+// Quita de la programación todas las cantidades de un ancho específico (2026-10-16, a pedido
+// del usuario: el filtro de la tabla esconde filas que ya tienen una cantidad puesta, y esa
+// cantidad sigue contando para el tope de bancos aunque no se vea en pantalla — caso real: el
+// usuario filtró por "ancho 50", programó 100.80 m, y el sistema igual lo bloqueó porque una
+// fila de ancho 40 escondida por el filtro tenía 8.76 m puestos de antes, sin que se notara).
+// Pone en 0 el "A programar" y desmarca el checkbox de TODAS las filas de ese ancho, estén o no
+// visibles bajo el filtro actual (usa el `data-ancho` del propio `<tr>`, no el filtro), para
+// poder deshacer un ancho que no se quería incluir sin tener que ir a cazarlo a mano.
+function _quitarAnchoProgramar(ancho) {
+  document.querySelectorAll('#mpp-filas-body tr[data-ancho]').forEach(tr => {
+    if (Number(tr.dataset.ancho) !== ancho) return;
+    const inp = tr.querySelector('input[data-fila-id]');
+    if (inp) inp.value = 0;
+    const chk = tr.querySelector('.mpp-chk-fila');
+    if (chk) chk.checked = false;
+  });
+  _actualizarResumenBancosPrelosa();
 }
 // "Marcar todas" solo actúa sobre las filas visibles — si hay un filtro de rango de cuadro
 // activo, respeta ese recorte (coincide con lo que el usuario está viendo, no con la lista
@@ -1522,36 +1563,83 @@ function _resumenPorMedidasHTML(lineas, l) {
     g.peso += _pesoFila({ ...f, cantidad }, l);
   });
   const filas = Array.from(grupos.values()).sort((a, b) => a.dim - b.dim || String(a.medida).localeCompare(String(b.medida)));
-  let totalCantidad = 0, totalMetros = 0, totalPeso = 0;
-  const filasHTML = filas.map(g => {
-    totalCantidad += g.cantidad;
-    const longTotal = g.dim * g.cantidad;
-    totalMetros += longTotal;
-    totalPeso += g.peso;
-    return `<tr>
-      <td>${esVigueta ? _esc(g.medida) : g.medida + ' cm'}</td>
-      <td style="text-align:center">${g.hilosTxt}</td>
-      <td style="text-align:right">${g.dim.toFixed(2)}</td>
-      <td style="text-align:center;font-weight:700">${g.cantidad}</td>
-      <td style="text-align:right">${longTotal.toFixed(2)}</td>
-      <td style="text-align:right">${g.peso.toFixed(1)}</td>
-    </tr>`;
+
+  // Un cuadro aparte por cada ancho/hilos distinto (2026-10-22, a pedido del usuario: "cuando se
+  // tengan dos anchos o dos cantidades de hilos diferentes, independiza en un cuadro una medida
+  // y en el otro otra medida, para facilidad del operario al momento de producir") — agrupa las
+  // filas ya calculadas (por ancho/vigueta + hilos + dimensión) en un nivel más arriba, por
+  // ancho/vigueta + hilos SOLAMENTE (sin la dimensión): cada combinación de esas dos se separa
+  // en su propia tabla con su propio título y su propia fila de TOTALES, en vez de una sola
+  // tabla mezclando filas de distinta medida — coincide con el caso real que motivó esto: los
+  // "bancos de producción de prelosa" (ver `_topeMetrosBanco()`), donde cada cinta se arma con
+  // un ancho fijo, así que ver de un vistazo "esto es lo de la cinta de 50cm, esto lo de la de
+  // 30cm" es justo lo que facilita el montaje. Si solo hay UNA combinación (el caso más común),
+  // se sigue viendo exactamente igual que antes: una sola tabla, sin título de bloque.
+  const bloquesMap = new Map();
+  filas.forEach(g => {
+    const claveBloque = `${g.medida}__${g.hilosTxt}`;
+    if (!bloquesMap.has(claveBloque)) bloquesMap.set(claveBloque, { medida: g.medida, hilosTxt: g.hilosTxt, filas: [] });
+    bloquesMap.get(claveBloque).filas.push(g);
+  });
+  const bloques = Array.from(bloquesMap.values());
+  const multiplesBloques = bloques.length > 1;
+
+  // `conMedidaHilos`: la tabla única (un solo bloque) sigue mostrando Ancho/Vigueta + Hilos como
+  // columnas, igual que siempre; las tablas de bloques separados NO las repiten como columna
+  // (ya están en el título del bloque), para dejar más aire a Largo/Cantidad/Peso.
+  function tablaMedidasHTML(filasBloque, conMedidaHilos) {
+    let totalCantidad = 0, totalMetros = 0, totalPeso = 0;
+    const filasHTML = filasBloque.map(g => {
+      totalCantidad += g.cantidad;
+      const longTotal = g.dim * g.cantidad;
+      totalMetros += longTotal;
+      totalPeso += g.peso;
+      return `<tr>
+        ${conMedidaHilos ? `<td>${esVigueta ? _esc(g.medida) : g.medida + ' cm'}</td><td style="text-align:center">${g.hilosTxt}</td>` : ''}
+        <td style="text-align:right">${g.dim.toFixed(2)}</td>
+        <td style="text-align:center;font-weight:700">${g.cantidad}</td>
+        <td style="text-align:right">${longTotal.toFixed(2)}</td>
+        <td style="text-align:right">${g.peso.toFixed(1)}</td>
+      </tr>`;
+    }).join('');
+    return `<table class="preview-tabla">
+      <thead><tr>
+        ${conMedidaHilos ? `<th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Hilos</th>` : ''}
+        <th>Largo (m)</th><th>Cantidad</th><th>Long. tot. (m)</th><th>Peso (kg)</th>
+      </tr></thead>
+      <tbody>${filasHTML}</tbody>
+      <tfoot><tr class="total-row">
+        <td colspan="${conMedidaHilos ? 3 : 1}" style="text-align:right">TOTALES</td>
+        <td style="text-align:center">${totalCantidad}</td>
+        <td style="text-align:right">${totalMetros.toFixed(2)}</td>
+        <td style="text-align:right">${totalPeso.toFixed(1)}</td>
+      </tr></tfoot>
+    </table>`;
+  }
+
+  if (!multiplesBloques) {
+    return `
+      <div style="margin-top:14px">
+        <div style="font-size:11px;font-weight:700;color:#003F7F;margin-bottom:4px;letter-spacing:0.03em">RESUMEN POR MEDIDAS</div>
+        ${tablaMedidasHTML(filas, true)}
+      </div>`;
+  }
+  // Los bloques van en una grilla de 2 columnas (envuelve a una fila nueva si hay más de 2) —
+  // "un cuadro una medida y en el otro otra medida": el caso típico es exactamente 2 (una por
+  // cinta/banco), así que quedan uno al lado del otro, como las 2 cintas reales en planta.
+  const bloquesHTML = bloques.map(b => {
+    const titulo = esVigueta
+      ? `VIGUETA ${_esc(b.medida)} · ${b.hilosTxt} HILOS`
+      : `ANCHO ${b.medida} CM · ${b.hilosTxt} HILOS`;
+    return `<div>
+      <div style="font-size:10px;font-weight:700;color:#003F7F;margin-bottom:3px">${titulo}</div>
+      ${tablaMedidasHTML(b.filas, false)}
+    </div>`;
   }).join('');
   return `
     <div style="margin-top:14px">
       <div style="font-size:11px;font-weight:700;color:#003F7F;margin-bottom:4px;letter-spacing:0.03em">RESUMEN POR MEDIDAS</div>
-      <table class="preview-tabla">
-        <thead><tr>
-          <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Hilos</th><th>Largo (m)</th><th>Cantidad</th><th>Long. tot. (m)</th><th>Peso (kg)</th>
-        </tr></thead>
-        <tbody>${filasHTML}</tbody>
-        <tfoot><tr class="total-row">
-          <td colspan="3" style="text-align:right">TOTALES</td>
-          <td style="text-align:center">${totalCantidad}</td>
-          <td style="text-align:right">${totalMetros.toFixed(2)}</td>
-          <td style="text-align:right">${totalPeso.toFixed(1)}</td>
-        </tr></tfoot>
-      </table>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${bloquesHTML}</div>
     </div>`;
 }
 
@@ -2050,24 +2138,39 @@ function abrirModalProgramarDespacho(despachoProgramadoId) {
   const editando = despachoProgramadoId ? _despachosProgramadosLosaActual.find(x => x.id === despachoProgramadoId) : null;
   document.getElementById('mpd-id').value = editando ? editando.id : '';
   document.getElementById('modal-programar-despacho-titulo').textContent = editando ? '✏️ Editar programación de despacho' : '📋 Programar despacho';
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
   const conDisponible = _filasLosaActual.filter(f => _disponibleDespachoFila(f, _despachosLosaActual) > 0);
   document.getElementById('mpd-fecha').value = editando ? (editando.fecha || _fmtISO(new Date())) : _fmtISO(new Date());
   document.getElementById('mpd-observaciones').value = editando ? (editando.observaciones || '') : '';
   document.getElementById('mpd-filtros-lista').innerHTML = '';
+  // Encabezado dinámico — ver la misma nota en `abrirModalProgramarProduccion()`.
+  document.getElementById('mpd-filas-thead').innerHTML = `<tr>
+    <th style="width:28px"><input type="checkbox" onchange="_marcarTodasFilasProgramarDespacho(this.checked)"></th>
+    <th>Cuadro</th><th>Ejes num.</th><th>Ejes alfa.</th>
+    ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
+    <th>Dimensión</th><th>Disponible</th><th>A programar</th>
+  </tr>`;
   const tbody = document.getElementById('mpd-filas-body');
+  const colspanVacio = esVigueta ? 10 : 9;
   if (!conDisponible.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--gris-medio);padding:10px">No hay piezas disponibles para despacho todavía (nada fabricado pendiente de despachar).</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${colspanVacio}" style="text-align:center;color:var(--gris-medio);padding:10px">No hay piezas disponibles para despacho todavía (nada fabricado pendiente de despachar).</td></tr>`;
   } else {
-    // Columnas "Ejes num."/"Ejes alfa." (2026-10-19, ver nota en `abrirModalProgramarProduccion()`).
+    // Columnas "Ejes num."/"Ejes alfa."/"Ancho"/"Hilos" (2026-10-19/2026-10-22, ver nota en
+    // `abrirModalProgramarProduccion()`).
     tbody.innerHTML = conDisponible.map(f => {
       const disp = _disponibleDespachoFila(f, _despachosLosaActual);
-      const lineaExistente = editando ? (editando.lineas || []).find(l => l.filaId === f.id) : null;
+      const lineaExistente = editando ? (editando.lineas || []).find(l2 => l2.filaId === f.id) : null;
       const valorInicial = lineaExistente ? lineaExistente.cantidadProgramada : 0;
+      const colEspecifica = esVigueta
+        ? `<td>${_esc(f.tipoVigueta) || '—'}</td><td style="text-align:center">${f.hilosAbajo || 0}</td><td style="text-align:center">${f.hilosArriba || 0}</td>`
+        : `<td style="text-align:center">${f.ancho || 0}</td><td style="text-align:center">${f.hilos || 0}</td>`;
       return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}">
         <td><input type="checkbox" class="mpd-chk-fila" onchange="_marcarFilaProgramarDespacho(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
         <td>${_esc(f.ejesEntre) || '—'}</td>
         <td>${_esc(f.laterales) || '—'}</td>
+        ${colEspecifica}
         <td>${f.dimension || 0} m</td>
         <td>${disp}</td>
         <td><input type="number" min="0" max="${disp}" value="${valorInicial}" data-fila-id="${_escAttr(f.id)}" data-disponible="${disp}" oninput="_actualizarResumenPesoDespacho()" style="width:70px"></td>

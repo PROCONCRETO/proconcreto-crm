@@ -290,6 +290,17 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     crudo que ya alimenta el filtro por ejes — deja verificar a simple vista qué cuadro cae en
     qué eje, sin tener que adivinar o cruzar con la pantalla principal. Mismas columnas en los
     dos modales (`mpp`/`mpd`).
+  - **Columnas "Ancho (cm)"/"Hilos" (o "Vigueta"/"Hilos Abajo"/"Hilos Arriba" en vigueta y
+    bovedilla) en la tabla del propio modal** (2026-10-16, a pedido del usuario: "en la ventana
+    que se abre de programación de producción y programación de despachos, incluyamos las filas
+    de ancho y número de hilos") — mismo criterio que las columnas de Ejes: de solo lectura,
+    encabezado y columnas armados en `abrirModalProgramarProduccion()`/
+    `abrirModalProgramarDespacho()` según `l.sistema` (prelosa/placa alveolar muestran
+    Ancho+Hilos; vigueta_bovedilla muestra Vigueta+Hilos Abajo+Hilos Arriba en su lugar), para
+    que el operario vea de una sola vez qué medida va a programar sin tener que cruzar con la
+    lista principal. El `<thead>` de ambos modales ahora tiene id propio
+    (`#mpp-filas-thead`/`#mpd-filas-thead`) porque se reconstruye por completo cada vez que se
+    abre el modal (antes era un `<tr>` fijo en el HTML).
   - **Bancos de producción de prelosa** (`BANCO_PRELOSA_METROS_UTILES = 96`,
     `BANCO_PRELOSA_NUM_CINTAS = 2`, `BANCO_PRELOSA_MAX_ANCHOS = 2`, `_topeMetrosBanco()`,
     `_actualizarResumenBancosPrelosa()`, 2026-10-19, a pedido del usuario: "los bancos de
@@ -319,6 +330,19 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
       verdad se va a guardar), con un mensaje que explica el porqué del tope en ese caso
       concreto ("usa las 2 cintas completas" / "solo tiene disponible 1 cinta... hay otro ancho
       programado ese día").
+    - **Botón "✕" para quitar un ancho completo, incluidas filas escondidas por el filtro**
+      (`_quitarAnchoProgramar(ancho)`, 2026-10-16, a pedido del usuario tras un caso real: filtró
+      la tabla por "ancho 50", programó 100.80 m de ese ancho, y el sistema lo bloqueó —
+      resultó que una fila de ancho 40 que el filtro tenía escondida (fuera de pantalla, no
+      limpiada) ya tenía 8.76 m puestos de antes, y el cálculo del tope cuenta TODAS las filas
+      con cantidad, estén o no visibles bajo el filtro actual — por diseño, porque eso es
+      justo lo que se va a guardar. El resumen (`#mpp-resumen-bancos`) ya mostraba ambos anchos
+      con sus metros, pero el usuario no se dio cuenta de que el ancho sobrante estaba
+      escondido). Cada línea del resumen trae ahora un botón "✕" que pone en 0 el campo "A
+      programar" y desmarca el checkbox de TODAS las filas de ese ancho (usa el `data-ancho` del
+      propio `<tr>`, no el filtro activo, así que alcanza filas escondidas), y recalcula el
+      resumen al instante — deshace de un clic un ancho que no se quería incluir, sin tener que
+      cazarlo cambiando filtros a mano.
   - **"🖨️ Imprimir" dentro del propio modal** (`imprimirProgramacionProduccion()`/
     `descargarPDFProgramacionProduccion()`, 2026-10-15, a pedido del usuario: "la idea es poder
     imprimir lo que se espera producir, osea la programación de producción que damos con el
@@ -366,6 +390,23 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
       mismo ancho/vigueta y dimensión pero con distinto número de hilos NO son la misma pieza
       (distinto refuerzo), agruparlas bajo un solo valor de hilos sería engañoso. Vigueta no
       tiene un único campo "hilos" (son dos: Abajo/Arriba) — se muestra combinado "2+1".
+    - **Un cuadro separado por cada ancho/hilos distinto** (2026-10-22, a pedido del usuario:
+      "cuando se tengan dos anchos o dos cantidades de hilos diferentes, independiza en un
+      cuadro una medida y en el otro otra medida, para facilidad del operario al momento de
+      producir") — agrupa las filas ya calculadas (por ancho/vigueta + hilos + dimensión) un
+      nivel más arriba, por ancho/vigueta + hilos SOLAMENTE (sin la dimensión): cada combinación
+      distinta se separa en su propia tabla, con su propio título ("ANCHO 50 CM · 3 HILOS" /
+      "VIGUETA H11 · 2+1 HILOS") y su propia fila de TOTALES — en vez de una sola tabla
+      mezclando filas de distinta medida. Coincide con el caso real que lo motivó: los "bancos
+      de producción de prelosa" (`_topeMetrosBanco()`, más arriba) — cada cinta se arma con un
+      ancho fijo, así que ver de un vistazo "esto es lo de la cinta de 50cm, esto lo de la de
+      30cm" es justo lo que facilita el montaje. Los cuadros van en una grilla de 2 columnas
+      (`display:grid;grid-template-columns:1fr 1fr`, envuelve a una fila nueva si hay más de 2),
+      como las 2 cintas reales en planta, una al lado de la otra. **Si solo hay UNA combinación**
+      (el caso más común, sin mezclar anchos/hilos en la misma programación), se sigue viendo
+      exactamente igual que antes de este cambio: una sola tabla con columnas Ancho/Hilos, sin
+      ningún título de bloque — el comportamiento previo no cambió, solo se activa el reparto en
+      cuadros cuando de verdad hace falta distinguir.
   - **Columnas de la tabla principal** (2026-10-17, dos ajustes a pedido del usuario): "Dim."
     pasó a decir **"Largo"** en las dos tablas de cada imprimible (la principal y el resumen por
     medidas) — más claro para planta/logística que la abreviatura. La columna
