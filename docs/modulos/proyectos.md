@@ -686,6 +686,19 @@ Capturarlas una por una sería impracticable (Boreal tuvo 247 filas en una sola 
 `guardarListaProduccion()` solo descarta filas 100% vacías (mismo criterio que
 `guardarDespieceAcero()`), nunca las parcialmente llenas.
 
+- **Decimales con coma al pegar/importar** (`_parseFloatEs()`, 2026-10-20, reportado por el
+  usuario: "cuando intento pegar un cuadro de excel... los decimales vienen con comas y al
+  pegarlo solo queda el entero sin los decimales") — Excel en configuración regional en español
+  copia los decimales con coma ("3,5"), y `parseFloat()` de JS se detiene ahí (`parseFloat("3,5")`
+  da `3`, no `3.5`) — perdía el decimal en silencio, sin ningún error. `_parseFloatEs(valor)`
+  reemplaza la coma por un punto antes de parsear (ningún campo de esta pantalla — dimensión,
+  ancho, cantidad, hilos — necesita nunca un separador de miles, así que no hay ambigüedad).
+  Reemplaza todos los `parseFloat()` numéricos tanto en **Pegar** (`onPasteFilasProduccion()`)
+  como en **Importar Excel/CSV** (`onSeleccionImportarFilas()`) — el import es menos propenso
+  (SheetJS suele entregar los números ya parseados desde celdas numéricas reales), pero una
+  celda de texto o un CSV exportado en español puede traer la misma coma. Sigue aceptando el
+  punto decimal normal sin cambios.
+
 - **Números cortados en los campos angostos** (2026-10-19, reportado por el usuario con una
   captura real de "PISO 6": "no se ve con claridad los números digitados... aparecen cortados
   en algunos casos" — el campo de Ancho mostraba "50" como "5C") — causa real: las flechitas

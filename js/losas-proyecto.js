@@ -892,6 +892,18 @@ function agregarFilaProduccion() {
 // Cantidad (ver nota en la pantalla). El valor de cada celda de ejes sigue siendo un solo texto
 // combinado (ej. "1-1´"), igual que en el Excel real — el guion se separa solo al mostrarlo
 // en los dos cuadros chicos (ver `par()` en `_filaProduccionHTML`).
+// Excel en configuración regional en español copia los decimales con COMA ("3,5") en vez de
+// punto — `parseFloat()` de JS se detiene en la coma y pierde el decimal (`parseFloat("3,5")`
+// da 3, no 3.5) — 2026-10-20, reportado por el usuario: "cuando intento pegar un cuadro de
+// excel... los decimales vienen con comas y al pegarlo solo queda el entero sin los decimales".
+// Para los campos de esta pantalla (dimensión en metros, ancho en cm, cantidad y conteos de
+// hilos) nunca hace falta un separador de miles, así que basta con tratar la coma como
+// separador decimal. Usado tanto en Pegar como en Importar Excel/CSV — ahí el problema es
+// menos común (SheetJS suele traer los números ya parseados), pero una celda de texto o un CSV
+// exportado en español puede traer la misma coma.
+function _parseFloatEs(valor) {
+  return parseFloat(String(valor ?? '').trim().replace(',', '.')) || 0;
+}
 function onPasteFilasProduccion(event) {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   if (!l) return;
@@ -903,9 +915,9 @@ function onPasteFilasProduccion(event) {
     const cols = linea.split('\t');
     const base = { id: _nuevoIdFila(), cuadro: cols[0] || '', ejesEntre: cols[1] || '', laterales: cols[2] || '', observaciones: '', produccion: [] };
     if (esVigueta) {
-      return { ...base, tipoVigueta: cols[3] || '', hilosAbajo: parseFloat(cols[4]) || 0, hilosArriba: parseFloat(cols[5]) || 0, dimension: parseFloat(cols[6]) || 0, cantidad: parseFloat(cols[7]) || 0, ancho: 0, hilos: 0 };
+      return { ...base, tipoVigueta: cols[3] || '', hilosAbajo: _parseFloatEs(cols[4]), hilosArriba: _parseFloatEs(cols[5]), dimension: _parseFloatEs(cols[6]), cantidad: _parseFloatEs(cols[7]), ancho: 0, hilos: 0 };
     }
-    return { ...base, ancho: parseFloat(cols[3]) || 0, hilos: parseFloat(cols[4]) || 0, dimension: parseFloat(cols[5]) || 0, cantidad: parseFloat(cols[6]) || 0, tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0 };
+    return { ...base, ancho: _parseFloatEs(cols[3]), hilos: _parseFloatEs(cols[4]), dimension: _parseFloatEs(cols[5]), cantidad: _parseFloatEs(cols[6]), tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0 };
   });
   _filasLosaActual = _filasLosaActual.concat(filas);
   renderFilasProduccion();
@@ -952,19 +964,19 @@ function onSeleccionImportarFilas(event) {
       for (let i = filaHdr + 1; i < aoa.length; i++) {
         const r = aoa[i];
         const cuadro = String(r[ci.cuadro] ?? '').trim();
-        const dimension = parseFloat(r[ci.dimension]) || 0;
-        const cantidad = parseFloat(r[ci.cantidad]) || 0;
+        const dimension = _parseFloatEs(r[ci.dimension]);
+        const cantidad = _parseFloatEs(r[ci.cantidad]);
         if (!cuadro && !dimension && !cantidad) continue;
         nuevas.push({
           id: _nuevoIdFila(),
           ejesEntre: ci.ejesEntre >= 0 ? String(r[ci.ejesEntre] ?? '').trim() : '',
           laterales: ci.laterales >= 0 ? String(r[ci.laterales] ?? '').trim() : '',
           cuadro,
-          ancho: ci.ancho >= 0 ? (parseFloat(r[ci.ancho]) || 0) : 0,
-          hilos: ci.hilos >= 0 ? (parseFloat(r[ci.hilos]) || 0) : 0,
+          ancho: ci.ancho >= 0 ? _parseFloatEs(r[ci.ancho]) : 0,
+          hilos: ci.hilos >= 0 ? _parseFloatEs(r[ci.hilos]) : 0,
           tipoVigueta: ci.tipoVigueta >= 0 ? String(r[ci.tipoVigueta] ?? '').trim() : '',
-          hilosAbajo: ci.hilosAbajo >= 0 ? (parseFloat(r[ci.hilosAbajo]) || 0) : 0,
-          hilosArriba: ci.hilosArriba >= 0 ? (parseFloat(r[ci.hilosArriba]) || 0) : 0,
+          hilosAbajo: ci.hilosAbajo >= 0 ? _parseFloatEs(r[ci.hilosAbajo]) : 0,
+          hilosArriba: ci.hilosArriba >= 0 ? _parseFloatEs(r[ci.hilosArriba]) : 0,
           dimension, cantidad,
           observaciones: ci.observaciones >= 0 ? String(r[ci.observaciones] ?? '').trim() : '',
           produccion: [],
