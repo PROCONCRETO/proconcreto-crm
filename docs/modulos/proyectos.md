@@ -813,6 +813,33 @@ Capturarlas una por una sería impracticable (Boreal tuvo 247 filas en una sola 
     edición; si una fila con historial desaparece de la lista (por ejemplo, al pegar un bloque
     que reemplaza filas existentes), también se rechaza el guardado completo — perdería el
     historial de producción/despacho que vive adentro de ella.
+- **Fila de "← Volver / nombre / Exportar Excel / Programar.../Cargar..." fija al bajar**
+  (`#losa-acciones-row`, 2026-10-21, a pedido del usuario: "fijemos también la fila del medio
+  donde están los botones de Exportar excel, en ambas ventanas de producción y despachos") —
+  mismo criterio que el encabezado de la tabla (`renderLosaDetalle()` le cambia el `className`
+  a `acciones-row fija-al-bajar` en Producción/Despacho, `acciones-row` a secas en Lista). Como
+  esta fila se cuela ENTRE la pila fija de siempre (`.nav-top` 50px + `.nav` 44px = 94px) y la
+  tabla, el encabezado de la tabla tiene que correrse hacia abajo exactamente lo que esta fila
+  ocupa al pegarse: se midió una sola vez (28px de alto + 16px de `margin-bottom` = 44px) y se
+  fijó ese número (`top:138px`) en una regla aparte por ID
+  (`#tabla-filas-produccion.fija-al-bajar th`, más específica que la regla genérica de
+  `.tabla-items.fija-al-bajar th`, así que la pisa sin tocar ninguna otra tabla de la app). Si el
+  contenido de esta fila cambia de tamaño en el futuro (otra línea de botones, fuente más
+  grande), hay que volver a medir y actualizar ese número.
+- **Tabla de filas colapsable, solo Producción/Despacho** (`_filasColapsadas`,
+  `_toggleFilasProduccion()`, 2026-10-21, a pedido del usuario: "las listas de producción
+  pueden ser muy largas, y para llegar abajo se demora uno con el scroll... dejemos la opción de
+  poder pincharla para que se abra cuando se necesite revisar") — arranca COLAPSADA (una barra
+  clicable "▶ Ver tabla de producción/despacho (N filas)" en vez de la tabla completa), así que
+  las tarjetas "Producciones programadas"/"registradas" (o sus equivalentes de despacho) quedan
+  visibles casi de inmediato, sin tener que pasar por cientos de filas de scroll para llegar a
+  ellas. Clic en la barra la abre/cierra (`▼ Ocultar tabla...`). En Lista NO aplica — ahí la
+  tabla es el formulario principal de la pantalla, siempre se ve completa, la barra ni se
+  muestra. El estado por defecto (colapsada) se fija UNA SOLA VEZ en `abrirLosaDetalle()` (al
+  entrar a la Losa o cambiar de modo) — **a propósito NO se reinicia dentro de
+  `renderFilasProduccion()`**, que se repite constantemente durante la sesión (cada guardado,
+  cada carga): si se reiniciara ahí, cualquier acción sin relación volvería a cerrar la tabla
+  aunque el usuario la hubiera abierto a propósito un momento antes.
 
 ### Navegación — pantalla nueva, no un patrón ya existente
 

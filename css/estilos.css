@@ -160,6 +160,21 @@
      nueva, revisar primero si esa tabla es una sección corta dentro de un formulario más largo
      (el patrón que sí lo causa) antes de activar esta clase ahí. */
   .tabla-items.fija-al-bajar th { position: sticky; top: 94px; z-index: 5; }
+  /* La fila de "← Volver / nombre de la Losa / Exportar Excel / Programar.../Cargar..." TAMBIÉN
+     queda fija al bajar en Producción/Despacho (2026-10-21, a pedido del usuario: "fijemos
+     también la fila del medio donde están los botones de Exportar excel, en ambas ventanas de
+     producción y despachos") — igual criterio que el encabezado de la tabla: solo lectura en
+     esas dos vistas, nunca en Lista (mismo riesgo documentado arriba). Como esta fila se cuela
+     ENTRE la pila fija de siempre (.nav-top 50px + .nav 44px = 94px) y la tabla, el encabezado
+     de la tabla tiene que correrse hacia abajo exactamente lo que esta fila ocupa al pegarse —
+     se mide una sola vez (28px de alto + 16px de margin-bottom = 44px) y se fija ese número
+     acá; si el contenido de esta fila cambia de tamaño en el futuro (otra línea de botones,
+     fuente más grande), hay que volver a medir. El selector por ID
+     (`#tabla-filas-produccion.fija-al-bajar th`) es más específico que la regla genérica de
+     arriba, así que la pisa sin tocarla — ninguna otra `.tabla-items`/`.tabla-cots` de la app
+     tiene esta fila extra encima, no les debe afectar. */
+  #losa-acciones-row.fija-al-bajar { position: sticky; top: 94px; z-index: 6; background: #F0F4F8; }
+  #tabla-filas-produccion.fija-al-bajar th { top: 138px; }
   .tabla-items td { padding: 8px 10px; border-bottom: 1px solid #EDF2F7; vertical-align: middle; }
   .tabla-items tr:hover td { background: var(--azul-suave); }
   .tabla-items input { border: 1px solid var(--gris-borde); border-radius: 4px; padding: 5px 7px; font-size: 13px; width: 100%; }

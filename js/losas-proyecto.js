@@ -44,6 +44,10 @@ let _LOSA_ACTIVA_ID = null;
 // compartir pantalla).
 let _MODO_FLUJO_LOSA = 'lista';
 
+// Tabla de filas colapsable en Producción/Despacho (2026-10-21) — ver la nota junto a donde se
+// inicializa, en `abrirLosaDetalle()`.
+let _filasColapsadas = false;
+
 // Arreglos de trabajo mientras se tiene abierta la pantalla de detalle de una Losa — mismo
 // criterio que `_despieceAceroActual` en Costeo de Producto: se editan en memoria, y se
 // persisten completos (toda la Losa de una vez) con `_guardarLosaActual()`.
@@ -458,6 +462,14 @@ function abrirLosaDetalle(id) {
   _bovedillaLosaActual = l.bovedilla ? JSON.parse(JSON.stringify(l.bovedilla)) : null;
   _programacionesLosaActual = JSON.parse(JSON.stringify(l.produccionesProgramadas || []));
   _despachosProgramadosLosaActual = JSON.parse(JSON.stringify(l.despachosProgramados || []));
+  // Tabla de filas colapsada por defecto en Producción/Despacho (2026-10-21, a pedido del
+  // usuario: "las listas de producción pueden ser muy largas, y para llegar abajo se demora uno
+  // con el scroll... dejemos la opción de poder pincharla para que se abra cuando se necesite
+  // revisar") — se fija UNA SOLA VEZ acá, al entrar a la Losa (no en `renderFilasProduccion()`,
+  // que se llama una y otra vez durante la sesión — si se reiniciara ahí, cualquier guardado o
+  // carga volvería a cerrar la tabla aunque el usuario la hubiera abierto a propósito). En Lista
+  // no aplica — ahí la tabla es el formulario principal, siempre debe verse.
+  _filasColapsadas = (_MODO_FLUJO_LOSA === 'produccion' || _MODO_FLUJO_LOSA === 'despacho');
   document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
   document.getElementById('pantalla-losa-detalle').classList.add('activa');
   renderLosaDetalle();
@@ -473,6 +485,10 @@ function renderLosaDetalle() {
   const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
   const esDespacho = _MODO_FLUJO_LOSA === 'despacho';
   document.getElementById('losa-detalle-titulo').textContent = `${_ICONOS_MODO_LOSA[_MODO_FLUJO_LOSA] || ''} ${l.nombre}${l.ubicacion ? ' — ' + l.ubicacion : ''} (${sis ? sis.etiqueta : ''})`;
+  // Fila de "← Volver / nombre / Exportar Excel / Programar.../Cargar..." fija al bajar, mismo
+  // criterio que el encabezado de la tabla (solo Producción/Despacho) — 2026-10-21, a pedido
+  // del usuario: "fijemos también la fila del medio donde están los botones de Exportar excel".
+  document.getElementById('losa-acciones-row').className = (esProduccion || esDespacho) ? 'acciones-row fija-al-bajar' : 'acciones-row';
   document.getElementById('losa-barra-lista').style.display = esLista ? '' : 'none';
   document.getElementById('losa-nota-pegar').style.display = esLista ? '' : 'none';
   document.getElementById('losa-btn-programar-produccion').style.display = esProduccion ? '' : 'none';
@@ -520,6 +536,26 @@ function renderFilasProduccion() {
   // distinto al azul de `.tabla-items`, que no se pidió cambiar.
   const tabla = document.getElementById('tabla-filas-produccion');
   if (tabla) tabla.className = 'tabla-items fija-al-bajar';
+  // Tabla colapsable, solo Producción/Despacho (2026-10-21, a pedido del usuario: "las listas
+  // de producción pueden ser muy largas, y para llegar abajo se demora uno con el scroll...
+  // dejemos la opción de poder pincharla para que se abra cuando se necesite revisar") — en
+  // Lista NO aplica (`#losa-filas-toggle` se esconde y la tabla se ve siempre completa): ahí la
+  // tabla es el formulario principal de la pantalla, no "algo que se consulta de vez en cuando".
+  // `_filasColapsadas` arranca en `true` al entrar a la Losa en Producción/Despacho (se fija
+  // una sola vez en `abrirLosaDetalle()`, no acá — este render se repite todo el tiempo durante
+  // la sesión, y reiniciarlo acá cerraría la tabla de nuevo cada vez que algo se guarda o se
+  // carga, aunque el usuario la hubiera abierto a propósito).
+  const togglePanel = document.getElementById('losa-filas-toggle');
+  const tablaWrap = document.getElementById('losa-filas-tabla-wrap');
+  if (togglePanel && tablaWrap) {
+    togglePanel.style.display = esLista ? 'none' : 'flex';
+    if (!esLista) {
+      tablaWrap.style.display = _filasColapsadas ? 'none' : '';
+      document.getElementById('losa-filas-toggle-texto').textContent =
+        `${_filasColapsadas ? '▶' : '▼'} ${_filasColapsadas ? 'Ver' : 'Ocultar'} tabla de ${esProduccion ? 'producción' : 'despacho'} (${_filasLosaActual.length} fila${_filasLosaActual.length === 1 ? '' : 's'})`;
+    }
+  }
+  if (esLista) tablaWrap.style.display = '';
   const thead = document.getElementById('filas-produccion-thead');
   // "Unidades fabricadas" (2026-10-15, a pedido del usuario), justo antes de "Pend.
   // Producción" — solo en modo producción, igual que el resto de columnas de seguimiento.
@@ -546,6 +582,12 @@ function renderFilasProduccion() {
   // cuadrados") — en las TRES vistas (lista/producción/despacho), a diferencia del avance
   // ponderado de abajo, que sigue siendo solo de producción.
   if (tfoot) tfoot.innerHTML = _pieTotalesHTML(l) + (esProduccion ? _pieAvanceProduccionHTML() : '');
+}
+// Click en la barra "▶/▼ Ver/Ocultar tabla..." — ver la nota junto a `_filasColapsadas` y en
+// `renderFilasProduccion()`.
+function _toggleFilasProduccion() {
+  _filasColapsadas = !_filasColapsadas;
+  renderFilasProduccion();
 }
 
 // Fila de TOTALES alineada debajo de su propia columna (2026-10-17, a pedido del usuario:

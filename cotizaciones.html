@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ProSuite — Proconcreto</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect x='1' y='1' width='38' height='38' rx='10' fill='%23003F7F'/%3E%3Ctext x='9' y='29' font-family='Arial, sans-serif' font-weight='900' font-size='24' fill='%23FFFFFF'%3EP%3C/text%3E%3Crect x='21' y='21' width='15' height='15' rx='4' fill='%238BC53F'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="css/estilos.css?v=20261020a">
+<link rel="stylesheet" href="css/estilos.css?v=20261021c">
 </head>
 <body>
 
@@ -1324,7 +1324,7 @@
      PANTALLA: DETALLE DE UNA LOSA — lista de producción, control de producción y despacho
 ═══════════════════════════════════════ -->
 <div id="pantalla-losa-detalle" class="pantalla">
-  <div class="acciones-row">
+  <div class="acciones-row" id="losa-acciones-row">
     <div class="flex-gap" style="align-items:center">
       <button class="btn btn-secundario btn-sm" onclick="volverALosasProyecto()">← Volver</button>
       <div id="losa-detalle-titulo" style="font-size:18px;font-weight:700;color:var(--azul)"></div>
@@ -1352,11 +1352,16 @@
   </div>
 
   <div class="card" style="padding:0" onpaste="onPasteFilasProduccion(event)" tabindex="0">
-    <table id="tabla-filas-produccion" class="tabla-items" style="min-width:980px">
-      <thead id="filas-produccion-thead"></thead>
-      <tbody id="filas-produccion-body"></tbody>
-      <tfoot id="filas-produccion-tfoot"></tfoot>
-    </table>
+    <div id="losa-filas-toggle" style="display:none;padding:12px 16px;cursor:pointer;align-items:center;font-size:13px;font-weight:600;color:var(--azul)" onclick="_toggleFilasProduccion()">
+      <span id="losa-filas-toggle-texto"></span>
+    </div>
+    <div id="losa-filas-tabla-wrap">
+      <table id="tabla-filas-produccion" class="tabla-items" style="min-width:980px">
+        <thead id="filas-produccion-thead"></thead>
+        <tbody id="filas-produccion-body"></tbody>
+        <tfoot id="filas-produccion-tfoot"></tfoot>
+      </table>
+    </div>
   </div>
 
   <div id="losa-card-produccion-programada" class="card" style="margin-top:16px;display:none">
@@ -3360,7 +3365,7 @@
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
 <script src="js/proyectos.js?v=20261016b"></script>
-<script src="js/losas-proyecto.js?v=20261021b"></script>
+<script src="js/losas-proyecto.js?v=20261021c"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20261013a"></script>
 <script src="js/cotizador.js?v=20261007a"></script>
