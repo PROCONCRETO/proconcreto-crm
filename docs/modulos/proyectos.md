@@ -519,9 +519,25 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     derecho teniendo las mismas tres, del formato, editar y borrar") — reemplaza el clic sobre
     la fila por tres botones, mismo patrón visual EXACTO que `renderAjustesMezcla()`
     (`js/calidad-ajuste-mezcla.js`):
-    - **"🖨️ Formato"** = lo que antes abría el clic en la fila: `#modal-detalle-produccion`
-      (Cuadro / Programado / Producido, de solo lectura) — se mantiene tal cual, solo cambia
-      cómo se dispara.
+    - **"👁️ Detalle"** (renombrado 2026-10-19 — se llamaba "🖨️ Formato" hasta entonces; a pedido
+      del usuario, mirando la tarjeta real: "cambiemos el botón de 'formato', pues en realidad
+      no generamos un imprimible. nombrémoslo como 'Detalle' y cambiemos el loguito" — a
+      diferencia de "🖨️ Formato" de la tarjeta "📋 Producciones programadas" de arriba, que SÍ
+      genera un PDF real con `imprimirProgramacionProduccionGuardada()`, este botón NUNCA
+      imprimió nada — siempre abrió `#modal-detalle-produccion`, un modal de solo lectura en
+      pantalla. Ícono nuevo 👁️, mismo que ya usa el resto de la app para "ver" algo de solo
+      lectura (`👁️ Ver PDF`/`👁️ Ver orden`/`👁️ Ver`) — ningún precedente de 🖨️ para algo que no
+      imprime) = lo que antes abría el clic en la fila: `#modal-detalle-produccion` (Cuadro /
+      Programado / Producido, de solo lectura) — se mantiene tal cual, solo cambia la etiqueta y
+      el ícono del botón.
+      - **Columnas Ancho/Hilos (o Vigueta/Hilos Abajo/Hilos Arriba) + Largo** (2026-10-19, a
+        pedido del usuario: "en el detalle de producción cargada, metamos las columnas de
+        largo, ancho y número de hilos") — de solo lectura, tomadas de la fila real
+        (`_filasLosaActual`) vía `linea.filaId`, mismo criterio que ya usan los modales de
+        Programar producción/despacho y la matriz de "Producción diaria" (ver abajo): columnas
+        condicionales según `l.sistema`, entre "Cuadro" y "Programado". El `<thead>`
+        (`#vdp-thead`) se reconstruye por completo cada vez que se abre el modal — modal
+        ensanchado de 620px a 720px para que quepan cómodas.
     - **"✏️ Editar"** (`editarProduccionRegistrada()`) = abre "+ Cargar producción" con esta
       programación ya elegida en el combo (`_renderLineasCargarProduccion()`), en vez de que el
       usuario tenga que volver a buscarla — la edición in-situ en sí ya existía desde el
@@ -630,8 +646,8 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     todavía (`fechas.length === 0`), se mostraba un mensaje y NINGUNA fila; ahora las filas
     siempre aparecen (con "Total fabricado" en 0 y sin columnas de fecha si aún no hay nada
     registrado). Solo se muestra un mensaje si la Losa en sí no tiene filas todavía.
-  - **Columnas fijas (`position:sticky;left:...`) a la izquierda — Cuadro, Ancho, Largo, Cant.
-    a fabricar y Total fabricado** (2026-10-15, a pedido del usuario: "si la losa es muy
+  - **Columnas fijas (`position:sticky;left:...`) a la izquierda — Cuadro, Ancho, Hilos, Largo,
+    Cant. a fabricar y Total fabricado** (2026-10-15, a pedido del usuario: "si la losa es muy
     grande, [las columnas de fecha] van a ser muchas... permitamos que se vean todas los
     registros de fabricación, bloqueando [esas columnas]... y permitiendo desplazar con la
     barra hacia la derecha") — mismo mecanismo que ya fija `.tabla-cots th` arriba al bajar
@@ -646,6 +662,17 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     (`docs/01-arquitectura-tecnica.md`): su recálculo visual no es verificable de forma
     confiable con el arnés de Chrome headless (`--dump-dom`) — se probaron los valores de
     `left`/`position` en el DOM, no el resultado visual en pantalla.
+  - **Columna "Hilos" agregada (2026-10-19, a pedido del usuario: "incluyamos una columna con
+    el número de hilos"; y recordó explícitamente que debía seguir fija: "para esta ventana...
+    debemos bloquear las columnas hasta TOTAL FABRICADO")** — prelosa/placa alveolar trae una
+    sola columna "Hilos" (`f.hilos`, justo después de "Ancho (cm)"); vigueta trae "Hilos
+    Abajo"/"Hilos Arriba" por separado (`f.hilosAbajo`/`f.hilosArriba`, justo después de
+    "Cuadro", donde iría "Ancho" si lo tuviera) — mismo criterio que ya usan los modales de
+    Programar producción/despacho, nunca un "hilos" genérico para vigueta. Sigue siendo parte
+    del bloque congelado: se agregó a la misma cascada de `left` acumulado (`AW.hilos`/
+    `AW.hilosAbajo`/`AW.hilosArriba`), así que el resto de columnas fijas (Largo, Cant. a
+    fabricar, Total fabricado) corrieron su `left` en consecuencia. La celda de Hilos del pie
+    "Total día" queda vacía a propósito (sumar números de hilos no significa nada).
 - **Selección de filas por checkbox, eliminada** (2026-10-15, a pedido del usuario: "quitemos
   mejor el seleccionable de la primera columna") — existía solo para elegir qué imprimir con el
   ahora ya eliminado `imprimirListaProduccion()` (ver bullet "🖨️ Imprimir lista de producción —
@@ -717,6 +744,27 @@ conservó a propósito (mismo espíritu que `viaje.entregas[].productos[]` en Lo
   a partir de TODAS las líneas ya cargadas de ese plan en ese momento — nunca parcial ni
   duplicado. `_pendienteDespachoFila()` sigue funcionando exactamente igual que siempre, sin
   tocar su fórmula ni su firma.
+- **"📊 Despacho diario"** (`abrirMatrizDespachoDiaria()`, 2026-10-19, a pedido del usuario: "este
+  botón nos hace falta, pues es en este donde puedo revisar lo que se ha despachado al
+  detalle... desarrollemoslo con la misma filosofia del boton que tenemos en producción") —
+  misma filosofía y misma pantalla EXACTA que "📊 Producción diaria" (matriz fila × fecha,
+  columnas fijas `position:sticky` a la izquierda — Cuadro/Ancho/Hilos (o Vigueta/Hilos Abajo/
+  Hilos Arriba)/Largo/Cantidad/Total despachado —, una columna por fecha desplazable con la
+  barra a la derecha, siempre lista TODAS las filas de la Losa aunque no tengan despacho
+  todavía). **Única diferencia real de fondo**: la producción vive EN CADA FILA
+  (`fila.produccion[]`), pero el despacho vive a nivel de LOSA (`_despachosLosaActual[]` — cada
+  evento trae una `fecha` y una lista de `lineas[]` que referencian varias filas a la vez, como
+  una remisión real cubre varias piezas), así que `abrirMatrizDespachoDiaria()` arma primero un
+  mapa `filaId → fecha → cantidad` recorriendo los despachos UNA sola vez (en vez de filtrar
+  `fila.produccion` directo por fila, como hace Producción diaria) — mismo resultado visual,
+  fuente de datos distinta por necesidad del modelo. Modal nuevo `#modal-despacho-diario`
+  (`dd-thead`/`dd-tbody`/`dd-tfoot`), botón nuevo "📊 Despacho diario" junto a "+ Cargar
+  despacho", visible solo en modo despacho. Verificado con un arnés real — 28 aserciones: ambos
+  sistemas (prelosa/vigueta), varias líneas de un mismo despacho repartidas entre distintas
+  filas, varios despachos en fechas distintas agregando correctamente por fila y por fecha, el
+  pie "Total día" sumando bien tanto el total general como cada columna de fecha, el caso sin
+  despachos todavía (lista las filas igual, en 0, sin romperse) y el colspan del estado vacío —
+  más una captura real confirmando que se ve idéntica a Producción diaria.
 - **"📋 Despachos programados"** (`renderDespachoProgramado()`, 2026-10-21) — misma lógica
   EXACTA que "📋 Producciones programadas" (ver bullet propio más arriba), del lado de
   Despacho: tarjeta entre la tabla de filas y "📦 Despachos registrados", lista las
@@ -743,9 +791,16 @@ conservó a propósito (mismo espíritu que `viaje.entregas[].productos[]` en Lo
   de filas, junto a "🏗️ Producciones registradas"). Lista las `despachosProgramados[]` con AL
   MENOS una línea cargada; "Contenido" cuenta solo lo REALMENTE despachado.
   - **Columna "Acciones"** (2026-10-18) — misma lógica EXACTA que la de "🏗️ Producciones
-    registradas" (ver bullet correspondiente más arriba): **"🖨️ Formato"** abre
-    `#modal-detalle-despacho` (Remisión / Fecha / Observaciones + Cuadro / Programado /
-    Despachado por línea, solo lectura — no cambió, solo cómo se llega a él); **"✏️ Editar"**
+    registradas" (ver bullet correspondiente más arriba): **"👁️ Detalle"** (renombrado
+    2026-10-19, se llamaba "🖨️ Formato" — mismo cambio y mismo motivo que su equivalente de
+    Producción: nunca generó un PDF, es un modal de solo lectura) abre `#modal-detalle-despacho`
+    (Remisión / Fecha / Observaciones + Cuadro / Programado / Despachado por línea, solo lectura
+    — no cambió, solo la etiqueta/ícono del botón y cómo se llega a él) — **columnas Ancho/Hilos
+    (o Vigueta/Hilos Abajo/Hilos Arriba) + Largo agregadas 2026-10-19**, mismo cambio y mismo
+    criterio que "👁️ Detalle" de Producción (ver esa nota más arriba, el usuario pidió
+    aplicarlo también acá: "ten en cuenta los cambios que hemos hecho hoy también en la ventana
+    de despachos en proyectos") — `#vdd-thead` dinámico, modal ensanchado de 620px a 720px;
+    **"✏️ Editar"**
     (`editarDespachoRegistrado()`) abre "+ Cargar despacho" con esta programación ya elegida;
     **"🗑️ Borrar"** (`eliminarDespachoRegistrado()`) elimina la programación completa Y,
     a diferencia de Producción, también quita la entrada correspondiente del libro real

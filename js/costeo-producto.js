@@ -1059,6 +1059,18 @@ function calcularCosteoProducto(c) {
   let maquinaria = 0;
   const maquinariaDetalle = [];
   const _acpmManualCosteo = _tieneAcpmManualCosteo(c);
+  // Combustible ACPM (Montacargas/Minicargador) — reclasificado a Consumos (2026-10-19, a
+  // pedido del usuario: "en los resúmenes detallados de los costeos, en la sección de
+  // maquinaria, estamos incluyendo el ACPM de las máquinas. este insumo debe ser parte del
+  // resumen de consumos. hagamos la reclasificación, sin modificar el cálculo de combustible")
+  // — `consumos`/`consumosDetalle` se declaran ACÁ, antes del loop de Maquinaria (en vez de en
+  // "Insumos y consumos" más abajo, donde vivían antes), porque el ACPM automático se calcula
+  // DENTRO del loop de Maquinaria (depende de cada fila de máquina, ver
+  // _costoAcpmDiaMaquinaAutomatico()) — el loop de Insumos de abajo sigue sumando sobre estas
+  // MISMAS variables, no las vuelve a declarar. El total (`totalUnidad`) no cambia: es la misma
+  // plata, solo se mueve de categoría/subtotal.
+  let consumos = 0;
+  const consumosDetalle = [];
   (c.maquinas || []).forEach(row => {
     const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
@@ -1073,18 +1085,22 @@ function calcularCosteoProducto(c) {
     maquinaria += costo;
     maquinariaDetalle.push({ nombre: row.nombre, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad, costo });
     // Combustible ACPM automático (Montacargas/Minicargador) — ver _costoAcpmDiaMaquinaAutomatico().
+    // Mismo cálculo de siempre (costoAcpmDia/costoAcpmUnidad, sin tocar); solo cambia la
+    // categoría a la que se suma (Consumos en vez de Maquinaria, ver nota arriba).
     const costoAcpmDia = _costoAcpmDiaMaquinaAutomatico(maq, productoGeneraIva, _acpmManualCosteo);
     if (costoAcpmDia > 0) {
       const costoAcpmUnidad = unidadesDia > 0 ? costoAcpmDia / unidadesDia : 0;
-      maquinaria += costoAcpmUnidad;
-      maquinariaDetalle.push({ nombre: `Combustible ACPM (${row.nombre})`, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad: costoAcpmDia, costo: costoAcpmUnidad, automatico: true });
+      consumos += costoAcpmUnidad;
+      consumosDetalle.push({ nombre: `Combustible ACPM (${row.nombre})`, cantidad: null, unidad: _labelUnidadUso(maq.unidadUso), precio: costoAcpmDia, costo: costoAcpmUnidad, automatico: true });
     }
   });
 
   // Insumos y consumos — "por estiba" (empaque) ÷ unidades/estiba, "por día" (consumos) ÷ unidades/día.
   // Misma regla de IVA descontable/no descontable que la Materia Prima (ver arriba).
-  let empaque = 0, consumos = 0;
-  const empaqueDetalle = [], consumosDetalle = [];
+  // `consumos`/`consumosDetalle` ya vienen declarados arriba (junto al loop de Maquinaria, por
+  // el ACPM automático) — este loop solo sigue sumando sobre esas mismas variables.
+  let empaque = 0;
+  const empaqueDetalle = [];
   (c.insumos || []).forEach(row => {
     const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
     if (!ins) return;
@@ -1260,6 +1276,12 @@ function _calcularCosteoReforzado(c) {
   let maquinaria = 0;
   const maquinariaDetalle = [];
   const _acpmManualCosteo = _tieneAcpmManualCosteo(c);
+  // Combustible ACPM — reclasificado a Consumos (2026-10-19, ver nota completa en
+  // `calcularCosteoProducto()`); `consumos`/`consumosDetalle` se declaran acá, antes del loop de
+  // Maquinaria, porque el ACPM automático se calcula ahí mismo. El loop de Insumos de abajo
+  // sigue sumando sobre estas MISMAS variables.
+  let consumos = 0;
+  const consumosDetalle = [];
   (c.maquinas || []).forEach(row => {
     const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
@@ -1279,19 +1301,21 @@ function _calcularCosteoReforzado(c) {
     maquinaria += costo;
     maquinariaDetalle.push({ nombre: row.nombre, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad, costo });
     // Combustible ACPM automático (Montacargas/Minicargador) — ver _costoAcpmDiaMaquinaAutomatico().
+    // Mismo cálculo de siempre; solo cambia la categoría a la que se suma (Consumos).
     const costoAcpmDia = _costoAcpmDiaMaquinaAutomatico(maq, productoGeneraIva, _acpmManualCosteo);
     if (costoAcpmDia > 0) {
       const costoAcpmUnidad = unidadesDiaFila > 0 ? costoAcpmDia / unidadesDiaFila : 0;
-      maquinaria += costoAcpmUnidad;
-      maquinariaDetalle.push({ nombre: `Combustible ACPM (${row.nombre})`, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad: costoAcpmDia, costo: costoAcpmUnidad, automatico: true });
+      consumos += costoAcpmUnidad;
+      consumosDetalle.push({ nombre: `Combustible ACPM (${row.nombre})`, cantidad: null, unidad: _labelUnidadUso(maq.unidadUso), precio: costoAcpmDia, costo: costoAcpmUnidad, automatico: true });
     }
   });
 
   // Insumos — "por día" (consumos: ensayos, combustible...) o "directo" (Desmoldante y
   // similares: la cantidad ya es por unidad, no se reparte) — acumulados en "Otros insumos",
   // separado de Empaque/Consumos porque no encaja en ninguna de esas dos categorías.
-  let empaque = 0, consumos = 0, otros = 0;
-  const empaqueDetalle = [], consumosDetalle = [], otrosDetalle = [];
+  // `consumos`/`consumosDetalle` ya vienen declarados arriba, junto al loop de Maquinaria.
+  let empaque = 0, otros = 0;
+  const empaqueDetalle = [], otrosDetalle = [];
   (c.insumos || []).forEach(row => {
     const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
     if (!ins) return;
@@ -1407,10 +1431,13 @@ function _calcularCosteoElementoSimple(c) {
   const herramientaMenor = manoObra * ((c.pctHerramientaMenor || 0) / 100);
 
   // Maquinaria — idéntico a Reforzado: incluye "Amortizar en (uds)" para moldes y el Combustible
-  // ACPM automático para Montacargas/Minicargador.
+  // ACPM automático para Montacargas/Minicargador (reclasificado a Consumos, 2026-10-19 — ver
+  // nota completa en `calcularCosteoProducto()`).
   let maquinaria = 0;
   const maquinariaDetalle = [];
   const _acpmManualCosteo = _tieneAcpmManualCosteo(c);
+  let consumos = 0;
+  const consumosDetalle = [];
   (c.maquinas || []).forEach(row => {
     const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
@@ -1430,14 +1457,15 @@ function _calcularCosteoElementoSimple(c) {
     const costoAcpmDia = _costoAcpmDiaMaquinaAutomatico(maq, productoGeneraIva, _acpmManualCosteo);
     if (costoAcpmDia > 0) {
       const costoAcpmUnidad = unidadesDiaFila > 0 ? costoAcpmDia / unidadesDiaFila : 0;
-      maquinaria += costoAcpmUnidad;
-      maquinariaDetalle.push({ nombre: `Combustible ACPM (${row.nombre})`, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad: costoAcpmDia, costo: costoAcpmUnidad, automatico: true });
+      consumos += costoAcpmUnidad;
+      consumosDetalle.push({ nombre: `Combustible ACPM (${row.nombre})`, cantidad: null, unidad: _labelUnidadUso(maq.unidadUso), precio: costoAcpmDia, costo: costoAcpmUnidad, automatico: true });
     }
   });
 
   // Insumos — idéntico a Reforzado (por día → Consumos, directo → Otros, por estiba → Empaque).
-  let empaque = 0, consumos = 0, otros = 0;
-  const empaqueDetalle = [], consumosDetalle = [], otrosDetalle = [];
+  // `consumos`/`consumosDetalle` ya vienen declarados arriba, junto al loop de Maquinaria.
+  let empaque = 0, otros = 0;
+  const empaqueDetalle = [], otrosDetalle = [];
   (c.insumos || []).forEach(row => {
     const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
     if (!ins) return;
@@ -1611,6 +1639,11 @@ function _calcularCosteoPretensado(c) {
   let maquinaria = 0;
   const maquinariaDetalle = [];
   const _acpmManualCosteo = _tieneAcpmManualCosteo(c);
+  // Combustible ACPM — reclasificado a Consumos (2026-10-19, ver nota completa en
+  // `calcularCosteoProducto()`); declarado acá, antes del loop de Maquinaria, porque el ACPM
+  // automático se calcula ahí mismo.
+  let consumos = 0;
+  const consumosDetalle = [];
   (c.maquinas || []).forEach(row => {
     const maq = MAQUINARIA_EQUIPOS.find(x => x.nombre === row.nombre);
     if (!maq) { maquinariaDetalle.push({ nombre: row.nombre, unidadUso: '', costoUnidad: 0, costo: 0, noEncontrado: true }); return; }
@@ -1631,11 +1664,12 @@ function _calcularCosteoPretensado(c) {
     maquinaria += costo;
     maquinariaDetalle.push({ nombre: row.nombre, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad, costo });
     // Combustible ACPM automático (Montacargas/Minicargador) — ver _costoAcpmDiaMaquinaAutomatico().
+    // Mismo cálculo de siempre; solo cambia la categoría a la que se suma (Consumos).
     const costoAcpmDia = _costoAcpmDiaMaquinaAutomatico(maq, productoGeneraIva, _acpmManualCosteo);
     if (costoAcpmDia > 0) {
       const costoAcpmUnidad = unidadesDiaFila > 0 ? costoAcpmDia / unidadesDiaFila : 0;
-      maquinaria += costoAcpmUnidad;
-      maquinariaDetalle.push({ nombre: `Combustible ACPM (${row.nombre})`, unidadUso: _labelUnidadUso(maq.unidadUso), costoUnidad: costoAcpmDia, costo: costoAcpmUnidad, automatico: true });
+      consumos += costoAcpmUnidad;
+      consumosDetalle.push({ nombre: `Combustible ACPM (${row.nombre})`, cantidad: null, unidad: _labelUnidadUso(maq.unidadUso), precio: costoAcpmDia, costo: costoAcpmUnidad, automatico: true });
     }
   });
 
@@ -1643,9 +1677,10 @@ function _calcularCosteoPretensado(c) {
   // "Por día" usa el rendimiento de línea (Energía, Agua, ACPM, Detergente, Ensayo de compresión,
   // Discos de corte); "Directo" para cantidades ya calculadas por ml (Resorte Loza, Alambre
   // Dulce). "Por estiba" no aplica a Pretensado (se vende por ml) pero queda disponible por si
-  // algún producto puntual lo necesita.
-  let empaque = 0, consumos = 0, otros = 0;
-  const empaqueDetalle = [], consumosDetalle = [], otrosDetalle = [];
+  // algún producto puntual lo necesita. `consumos`/`consumosDetalle` ya vienen declarados
+  // arriba, junto al loop de Maquinaria.
+  let empaque = 0, otros = 0;
+  const empaqueDetalle = [], otrosDetalle = [];
   (c.insumos || []).forEach(row => {
     const ins = INSUMOS_COSTOS.find(x => x.nombre === row.nombre);
     if (!ins) return;

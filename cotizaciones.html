@@ -1383,6 +1383,7 @@
       <button id="losa-btn-produccion-diaria" class="btn btn-secundario btn-sm" onclick="abrirMatrizProduccionDiaria()" style="display:none">📊 Producción diaria</button>
       <button id="losa-btn-programar-despacho" class="btn btn-primario btn-sm" onclick="abrirModalProgramarDespacho()" style="display:none">+ Programar despacho</button>
       <button id="losa-btn-cargar-despacho" class="btn btn-primario btn-sm" onclick="abrirModalCargarDespacho()" style="display:none">+ Cargar despacho</button>
+      <button id="losa-btn-despacho-diario" class="btn btn-secundario btn-sm" onclick="abrirMatrizDespachoDiaria()" style="display:none">📊 Despacho diario</button>
     </div>
   </div>
 
@@ -1518,15 +1519,31 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-despacho-diario">
+  <div class="modal" style="width:900px;max-width:95vw">
+    <div class="modal-titulo">📊 Despacho diario</div>
+    <div style="max-height:60vh;overflow:auto">
+      <table class="tabla-cots" style="min-width:600px">
+        <thead id="dd-thead"></thead>
+        <tbody id="dd-tbody"></tbody>
+        <tfoot id="dd-tfoot"></tfoot>
+      </table>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-despacho-diario')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-detalle-produccion">
-  <div class="modal" style="width:620px;max-width:95vw">
+  <div class="modal" style="width:720px;max-width:95vw">
     <div class="modal-titulo">🏗️ Detalle de producción cargada</div>
     <div class="form-grid" style="margin-bottom:10px;font-size:13px">
       <div><b>Fecha:</b> <span id="vdp-fecha"></span></div>
       <div><b>Observaciones:</b> <span id="vdp-observaciones"></span></div>
     </div>
     <div style="max-height:320px;overflow-y:auto">
-      <table class="tabla-cots"><thead><tr><th>Cuadro</th><th>Programado</th><th>Producido</th></tr></thead><tbody id="vdp-filas-body"></tbody></table>
+      <table class="tabla-cots"><thead id="vdp-thead"><tr><th>Cuadro</th><th>Programado</th><th>Producido</th></tr></thead><tbody id="vdp-filas-body"></tbody></table>
     </div>
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-detalle-produccion')">Cerrar</button>
@@ -1597,7 +1614,7 @@
 </div>
 
 <div class="modal-overlay" id="modal-detalle-despacho">
-  <div class="modal" style="width:620px;max-width:95vw">
+  <div class="modal" style="width:720px;max-width:95vw">
     <div class="modal-titulo">📦 Detalle de despacho cargado</div>
     <div class="form-grid" style="margin-bottom:10px;font-size:13px">
       <div><b>Remisión:</b> <span id="vdd-remision"></span></div>
@@ -1605,7 +1622,7 @@
     </div>
     <div style="font-size:13px;margin-bottom:10px"><b>Observaciones:</b> <span id="vdd-observaciones"></span></div>
     <div style="max-height:320px;overflow-y:auto">
-      <table class="tabla-cots"><thead><tr><th>Cuadro</th><th>Programado</th><th>Despachado</th></tr></thead><tbody id="vdd-filas-body"></tbody></table>
+      <table class="tabla-cots"><thead id="vdd-thead"><tr><th>Cuadro</th><th>Programado</th><th>Despachado</th></tr></thead><tbody id="vdd-filas-body"></tbody></table>
     </div>
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-detalle-despacho')">Cerrar</button>
@@ -3405,14 +3422,14 @@
 <script src="js/costeo-mano-obra.js?v=20260825a"></script>
 <script src="js/costeo-maquinaria.js?v=20260920a"></script>
 <script src="js/costeo-referencia.js?v=20260821a"></script>
-<script src="js/costeo-producto.js?v=20261011d"></script>
+<script src="js/costeo-producto.js?v=20261019a"></script>
 <script src="js/calidad-mezclas.js?v=20261011c"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
 <script src="js/logistica.js?v=20261011c"></script>
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20260921b"></script>
 <script src="js/proyectos.js?v=20261016b"></script>
-<script src="js/losas-proyecto.js?v=20261022f"></script>
+<script src="js/losas-proyecto.js?v=20261022j"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20261016a"></script>
 <script src="js/cotizador.js?v=20261007a"></script>

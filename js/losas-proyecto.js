@@ -716,6 +716,7 @@ function renderLosaDetalle() {
   document.getElementById('losa-btn-produccion-diaria').style.display = esProduccion ? '' : 'none';
   document.getElementById('losa-btn-programar-despacho').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-btn-cargar-despacho').style.display = esDespacho ? '' : 'none';
+  document.getElementById('losa-btn-despacho-diario').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-card-produccion-programada').style.display = esProduccion ? '' : 'none';
   document.getElementById('losa-card-produccion-registrada').style.display = esProduccion ? '' : 'none';
   document.getElementById('losa-card-despacho-programado').style.display = esDespacho ? '' : 'none';
@@ -2179,10 +2180,13 @@ function eliminarProgramacionProduccion(id) {
 // que tenemos por ejemplo en ajuste diario de mezclas, con las acciones en el lado derecho
 // teniendo las mismas tres, del formato, editar y borrar") — reemplaza el clic sobre la fila
 // (que abría el detalle de solo lectura) por tres botones explícitos, mismo patrón visual EXACTO
-// que `renderAjustesMezcla()` en `js/calidad-ajuste-mezcla.js`: 🖨️ Formato (el mismo detalle de
-// solo lectura que antes abría el clic en la fila), ✏️ Editar (abre "+ Cargar producción" con
-// esta programación ya seleccionada — reutiliza la edición in-situ que ya existía ahí) y
-// 🗑️ Borrar (elimina la programación completa, con confirmación).
+// que `renderAjustesMezcla()` en `js/calidad-ajuste-mezcla.js`: 👁️ Detalle (el mismo detalle de
+// solo lectura que antes abría el clic en la fila — se llamó "🖨️ Formato" hasta 2026-10-19,
+// renombrado a pedido del usuario: "en realidad no generamos un imprimible... nombrémoslo como
+// Detalle y cambiemos el loguito", no genera ningún PDF, a diferencia de "+ Programar
+// producción" → "🖨️ Formato" en la tarjeta de arriba, que sí imprime), ✏️ Editar (abre "+ Cargar
+// producción" con esta programación ya seleccionada — reutiliza la edición in-situ que ya
+// existía ahí) y 🗑️ Borrar (elimina la programación completa, con confirmación).
 function renderProduccionRegistrada() {
   const tbody = document.getElementById('produccion-registrada-body');
   if (!tbody) return;
@@ -2201,7 +2205,7 @@ function renderProduccionRegistrada() {
       <td>${_esc(p.observaciones) || '—'}</td>
       <td>
         <div class="flex-gap">
-          <button class="btn btn-secundario btn-xs" onclick="verDetalleProduccionRegistrada('${_escAttr(p.id)}')">🖨️ Formato</button>
+          <button class="btn btn-secundario btn-xs" onclick="verDetalleProduccionRegistrada('${_escAttr(p.id)}')">👁️ Detalle</button>
           <button class="btn btn-primario btn-xs" onclick="editarProduccionRegistrada('${_escAttr(p.id)}')">✏️ Editar</button>
           <button class="btn btn-rojo btn-xs" onclick="eliminarProduccionRegistrada('${_escAttr(p.id)}')">🗑️</button>
         </div>
@@ -2237,19 +2241,39 @@ function eliminarProduccionRegistrada(id) {
   renderFilasProduccion();
   renderProduccionRegistrada();
 }
-// Detalle de solo lectura ("🖨️ Formato") — mismo
+// Detalle de solo lectura ("👁️ Detalle") — mismo
 // contenido que ve "+ Cargar producción" (Cuadro / Programado / Producido), pero sin inputs:
 // es historial, no una carga en curso.
+// Columnas Ancho/Hilos (o Vigueta/Hilos Abajo/Hilos Arriba) + Largo (2026-10-19, a pedido del
+// usuario: "en el detalle de producción cargada, metamos las columnas de largo, ancho y número
+// de hilos") — mismo criterio que ya usan los modales de Programar producción/despacho y la
+// matriz de Producción diaria: de solo lectura, tomadas de la fila real (`_filasLosaActual`),
+// para identificar de un vistazo qué medida tiene cada cuadro sin tener que cruzar con la lista
+// principal. El `<thead>` ahora tiene id propio (`#vdp-thead`) porque se reconstruye por
+// completo cada vez que se abre el modal.
 function verDetalleProduccionRegistrada(id) {
   const p = _programacionesLosaActual.find(x => x.id === id);
   if (!p) return;
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
   document.getElementById('vdp-fecha').textContent = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—';
   document.getElementById('vdp-observaciones').textContent = p.observaciones || '—';
+  document.getElementById('vdp-thead').innerHTML = `<tr>
+    <th>Cuadro</th>
+    ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
+    <th>Largo (m)</th>
+    <th>Programado</th><th>Producido</th>
+  </tr>`;
   document.getElementById('vdp-filas-body').innerHTML = (p.lineas || []).map(linea => {
     const f = _filasLosaActual.find(x => x.id === linea.filaId);
     const cargada = linea.cantidadReal != null;
+    const colEspecifica = esVigueta
+      ? `<td>${_esc(f?.tipoVigueta) || '—'}</td><td style="text-align:center">${f?.hilosAbajo || 0}</td><td style="text-align:center">${f?.hilosArriba || 0}</td>`
+      : `<td style="text-align:center">${f?.ancho || 0}</td><td style="text-align:center">${f?.hilos || 0}</td>`;
     return `<tr>
       <td>${_esc(f?.cuadro || '—')}</td>
+      ${colEspecifica}
+      <td style="text-align:center">${f?.dimension || 0}</td>
       <td>${linea.cantidadProgramada}</td>
       <td>${cargada ? linea.cantidadReal : '<span style="color:var(--naranja)">Pendiente</span>'}</td>
     </tr>`;
@@ -2261,10 +2285,11 @@ function verDetalleProduccionRegistrada(id) {
 // compartidos por el usuario (una columna por día de producción). Siempre lista TODAS las
 // filas de la Losa (2026-10-15, a pedido del usuario), no solo las que ya tienen producción —
 // antes, si todavía no se había cargado ninguna producción, no se veía ninguna fila. Las
-// columnas Cuadro/Ancho/Largo/Cant. a fabricar/Total fabricado quedan FIJAS a la izquierda
-// (`position:sticky;left:...`, mismo mecanismo que ya usa `.tabla-cots th` para fijarse arriba
-// al bajar, pero en el eje horizontal) porque en una Losa grande las columnas de fecha pueden
-// ser muchas — se desplazan con la barra horizontal sin perder de vista qué fila es cada una.
+// columnas Cuadro/Ancho/Hilos/Largo/Cant. a fabricar/Total fabricado quedan FIJAS a la
+// izquierda (`position:sticky;left:...`, mismo mecanismo que ya usa `.tabla-cots th` para
+// fijarse arriba al bajar, pero en el eje horizontal) porque en una Losa grande las columnas
+// de fecha pueden ser muchas — se desplazan con la barra horizontal sin perder de vista qué
+// fila es cada una.
 function abrirMatrizProduccionDiaria() {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   const esVigueta = l?.sistema === 'vigueta_bovedilla';
@@ -2278,14 +2303,24 @@ function abrirMatrizProduccionDiaria() {
   // Anchos fijos para las columnas congeladas — position:sticky necesita un "left" numérico,
   // no sirve con anchos automáticos; thead/tbody/tfoot usan exactamente el mismo ancho por
   // columna para que las celdas queden alineadas.
-  const AW = { cuadro: 60, ancho: 70, largo: 70, cantidad: 100, total: 110 };
+  // "Hilos" (2026-10-19, a pedido del usuario: "incluyamos una columna con el número de
+  // hilos") — prelosa/placa alveolar trae una sola columna "Hilos" (`f.hilos`); vigueta trae
+  // "Hilos Abajo"/"Hilos Arriba" por separado (`f.hilosAbajo`/`f.hilosArriba`), mismo criterio
+  // que ya usan los modales de Programar producción/despacho — NUNCA un solo "hilos" genérico
+  // para vigueta. Sigue siendo parte del bloque FIJO a la izquierda (el usuario lo recordó
+  // explícitamente: "para esta ventana... debemos bloquear las columnas hasta TOTAL FABRICADO"),
+  // así que entra en la misma cascada de `left` acumulado que el resto de columnas congeladas.
+  const AW = { cuadro: 60, ancho: 70, hilos: 55, hilosAbajo: 60, hilosArriba: 60, largo: 70, cantidad: 100, total: 110 };
   let acum = 0;
   const leftCuadro = acum; acum += AW.cuadro;
   const leftAncho = acum; if (!esVigueta) acum += AW.ancho;
+  const leftHilos = acum; if (!esVigueta) acum += AW.hilos;
+  const leftHilosAbajo = acum; if (esVigueta) acum += AW.hilosAbajo;
+  const leftHilosArriba = acum; if (esVigueta) acum += AW.hilosArriba;
   const leftLargo = acum; acum += AW.largo;
   const leftCantidad = acum; acum += AW.cantidad;
   const leftTotal = acum;
-  const numColsFijas = esVigueta ? 4 : 5;
+  const numColsFijas = 6;
   // z-index 5 en los `<th>` ya viene de `.tabla-cots th` (también les da el `top:0` que los fija
   // arriba al bajar) — acá solo hace falta agregar el `left` para fijarlos también a la
   // izquierda. Los `<td>`/`<tfoot><td>` sí necesitan su propio z-index + fondo sólido (si no, el
@@ -2296,6 +2331,9 @@ function abrirMatrizProduccionDiaria() {
   thead.innerHTML = `<tr>
     ${thFijo(leftCuadro, AW.cuadro, 'Cuadro')}
     ${esVigueta ? '' : thFijo(leftAncho, AW.ancho, 'Ancho (cm)')}
+    ${esVigueta ? '' : thFijo(leftHilos, AW.hilos, 'Hilos')}
+    ${esVigueta ? thFijo(leftHilosAbajo, AW.hilosAbajo, 'Hilos Abajo') : ''}
+    ${esVigueta ? thFijo(leftHilosArriba, AW.hilosArriba, 'Hilos Arriba') : ''}
     ${thFijo(leftLargo, AW.largo, 'Largo (m)')}
     ${thFijo(leftCantidad, AW.cantidad, 'Cant. a fabricar')}
     ${thFijo(leftTotal, AW.total, 'Total fabricado')}
@@ -2324,6 +2362,9 @@ function abrirMatrizProduccionDiaria() {
     return `<tr>
       ${tdFijo(leftCuadro, AW.cuadro, _esc(f.cuadro) || '—', 'font-weight:600')}
       ${esVigueta ? '' : tdFijo(leftAncho, AW.ancho, f.ancho || 0, 'text-align:center')}
+      ${esVigueta ? '' : tdFijo(leftHilos, AW.hilos, f.hilos || 0, 'text-align:center')}
+      ${esVigueta ? tdFijo(leftHilosAbajo, AW.hilosAbajo, f.hilosAbajo || 0, 'text-align:center') : ''}
+      ${esVigueta ? tdFijo(leftHilosArriba, AW.hilosArriba, f.hilosArriba || 0, 'text-align:center') : ''}
       ${tdFijo(leftLargo, AW.largo, (Number(f.dimension) || 0).toFixed(2), 'text-align:center')}
       ${tdFijo(leftCantidad, AW.cantidad, f.cantidad || 0, 'text-align:center')}
       ${tdFijo(leftTotal, AW.total, filaTotal || 0, 'text-align:center;font-weight:700')}
@@ -2334,6 +2375,9 @@ function abrirMatrizProduccionDiaria() {
   tfoot.innerHTML = fechas.length ? `<tr style="font-weight:700">
     ${tdFijo(leftCuadro, AW.cuadro, 'Total día', 'background:var(--azul-suave)')}
     ${esVigueta ? '' : tdFijo(leftAncho, AW.ancho, '', 'background:var(--azul-suave)')}
+    ${esVigueta ? '' : tdFijo(leftHilos, AW.hilos, '', 'background:var(--azul-suave)')}
+    ${esVigueta ? tdFijo(leftHilosAbajo, AW.hilosAbajo, '', 'background:var(--azul-suave)') : ''}
+    ${esVigueta ? tdFijo(leftHilosArriba, AW.hilosArriba, '', 'background:var(--azul-suave)') : ''}
     ${tdFijo(leftLargo, AW.largo, '', 'background:var(--azul-suave)')}
     ${tdFijo(leftCantidad, AW.cantidad, granTotalCantidad, 'background:var(--azul-suave);text-align:center')}
     ${tdFijo(leftTotal, AW.total, granTotalFabricado, 'background:var(--azul-suave);text-align:center')}
@@ -2341,6 +2385,111 @@ function abrirMatrizProduccionDiaria() {
   </tr>` : '';
 
   document.getElementById('modal-produccion-diaria').classList.add('abierto');
+}
+
+// "Ver despacho diario" — matriz fila × fecha, misma filosofía EXACTA que "Producción diaria"
+// (2026-10-19, a pedido del usuario: "este botón nos hace falta, pues es en este donde puedo
+// revisar lo que se ha despachado al detalle... desarrollemoslo con la misma filosofia del
+// boton que tenemos en producción"). Única diferencia real de fondo: la producción vive EN
+// CADA FILA (`fila.produccion[]`), pero el despacho vive a nivel de LOSA
+// (`_despachosLosaActual[]` — cada evento trae una `fecha` y una lista de `lineas[]` que
+// referencian varias filas a la vez, como una remisión real cubre varias piezas) — así que acá
+// se arma primero un mapa filaId→fecha→cantidad recorriendo los despachos UNA sola vez, en vez
+// de filtrar `fila.produccion` directo como hace Producción diaria. Mismas columnas fijas
+// (Cuadro/Ancho/Hilos (o Vigueta/Hilos Abajo/Hilos Arriba)/Largo/Cantidad/Total despachado,
+// `position:sticky`) congeladas a la izquierda, mismas fechas desplazables a la derecha.
+function abrirMatrizDespachoDiaria() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const esVigueta = l?.sistema === 'vigueta_bovedilla';
+  const fechasSet = new Set();
+  const porFilaFecha = new Map(); // filaId -> Map(fecha -> cantidad)
+  _despachosLosaActual.forEach(d => {
+    if (!d.fecha) return;
+    fechasSet.add(d.fecha);
+    (d.lineas || []).forEach(linea => {
+      if (!linea.filaId) return;
+      if (!porFilaFecha.has(linea.filaId)) porFilaFecha.set(linea.filaId, new Map());
+      const m = porFilaFecha.get(linea.filaId);
+      m.set(d.fecha, (m.get(d.fecha) || 0) + (Number(linea.cantidad) || 0));
+    });
+  });
+  const fechas = Array.from(fechasSet).sort();
+  const thead = document.getElementById('dd-thead');
+  const tbody = document.getElementById('dd-tbody');
+  const tfoot = document.getElementById('dd-tfoot');
+
+  const AW = { cuadro: 60, ancho: 70, hilos: 55, hilosAbajo: 60, hilosArriba: 60, largo: 70, cantidad: 100, total: 110 };
+  let acum = 0;
+  const leftCuadro = acum; acum += AW.cuadro;
+  const leftAncho = acum; if (!esVigueta) acum += AW.ancho;
+  const leftHilos = acum; if (!esVigueta) acum += AW.hilos;
+  const leftHilosAbajo = acum; if (esVigueta) acum += AW.hilosAbajo;
+  const leftHilosArriba = acum; if (esVigueta) acum += AW.hilosArriba;
+  const leftLargo = acum; acum += AW.largo;
+  const leftCantidad = acum; acum += AW.cantidad;
+  const leftTotal = acum;
+  const numColsFijas = 6;
+  const thFijo = (leftPx, w, texto) => `<th style="position:sticky;left:${leftPx}px;width:${w}px;min-width:${w}px;text-align:center">${texto}</th>`;
+  const tdFijo = (leftPx, w, texto, extra) => `<td style="position:sticky;left:${leftPx}px;width:${w}px;min-width:${w}px;z-index:2;background:#fff;${extra || ''}">${texto}</td>`;
+
+  thead.innerHTML = `<tr>
+    ${thFijo(leftCuadro, AW.cuadro, 'Cuadro')}
+    ${esVigueta ? '' : thFijo(leftAncho, AW.ancho, 'Ancho (cm)')}
+    ${esVigueta ? '' : thFijo(leftHilos, AW.hilos, 'Hilos')}
+    ${esVigueta ? thFijo(leftHilosAbajo, AW.hilosAbajo, 'Hilos Abajo') : ''}
+    ${esVigueta ? thFijo(leftHilosArriba, AW.hilosArriba, 'Hilos Arriba') : ''}
+    ${thFijo(leftLargo, AW.largo, 'Largo (m)')}
+    ${thFijo(leftCantidad, AW.cantidad, 'Cantidad')}
+    ${thFijo(leftTotal, AW.total, 'Total despachado')}
+    ${fechas.map(fe => `<th style="text-align:center;min-width:55px">${new Date(fe + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' })}</th>`).join('')}
+  </tr>`;
+
+  if (!_filasLosaActual.length) {
+    tbody.innerHTML = `<tr><td colspan="${numColsFijas + fechas.length}" style="text-align:center;color:var(--gris-medio);padding:14px">No hay filas en esta Losa todavía.</td></tr>`;
+    tfoot.innerHTML = '';
+    document.getElementById('modal-despacho-diario').classList.add('abierto');
+    return;
+  }
+
+  const totalesPorFecha = fechas.map(() => 0);
+  let granTotalCantidad = 0, granTotalDespachado = 0;
+  tbody.innerHTML = _filasLosaActual.map(f => {
+    const mFecha = porFilaFecha.get(f.id);
+    let filaTotal = 0;
+    const celdas = fechas.map((fe, fi) => {
+      const cant = mFecha ? (mFecha.get(fe) || 0) : 0;
+      filaTotal += cant;
+      totalesPorFecha[fi] += cant;
+      return `<td style="text-align:center">${cant || ''}</td>`;
+    }).join('');
+    granTotalCantidad += Number(f.cantidad) || 0;
+    granTotalDespachado += filaTotal;
+    return `<tr>
+      ${tdFijo(leftCuadro, AW.cuadro, _esc(f.cuadro) || '—', 'font-weight:600')}
+      ${esVigueta ? '' : tdFijo(leftAncho, AW.ancho, f.ancho || 0, 'text-align:center')}
+      ${esVigueta ? '' : tdFijo(leftHilos, AW.hilos, f.hilos || 0, 'text-align:center')}
+      ${esVigueta ? tdFijo(leftHilosAbajo, AW.hilosAbajo, f.hilosAbajo || 0, 'text-align:center') : ''}
+      ${esVigueta ? tdFijo(leftHilosArriba, AW.hilosArriba, f.hilosArriba || 0, 'text-align:center') : ''}
+      ${tdFijo(leftLargo, AW.largo, (Number(f.dimension) || 0).toFixed(2), 'text-align:center')}
+      ${tdFijo(leftCantidad, AW.cantidad, f.cantidad || 0, 'text-align:center')}
+      ${tdFijo(leftTotal, AW.total, filaTotal || 0, 'text-align:center;font-weight:700')}
+      ${celdas}
+    </tr>`;
+  }).join('');
+
+  tfoot.innerHTML = fechas.length ? `<tr style="font-weight:700">
+    ${tdFijo(leftCuadro, AW.cuadro, 'Total día', 'background:var(--azul-suave)')}
+    ${esVigueta ? '' : tdFijo(leftAncho, AW.ancho, '', 'background:var(--azul-suave)')}
+    ${esVigueta ? '' : tdFijo(leftHilos, AW.hilos, '', 'background:var(--azul-suave)')}
+    ${esVigueta ? tdFijo(leftHilosAbajo, AW.hilosAbajo, '', 'background:var(--azul-suave)') : ''}
+    ${esVigueta ? tdFijo(leftHilosArriba, AW.hilosArriba, '', 'background:var(--azul-suave)') : ''}
+    ${tdFijo(leftLargo, AW.largo, '', 'background:var(--azul-suave)')}
+    ${tdFijo(leftCantidad, AW.cantidad, granTotalCantidad, 'background:var(--azul-suave);text-align:center')}
+    ${tdFijo(leftTotal, AW.total, granTotalDespachado, 'background:var(--azul-suave);text-align:center')}
+    ${totalesPorFecha.map(t => `<td style="text-align:center;background:var(--azul-suave)">${t || ''}</td>`).join('')}
+  </tr>` : '';
+
+  document.getElementById('modal-despacho-diario').classList.add('abierto');
 }
 
 // ── Control de Despacho — mismo flujo de dos pasos que Producción (2026-10-16, a pedido del
@@ -2834,7 +2983,7 @@ function renderDespachosRegistrados() {
       <td>${_esc(p.observaciones) || '—'}</td>
       <td>
         <div class="flex-gap">
-          <button class="btn btn-secundario btn-xs" onclick="verDetalleDespachoRegistrado('${_escAttr(p.id)}')">🖨️ Formato</button>
+          <button class="btn btn-secundario btn-xs" onclick="verDetalleDespachoRegistrado('${_escAttr(p.id)}')">👁️ Detalle</button>
           <button class="btn btn-primario btn-xs" onclick="editarDespachoRegistrado('${_escAttr(p.id)}')">✏️ Editar</button>
           <button class="btn btn-rojo btn-xs" onclick="eliminarDespachoRegistrado('${_escAttr(p.id)}')">🗑️</button>
         </div>
@@ -2865,19 +3014,37 @@ function eliminarDespachoRegistrado(id) {
   renderFilasProduccion();
   renderDespachosRegistrados();
 }
-// Detalle de solo lectura ("🖨️ Formato") — mismo contenido que ve "+ Cargar despacho" (Cuadro /
+// Detalle de solo lectura ("👁️ Detalle") — mismo contenido que ve "+ Cargar despacho" (Cuadro /
 // Programado / Despachado), sin inputs: es historial.
+// Columnas Ancho/Hilos (o Vigueta/Hilos Abajo/Hilos Arriba) + Largo (2026-10-19, a pedido del
+// usuario: mismo cambio pedido para "Detalle de producción cargada", aplicado también acá
+// ("ten en cuenta los cambios que hemos hecho hoy también en la ventana de despachos en
+// proyectos") — ver la nota completa en `verDetalleProduccionRegistrada()`, es exactamente el
+// mismo criterio.
 function verDetalleDespachoRegistrado(id) {
   const p = _despachosProgramadosLosaActual.find(x => x.id === id);
   if (!p) return;
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
   document.getElementById('vdd-remision').textContent = p.remision || '—';
   document.getElementById('vdd-fecha').textContent = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—';
   document.getElementById('vdd-observaciones').textContent = p.observaciones || '—';
+  document.getElementById('vdd-thead').innerHTML = `<tr>
+    <th>Cuadro</th>
+    ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
+    <th>Largo (m)</th>
+    <th>Programado</th><th>Despachado</th>
+  </tr>`;
   document.getElementById('vdd-filas-body').innerHTML = (p.lineas || []).map(linea => {
     const f = _filasLosaActual.find(x => x.id === linea.filaId);
     const cargada = linea.cantidadReal != null;
+    const colEspecifica = esVigueta
+      ? `<td>${_esc(f?.tipoVigueta) || '—'}</td><td style="text-align:center">${f?.hilosAbajo || 0}</td><td style="text-align:center">${f?.hilosArriba || 0}</td>`
+      : `<td style="text-align:center">${f?.ancho || 0}</td><td style="text-align:center">${f?.hilos || 0}</td>`;
     return `<tr>
       <td>${_esc(f?.cuadro || '—')}</td>
+      ${colEspecifica}
+      <td style="text-align:center">${f?.dimension || 0}</td>
       <td>${linea.cantidadProgramada}</td>
       <td>${cargada ? linea.cantidadReal : '<span style="color:var(--naranja)">Pendiente</span>'}</td>
     </tr>`;
