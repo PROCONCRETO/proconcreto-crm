@@ -1501,7 +1501,10 @@ function _marcarFilaProgramar(checkbox) {
 // (96×2 = 192 m); si se programan 2 anchos distintos, cada uno usa solo UNA cinta (96 m cada
 // uno, porque una cinta no se puede repartir entre dos anchos a la vez). `_topeMetrosBanco()`
 // calcula el tope según cuántos anchos distintos hay en ese momento en la programación.
-const BANCO_PRELOSA_METROS_UTILES = 96;
+// Tope por cinta subido de 96 a 98 m útiles (2026-10-20, a pedido del usuario: "modifiquemos la
+// programación de los bancos a 98 metros por cinta, 196 metros de prelosa por banco (dos
+// cintas)" — confirmado que el "196" es 98×2, mismo modelo de siempre, solo cambia la cifra).
+const BANCO_PRELOSA_METROS_UTILES = 98;
 const BANCO_PRELOSA_NUM_CINTAS = 2;
 const BANCO_PRELOSA_MAX_ANCHOS = 2;
 function _topeMetrosBanco(cantidadAnchos) {
@@ -1542,7 +1545,7 @@ function _actualizarResumenBancosPrelosa() {
     </div>`;
   }).join('');
   cont.innerHTML = `<div style="margin:4px 0 8px;padding:8px 10px;background:var(--gris-fondo);border-radius:var(--radio)">
-    <div style="font-size:11px;font-weight:700;color:var(--gris-medio);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px">Bancos de producción (2 cintas de 96 m c/u)</div>
+    <div style="font-size:11px;font-weight:700;color:var(--gris-medio);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px">Bancos de producción (2 cintas de ${BANCO_PRELOSA_METROS_UTILES} m c/u)</div>
     ${filasHTML}
     ${excesoAnchos ? `<div style="font-size:11.5px;color:var(--rojo);font-weight:600;margin-top:4px">⚠️ Solo se pueden programar ${BANCO_PRELOSA_MAX_ANCHOS} anchos distintos por día (una cinta por ancho) — hay ${anchos.length}.</div>` : ''}
   </div>`;

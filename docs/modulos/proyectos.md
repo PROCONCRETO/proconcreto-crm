@@ -330,6 +330,15 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
       verdad se va a guardar), con un mensaje que explica el porqué del tope en ese caso
       concreto ("usa las 2 cintas completas" / "solo tiene disponible 1 cinta... hay otro ancho
       programado ese día").
+    - **Tope por cinta subido de 96 a 98 m (2026-10-20, a pedido del usuario: "modifiquemos la
+      programación de los bancos a 98 metros por cinta, 196 metros de prelosa por banco (dos
+      cintas)")** — un solo cambio de constante (`BANCO_PRELOSA_METROS_UTILES = 98`), el resto
+      de la lógica de `_topeMetrosBanco()` no se tocó: un solo ancho sigue usando las 2 cintas
+      completas (ahora `98 × 2 = 196` m, antes 192), dos anchos distintos siguen con 98 m cada
+      uno (antes 96). Se corrigió también el título fijo del resumen en vivo
+      (`#mpp-resumen-bancos`), que antes decía "2 cintas de 96 m c/u" en texto plano — ahora
+      interpola `BANCO_PRELOSA_METROS_UTILES` para que nunca vuelva a quedar desactualizado si
+      la cifra cambia de nuevo.
     - **Botón "✕" para quitar un ancho completo, incluidas filas escondidas por el filtro**
       (`_quitarAnchoProgramar(ancho)`, 2026-10-16, a pedido del usuario tras un caso real: filtró
       la tabla por "ancho 50", programó 100.80 m de ese ancho, y el sistema lo bloqueó —
