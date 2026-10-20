@@ -1658,17 +1658,22 @@ const TIPOS_FILTRO_PROGRAMAR = [
   { id: 'ejeAlfa', label: 'Entre ejes alfabéticos' },
   { id: 'ancho', label: 'Ancho de prelosa', soloConAncho: true, soloValorUnico: true },
   { id: 'hilos', label: 'Número de hilos', soloConAncho: true, soloValorUnico: true },
-  { id: 'fabricado', label: 'Fabricado' },
-  { id: 'pendProd', label: 'Pendiente de producción' },
-  { id: 'pendDesp', label: 'Pendiente de despacho' },
-  { id: 'disponible', label: 'Disponible para despacho' },
+  { id: 'fabricado', label: 'Fabricado', soloSiNo: true },
+  { id: 'pendProd', label: 'Pendiente de producción', soloSiNo: true },
+  { id: 'pendDesp', label: 'Pendiente de despacho', soloSiNo: true },
+  { id: 'disponible', label: 'Disponible para despacho', soloSiNo: true },
 ];
-// Tipos cuyo valor vive en un ÚNICO `data-*` numérico del `<tr>` y se compara por rango simple
-// Desde/Hasta (a diferencia de ejeNum/ejeAlfa, cuyo valor es en sí un RANGO "1-2" que hay que
-// parsear con `_parRangoFiltro()` — ver `_filaPasaFiltroProgramar()`). El id del tipo coincide
-// a propósito con la clave del dataset (`tr.dataset[tipo]`, vía `data-pend-prod`/`data-pend-desp`
+// Tipos "Sí/No" (corregido 2026-10-20 — nacieron como Desde/Hasta igual que cuadro, pero el
+// usuario reportó que "no generan ningún efecto al aplicarlo": un Desde/Hasta numérico no tenía
+// ningún error de código (probado), pero sí un problema real de diseño — escribir "Desde 0" en
+// Pendiente no excluye NADA, porque ningún pendiente es negativo, así que el filtro se sentía
+// "roto" aunque técnicamente funcionara. El usuario mismo lo resumió: "no sé si se requiera
+// acotarlo en ciertos límites, pero en realidad para estos solo aplica o sí o no" — no hace
+// falta un RANGO para "¿esta fila tiene algo pendiente/fabricado/disponible, o no?", un
+// desplegable de 2 opciones alcanza y es mucho más directo). El id de cada tipo coincide a
+// propósito con la clave del dataset (`tr.dataset[tipo]`, vía `data-pend-prod`/`data-pend-desp`
 // → `pendProd`/`pendDesp` en camelCase automático del DOM) para no necesitar un mapeo aparte.
-const TIPOS_FILTRO_RANGO_SIMPLE = ['cuadro', 'fabricado', 'pendProd', 'pendDesp', 'disponible'];
+const TIPOS_FILTRO_SI_NO = ['fabricado', 'pendProd', 'pendDesp', 'disponible'];
 function _valoresDisponiblesFiltro(tipo) {
   const set = new Set();
   _filasLosaActual.forEach(f => {
@@ -1684,6 +1689,13 @@ function _filtroValorAreaHTML(tipo, prefijo) {
     const opciones = valores.map(v => `<option value="${v}">${v}</option>`).join('');
     return `<select data-rol="valor" onchange="_aplicarFiltrosProgramar('${prefijo}')" style="width:170px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:12px">
       <option value="">Todos</option>${opciones}
+    </select>`;
+  }
+  if (t && t.soloSiNo) {
+    return `<select data-rol="sino" onchange="_aplicarFiltrosProgramar('${prefijo}')" style="width:170px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:12px">
+      <option value="">Todos</option>
+      <option value="si">Sí (mayor a 0)</option>
+      <option value="no">No (en 0)</option>
     </select>`;
   }
   const esAlfa = tipo === 'ejeAlfa';
@@ -1722,16 +1734,21 @@ function _parRangoFiltro(valor, numerico) {
   return pa <= pb ? [pa, pb] : [pb, pa];
 }
 function _filaPasaFiltroProgramar(tr, filtro) {
-  const { tipo, desde, hasta, valorUnico } = filtro;
+  const { tipo, desde, hasta, valorUnico, siNo } = filtro;
   if (tipo === 'ancho' || tipo === 'hilos') {
     const v = parseFloat(tr.dataset[tipo]);
     return !isNaN(v) && v === valorUnico;
   }
-  // Rango simple Desde/Hasta contra un único `data-*` numérico — cuadro, y desde 2026-10-20
-  // también fabricado/pendiente de producción/pendiente de despacho/disponible (ver
-  // `TIPOS_FILTRO_RANGO_SIMPLE`, mismo id de tipo que la clave del dataset).
-  if (TIPOS_FILTRO_RANGO_SIMPLE.includes(tipo)) {
+  // Sí/No contra un único `data-*` numérico (ver `TIPOS_FILTRO_SI_NO`, mismo id de tipo que la
+  // clave del dataset) — "Sí" = mayor a 0, "No" = en 0 (nunca es negativo, por diseño de las
+  // funciones `_fabricadoFila()`/`_pendiente*Fila()`/`_disponibleDespachoFila()`).
+  if (TIPOS_FILTRO_SI_NO.includes(tipo)) {
     const v = parseFloat(tr.dataset[tipo]);
+    if (isNaN(v)) return false;
+    return siNo === 'si' ? v > 0 : v <= 0;
+  }
+  if (tipo === 'cuadro') {
+    const v = parseFloat(tr.dataset.cuadro);
     return !isNaN(v) && (desde == null || v >= desde) && (hasta == null || v <= hasta);
   }
   const rango = _parRangoFiltro(tipo === 'ejeNum' ? tr.dataset.ejeNum : tr.dataset.ejeAlfa, tipo === 'ejeNum');
@@ -1748,6 +1765,10 @@ function _aplicarFiltrosProgramar(prefijo) {
       const valorRaw = fila.querySelector('[data-rol="valor"]').value;
       return { tipo, valorUnico: valorRaw === '' ? null : parseFloat(valorRaw) };
     }
+    if (t && t.soloSiNo) {
+      const sinoRaw = fila.querySelector('[data-rol="sino"]').value;
+      return { tipo, siNo: sinoRaw === '' ? null : sinoRaw };
+    }
     const esAlfa = tipo === 'ejeAlfa';
     const desdeRaw = fila.querySelector('[data-rol="desde"]').value.trim();
     const hastaRaw = fila.querySelector('[data-rol="hasta"]').value.trim();
@@ -1756,7 +1777,7 @@ function _aplicarFiltrosProgramar(prefijo) {
       desde: desdeRaw === '' ? null : (esAlfa ? desdeRaw.toUpperCase() : parseFloat(desdeRaw)),
       hasta: hastaRaw === '' ? null : (esAlfa ? hastaRaw.toUpperCase() : parseFloat(hastaRaw)),
     };
-  }).filter(f => f.desde != null || f.hasta != null || f.valorUnico != null);
+  }).filter(f => f.desde != null || f.hasta != null || f.valorUnico != null || f.siNo != null);
   document.querySelectorAll(`#${prefijo}-filas-body tr[data-cuadro]`).forEach(tr => {
     tr.style.display = filtros.every(f => _filaPasaFiltroProgramar(tr, f)) ? '' : 'none';
   });

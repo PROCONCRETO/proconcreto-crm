@@ -334,35 +334,44 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
       filtro de los modales Programar producción/despacho (prefijo `mpp`/`mpd`) sigue intacto,
       sin interferencia del nuevo prefijo `fp` — sin errores de consola.
     - **4 tipos de filtro nuevos: Fabricado / Pendiente de producción / Pendiente de despacho /
-      Disponible para despacho** (`TIPOS_FILTRO_RANGO_SIMPLE`, 2026-10-20, a pedido del usuario:
-      "agreguemos los filtros de pendientes y fabricado") — mismo Desde/Hasta que ya tenían
-      cuadro/ejes (a diferencia de ancho/hilos, que usan un desplegable de valor exacto porque
-      son pocos valores estandarizados; pendiente/fabricado pueden ser cualquier número entre 0
-      y la cantidad de la fila). Disponibles en los TRES lugares que comparten
+      Disponible para despacho** (2026-10-20, a pedido del usuario: "agreguemos los filtros de
+      pendientes y fabricado") — disponibles en los TRES lugares que comparten
       `TIPOS_FILTRO_PROGRAMAR` (cuadro principal `fp`, y los modales `mpp`/`mpd`, que ahora
       también traen estos 4 `data-*` en cada `<tr>` aunque no muestren esa columna en pantalla
       — ej. `mpp` puede filtrar por "Disponible para despacho" aunque esa tarjeta solo muestre
       "Pendiente") y en AMBOS sistemas (a diferencia de ancho/hilos, vigueta SÍ tiene
       pendiente/fabricado/disponible — lo que no tiene es un "ancho" real).
-      - `_filaPasaFiltroProgramar()` se generalizó: la rama que antes solo sabía comparar
-        "cuadro" por rango simple (`tr.dataset.cuadro` contra Desde/Hasta) ahora cubre cualquier
-        tipo en `TIPOS_FILTRO_RANGO_SIMPLE` — el id de cada tipo nuevo coincide a propósito con
-        la clave camelCase que el DOM arma sola a partir del atributo (`data-pend-prod` →
-        `dataset.pendProd`), así no hace falta un mapeo aparte.
+      - **Desplegable Sí/No, no Desde/Hasta (corregido el mismo día)** — la primera versión los
+        armó como rango Desde/Hasta, igual que cuadro/ejes (`TIPOS_FILTRO_RANGO_SIMPLE`), pero el
+        usuario reportó, con una captura real: "los últimos cuatro filtros que agregamos no
+        generan ningún efecto al aplicarlo. no sé si se requiera acotarlo en ciertos límites,
+        pero en realidad para estos solo aplica o sí o no". Se verificó que NO había ningún bug
+        de despliegue ni de código (el archivo servido en producción era idéntico byte a byte al
+        local, y un arnés real confirmó que Desde/Hasta sí filtraba) — el problema era de diseño:
+        como ningún pendiente/fabricado/disponible puede ser negativo, escribir "Desde 0" no
+        excluye NADA (todo es `≥ 0`), así que el filtro se sentía "roto" aunque técnicamente
+        funcionara. Se reemplazó por un desplegable de 3 opciones (`soloSiNo` en
+        `TIPOS_FILTRO_PROGRAMAR`, `TIPOS_FILTRO_SI_NO`): "Todos" / "Sí (mayor a 0)" / "No (en
+        0)" — mucho más directo para la pregunta real que se quiere responder ("¿esta fila
+        todavía tiene algo pendiente/fabricado/disponible, o no?"), sin necesitar ningún rango.
+      - `_filaPasaFiltroProgramar()`: los 4 tipos nuevos se evalúan contra `tr.dataset[tipo]` —
+        el id de cada tipo coincide a propósito con la clave camelCase que el DOM arma sola a
+        partir del atributo (`data-pend-prod` → `dataset.pendProd`), así no hace falta un mapeo
+        aparte. "cuadro" volvió a su rama propia (ya no comparte lista con estos 4, que ahora son
+        Sí/No en vez de rango).
       - **Vive sincronizado en vivo** — como `_actualizarFilaProduccion(i)` ya corría en cada
         edición de Cantidad (la única "importante" que sigue editable con fila ya fabricada, ver
         candado de medidas), se le agregó sincronizar también
         `data-fabricado`/`data-pend-prod`/`data-pend-desp`/`data-disponible` del `<tr>` (fabricado
         no cambia al editar esta fila — depende de `fila.produccion[]`, no de lo planeado — pero
         pendiente/disponible sí, al depender de Cantidad) y reaplicar el filtro de inmediato.
-      - Verificado con un arnés real — 14 aserciones: las 4 opciones aparecen en el desplegable
-        de `fp` (y también en vigueta, a diferencia de ancho/hilos); filtrar por cada uno de los
-        4 tipos por separado da el subconjunto correcto de cuadros (fijado a mano contra un caso
-        con fabricado/despachado parciales reales); un rango Desde+Hasta combinado (no solo
-        Desde) sigue funcionando; editar la Cantidad de una fila en vivo la saca/mete de un
-        filtro de "Pendiente de producción" activo sin recargar nada; y los modales `mpp`/`mpd`
-        filtran correctamente por tipos que ni siquiera muestran como columna propia — sin
-        errores de consola.
+      - Verificado con un arnés real — 14 aserciones: el área de valor de los 4 tipos nuevos es
+        un `<select>` Sí/No/Todos, no Desde/Hasta; cada combinación tipo+Sí/No da el subconjunto
+        correcto de cuadros (fijado a mano contra un caso con fabricado/despachado parciales
+        reales); "Todos" no excluye ninguna fila; editar la Cantidad de una fila en vivo la
+        saca/mete de un filtro "Pendiente de producción = Sí" activo sin recargar nada; y una
+        regresión — "Entre cuadros" sigue con su Desde/Hasta de siempre, sin verse afectado —
+        sin errores de consola.
   - **Columnas "Ancho (cm)"/"Hilos" (o "Vigueta"/"Hilos Abajo"/"Hilos Arriba" en vigueta y
     bovedilla) en la tabla del propio modal** (2026-10-16, a pedido del usuario: "en la ventana
     que se abre de programación de producción y programación de despachos, incluyamos las filas
