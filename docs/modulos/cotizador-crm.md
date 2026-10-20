@@ -51,6 +51,13 @@ Para ítems livianos donde muchas piezas caben por camión, el resultado coincid
 
 `_transportePorViaje()` ahora recibe la lista de ítems (`itemsActuales`, `op.items`, etc.) en vez de `pesoTotal` — se usa en los mismos 4 lugares de siempre: `recalcular()`, `calcOpcion()`, `construirTablaCotizacion()`, `guardarCotizacion()`. Se quitó del PDF el detalle `(peso total kg ÷ capacidad kg/viaje)` para destino "Otro" porque ya no describe cómo se calculó el número de viajes (ahora es por pieza, no una simple división).
 
+### Descuento de Transporte/Cargue/Descargue, antes duplicado en el PDF (2026-10-20)
+
+El usuario, con una captura real del PDF impreso: "en el imprimible de la cotización, estamos indicando el descuento del transporte en dos partes... dejémoslo solo en la columna de descuentos" — las filas de Transporte, Cargue a mano y Descargue mecánico en `construirTablaCotizacion()` (`js/cotizador.js`) ya tenían su descuento correctamente reflejado en la columna dedicada "DESC." (`${descTrans > 0 ? descTrans + '%' : '0%'}`, igual que cualquier ítem normal), pero ADEMÁS le pegaban un sufijo de texto al nombre del producto (`` ` (desc. ${descTrans}%)` ``) — ej. "Transporte (desc. 5%):", con el 5% repetido otra vez más adelante en su propia columna.
+
+- Se quitó el sufijo de texto (`descLabel`) de las 4 filas que lo tenían: Transporte por peso, Transporte por viaje completo (conserva su propio sufijo " — viaje completo", solo se quitó el de descuento), Cargue a mano y Descargue mecánico — la columna "DESC." sigue mostrando el porcentaje exactamente igual que antes, en las mismas celdas, sin tocar ningún cálculo de precio/total.
+- Verificado con un arnés real — 13 aserciones: las 4 filas quedan con el nombre limpio y sin el sufijo "(desc. X%)" pegado, en los dos modos de transporte (por peso y por viaje completo) y con descuentos reales en los tres conceptos a la vez; la columna DESC. de cada una sigue mostrando el porcentaje correcto; y una regresión — sin ningún descuento (0%), el comportamiento no cambió.
+
 ## Pantallas (`ir()` en `navegacion.js`)
 
 `pipeline`, `historico`, `clientes`, `estadisticas`

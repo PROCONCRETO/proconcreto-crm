@@ -89,7 +89,15 @@ function _pintarSugerenciasProductoCosteo() {
   const box = document.getElementById('costeo-producto-sugerencias');
   if (!box) return;
   if (!_sugerenciasProductoCosteo.length) {
-    box.innerHTML = `<div style="padding:10px 12px;color:var(--gris-medio);font-size:12px">${_sugerenciasOcultasPorCosteo ? 'Ese producto ya tiene un Costeo de Producto guardado.' : 'Sin resultados.'}</div>`;
+    // "+ Crear producto especial" (2026-10-20, ver nota completa en
+    // _crearProductoEspecialDesdeCosteo()) — solo cuando de verdad no hay NADA que coincida con
+    // lo escrito (ni siquiera "ya tiene costeo guardado", caso en el que SÍ existe un producto
+    // real con ese nombre — crear uno nuevo ahí sería un duplicado) y hay texto escrito (no se
+    // puede crear un producto sin nombre).
+    const q = (document.getElementById('m-costeo-producto')?.value || '').trim();
+    const puedeCrear = q && !_sugerenciasOcultasPorCosteo;
+    box.innerHTML = `<div style="padding:10px 12px;color:var(--gris-medio);font-size:12px">${_sugerenciasOcultasPorCosteo ? 'Ese producto ya tiene un Costeo de Producto guardado.' : 'Sin resultados.'}</div>`
+      + (puedeCrear ? `<div onmousedown="_crearProductoEspecialDesdeCosteo()" style="padding:10px 12px;cursor:pointer;border-top:1px solid var(--gris-borde);color:var(--azul);font-weight:600;font-size:13px">➕ Crear "${_esc(q)}" como producto especial (oculto) y costearlo</div>` : '');
     box.style.display = 'block';
     return;
   }
@@ -105,6 +113,40 @@ function _elegirProductoCosteo(i) {
   const p = _sugerenciasProductoCosteo[i];
   if (!p) return;
   document.getElementById('m-costeo-producto').value = _textoProductoCosteo(p);
+  document.getElementById('costeo-producto-sugerencias').style.display = 'none';
+  cargarProductoCosteo();
+}
+
+// "+ Crear producto especial" directo desde el buscador de Costeo (2026-10-20, a pedido del
+// usuario: "cuando vamos a costear un producto que no es de línea, me obliga a crear primero el
+// producto y luego costearlo. planteemos la opción de no tener que crear el producto, si no
+// hasta que lo vaya a pasar a activo"). El concepto de "producto especial/borrador" (oculto,
+// código provisional "ESP-...", solo el Nombre es obligatorio) ya existía desde Catálogo
+// (`_generarCodigoEspecial()`/`guardarProducto()` en `js/catalogo.js`) — lo único nuevo es
+// poder crearlo SIN salir de Costeo de Producto, reutilizando exactamente el mismo modelo de
+// datos (mismo prefijo de código, mismos valores por defecto) para que después se pueda seguir
+// editando/activando desde Catálogo con "⬆️ Activar a línea" como cualquier otro especial.
+function _crearProductoEspecialDesdeCosteo() {
+  const input = document.getElementById('m-costeo-producto');
+  const nombre = (input?.value || '').trim();
+  if (!nombre) return;
+  const codigo = _generarCodigoEspecial();
+  const prod = {
+    codigo, nombre, grupo: '', medidas: '', unidad: 'UD', peso: null, iva: 'NO',
+    lista: 0, minimo: 0, activo: false, especial: true, disenoMezcla: '',
+  };
+  CATALOGO.push(prod);
+  PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
+  // Mismo rollback que `guardarProducto()` si Supabase rechaza el guardado — no deja un
+  // producto "fantasma" en memoria que bloquee un futuro intento.
+  _upsertProducto(prod).then(({ error }) => {
+    if (error) {
+      CATALOGO = CATALOGO.filter(x => x.codigo !== codigo);
+      PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
+      alert('No se pudo crear el producto especial: ' + error.message);
+    }
+  });
+  input.value = _textoProductoCosteo(prod);
   document.getElementById('costeo-producto-sugerencias').style.display = 'none';
   cargarProductoCosteo();
 }

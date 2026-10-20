@@ -290,6 +290,79 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     crudo que ya alimenta el filtro por ejes — deja verificar a simple vista qué cuadro cae en
     qué eje, sin tener que adivinar o cruzar con la pantalla principal. Mismas columnas en los
     dos modales (`mpp`/`mpd`).
+  - **Mismos filtros en el cuadro principal de cada Losa (Lista/Producción/Despacho)**
+    (2026-10-20, a pedido del usuario: "en las ventanas de listas de producción, producción y
+    despachos, en los cuadros principales de cada losa, implementemos los mismos filtros que
+    implementamos en programar producción y programar despachos") — reutiliza TAL CUAL
+    `_agregarFiltroProgramar()`/`_aplicarFiltrosProgramar()`/`TIPOS_FILTRO_PROGRAMAR` (antes
+    solo consumidas con prefijo `mpp`/`mpd`), ahora también con prefijo **`fp`** sobre la tabla
+    principal (`#tabla-filas-produccion`) — misma barra "FILTROS (opcional)" + "+ Agregar
+    filtro" arriba de la tabla, visible en las TRES vistas (a diferencia de la tabla colapsable,
+    que no aplica en Lista). El `<tbody>` de esa tabla se renombró de `#filas-produccion-body` a
+    **`#fp-filas-body`** (el genérico `_aplicarFiltrosProgramar(prefijo)` espera siempre
+    `#${prefijo}-filas-body`) — `<thead>`/`<tfoot>` conservan su id de siempre, sin tocar.
+    - **Cada `<tr>` de fila ahora trae `data-cuadro`/`data-eje-num`/`data-eje-alfa`/`data-ancho`/
+      `data-hilos`** (`_filaProduccionHTML()`), igual que ya traían las filas de los modales de
+      Programar — es lo que lee `_filaPasaFiltroProgramar()` para decidir si una fila pasa.
+    - **El filtro se REAPLICA después de cada render completo** (`_aplicarFiltrosProgramar('fp')`
+      al final de `renderFilasProduccion()`) — a diferencia de los modales (que se abren una vez
+      y no vuelven a reconstruir su `<tbody>` mientras están abiertos), esta tabla SÍ se
+      reconstruye por completo muchas veces en una sesión (cada guardado, cada "+ Agregar fila",
+      pegar/importar) — sin esto, el filtro configurado en `#fp-filtros-lista` (que vive FUERA
+      del `<tbody>`, así que sobrevive solo al re-render) se habría visto "roto": los criterios
+      seguirían ahí pero todas las filas nuevas se habrían mostrado sin filtrar.
+    - **Editar Cuadro/Ejes/Ancho/Hilos en vivo (modo Lista) resincroniza el filtro al instante**
+      — como esta tabla (a diferencia de los modales de Programar) permite EDITAR esos mismos
+      campos inline, y la edición es quirúrgica (solo toca la celda tocada, nunca reconstruye el
+      `<tr>`, para no perder el foco a mitad de tecleo — mismo criterio ya usado en toda la
+      pantalla), hacía falta sincronizar el `data-*` del `<tr>` a mano en cada edición relevante.
+      Se centralizó en `_actualizarFilaProduccion(i)` (ya se llamaba en cada edición de
+      ancho/dimensión/cantidad; se agregó también a la edición de cuadro y de ejes
+      `_actualizarParEje()`) — sincroniza los 5 `data-*` y llama a
+      `_aplicarFiltrosProgramar('fp')` de inmediato: si se edita, por ejemplo, el ancho de una
+      fila visible bajo un filtro de "ancho=50" y deja de cumplirlo, desaparece de la vista sin
+      necesidad de guardar ni recargar nada.
+    - **"Marcar todas" y la tabla colapsable no cambiaron** — el filtro solo esconde filas con
+      `display:none`, igual que en los modales; colapsar/expandir sigue escondiendo el `<tbody>`
+      completo sin relación con qué filas pasan el filtro en ese momento.
+    - Verificado con un arnés real — 18 aserciones: filtrar por cuadro/ancho/ejes en modo Lista;
+      quitar un filtro restaura todas las filas; el filtro sobrevive y se reaplica solo tras
+      "+ Agregar fila" (sin perderse ni mostrar de más); editar el cuadro de una fila visible la
+      saca o la mete del filtro activo en vivo, sin recargar; el filtro funciona igual en
+      Producción y en Despacho (mismas filas, solo de solo lectura); vigueta no ofrece los tipos
+      "Ancho de prelosa"/"Número de hilos"; el estado sin filas no se rompe; y una regresión — el
+      filtro de los modales Programar producción/despacho (prefijo `mpp`/`mpd`) sigue intacto,
+      sin interferencia del nuevo prefijo `fp` — sin errores de consola.
+    - **4 tipos de filtro nuevos: Fabricado / Pendiente de producción / Pendiente de despacho /
+      Disponible para despacho** (`TIPOS_FILTRO_RANGO_SIMPLE`, 2026-10-20, a pedido del usuario:
+      "agreguemos los filtros de pendientes y fabricado") — mismo Desde/Hasta que ya tenían
+      cuadro/ejes (a diferencia de ancho/hilos, que usan un desplegable de valor exacto porque
+      son pocos valores estandarizados; pendiente/fabricado pueden ser cualquier número entre 0
+      y la cantidad de la fila). Disponibles en los TRES lugares que comparten
+      `TIPOS_FILTRO_PROGRAMAR` (cuadro principal `fp`, y los modales `mpp`/`mpd`, que ahora
+      también traen estos 4 `data-*` en cada `<tr>` aunque no muestren esa columna en pantalla
+      — ej. `mpp` puede filtrar por "Disponible para despacho" aunque esa tarjeta solo muestre
+      "Pendiente") y en AMBOS sistemas (a diferencia de ancho/hilos, vigueta SÍ tiene
+      pendiente/fabricado/disponible — lo que no tiene es un "ancho" real).
+      - `_filaPasaFiltroProgramar()` se generalizó: la rama que antes solo sabía comparar
+        "cuadro" por rango simple (`tr.dataset.cuadro` contra Desde/Hasta) ahora cubre cualquier
+        tipo en `TIPOS_FILTRO_RANGO_SIMPLE` — el id de cada tipo nuevo coincide a propósito con
+        la clave camelCase que el DOM arma sola a partir del atributo (`data-pend-prod` →
+        `dataset.pendProd`), así no hace falta un mapeo aparte.
+      - **Vive sincronizado en vivo** — como `_actualizarFilaProduccion(i)` ya corría en cada
+        edición de Cantidad (la única "importante" que sigue editable con fila ya fabricada, ver
+        candado de medidas), se le agregó sincronizar también
+        `data-fabricado`/`data-pend-prod`/`data-pend-desp`/`data-disponible` del `<tr>` (fabricado
+        no cambia al editar esta fila — depende de `fila.produccion[]`, no de lo planeado — pero
+        pendiente/disponible sí, al depender de Cantidad) y reaplicar el filtro de inmediato.
+      - Verificado con un arnés real — 14 aserciones: las 4 opciones aparecen en el desplegable
+        de `fp` (y también en vigueta, a diferencia de ancho/hilos); filtrar por cada uno de los
+        4 tipos por separado da el subconjunto correcto de cuadros (fijado a mano contra un caso
+        con fabricado/despachado parciales reales); un rango Desde+Hasta combinado (no solo
+        Desde) sigue funcionando; editar la Cantidad de una fila en vivo la saca/mete de un
+        filtro de "Pendiente de producción" activo sin recargar nada; y los modales `mpp`/`mpd`
+        filtran correctamente por tipos que ni siquiera muestran como columna propia — sin
+        errores de consola.
   - **Columnas "Ancho (cm)"/"Hilos" (o "Vigueta"/"Hilos Abajo"/"Hilos Arriba" en vigueta y
     bovedilla) en la tabla del propio modal** (2026-10-16, a pedido del usuario: "en la ventana
     que se abre de programación de producción y programación de despachos, incluyamos las filas
@@ -950,7 +1023,8 @@ Capturarlas una por una sería impracticable (Boreal tuvo 247 filas en una sola 
     la primera versión escondía la tabla ENTERA con `tablaWrap.style.display='none'`, lo que de
     paso tapaba la fila de TOTALES y el avance ponderado justo cuando más se necesita una
     mirada rápida). Ahora `#losa-filas-tabla-wrap` siempre queda visible; lo único que se
-    esconde con `_filasColapsadas` es el `<tbody>` (`#filas-produccion-body`) — el `<thead>` y
+    esconde con `_filasColapsadas` es el `<tbody>` (`#fp-filas-body`, renombrado 2026-10-20 — ver
+    "Filtros en el cuadro principal" más abajo) — el `<thead>` y
     el `<tfoot>` (`_pieTotalesHTML()` + `_pieAvanceProduccionHTML()`) se siguen armando y
     mostrando igual que siempre. Resultado: colapsada, la tarjeta queda reducida a encabezado +
     fila "📐 TOTALES" + "📊 Avance de producción", sin una sola fila individual — exactamente lo

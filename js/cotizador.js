@@ -633,7 +633,6 @@ function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCarg
   if (destino && pesoTotal > 0) {
     const esViaje = modoTransporte === 'viaje';
     const destLabelNombre = nombreDestino(destino, destinoNombre);
-    const descLabel = descTrans > 0 ? ` (desc. ${descTrans}%)` : '';
     const modoLabel = esViaje ? ' — viaje completo' : '';
 
     if (esViaje) {
@@ -649,7 +648,7 @@ function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCarg
       const precioPorViajeAjustado = precioPorViaje * (1 - descTrans / 100);
       filasTabla += `<tr>
         <td>${numeroViajes}</td><td>viaje${numeroViajes === 1 ? '' : 's'}</td>
-        <td>Transporte${descLabel}${modoLabel}:<br><span style="font-size:10px;color:#666">Chinchiná – ${destLabelNombre}</span></td>
+        <td>Transporte${modoLabel}:<br><span style="font-size:10px;color:#666">Chinchiná – ${destLabelNombre}</span></td>
         <td style="text-align:center">${transIva ? 'SI' : 'NO'}</td>
         <td style="text-align:right">$ ${precioPorViaje.toLocaleString()}</td>
         <td style="text-align:center">${descTrans > 0 ? descTrans + '%' : '0%'}</td>
@@ -663,7 +662,7 @@ function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCarg
       if (transIva) ivaTotal += Math.round(transporte * 0.19);
       filasTabla += `<tr>
         <td>${Math.round(pesoTotal)}</td><td>kg</td>
-        <td>Transporte${descLabel}:<br><span style="font-size:10px;color:#666">Chinchiná – ${destLabelNombre}</span></td>
+        <td>Transporte:<br><span style="font-size:10px;color:#666">Chinchiná – ${destLabelNombre}</span></td>
         <td style="text-align:center">${transIva ? 'SI' : 'NO'}</td>
         <td style="text-align:right">$ ${tarifaKg.toLocaleString()}</td>
         <td style="text-align:center">${descTrans > 0 ? descTrans + '%' : '0%'}</td>
@@ -678,16 +677,14 @@ function construirTablaCotizacion(items, destino, descTrans, cargueVal, descCarg
     logistica += base;
     ivaTotal += Math.round(base * 0.19);
     const tarifaAjust = 11 * (1 - descCargue / 100);
-    const descLabel = descCargue > 0 ? ` (desc. ${descCargue}%)` : '';
-    filasTabla += `<tr><td>${Math.round(pesoTotal)}</td><td>kg</td><td>Cargue a mano${descLabel}</td><td style="text-align:center">SI</td><td style="text-align:right">$ 11</td><td style="text-align:center">${descCargue > 0 ? descCargue + '%' : '0%'}</td><td style="text-align:right">$ ${Number(tarifaAjust.toFixed(2)).toLocaleString()}</td><td style="text-align:right">$ ${base.toLocaleString()}</td></tr>`;
+    filasTabla += `<tr><td>${Math.round(pesoTotal)}</td><td>kg</td><td>Cargue a mano</td><td style="text-align:center">SI</td><td style="text-align:right">$ 11</td><td style="text-align:center">${descCargue > 0 ? descCargue + '%' : '0%'}</td><td style="text-align:right">$ ${Number(tarifaAjust.toFixed(2)).toLocaleString()}</td><td style="text-align:right">$ ${base.toLocaleString()}</td></tr>`;
   }
   if (descargueVal === 'si') {
     const base = Math.round(pesoTotal * 11 * (1 - descDescargue / 100));
     logistica += base;
     ivaTotal += Math.round(base * 0.19);
     const tarifaAjust = 11 * (1 - descDescargue / 100);
-    const descLabel = descDescargue > 0 ? ` (desc. ${descDescargue}%)` : '';
-    filasTabla += `<tr><td>${Math.round(pesoTotal)}</td><td>kg</td><td>Descargue mecánico${descLabel}</td><td style="text-align:center">SI</td><td style="text-align:right">$ 11</td><td style="text-align:center">${descDescargue > 0 ? descDescargue + '%' : '0%'}</td><td style="text-align:right">$ ${Number(tarifaAjust.toFixed(2)).toLocaleString()}</td><td style="text-align:right">$ ${base.toLocaleString()}</td></tr>`;
+    filasTabla += `<tr><td>${Math.round(pesoTotal)}</td><td>kg</td><td>Descargue mecánico</td><td style="text-align:center">SI</td><td style="text-align:right">$ 11</td><td style="text-align:center">${descDescargue > 0 ? descDescargue + '%' : '0%'}</td><td style="text-align:right">$ ${Number(tarifaAjust.toFixed(2)).toLocaleString()}</td><td style="text-align:right">$ ${base.toLocaleString()}</td></tr>`;
   }
   const total = subtotal + transporte + logistica + ivaTotal;
   const html = `<table class="preview-tabla">

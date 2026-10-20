@@ -690,6 +690,12 @@ function abrirLosaDetalle(id) {
   // carga volvería a cerrar la tabla aunque el usuario la hubiera abierto a propósito). En Lista
   // no aplica — ahí la tabla es el formulario principal, siempre debe verse.
   _filasColapsadas = (_MODO_FLUJO_LOSA === 'produccion' || _MODO_FLUJO_LOSA === 'despacho');
+  // Filtros del cuadro principal (2026-10-20) — se reinician UNA SOLA VEZ acá, mismo criterio
+  // que `_filasColapsadas`: `renderFilasProduccion()` se llama una y otra vez durante la
+  // sesión (cada guardado, cada carga), y reiniciarlos ahí borraría un filtro que el usuario
+  // armó a propósito con cada acción sin relación.
+  const fpFiltros = document.getElementById('fp-filtros-lista');
+  if (fpFiltros) fpFiltros.innerHTML = '';
   document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
   document.getElementById('pantalla-losa-detalle').classList.add('activa');
   renderLosaDetalle();
@@ -797,7 +803,7 @@ function renderFilasProduccion() {
     ${esLista ? '' : (esProduccion ? '<th>Unidades fabricadas</th><th>Pend. Producción</th>' : '<th>Disponible despacho</th><th>Pend. Despacho</th>')}
     <th>Observaciones</th><th></th>
   </tr>`;
-  const tbody = document.getElementById('filas-produccion-body');
+  const tbody = document.getElementById('fp-filas-body');
   const tfoot = document.getElementById('filas-produccion-tfoot');
   if (!_filasLosaActual.length) {
     tbody.style.display = '';
@@ -809,6 +815,17 @@ function renderFilasProduccion() {
   // `<thead>`/`<tfoot>` quedan siempre visibles.
   tbody.style.display = (!esLista && _filasColapsadas) ? 'none' : '';
   tbody.innerHTML = _filasLosaActual.map((f, i) => _filaProduccionHTML(f, i, l, esVigueta)).join('');
+  // Filtros (2026-10-20, a pedido del usuario: "en las ventanas de listas de producción,
+  // producción y despachos, en los cuadros principales de cada losa, implementemos los mismos
+  // filtros que implementamos en programar producción y programar despachos") — reutiliza tal
+  // cual `_agregarFiltroProgramar()`/`_aplicarFiltrosProgramar()` (antes solo usadas con
+  // prefijo 'mpp'/'mpd' en los modales de Programar), con prefijo 'fp' acá. El `<tbody>` se
+  // reconstruye por completo en cada `renderFilasProduccion()` (cada guardado, cada carga,
+  // pegar/importar) — por eso el filtro hay que REAPLICARLO acá mismo después de poblar las
+  // filas nuevas; el estado del filtro en sí (los `<select>`/`<input>` de `#fp-filtros-lista`)
+  // vive FUERA del `<tbody>`, así que sobrevive solo al re-render — ver `abrirLosaDetalle()`
+  // para dónde se reinicia (una sola vez por navegación, mismo criterio que `_filasColapsadas`).
+  _aplicarFiltrosProgramar('fp');
   // Fila de TOTALES (2026-10-17, a pedido del usuario: "incluyamos al final del cuadro... una
   // fila de totales, donde totalicemos unidades, los metros lineales como los metros
   // cuadrados") — en las TRES vistas (lista/producción/despacho), a diferencia del avance
@@ -1006,12 +1023,12 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
   const fabricado = _fabricadoFila(f);
   const bloqueado = fabricado > 0;
   const TITULO_BLOQUEO = '🔒 Ya tiene unidades fabricadas — esta medida no se puede modificar. Si necesitas una medida distinta, agrega una fila nueva.';
-  const txt = (valor, campo, ancho, candado) => {
+  const txt = (valor, campo, ancho, candado, sincroniza) => {
     if (esLista && candado && bloqueado) {
       return `<input type="text" value="${_escAttr(valor || '')}" disabled title="${TITULO_BLOQUEO}" style="width:${ancho}px;background:var(--gris-fondo);color:var(--gris-medio);cursor:not-allowed">`;
     }
     return esLista
-      ? `<input type="text" value="${_escAttr(valor || '')}" oninput="_filasLosaActual[${i}].${campo}=this.value" style="width:${ancho}px">`
+      ? `<input type="text" value="${_escAttr(valor || '')}" oninput="_filasLosaActual[${i}].${campo}=this.value${sincroniza ? `;_actualizarFilaProduccion(${i})` : ''}" style="width:${ancho}px">`
       : _esc(valor || '—');
   };
   // Sin el "|| 0" en `value` (2026-10-14, a pedido del usuario: "deja todos los campos sin
@@ -1049,9 +1066,9 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
       <input type="text" value="${_escAttr(b)}" oninput="_actualizarParEje(${i},'${campo}',1,this.value)" style="width:28px;text-align:center;padding:4px 2px">
     </div>`;
   };
-  return `<tr>
+  return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-fabricado="${fabricado}" data-pend-prod="${pendProd}" data-pend-desp="${pendDesp}" data-disponible="${dispDesp}">
     <td>${i + 1}</td>
-    <td>${txt(f.cuadro, 'cuadro', 48)}</td>
+    <td>${txt(f.cuadro, 'cuadro', 48, false, true)}</td>
     <td>${par(f.ejesEntre, 'ejesEntre')}</td>
     <td>${par(f.laterales, 'laterales')}</td>
     ${esVigueta ? `
@@ -1060,7 +1077,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     <td>${num(f.hilosArriba, 'hilosArriba', 44, false, '', true)}</td>
     ` : `
     <td>${num(f.ancho, 'ancho', 54, true, l.sistema === 'prelosa' ? `_validarAnchoPrelosa(${i})` : '', true)}</td>
-    <td>${num(f.hilos, 'hilos', 44, false, '', true)}</td>
+    <td>${num(f.hilos, 'hilos', 44, true, '', true)}</td>
     `}
     <td>${num(f.dimension, 'dimension', 58, true, '', true)}</td>
     <td>${num(f.cantidad, 'cantidad', 50, true, `_validarCantidadMinima(${i})`)}</td>
@@ -1142,6 +1159,28 @@ function _actualizarFilaProduccion(i) {
     const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
     tfoot.innerHTML = _pieTotalesHTML(l) + (esProduccion ? _pieAvanceProduccionHTML() : '');
   }
+  // Filtros (2026-10-20) — mientras se edita una fila en Lista (Cuadro/Ejes/Ancho/Hilos, los
+  // mismos campos que ofrece el filtro), el `data-*` del `<tr>` que lee `_aplicarFiltrosProgramar()`
+  // quedaría desactualizado sin esto (esta función solo toca celdas puntuales, nunca reconstruye
+  // el `<tr>` completo — así no se pierde el foco a mitad de tecleo). Se sincroniza acá, en el
+  // único lugar que ya corre en cada edición relevante, y se reaplica el filtro de inmediato por
+  // si la fila deja de cumplir (o empieza a cumplir) con lo que se tecleó.
+  const tr = document.getElementById(`fp-longtotal-${i}`)?.closest('tr');
+  if (tr) {
+    tr.dataset.cuadro = f.cuadro || '';
+    tr.dataset.ejeNum = f.ejesEntre || '';
+    tr.dataset.ejeAlfa = f.laterales || '';
+    tr.dataset.ancho = f.ancho || 0;
+    tr.dataset.hilos = f.hilos || 0;
+    // Fabricado no cambia por editar esta fila (depende de fila.produccion[], no de lo
+    // planeado) — pero pendiente/disponible SÍ dependen de Cantidad, que es la única de las
+    // "importantes" que sigue editable incluso ya fabricada (ver candado más arriba).
+    tr.dataset.fabricado = _fabricadoFila(f);
+    tr.dataset.pendProd = pendProd;
+    tr.dataset.pendDesp = pendDesp;
+    tr.dataset.disponible = dispDesp;
+  }
+  _aplicarFiltrosProgramar('fp');
 }
 
 // Recompone el valor combinado ("1-1´", "I-G"...) de Ejes numéricos/Ejes alfabéticos a partir
@@ -1156,6 +1195,7 @@ function _actualizarParEje(i, campo, parte, valor) {
   const nuevaA = parte === 0 ? valor : a;
   const nuevaB = parte === 1 ? valor : b;
   f[campo] = (nuevaA || nuevaB) ? `${nuevaA}-${nuevaB}` : '';
+  _actualizarFilaProduccion(i);
 }
 
 function agregarFilaProduccion() {
@@ -1465,7 +1505,7 @@ function abrirModalProgramarProduccion(programacionId) {
       const colEspecifica = esVigueta
         ? `<td>${_esc(f.tipoVigueta) || '—'}</td><td style="text-align:center">${f.hilosAbajo || 0}</td><td style="text-align:center">${f.hilosArriba || 0}</td>`
         : `<td style="text-align:center">${f.ancho || 0}</td><td style="text-align:center">${f.hilos || 0}</td>`;
-      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}">
+      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-fabricado="${_fabricadoFila(f)}" data-pend-prod="${pend}" data-pend-desp="${_pendienteDespachoFila(f, _despachosLosaActual)}" data-disponible="${_disponibleDespachoFila(f, _despachosLosaActual)}">
         <td><input type="checkbox" class="mpp-chk-fila" onchange="_marcarFilaProgramar(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
         <td>${_esc(f.ejesEntre) || '—'}</td>
@@ -1603,13 +1643,32 @@ function _marcarTodasFilasProgramar(marcar) {
 // dichos ejes" — un cuadro que va de eje 2 a eje 5 ya NO aparece al filtrar "entre eje 3 y 4",
 // porque se sale de ese rango; solo entran cuadros cuyo rango completo cae adentro, igual
 // criterio que ya usan cuadro/ancho/hilos — más consistente y menos sorprendente).
+// "Fabricado"/"Pendiente de producción"/"Pendiente de despacho"/"Disponible para despacho"
+// (2026-10-20, a pedido del usuario: "agreguemos los filtros de pendientes y fabricado") — a
+// diferencia de ancho/hilos (pocos valores estandarizados, desplegable de valor exacto), estas
+// cantidades pueden ser cualquier número entre 0 y la cantidad total de la fila, así que usan
+// el mismo Desde/Hasta que ya tenían cuadro/ejes (sin marca especial — caen por defecto en la
+// rama Desde/Hasta de `_filtroValorAreaHTML()`). Disponibles en los TRES lugares que comparten
+// `TIPOS_FILTRO_PROGRAMAR` (modales Programar producción/despacho y el cuadro principal de cada
+// Losa, prefijo `fp`) y en AMBOS sistemas (a diferencia de ancho/hilos, vigueta sí tiene
+// pendiente/fabricado/disponible — lo que no tiene es un "ancho" real).
 const TIPOS_FILTRO_PROGRAMAR = [
   { id: 'cuadro', label: 'Entre cuadros' },
   { id: 'ejeNum', label: 'Entre ejes numéricos' },
   { id: 'ejeAlfa', label: 'Entre ejes alfabéticos' },
   { id: 'ancho', label: 'Ancho de prelosa', soloConAncho: true, soloValorUnico: true },
   { id: 'hilos', label: 'Número de hilos', soloConAncho: true, soloValorUnico: true },
+  { id: 'fabricado', label: 'Fabricado' },
+  { id: 'pendProd', label: 'Pendiente de producción' },
+  { id: 'pendDesp', label: 'Pendiente de despacho' },
+  { id: 'disponible', label: 'Disponible para despacho' },
 ];
+// Tipos cuyo valor vive en un ÚNICO `data-*` numérico del `<tr>` y se compara por rango simple
+// Desde/Hasta (a diferencia de ejeNum/ejeAlfa, cuyo valor es en sí un RANGO "1-2" que hay que
+// parsear con `_parRangoFiltro()` — ver `_filaPasaFiltroProgramar()`). El id del tipo coincide
+// a propósito con la clave del dataset (`tr.dataset[tipo]`, vía `data-pend-prod`/`data-pend-desp`
+// → `pendProd`/`pendDesp` en camelCase automático del DOM) para no necesitar un mapeo aparte.
+const TIPOS_FILTRO_RANGO_SIMPLE = ['cuadro', 'fabricado', 'pendProd', 'pendDesp', 'disponible'];
 function _valoresDisponiblesFiltro(tipo) {
   const set = new Set();
   _filasLosaActual.forEach(f => {
@@ -1668,8 +1727,11 @@ function _filaPasaFiltroProgramar(tr, filtro) {
     const v = parseFloat(tr.dataset[tipo]);
     return !isNaN(v) && v === valorUnico;
   }
-  if (tipo === 'cuadro') {
-    const v = parseFloat(tr.dataset.cuadro);
+  // Rango simple Desde/Hasta contra un único `data-*` numérico — cuadro, y desde 2026-10-20
+  // también fabricado/pendiente de producción/pendiente de despacho/disponible (ver
+  // `TIPOS_FILTRO_RANGO_SIMPLE`, mismo id de tipo que la clave del dataset).
+  if (TIPOS_FILTRO_RANGO_SIMPLE.includes(tipo)) {
+    const v = parseFloat(tr.dataset[tipo]);
     return !isNaN(v) && (desde == null || v >= desde) && (hasta == null || v <= hasta);
   }
   const rango = _parRangoFiltro(tipo === 'ejeNum' ? tr.dataset.ejeNum : tr.dataset.ejeAlfa, tipo === 'ejeNum');
@@ -2548,7 +2610,7 @@ function abrirModalProgramarDespacho(despachoProgramadoId) {
       const colEspecifica = esVigueta
         ? `<td>${_esc(f.tipoVigueta) || '—'}</td><td style="text-align:center">${f.hilosAbajo || 0}</td><td style="text-align:center">${f.hilosArriba || 0}</td>`
         : `<td style="text-align:center">${f.ancho || 0}</td><td style="text-align:center">${f.hilos || 0}</td>`;
-      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}">
+      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-fabricado="${_fabricadoFila(f)}" data-pend-prod="${_pendienteProduccionFila(f)}" data-pend-desp="${_pendienteDespachoFila(f, _despachosLosaActual)}" data-disponible="${disp}">
         <td><input type="checkbox" class="mpd-chk-fila" onchange="_marcarFilaProgramarDespacho(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
         <td>${_esc(f.ejesEntre) || '—'}</td>
