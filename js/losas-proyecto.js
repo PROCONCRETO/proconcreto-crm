@@ -848,12 +848,22 @@ function _toggleFilasProduccion() {
 // mismo criterio que ya usa el colspan de la fila TOTALES de los imprimibles. El resto de
 // columnas a la derecha (Peso, Pend./Fabricadas, Observaciones, la de acciones) quedan vacías
 // en un último `<td colspan>`.
+// Recalcula solo sobre las filas filtradas, con una señal visible de "FILTRADO" (2026-10-20, a
+// pedido del usuario: "al aplicar los filtros, recalculemos los totales (con una nota o señal
+// que indique la parcialidad)" — antes sumaba siempre TODA `_filasLosaActual`, sin importar si
+// había un filtro activo escondiendo filas, así que el total nunca cambiaba con el filtro
+// puesto y no avisaba que lo que se veía en pantalla no era el total real de la Losa.
+// `_filasVisiblesFp()` devuelve `null` cuando no hay filtro (se usan todas, comportamiento de
+// siempre, sin badge) o el subconjunto que pasa el filtro (aunque sean 0 filas).
 function _pieTotalesHTML(l) {
   const esVigueta = l.sistema === 'vigueta_bovedilla';
   const esLista = _MODO_FLUJO_LOSA === 'lista';
   const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
+  const filasVisibles = _filasVisiblesFp();
+  const filtroActivo = filasVisibles !== null;
+  const filas = filtroActivo ? filasVisibles : _filasLosaActual;
   let totalUnidades = 0, totalMetros = 0, totalM2 = 0, totalPeso = 0;
-  _filasLosaActual.forEach(f => {
+  filas.forEach(f => {
     const dim = Number(f.dimension) || 0;
     const cant = Number(f.cantidad) || 0;
     totalUnidades += cant;
@@ -870,8 +880,11 @@ function _pieTotalesHTML(l) {
   // de la última fila de los cuadros, incluyamos también el total del peso") lleva su propia
   // celda de total, igual que Cantidad/Long. total/m².
   const colspanFinal = (esLista ? 0 : 2) + 1 + 1;
+  const badgeFiltro = filtroActivo
+    ? ` <span style="font-size:10px;font-weight:700;color:var(--naranja);background:#FFF3E0;padding:2px 7px;border-radius:8px;vertical-align:middle" title="Estos totales son solo de las filas que pasan el filtro activo, no de toda la Losa">⚠️ FILTRADO (${filas.length}/${_filasLosaActual.length})</span>`
+    : '';
   return `<tr style="background:var(--azul-suave);font-weight:700">
-    <td colspan="${colspanInicial}" style="padding:10px;text-align:right;color:var(--azul)">📐 TOTALES</td>
+    <td colspan="${colspanInicial}" style="padding:10px;text-align:right;color:var(--azul)">📐 TOTALES${badgeFiltro}</td>
     <td style="padding:10px;text-align:center;color:var(--azul)">${totalUnidades}</td>
     <td style="padding:10px;text-align:right;color:var(--azul)">${totalMetros.toFixed(2)}</td>
     ${esVigueta ? '' : `<td style="padding:10px;text-align:right;color:var(--azul)">${totalM2.toFixed(2)}</td>`}
@@ -973,8 +986,13 @@ function exportarFilasLosaExcel() {
 // pocas piezas muy largas pesa en el avance tanto como corresponde a sus metros reales, no
 // menos que una fila con muchas piezas cortas.
 function _pieAvanceProduccionHTML() {
+  // Mismo criterio de "recalcula solo sobre lo filtrado, con señal" que `_pieTotalesHTML()`
+  // (2026-10-20, ver su nota) — `null` de `_filasVisiblesFp()` = sin filtro, usa todas.
+  const filasVisibles = _filasVisiblesFp();
+  const filtroActivo = filasVisibles !== null;
+  const filas = filtroActivo ? filasVisibles : _filasLosaActual;
   let totalPonderado = 0, avancePonderado = 0;
-  _filasLosaActual.forEach(f => {
+  filas.forEach(f => {
     const dim = Number(f.dimension) || 0;
     const cant = Number(f.cantidad) || 0;
     const fabricadas = cant - _pendienteProduccionFila(f);
@@ -984,9 +1002,12 @@ function _pieAvanceProduccionHTML() {
   const pctAvance = totalPonderado > 0 ? (avancePonderado / totalPonderado) * 100 : 0;
   const pctFaltante = 100 - pctAvance;
   const numCols = document.querySelectorAll('#filas-produccion-thead th').length || 1;
+  const badgeFiltro = filtroActivo
+    ? ` <span style="font-size:10px;font-weight:700;color:var(--naranja);background:#FFF3E0;padding:2px 7px;border-radius:8px;vertical-align:middle" title="Este avance es solo de las filas que pasan el filtro activo, no de toda la Losa">⚠️ FILTRADO (${filas.length}/${_filasLosaActual.length})</span>`
+    : '';
   return `<tr style="background:var(--azul-suave);font-weight:700">
     <td colspan="${numCols}" style="padding:10px;text-align:center;color:var(--azul)">
-      📊 Avance de producción (ponderado por longitud): ${pctAvance.toFixed(1)}% avance · ${pctFaltante.toFixed(1)}% faltante
+      📊 Avance de producción (ponderado por longitud): ${pctAvance.toFixed(1)}% avance · ${pctFaltante.toFixed(1)}% faltante${badgeFiltro}
     </td>
   </tr>`;
 }
@@ -1152,19 +1173,16 @@ function _actualizarFilaProduccion(i) {
   const elPP = document.getElementById(`fp-pendprod-${i}`); if (elPP) { elPP.textContent = pendProd; elPP.style.color = pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'; }
   const elDD = document.getElementById(`fp-dispdesp-${i}`); if (elDD) { elDD.textContent = dispDesp; elDD.style.color = dispDesp > 0 ? 'var(--verde)' : 'var(--gris-medio)'; }
   const elPD = document.getElementById(`fp-penddesp-${i}`); if (elPD) { elPD.textContent = pendDesp; elPD.style.color = pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'; }
-  // La fila de TOTALES depende de TODAS las filas, no solo de esta — se refresca aparte (sin
-  // tocar el <tbody>, así no se pierde el foco de ningún input a mitad de tecleo).
-  const tfoot = document.getElementById('filas-produccion-tfoot');
-  if (tfoot) {
-    const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
-    tfoot.innerHTML = _pieTotalesHTML(l) + (esProduccion ? _pieAvanceProduccionHTML() : '');
-  }
   // Filtros (2026-10-20) — mientras se edita una fila en Lista (Cuadro/Ejes/Ancho/Hilos, los
   // mismos campos que ofrece el filtro), el `data-*` del `<tr>` que lee `_aplicarFiltrosProgramar()`
   // quedaría desactualizado sin esto (esta función solo toca celdas puntuales, nunca reconstruye
   // el `<tr>` completo — así no se pierde el foco a mitad de tecleo). Se sincroniza acá, en el
   // único lugar que ya corre en cada edición relevante, y se reaplica el filtro de inmediato por
-  // si la fila deja de cumplir (o empieza a cumplir) con lo que se tecleó.
+  // si la fila deja de cumplir (o empieza a cumplir) con lo que se tecleó. A PROPÓSITO antes de
+  // refrescar el pie de TOTALES/avance (más abajo): esos dos ahora recalculan solo sobre las
+  // filas visibles cuando hay un filtro activo (2026-10-20, ver nota junto a `_pieTotalesHTML()`)
+  // — si se refrescaran antes de sincronizar el dataset, usarían el estado de ESTA fila
+  // desactualizado un instante.
   const tr = document.getElementById(`fp-longtotal-${i}`)?.closest('tr');
   if (tr) {
     tr.dataset.cuadro = f.cuadro || '';
@@ -1181,6 +1199,13 @@ function _actualizarFilaProduccion(i) {
     tr.dataset.disponible = dispDesp;
   }
   _aplicarFiltrosProgramar('fp');
+  // La fila de TOTALES depende de TODAS las filas, no solo de esta — se refresca aparte (sin
+  // tocar el <tbody>, así no se pierde el foco de ningún input a mitad de tecleo).
+  const tfoot = document.getElementById('filas-produccion-tfoot');
+  if (tfoot) {
+    const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
+    tfoot.innerHTML = _pieTotalesHTML(l) + (esProduccion ? _pieAvanceProduccionHTML() : '');
+  }
 }
 
 // Recompone el valor combinado ("1-1´", "I-G"...) de Ejes numéricos/Ejes alfabéticos a partir
@@ -1757,8 +1782,12 @@ function _filaPasaFiltroProgramar(tr, filtro) {
   // fila debe caer completo adentro de [desde, hasta].
   return (desde == null || rango[0] >= desde) && (hasta == null || rango[1] <= hasta);
 }
-function _aplicarFiltrosProgramar(prefijo) {
-  const filtros = Array.from(document.querySelectorAll(`#${prefijo}-filtros-lista .filtro-programar-fila`)).map(fila => {
+// Arma (sin aplicar todavía) la lista de criterios activos de un set de filtros — extraído de
+// `_aplicarFiltrosProgramar()` (2026-10-20) para poder preguntar "¿hay algún filtro configurado
+// ahora mismo?" desde otros lugares, como `_pieTotalesHTML()`/`_pieAvanceProduccionHTML()` (ver
+// nota ahí: recalculan solo sobre las filas visibles cuando esto no viene vacío).
+function _filtrosProgramarActivos(prefijo) {
+  return Array.from(document.querySelectorAll(`#${prefijo}-filtros-lista .filtro-programar-fila`)).map(fila => {
     const tipo = fila.querySelector('[data-tipo]').value;
     const t = TIPOS_FILTRO_PROGRAMAR.find(x => x.id === tipo);
     if (t && t.soloValorUnico) {
@@ -1778,9 +1807,25 @@ function _aplicarFiltrosProgramar(prefijo) {
       hasta: hastaRaw === '' ? null : (esAlfa ? hastaRaw.toUpperCase() : parseFloat(hastaRaw)),
     };
   }).filter(f => f.desde != null || f.hasta != null || f.valorUnico != null || f.siNo != null);
+}
+function _aplicarFiltrosProgramar(prefijo) {
+  const filtros = _filtrosProgramarActivos(prefijo);
   document.querySelectorAll(`#${prefijo}-filas-body tr[data-cuadro]`).forEach(tr => {
     tr.style.display = filtros.every(f => _filaPasaFiltroProgramar(tr, f)) ? '' : 'none';
   });
+}
+// Subconjunto de `_filasLosaActual` que pasa el filtro activo del cuadro principal (prefijo
+// `fp`) — `null` cuando no hay ningún filtro configurado (ver `_filtrosProgramarActivos()`),
+// para que quien llame pueda distinguir "sin filtro, usa todas las filas" de "con filtro, 0
+// filas pasan" (que sí es un resultado válido, no lo mismo que "sin filtro"). Recalcula
+// `_filaPasaFiltroProgramar()` directo contra cada `<tr>` en vez de leer `tr.style.display` —
+// así no depende de que `_aplicarFiltrosProgramar('fp')` ya se haya corrido antes en esta misma
+// pasada (orden que sí importaba cuando esto se agregó, ver nota en `_actualizarFilaProduccion()`).
+function _filasVisiblesFp() {
+  const filtros = _filtrosProgramarActivos('fp');
+  if (!filtros.length) return null;
+  const trs = document.querySelectorAll('#fp-filas-body tr[data-cuadro]');
+  return _filasLosaActual.filter((f, i) => trs[i] && filtros.every(ft => _filaPasaFiltroProgramar(trs[i], ft)));
 }
 function guardarProgramacionProduccion() {
   const fecha = document.getElementById('mpp-fecha').value;

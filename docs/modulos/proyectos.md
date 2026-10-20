@@ -670,6 +670,36 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
   no tiene ningún `<input>` adentro, reemplazar su `innerHTML` no le quita el foco a nada. El pie
   de "Avance de producción" de abajo sigue siendo un banner de ancho completo (no se pidió
   alinearlo por columna).
+  - **Recalcula solo sobre lo filtrado, con una señal naranja "⚠️ FILTRADO (N/M)"** (2026-10-20,
+    a pedido del usuario: "al aplicar los filtros, recalculemos los totales (con una nota o
+    señal que indique la parcialidad)") — antes `_pieTotalesHTML()`/`_pieAvanceProduccionHTML()`
+    sumaban siempre TODA `_filasLosaActual`, sin importar si un filtro (ver "Mismos filtros en
+    el cuadro principal" más arriba) tenía filas escondidas: el total nunca cambiaba con el
+    filtro puesto, y nada avisaba que lo que se veía en pantalla no era el total real de la
+    Losa. `_filasVisiblesFp()` (nuevo) devuelve `null` cuando no hay ningún filtro configurado
+    (se usan todas las filas, comportamiento de siempre, sin badge) o el subconjunto exacto que
+    pasa el filtro (incluso si son 0 filas — caso válido, no se confunde con "sin filtro").
+    Recalcula `_filaPasaFiltroProgramar()` directo contra cada `<tr>`, sin depender de que
+    `_aplicarFiltrosProgramar('fp')` ya se haya corrido antes en esa misma pasada por el render.
+    El badge (`N` filas visibles / `M` filas totales de la Losa) se agrega adentro de la celda
+    "📐 TOTALES" y del texto de "📊 Avance de producción", sin tocar ningún `colspan`.
+    - **Orden corregido en `_actualizarFilaProduccion(i)`** — al editar Cantidad en vivo (modo
+      Lista) con un filtro activo que depende de esa Cantidad (ej. "Pendiente de producción =
+      Sí"), hacía falta sincronizar primero el `data-*` del `<tr>` y reaplicar el filtro, y
+      RECIÉN DESPUÉS refrescar el pie de TOTALES/avance — si se refrescaba antes (como estaba
+      desde que se agregaron los filtros del cuadro principal), el pie usaba el estado de esa
+      fila desactualizado un instante.
+    - `_filtrosProgramarActivos(prefijo)` — se extrajo de `_aplicarFiltrosProgramar()` el armado
+      de la lista de criterios (sin aplicarla todavía), para poder preguntar "¿hay algún filtro
+      configurado ahora mismo?" desde `_pieTotalesHTML()`/`_pieAvanceProduccionHTML()` sin
+      duplicar esa lógica.
+    - Verificado con un arnés real — 12 aserciones: sin filtro, totales completos y sin badge;
+      con un filtro Sí/No activo, TOTALES y el avance ponderado recalculan exactos solo sobre
+      las filas que pasan (fijado a mano contra un caso con fabricado parcial real), con el
+      badge "N/M" correcto; al quitar el filtro, vuelve a los totales completos sin badge; un
+      filtro sin ninguna coincidencia muestra "FILTRADO (0/3)" con los totales en 0, sin
+      romperse; y editar Cantidad en vivo con un filtro dependiente de ella activo actualiza el
+      badge y los totales de inmediato, en el orden correcto — sin errores de consola.
 - **Encabezado fijo al bajar, en las TRES vistas** (clase `.tabla-items.fija-al-bajar`,
   `css/estilos.css`, 2026-10-17, a pedido del usuario: "bloquea las primeras filas... pues al
   bajar se pierden los títulos y no sabe uno qué está viendo") — `renderFilasProduccion()`
