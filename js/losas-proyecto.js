@@ -2768,18 +2768,15 @@ function guardarProgramacionDespacho() {
     lineas.push({ filaId: inp.dataset.filaId, cantidadProgramada, cantidadReal: null });
   }
   if (!lineas.length) { alert('Ingresa al menos una cantidad a programar.'); return; }
-  // Tope duro de capacidad del vehículo (2026-10-19) — recalculado contra `lineas` (lo que de
-  // verdad se va a guardar), no contra lo que se veía en pantalla.
-  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
-  const totalKg = lineas.reduce((s, ln) => {
-    const f = _filasLosaActual.find(x => x.id === ln.filaId);
-    return s + (f && l ? _pesoFila({ ...f, cantidad: ln.cantidadProgramada }, l) : 0);
-  }, 0);
-  const capacidadTon = CAPACIDAD_VEHICULO[vehiculo] || 0;
-  if (capacidadTon && totalKg > capacidadTon * 1000) {
-    alert(`El peso programado (${(totalKg / 1000).toFixed(2)} ton) supera la capacidad de "${vehiculo}" (${capacidadTon} ton) — reduce las cantidades o elige otro vehículo.`);
-    return;
-  }
+  // Capacidad del vehículo — informativo, YA NO bloquea el guardado (corregido 2026-10-20, a
+  // pedido del usuario: "mostremos el aviso de que supera el peso máximo a modo informativo
+  // pero sin restringir el despacho" — antes era un tope duro que impedía guardar del todo si
+  // el peso programado pasaba de la capacidad; en la práctica a veces sí hace falta sobrecargar
+  // un vehículo a propósito, y el aviso no debía impedirlo). El aviso en sí se mantiene, en
+  // vivo, mientras se arma la programación — `_actualizarResumenPesoDespacho()` ya muestra el
+  // peso en rojo con "⚠️ supera la capacidad" apenas se pasa, antes incluso de intentar guardar
+  // — así que acá ya no hace falta recalcular el peso total ni la capacidad, se quitó junto con
+  // el bloqueo (nada más lo usaba).
   // Edita in-situ si `#mpd-id` trae una programación existente — ver la misma nota en
   // `guardarProgramacionProduccion()`.
   const editId = document.getElementById('mpd-id').value;

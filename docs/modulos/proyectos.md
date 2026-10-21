@@ -840,12 +840,34 @@ conservó a propósito (mismo espíritu que `viaje.entregas[].productos[]` en Lo
     nivel superior — mismo mecanismo que ya usa `sb` de `config.js` en toda la app). Resumen de
     peso en vivo (`_actualizarResumenPesoDespacho()`, Σ `_pesoFila()` de lo programado) junto al
     desplegable, con ⚠️ si supera la capacidad. **Elegir vehículo es obligatorio** para guardar
-    — sin eso no hay peso máximo contra qué validar; `guardarProgramacionDespacho()` recalcula
-    el peso total contra `lineas` (lo que de verdad se va a guardar) y rechaza si supera la
-    capacidad × 1000 (kg). El vehículo elegido queda guardado en la programación
-    (`despachosProgramados[].vehiculo`) y se muestra también en el imprimible
+    — sin eso no hay peso máximo contra qué comparar. El vehículo elegido queda guardado en la
+    programación (`despachosProgramados[].vehiculo`) y se muestra también en el imprimible
     (`imprimirProgramacionDespacho()`, tercera columna del recuadro de info junto a
     Sistema/Piezas a programar, con el peso total en toneladas en la etiqueta).
+    - **El exceso de peso es informativo, ya NO bloquea el guardado (corregido 2026-10-20, a
+      pedido del usuario: "mostremos el aviso de que supera el peso máximo a modo informativo
+      pero sin restringir el despacho")** — la primera versión (2026-10-19) hacía que
+      `guardarProgramacionDespacho()` recalculara el peso total contra `lineas` (lo que de
+      verdad se iba a guardar) y rechazara el guardado por completo si pasaba de la capacidad ×
+      1000 (kg). Se quitó ese `return` — en la práctica a veces sí hace falta sobrecargar un
+      vehículo a propósito (ej. un tercerizado más grande del que figura en el catálogo, o una
+      excepción puntual aprobada aparte), y el aviso no debía impedir guardar la programación.
+      El aviso en sí NO desapareció: `_actualizarResumenPesoDespacho()` sigue mostrando el peso
+      en rojo con "⚠️ supera la capacidad" en vivo, mientras se arma la programación, antes
+      incluso de intentar guardar — eso ya cumplía el rol de "modo informativo" que pedía el
+      usuario, solo hacía falta dejar de usarlo también como bloqueo. El cálculo de peso/
+      capacidad que solo servía para ese bloqueo (`totalKg`/`l` dentro de
+      `guardarProgramacionDespacho()`) se quitó entero por quedar sin ningún uso, no solo el
+      `return`. Las demás validaciones de esa función (fecha, vehículo elegido, cantidad
+      programada contra lo disponible real de cada fila) no cambiaron — siguen bloqueando igual
+      que siempre, solo el tope de capacidad del vehículo pasó a ser informativo.
+      - Verificado con un arnés real — 13 aserciones: programar un despacho que supera la
+        capacidad del vehículo más chico del catálogo (18 ton contra 11 ton) sigue mostrando el
+        aviso en rojo en vivo, y SÍ se guarda completo, con la cantidad programada intacta y sin
+        la alerta de bloqueo de antes; y cuatro regresiones — sin vehículo elegido sigue
+        bloqueando, programar más de lo disponible sigue bloqueando, y un despacho normal
+        (dentro de capacidad) se sigue guardando exactamente igual que siempre — sin errores de
+        consola.
   - **"🖨️ Imprimir" dentro del propio modal** (`imprimirProgramacionDespacho()`/
     `descargarPDFProgramacionDespacho()`, 2026-10-17, a pedido del usuario: "incluyamos el
     botón de imprimir, para poder pasar el impreso de lo que se debe organizar y cargar en el
