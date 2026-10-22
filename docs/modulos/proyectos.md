@@ -372,6 +372,27 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
         saca/mete de un filtro "Pendiente de producción = Sí" activo sin recargar nada; y una
         regresión — "Entre cuadros" sigue con su Desde/Hasta de siempre, sin verse afectado —
         sin errores de consola.
+      - **Se quitó el desplegable Sí/No/Todos — ahora elegir el TIPO ya filtra, de un clic**
+        (2026-10-22, a pedido del usuario: "no están funcionando los últimos 4 filtros" → al
+        investigar, el mecanismo sí filtraba bien técnicamente (confirmado con un arnés real,
+        12/12 PASS, y con el archivo desplegado idéntico byte a byte al local) — el problema era
+        de nuevo de diseño, no de código: el usuario esperaba que elegir "Fabricado" en la lista
+        ya mostrara las piezas fabricadas directo, sin el paso adicional de elegir "Sí" en el
+        segundo desplegable — "es claro el nombre del filtro". Confirmó además que la opción
+        "No" ya no hace falta para estos 4 (cada uno "muestra las piezas [fabricadas/pendientes/
+        disponibles] (totales y parciales por renglón)" apenas se elige, sin alternativa). Se
+        quitó el `<select data-rol="sino">` por completo — el área de valor de estos 4 tipos
+        ahora es solo un `<span>✓ filtro aplicado</span>` informativo, sin nada seleccionable;
+        `_cambiarTipoFiltroProgramar()` (sin cambios) ya llama a `_aplicarFiltrosProgramar()`
+        apenas se elige el tipo, así que el filtro queda activo de inmediato.
+        `_filtrosProgramarActivos()` ya no lee ningún `<select>` de valor para estos 4 — los da
+        por `siNo: 'si'` siempre que la fila de filtro exista (la única forma de "apagarlo" es
+        quitar la fila entera con el botón "✕"). `_filaPasaFiltroProgramar()` simplificado a
+        `v > 0` directo, sin la rama "No (en 0)". Reverificado con un arnés real — 10
+        aserciones: los 4 tipos filtran correcto apenas se elige el tipo (sin tocar nada más);
+        ninguno deja un `<select>`/`<input>` seleccionable en el área de valor; quitar el
+        filtro vuelve a mostrar todo; y "Entre cuadros" (Desde/Hasta) sigue intacto —
+        regresión, sin verse afectado por el cambio.
   - **Columnas "Ancho (cm)"/"Hilos" (o "Vigueta"/"Hilos Abajo"/"Hilos Arriba" en vigueta y
     bovedilla) en la tabla del propio modal** (2026-10-16, a pedido del usuario: "en la ventana
     que se abre de programación de producción y programación de despachos, incluyamos las filas

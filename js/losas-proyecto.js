@@ -1738,16 +1738,18 @@ const TIPOS_FILTRO_PROGRAMAR = [
   { id: 'pendDesp', label: 'Pendiente de despacho', soloSiNo: true },
   { id: 'disponible', label: 'Disponible para despacho', soloSiNo: true },
 ];
-// Tipos "Sí/No" (corregido 2026-10-20 — nacieron como Desde/Hasta igual que cuadro, pero el
-// usuario reportó que "no generan ningún efecto al aplicarlo": un Desde/Hasta numérico no tenía
-// ningún error de código (probado), pero sí un problema real de diseño — escribir "Desde 0" en
-// Pendiente no excluye NADA, porque ningún pendiente es negativo, así que el filtro se sentía
-// "roto" aunque técnicamente funcionara. El usuario mismo lo resumió: "no sé si se requiera
-// acotarlo en ciertos límites, pero en realidad para estos solo aplica o sí o no" — no hace
-// falta un RANGO para "¿esta fila tiene algo pendiente/fabricado/disponible, o no?", un
-// desplegable de 2 opciones alcanza y es mucho más directo). El id de cada tipo coincide a
-// propósito con la clave del dataset (`tr.dataset[tipo]`, vía `data-pend-prod`/`data-pend-desp`
-// → `pendProd`/`pendDesp` en camelCase automático del DOM) para no necesitar un mapeo aparte.
+// Tipos "Sí/No" — se aplican directo al elegir el TIPO en la lista, sin un segundo desplegable
+// (corregido 2026-10-22, a pedido del usuario: "no está funcionando los últimos 4 filtros" →
+// al investigar resultó que SÍ filtraban bien técnicamente, pero el usuario esperaba que elegir
+// "Fabricado" en la lista ya mostrara las piezas fabricadas directo, sin tener que elegir
+// ADEMÁS "Sí" en un segundo desplegable — "es claro el nombre del filtro", y confirmó que cada
+// uno debe mostrar "las piezas [fabricadas/pendientes/disponibles] (totales y parciales por
+// renglón)" apenas se elige, sin una opción "No" — a diferencia del primer intento (2026-10-20)
+// que sí tenía un desplegable Sí/No/Todos, este ya no lo necesita: el nombre del tipo ES el
+// criterio completo (mayor a 0), y quitar el filtro (botón "✕") es la única forma de volver a
+// "Todos" para este criterio. El id de cada tipo coincide a propósito con la clave del dataset
+// (`tr.dataset[tipo]`, vía `data-pend-prod`/`data-pend-desp` → `pendProd`/`pendDesp` en
+// camelCase automático del DOM) para no necesitar un mapeo aparte.
 const TIPOS_FILTRO_SI_NO = ['fabricado', 'pendProd', 'pendDesp', 'disponible'];
 function _valoresDisponiblesFiltro(tipo) {
   const set = new Set();
@@ -1767,11 +1769,10 @@ function _filtroValorAreaHTML(tipo, prefijo) {
     </select>`;
   }
   if (t && t.soloSiNo) {
-    return `<select data-rol="sino" onchange="_aplicarFiltrosProgramar('${prefijo}')" style="width:170px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:12px">
-      <option value="">Todos</option>
-      <option value="si">Sí (mayor a 0)</option>
-      <option value="no">No (en 0)</option>
-    </select>`;
+    // Sin segundo desplegable (2026-10-22, ver nota en `TIPOS_FILTRO_SI_NO`) — el tipo ya
+    // elegido en el primer `<select>` es el criterio completo, este span es solo confirmación
+    // visual de que el filtro quedó activo.
+    return `<span style="font-size:11px;color:var(--verde);padding:6px 4px;white-space:nowrap">✓ filtro aplicado</span>`;
   }
   const esAlfa = tipo === 'ejeAlfa';
   return `<input type="${esAlfa ? 'text' : 'number'}" placeholder="Desde" data-rol="desde" oninput="_aplicarFiltrosProgramar('${prefijo}')" style="width:80px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio)">
@@ -1809,18 +1810,17 @@ function _parRangoFiltro(valor, numerico) {
   return pa <= pb ? [pa, pb] : [pb, pa];
 }
 function _filaPasaFiltroProgramar(tr, filtro) {
-  const { tipo, desde, hasta, valorUnico, siNo } = filtro;
+  const { tipo, desde, hasta, valorUnico } = filtro;
   if (tipo === 'ancho' || tipo === 'hilos') {
     const v = parseFloat(tr.dataset[tipo]);
     return !isNaN(v) && v === valorUnico;
   }
-  // Sí/No contra un único `data-*` numérico (ver `TIPOS_FILTRO_SI_NO`, mismo id de tipo que la
-  // clave del dataset) — "Sí" = mayor a 0, "No" = en 0 (nunca es negativo, por diseño de las
-  // funciones `_fabricadoFila()`/`_pendiente*Fila()`/`_disponibleDespachoFila()`).
+  // Contra un único `data-*` numérico (ver `TIPOS_FILTRO_SI_NO`, mismo id de tipo que la clave
+  // del dataset) — elegir el tipo ya significa "mayor a 0" (2026-10-22, ya no hay un "No"
+  // seleccionable, ver nota junto a `TIPOS_FILTRO_SI_NO`).
   if (TIPOS_FILTRO_SI_NO.includes(tipo)) {
     const v = parseFloat(tr.dataset[tipo]);
-    if (isNaN(v)) return false;
-    return siNo === 'si' ? v > 0 : v <= 0;
+    return !isNaN(v) && v > 0;
   }
   if (tipo === 'cuadro') {
     const v = parseFloat(tr.dataset.cuadro);
@@ -1844,10 +1844,9 @@ function _filtrosProgramarActivos(prefijo) {
       const valorRaw = fila.querySelector('[data-rol="valor"]').value;
       return { tipo, valorUnico: valorRaw === '' ? null : parseFloat(valorRaw) };
     }
-    if (t && t.soloSiNo) {
-      const sinoRaw = fila.querySelector('[data-rol="sino"]').value;
-      return { tipo, siNo: sinoRaw === '' ? null : sinoRaw };
-    }
+    // Sin `<select>` de valor que leer (2026-10-22) — elegir el tipo en la lista YA es el
+    // criterio completo, siempre activo mientras esta fila de filtro exista.
+    if (t && t.soloSiNo) return { tipo, siNo: 'si' };
     const esAlfa = tipo === 'ejeAlfa';
     const desdeRaw = fila.querySelector('[data-rol="desde"]').value.trim();
     const hastaRaw = fila.querySelector('[data-rol="hasta"]').value.trim();
