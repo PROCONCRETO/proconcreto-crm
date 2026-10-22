@@ -571,6 +571,19 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     acompañar. Orden final de columnas: `#, Cuadro, Ancho(cm)/Vigueta, Largo (m), Cant. a
     programar, Long. tot. (m)` (más Peso y Observaciones solo en despacho, ver los dos bullets
     siguientes).
+    - **Columna "Hilos", justo después de Ancho/Vigueta** (2026-10-22, a pedido del usuario:
+      "incluyamos una columna con la cantidad de número de hilos del elemento", y al preguntar
+      el alcance: "tanto en el cuadro detallado como en el cuadro resumen") — el "cuadro
+      resumen" (`RESUMEN POR MEDIDAS`, ver el bullet de arriba) YA traía Hilos desde el
+      2026-10-19; lo que faltaba era este cuadro principal/detallado (una fila por línea
+      programada, no agrupada por medida). Mismo criterio que el resumen: prelosa/placa
+      alveolar muestra `f.hilos` directo; vigueta combina `hilosAbajo`+`hilosArriba` en una
+      sola celda ("2+3"), porque no tiene un único campo "hilos". `colspan` de la fila TOTALES
+      subió de 4 a 5 para acompañar la columna nueva. Mismos dos imprimibles
+      (`_htmlProgramacionProduccion()`/`_htmlProgramacionDespacho()`). Verificado con un arnés
+      real — 10 aserciones: encabezado "Hilos" presente en ambos imprimibles; celda con el
+      valor correcto en prelosa (`f.hilos`) y en vigueta ("abajo+arriba" combinado); `colspan`
+      de TOTALES correcto; y el cuadro resumen seguía trayendo Hilos sin cambios — regresión.
   - **Datos centrados bajo su etiqueta** (2026-10-17, a pedido del usuario: "centremos los
     datos, debajo del título, pues como las columnas son tan anchas, no se identifica bien a
     qué corresponde cada dato") — el bloque Sistema/Piezas a programar, que antes era

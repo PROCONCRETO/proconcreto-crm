@@ -2111,8 +2111,13 @@ let _fechaProgramacionImpresa = null;
 // que reabrir, así que solo regresa a la pantalla de la Losa.
 function _htmlProgramacionProduccion(l, p, sis, esVigueta, fecha, observaciones, lineas, origen) {
   let totalPiezas = 0, totalMetros = 0;
+  // Columna "Hilos" (2026-10-22, a pedido del usuario: "incluyamos una columna con la cantidad
+  // de número de hilos del elemento") — prelosa/placa alveolar trae una sola columna "Hilos"
+  // (`f.hilos`); vigueta trae abajo/arriba por separado, combinados en UNA sola celda
+  // "abajo+arriba" (mismo criterio ya usado en `_resumenPorMedidasHTML()`, ver `hilosTxt`).
   const filasHTML = lineas.map(({ f, cantidad }, n) => {
     const longTotal = (Number(f.dimension) || 0) * cantidad;
+    const hilosTxt = esVigueta ? `${Number(f.hilosAbajo) || 0}+${Number(f.hilosArriba) || 0}` : String(Number(f.hilos) || 0);
     totalPiezas += cantidad;
     totalMetros += longTotal;
     const colEspecifica = esVigueta
@@ -2122,6 +2127,7 @@ function _htmlProgramacionProduccion(l, p, sis, esVigueta, fecha, observaciones,
       <td style="color:#888">${n + 1}</td>
       <td style="font-weight:600">${_esc(f.cuadro) || '—'}</td>
       ${colEspecifica}
+      <td style="text-align:center">${hilosTxt}</td>
       <td style="text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>
       <td style="text-align:center;font-weight:700">${cantidad}</td>
       <td style="text-align:right">${longTotal.toFixed(2)}</td>
@@ -2167,11 +2173,11 @@ function _htmlProgramacionProduccion(l, p, sis, esVigueta, fecha, observaciones,
         <table class="preview-tabla">
           <thead><tr>
             <th>#</th><th>Cuadro</th>
-            <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Largo (m)</th><th>Cant. a programar</th><th>Long. tot. (m)</th><th>Observaciones (cant. real)</th>
+            <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Hilos</th><th>Largo (m)</th><th>Cant. a programar</th><th>Long. tot. (m)</th><th>Observaciones (cant. real)</th>
           </tr></thead>
           <tbody>${filasHTML}</tbody>
           <tfoot><tr class="total-row">
-            <td colspan="4" style="text-align:right">TOTALES</td>
+            <td colspan="5" style="text-align:right">TOTALES</td>
             <td style="text-align:center">${totalPiezas}</td>
             <td style="text-align:right">${totalMetros.toFixed(2)}</td>
             <td></td>
@@ -2903,9 +2909,12 @@ function _htmlProgramacionDespacho(l, p, sis, esVigueta, fecha, observaciones, v
   // que puede ser menor a `f.cantidad` si solo se programa una parte de la fila — en vez de la
   // cantidad total de la fila.
   let totalPiezas = 0, totalMetros = 0, totalPeso = 0;
+  // Columna "Hilos" (2026-10-22, ver nota en `_htmlProgramacionProduccion()` — mismo criterio,
+  // combinado "abajo+arriba" en una sola celda para vigueta).
   const filasHTML = lineas.map(({ f, cantidad }, n) => {
     const longTotal = (Number(f.dimension) || 0) * cantidad;
     const peso = _pesoFila({ ...f, cantidad }, l);
+    const hilosTxt = esVigueta ? `${Number(f.hilosAbajo) || 0}+${Number(f.hilosArriba) || 0}` : String(Number(f.hilos) || 0);
     totalPiezas += cantidad;
     totalMetros += longTotal;
     totalPeso += peso;
@@ -2916,6 +2925,7 @@ function _htmlProgramacionDespacho(l, p, sis, esVigueta, fecha, observaciones, v
       <td style="color:#888">${n + 1}</td>
       <td style="font-weight:600">${_esc(f.cuadro) || '—'}</td>
       ${colEspecifica}
+      <td style="text-align:center">${hilosTxt}</td>
       <td style="text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>
       <td style="text-align:center;font-weight:700">${cantidad}</td>
       <td style="text-align:right">${longTotal.toFixed(2)}</td>
@@ -2956,11 +2966,11 @@ function _htmlProgramacionDespacho(l, p, sis, esVigueta, fecha, observaciones, v
         <table class="preview-tabla">
           <thead><tr>
             <th>#</th><th>Cuadro</th>
-            <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Largo (m)</th><th>Cant. a programar</th><th>Long. tot. (m)</th><th>Peso (kg)</th><th>Observaciones (cant. real)</th>
+            <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Hilos</th><th>Largo (m)</th><th>Cant. a programar</th><th>Long. tot. (m)</th><th>Peso (kg)</th><th>Observaciones (cant. real)</th>
           </tr></thead>
           <tbody>${filasHTML}</tbody>
           <tfoot><tr class="total-row">
-            <td colspan="4" style="text-align:right">TOTALES</td>
+            <td colspan="5" style="text-align:right">TOTALES</td>
             <td style="text-align:center">${totalPiezas}</td>
             <td style="text-align:right">${totalMetros.toFixed(2)}</td>
             <td style="text-align:right">${totalPeso.toFixed(1)}</td>
