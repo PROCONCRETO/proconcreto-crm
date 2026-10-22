@@ -520,7 +520,8 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
       re-agrega `.abierto` al modal correspondiente además de reactivar `pantalla-losa-detalle`,
       mostrándolo exactamente como se dejó — sin guardar/restaurar nada aparte. Mismo arreglo en
       Programar despacho.
-  - **"RESUMEN POR MEDIDAS" al pie del imprimible** (`_resumenPorMedidasHTML()`, 2026-10-17, a
+  - **"RESUMEN POR MEDIDAS"** (`_resumenPorMedidasHTML()`, 2026-10-17 — **movido de "al pie" a
+    "al principio" el 2026-10-22, ver el bullet al final de este grupo**, a
     pedido del usuario: "incluyamos un resumen, que muestre la cantidad por medidas, esto
     porque en ocasiones la medida es la misma para varios cuadros en el plano... y termina
     siendo más fácil revisar unos totales que cuadro por cuadro") — agrupa las líneas impresas
@@ -528,8 +529,7 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
     (dos piezas del mismo ancho y largo son intercambiables, sin importar en qué cuadro vayan);
     en vigueta, Vigueta (tipo) + Dimensión — el tipo de vigueta es parte de la medida, no un
     dato aparte, así que dos viguetas del mismo largo pero de tipo distinto NO se agrupan.
-    Tabla aparte debajo de la tabla de filas (antes de la firma), con su propia fila de
-    totales — incluye **columna de Peso (kg)** (2026-10-17, a pedido del usuario: "incluyamos
+    Bloque aparte con su propia fila de totales — incluye **columna de Peso (kg)** (2026-10-17, a pedido del usuario: "incluyamos
     también en ambos imprimibles en el cuadro inferior, la columna de peso" — a diferencia de
     la tabla principal, donde Peso es solo del lado de despacho, en este resumen va en LOS DOS
     imprimibles; peso por grupo = Σ `_pesoFila()` de cada línea que cae en ese grupo, válido
@@ -555,10 +555,62 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
       30cm" es justo lo que facilita el montaje. Los cuadros van en una grilla de 2 columnas
       (`display:grid;grid-template-columns:1fr 1fr`, envuelve a una fila nueva si hay más de 2),
       como las 2 cintas reales en planta, una al lado de la otra. **Si solo hay UNA combinación**
-      (el caso más común, sin mezclar anchos/hilos en la misma programación), se sigue viendo
-      exactamente igual que antes de este cambio: una sola tabla con columnas Ancho/Hilos, sin
-      ningún título de bloque — el comportamiento previo no cambió, solo se activa el reparto en
-      cuadros cuando de verdad hace falta distinguir.
+      (el caso más común, sin mezclar anchos/hilos en la misma programación), su tarjeta ocupa
+      el ancho completo en vez de dejar una columna vacía al lado (ver el siguiente bullet,
+      `gridCols`).
+    - **Rediseño "el resumen gana más relevancia" — pasa de pie a cabecera, con tiles y
+      tarjetas** (2026-10-22, a pedido del usuario: "el cuadro resumen es más importante que el
+      cuadro detallado al momento de fabricar y de despachar... hagamos un mockup de el cuadro
+      detallado partido en dos columnas... para que el resumen gane más relevancia", confirmado
+      con un mockup real en un Artifact de Claude antes de tocar el código, y luego "montemoslo"
+      para llevarlo al imprimible real) — tres cambios juntos:
+      1. **Orden**: RESUMEN POR MEDIDAS pasa de ir DESPUÉS del cuadro detallado (justo antes de
+         la firma) a ir ANTES — lo primero que se ve en la página después de los datos de la
+         Losa, en los dos imprimibles.
+      2. **3 tiles de totales generales de toda la Losa**, arriba de las tarjetas por medida —
+         Piezas totales / Long. total / Peso total (en toneladas), número grande (26px) en
+         fondo azul suave (`var(--azul-suave)`), sumados directo sobre `lineas` (sin pasar por
+         `grupos`/`bloques` — son el total de TODA la impresión, no de un grupo). Antes no
+         existía ningún total agregado visible de un vistazo; había que sumar las tarjetas a
+         mano o mirar la tabla de abajo.
+      3. **Tarjetas en vez de tablas planas** — cada bloque (o la única tarjeta, si no hay más
+         de uno) ahora es una tarjeta con borde izquierdo de acento (`border-left:5px solid
+         #1565C0`), sombra suave, una insignia redondeada con el total de piezas del bloque
+         ("20 pzs") junto al título, y una fila TOTAL en tipografía más grande (14px) con fondo
+         azul suave — antes era una tabla plana con una fila de totales en negrita, sin acento
+         de color ni insignia. La CLAVE de agrupación (medida+hilos+dimensión) y los bloques
+         (medida+hilos) no cambiaron — solo cómo se ve cada uno. Ya no existe la rama
+         `conMedidaHilos` (alternaba entre mostrar Ancho/Hilos como columnas de la tabla o como
+         título de bloque, según hubiera 1 o más de 1 bloque) — ahora el título de la tarjeta
+         SIEMPRE lleva la medida+hilos, haya 1 bloque o varios, así que la tabla interna de cada
+         tarjeta siempre tiene las mismas 4 columnas (Largo/Cant./Long. tot./Peso).
+    - **El cuadro detallado baja de jerarquía — partido en 2 columnas, más chico** (mismo pedido
+      del 2026-10-22) — antes era UNA tabla ancha (`class="preview-tabla"`, encabezado azul
+      sólido) con su propia fila de TOTALES; ahora, como el resumen de arriba ya trae los
+      totales generales y por medida, el cuadro detallado baja a ser solo una referencia rápida
+      de "qué cuadro es cuál": se parte en 2 tablas lado a lado (`_cuadroDetalladoDosColsHTML()`,
+      nueva, compartida entre Producción y Despacho — reparte el arreglo de filas por la mitad,
+      la primera mitad a la izquierda), con encabezado gris claro (`#EDF2F7`/`#4A5568`, ya NO
+      azul — para que se vea claramente secundario frente a las tarjetas) y tipografía más chica
+      (9.5px vs. 12px antes). Columnas recortadas a lo esencial: `#, Cuadro, Ancho(o
+      Vigueta)/Hilos, Largo, Cant. a programar, Observaciones (cant. real)` — se quitaron
+      "Long. tot. (m)" (trivial = Largo × Cantidad, y ya agrupada en el resumen) y la fila de
+      TOTALES completa (la cubren los 3 tiles de arriba); Despacho conserva su columna de Peso
+      (`_cuadroDetalladoTheadHTML(esVigueta, conPeso)`, el único parámetro que distingue a los
+      dos imprimibles) porque sí le sirve a logística para repartir la carga entre viajes, aun
+      con el peso total ya visible en "Vehículo (X ton)" y en el resumen. La columna
+      "Observaciones (cant. real)" se mantiene en blanco a propósito — es donde planta anota a
+      mano la cantidad real lograda, un campo operativo real, no solo de auditoría.
+      - Verificado con un arnés real — 23 aserciones (prelosa con 2 anchos distintos + vigueta
+        con un solo bloque): RESUMEN POR MEDIDAS aparece antes que "Detalle por cuadro" en los
+        dos imprimibles; los 3 tiles dan los totales correctos (contrastados a mano contra los
+        mismos números ya validados en el mockup: 39 piezas, 72.24 m, 3.93 ton); cada tarjeta
+        trae su título, su insignia de piezas y su fila TOTAL correctos; el detalle queda
+        repartido en exactamente 2 tablas sin perder ninguna fila (11 filas → 6+5); ya no
+        aparece "TOTALES" en el detalle; Producción no lleva columna de Peso en el detalle,
+        Despacho sí; y vigueta combina "2+3" igual que antes. Revisado también con una captura
+        de pantalla real del imprimible completo (con el membrete y el pie reales de la app, no
+        solo el HTML aislado) antes de darlo por terminado.
   - **Columnas de la tabla principal** (2026-10-17, dos ajustes a pedido del usuario): "Dim."
     pasó a decir **"Largo"** en las dos tablas de cada imprimible (la principal y el resumen por
     medidas) — más claro para planta/logística que la abreviatura. La columna
@@ -575,15 +627,14 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
       "incluyamos una columna con la cantidad de número de hilos del elemento", y al preguntar
       el alcance: "tanto en el cuadro detallado como en el cuadro resumen") — el "cuadro
       resumen" (`RESUMEN POR MEDIDAS`, ver el bullet de arriba) YA traía Hilos desde el
-      2026-10-19; lo que faltaba era este cuadro principal/detallado (una fila por línea
+      2026-10-19; lo que faltaba era el cuadro principal/detallado (una fila por línea
       programada, no agrupada por medida). Mismo criterio que el resumen: prelosa/placa
-      alveolar muestra `f.hilos` directo; vigueta combina `hilosAbajo`+`hilosArriba` en una
-      sola celda ("2+3"), porque no tiene un único campo "hilos". `colspan` de la fila TOTALES
-      subió de 4 a 5 para acompañar la columna nueva. Mismos dos imprimibles
-      (`_htmlProgramacionProduccion()`/`_htmlProgramacionDespacho()`). Verificado con un arnés
-      real — 10 aserciones: encabezado "Hilos" presente en ambos imprimibles; celda con el
-      valor correcto en prelosa (`f.hilos`) y en vigueta ("abajo+arriba" combinado); `colspan`
-      de TOTALES correcto; y el cuadro resumen seguía trayendo Hilos sin cambios — regresión.
+      alveolar muestra `f.hilos` directo; vigueta combina `hilosAbajo`+`hilosArriba` en una sola
+      celda ("2+3"), porque no tiene un único campo "hilos". **Nota**: esta columna se agregó
+      sobre la tabla ancha de ENTONCES, de una sola pieza con su propia fila de TOTALES — ese
+      mismo día, más tarde, esa tabla se partió en 2 columnas y perdió la fila de TOTALES (ver
+      el bullet "El cuadro detallado baja de jerarquía" más arriba); la columna "Hilos" en sí
+      sigue igual, solo cambió la tabla que la contiene.
   - **Datos centrados bajo su etiqueta** (2026-10-17, a pedido del usuario: "centremos los
     datos, debajo del título, pues como las columnas son tan anchas, no se identifica bien a
     qué corresponde cada dato") — el bloque Sistema/Piezas a programar, que antes era

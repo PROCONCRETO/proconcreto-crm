@@ -1994,6 +1994,17 @@ function guardarProgramacionProduccion() {
 // es parte de la medida, no solo un dato aparte — dos viguetas del mismo largo pero de tipo
 // distinto NO son la misma pieza). Compartido entre `imprimirProgramacionProduccion()` e
 // `imprimirProgramacionDespacho()`.
+// Rediseño "el resumen gana más relevancia" (2026-10-22, a pedido del usuario: "el cuadro
+// resumen es más importante que el cuadro detallado al momento de fabricar y de despachar...
+// que el resumen gane más relevancia" — montado a partir de un mockup que el usuario aprobó,
+// ver `docs/modulos/proyectos.md`) — ahora va PRIMERO en la página (antes del cuadro detallado,
+// ver `_htmlProgramacionProduccion()`/`_htmlProgramacionDespacho()`), con 3 tiles grandes de
+// totales generales de toda la Losa arriba, y una tarjeta por cada ancho/hilos (con acento de
+// color, insignia de piezas y una fila TOTAL grande) en vez de una tabla plana — mismo criterio
+// de agrupación de siempre (medida+hilos+dimensión, bloques por medida+hilos SOLAMENTE), pero
+// la medida+hilos ahora SIEMPRE va en el encabezado de la tarjeta (antes solo en el título
+// cuando había más de un bloque; con una sola tarjeta de ancho completo cuando hay un único
+// bloque, ya no hace falta la rama `conMedidaHilos` que alternaba entre columnas y título).
 function _resumenPorMedidasHTML(lineas, l) {
   const esVigueta = l.sistema === 'vigueta_bovedilla';
   // "Hilos" (2026-10-19, a pedido del usuario: "incluir una columna con el número de hilos") —
@@ -2003,10 +2014,15 @@ function _resumenPorMedidasHTML(lineas, l) {
   // Vigueta no tiene un único campo "hilos" (son dos: Abajo/Arriba) — se muestra combinado
   // "2+1", mismo formato corto que ya se usa en el resto de la pantalla para esos dos campos.
   const grupos = new Map();
+  let totalPiezasAll = 0, totalMetrosAll = 0, totalPesoAll = 0;
   lineas.forEach(({ f, cantidad }) => {
     const dim = Number(f.dimension) || 0;
     const medida = esVigueta ? (f.tipoVigueta || '—') : (Number(f.ancho) || 0);
     const hilosTxt = esVigueta ? `${Number(f.hilosAbajo) || 0}+${Number(f.hilosArriba) || 0}` : String(Number(f.hilos) || 0);
+    const peso = _pesoFila({ ...f, cantidad }, l);
+    totalPiezasAll += cantidad;
+    totalMetrosAll += dim * cantidad;
+    totalPesoAll += peso;
     const clave = `${medida}__${hilosTxt}__${dim.toFixed(2)}`;
     if (!grupos.has(clave)) grupos.set(clave, { medida, hilosTxt, dim, cantidad: 0, peso: 0 });
     const g = grupos.get(clave);
@@ -2014,7 +2030,7 @@ function _resumenPorMedidasHTML(lineas, l) {
     // Mismo peso por unidad para todas las líneas de un mismo grupo (comparten ancho/vigueta y
     // dimensión, que es justo lo que determina el peso por pieza) — sumar `_pesoFila()` línea
     // por línea da el mismo resultado que peso-por-unidad × cantidad total del grupo.
-    g.peso += _pesoFila({ ...f, cantidad }, l);
+    g.peso += peso;
   });
   const filas = Array.from(grupos.values()).sort((a, b) => a.dim - b.dim || String(a.medida).localeCompare(String(b.medida)));
 
@@ -2023,78 +2039,106 @@ function _resumenPorMedidasHTML(lineas, l) {
   // y en el otro otra medida, para facilidad del operario al momento de producir") — agrupa las
   // filas ya calculadas (por ancho/vigueta + hilos + dimensión) en un nivel más arriba, por
   // ancho/vigueta + hilos SOLAMENTE (sin la dimensión): cada combinación de esas dos se separa
-  // en su propia tabla con su propio título y su propia fila de TOTALES, en vez de una sola
-  // tabla mezclando filas de distinta medida — coincide con el caso real que motivó esto: los
-  // "bancos de producción de prelosa" (ver `_topeMetrosBanco()`), donde cada cinta se arma con
-  // un ancho fijo, así que ver de un vistazo "esto es lo de la cinta de 50cm, esto lo de la de
-  // 30cm" es justo lo que facilita el montaje. Si solo hay UNA combinación (el caso más común),
-  // se sigue viendo exactamente igual que antes: una sola tabla, sin título de bloque.
+  // en su propia tarjeta con su propio título y su propia fila TOTAL, en vez de una sola tabla
+  // mezclando filas de distinta medida — coincide con el caso real que lo motivó: los "bancos
+  // de producción de prelosa" (ver `_topeMetrosBanco()`), donde cada cinta se arma con un ancho
+  // fijo, así que ver de un vistazo "esto es lo de la cinta de 50cm, esto lo de la de 30cm" es
+  // justo lo que facilita el montaje.
   const bloquesMap = new Map();
   filas.forEach(g => {
     const claveBloque = `${g.medida}__${g.hilosTxt}`;
-    if (!bloquesMap.has(claveBloque)) bloquesMap.set(claveBloque, { medida: g.medida, hilosTxt: g.hilosTxt, filas: [] });
-    bloquesMap.get(claveBloque).filas.push(g);
+    if (!bloquesMap.has(claveBloque)) bloquesMap.set(claveBloque, { medida: g.medida, hilosTxt: g.hilosTxt, filas: [], cantidad: 0 });
+    const b = bloquesMap.get(claveBloque);
+    b.filas.push(g);
+    b.cantidad += g.cantidad;
   });
   const bloques = Array.from(bloquesMap.values());
-  const multiplesBloques = bloques.length > 1;
 
-  // `conMedidaHilos`: la tabla única (un solo bloque) sigue mostrando Ancho/Vigueta + Hilos como
-  // columnas, igual que siempre; las tablas de bloques separados NO las repiten como columna
-  // (ya están en el título del bloque), para dejar más aire a Largo/Cantidad/Peso.
-  function tablaMedidasHTML(filasBloque, conMedidaHilos) {
-    let totalCantidad = 0, totalMetros = 0, totalPeso = 0;
-    const filasHTML = filasBloque.map(g => {
-      totalCantidad += g.cantidad;
-      const longTotal = g.dim * g.cantidad;
-      totalMetros += longTotal;
-      totalPeso += g.peso;
-      return `<tr>
-        ${conMedidaHilos ? `<td>${esVigueta ? _esc(g.medida) : g.medida + ' cm'}</td><td style="text-align:center">${g.hilosTxt}</td>` : ''}
-        <td style="text-align:right">${g.dim.toFixed(2)}</td>
-        <td style="text-align:center;font-weight:700">${g.cantidad}</td>
-        <td style="text-align:right">${longTotal.toFixed(2)}</td>
-        <td style="text-align:right">${g.peso.toFixed(1)}</td>
-      </tr>`;
-    }).join('');
-    return `<table class="preview-tabla">
-      <thead><tr>
-        ${conMedidaHilos ? `<th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Hilos</th>` : ''}
-        <th>Largo (m)</th><th>Cantidad</th><th>Long. tot. (m)</th><th>Peso (kg)</th>
-      </tr></thead>
-      <tbody>${filasHTML}</tbody>
-      <tfoot><tr class="total-row">
-        <td colspan="${conMedidaHilos ? 3 : 1}" style="text-align:right">TOTALES</td>
-        <td style="text-align:center">${totalCantidad}</td>
-        <td style="text-align:right">${totalMetros.toFixed(2)}</td>
-        <td style="text-align:right">${totalPeso.toFixed(1)}</td>
-      </tr></tfoot>
-    </table>`;
-  }
-
-  if (!multiplesBloques) {
-    return `
-      <div style="margin-top:14px">
-        <div style="font-size:11px;font-weight:700;color:#003F7F;margin-bottom:4px;letter-spacing:0.03em">RESUMEN POR MEDIDAS</div>
-        ${tablaMedidasHTML(filas, true)}
-      </div>`;
-  }
-  // Los bloques van en una grilla de 2 columnas (envuelve a una fila nueva si hay más de 2) —
-  // "un cuadro una medida y en el otro otra medida": el caso típico es exactamente 2 (una por
-  // cinta/banco), así que quedan uno al lado del otro, como las 2 cintas reales en planta.
-  const bloquesHTML = bloques.map(b => {
+  function tarjetaHTML(b) {
     const titulo = esVigueta
       ? `VIGUETA ${_esc(b.medida)} · ${b.hilosTxt} HILOS`
       : `ANCHO ${b.medida} CM · ${b.hilosTxt} HILOS`;
-    return `<div>
-      <div style="font-size:10px;font-weight:700;color:#003F7F;margin-bottom:3px">${titulo}</div>
-      ${tablaMedidasHTML(b.filas, false)}
+    let totMetros = 0, totPeso = 0;
+    const filasHTML = b.filas.map(g => {
+      const longTotal = g.dim * g.cantidad;
+      totMetros += longTotal;
+      totPeso += g.peso;
+      return `<tr style="border-top:1px solid #EDF2F7">
+        <td style="padding:4px 0">${g.dim.toFixed(2)} m</td>
+        <td style="padding:4px 0;text-align:center;font-weight:700">${g.cantidad}</td>
+        <td style="padding:4px 0;text-align:right">${longTotal.toFixed(2)} m</td>
+        <td style="padding:4px 0;text-align:right">${g.peso.toFixed(1)} kg</td>
+      </tr>`;
+    }).join('');
+    return `<div style="background:#fff;border:1px solid #CBD5E0;border-left:5px solid #1565C0;border-radius:8px;padding:12px 14px;box-shadow:0 2px 6px rgba(0,63,127,0.08)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:800;color:#003F7F">${titulo}</div>
+        <div style="font-size:10px;font-weight:700;color:#1565C0;background:#E3F0FB;padding:2px 8px;border-radius:10px;white-space:nowrap">${b.cantidad} pzs</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="color:#4A5568;text-align:left">
+          <th style="padding:3px 0;font-weight:700;font-size:10px">Largo</th>
+          <th style="padding:3px 0;font-weight:700;font-size:10px;text-align:center">Cant.</th>
+          <th style="padding:3px 0;font-weight:700;font-size:10px;text-align:right">Long. tot.</th>
+          <th style="padding:3px 0;font-weight:700;font-size:10px;text-align:right">Peso</th>
+        </tr></thead>
+        <tbody>${filasHTML}</tbody>
+        <tfoot><tr style="background:#E3F0FB">
+          <td style="padding:6px 0 6px 6px;font-weight:800;color:#003F7F;border-radius:4px 0 0 4px">TOTAL</td>
+          <td style="padding:6px 0;text-align:center;font-weight:800;color:#003F7F;font-size:14px">${b.cantidad}</td>
+          <td style="padding:6px 0;text-align:right;font-weight:800;color:#003F7F;font-size:14px">${totMetros.toFixed(2)} m</td>
+          <td style="padding:6px 6px 6px 0;text-align:right;font-weight:800;color:#003F7F;font-size:14px;border-radius:0 4px 4px 0">${totPeso.toFixed(1)} kg</td>
+        </tr></tfoot>
+      </table>
     </div>`;
-  }).join('');
+  }
+
+  // Grilla de 2 columnas cuando hay más de un bloque (envuelve a una fila nueva si hay más de
+  // 2) — "un cuadro una medida y en el otro otra medida": el caso típico es exactamente 2 (una
+  // por cinta/banco), así que quedan uno al lado del otro, como las 2 cintas reales en planta.
+  // Con un solo bloque (el caso más común), su tarjeta ocupa el ancho completo (`1fr`), sin
+  // dejar una columna vacía al lado.
+  const tarjetasHTML = bloques.map(tarjetaHTML).join('');
+  const gridCols = bloques.length > 1 ? 'repeat(2,1fr)' : '1fr';
+  const _tile = (valor, etiqueta) => `<div style="background:#E3F0FB;border-radius:8px;padding:10px 8px;text-align:center">
+    <div style="font-size:26px;font-weight:800;color:#003F7F;line-height:1">${valor}</div>
+    <div style="font-size:9px;font-weight:700;color:#8898AA;text-transform:uppercase;letter-spacing:0.06em;margin-top:4px">${etiqueta}</div>
+  </div>`;
   return `
-    <div style="margin-top:14px">
-      <div style="font-size:11px;font-weight:700;color:#003F7F;margin-bottom:4px;letter-spacing:0.03em">RESUMEN POR MEDIDAS</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${bloquesHTML}</div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:15px;font-weight:800;color:#003F7F;letter-spacing:0.03em;margin-bottom:8px">RESUMEN POR MEDIDAS</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+        ${_tile(totalPiezasAll, 'Piezas totales')}
+        ${_tile(totalMetrosAll.toFixed(2) + ' m', 'Long. total')}
+        ${_tile((totalPesoAll / 1000).toFixed(2) + ' ton', 'Peso total')}
+      </div>
+      <div style="display:grid;grid-template-columns:${gridCols};gap:14px">${tarjetasHTML}</div>
     </div>`;
+}
+
+// Encabezado + partido en 2 columnas del cuadro detallado (2026-10-22, ver nota en
+// `_htmlProgramacionProduccion()`) — compartido entre Producción y Despacho, que solo difieren
+// en si llevan columna de Peso o no (`conPeso`) y en qué `<td>`s arma cada `<tr>` el que llama.
+function _cuadroDetalladoTheadHTML(esVigueta, conPeso) {
+  const th = (txt, align) => `<th style="padding:3px 4px;text-align:${align || 'left'};font-weight:700">${txt}</th>`;
+  return th('#') + th('Cuadro') + th(esVigueta ? 'Vigueta' : 'Ancho', 'center') + th('Hilos', 'center') + th('Largo', 'right') + th('Cant.', 'center') + (conPeso ? th('Peso', 'right') : '') + th('Observ.');
+}
+function _cuadroDetalladoDosColsHTML(filasHTML, theadRowHTML) {
+  if (!filasHTML.length) return '';
+  const mitad = Math.ceil(filasHTML.length / 2);
+  const col = subset => `<table style="width:100%;border-collapse:collapse;font-size:9.5px">
+    <thead><tr style="background:#EDF2F7;color:#4A5568">${theadRowHTML}</tr></thead>
+    <tbody>${subset.join('')}</tbody>
+  </table>`;
+  const izquierda = filasHTML.slice(0, mitad);
+  const derecha = filasHTML.slice(mitad);
+  return `<div style="display:flex;flex-direction:column;gap:6px;padding-top:6px;border-top:1px dashed #CBD5E0;margin-top:4px">
+    <div style="font-size:9px;font-weight:700;color:#8898AA;text-transform:uppercase;letter-spacing:0.08em">Detalle por cuadro — orden de referencia</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      ${col(izquierda)}
+      ${derecha.length ? col(derecha) : '<div></div>'}
+    </div>
+  </div>`;
 }
 
 let _fechaProgramacionImpresa = null;
@@ -2110,30 +2154,34 @@ let _fechaProgramacionImpresa = null;
 // 2026-10-19 más abajo); si se imprimió directo desde la tarjeta, no había ningún modal abierto
 // que reabrir, así que solo regresa a la pantalla de la Losa.
 function _htmlProgramacionProduccion(l, p, sis, esVigueta, fecha, observaciones, lineas, origen) {
-  let totalPiezas = 0, totalMetros = 0;
-  // Columna "Hilos" (2026-10-22, a pedido del usuario: "incluyamos una columna con la cantidad
-  // de número de hilos del elemento") — prelosa/placa alveolar trae una sola columna "Hilos"
-  // (`f.hilos`); vigueta trae abajo/arriba por separado, combinados en UNA sola celda
-  // "abajo+arriba" (mismo criterio ya usado en `_resumenPorMedidasHTML()`, ver `hilosTxt`).
-  const filasHTML = lineas.map(({ f, cantidad }, n) => {
-    const longTotal = (Number(f.dimension) || 0) * cantidad;
+  let totalPiezas = 0;
+  // Cuadro detallado partido en 2 columnas, de menor jerarquía (2026-10-22, a pedido del
+  // usuario: "el cuadro resumen es más importante que el cuadro detallado al momento de
+  // fabricar y de despachar... hagamos un mockup de el cuadro detallado partido en dos
+  // columnas... para que el resumen gane más relevancia" — montado a partir de un mockup que
+  // el usuario aprobó, ver `docs/modulos/proyectos.md`) — antes era UNA tabla ancha con su
+  // propia fila de TOTALES; ahora RESUMEN POR MEDIDAS va primero en la página (más abajo) con
+  // sus propios tiles de totales, así que esta tabla ya no necesita repetirlos, ni "Long. tot.
+  // (m)" por fila (trivial = Largo × Cantidad, y el agrupado ya se ve en el resumen) — queda
+  // solo como referencia rápida de "qué cuadro es cuál", con la columna "Observaciones (cant.
+  // real)" en blanco para que planta anote a mano la cantidad real lograda.
+  const filas = lineas.map(({ f, cantidad }, n) => {
     const hilosTxt = esVigueta ? `${Number(f.hilosAbajo) || 0}+${Number(f.hilosArriba) || 0}` : String(Number(f.hilos) || 0);
     totalPiezas += cantidad;
-    totalMetros += longTotal;
     const colEspecifica = esVigueta
-      ? `<td>${_esc(f.tipoVigueta) || '—'}</td>`
-      : `<td style="text-align:center">${f.ancho || 0}</td>`;
-    return `<tr>
-      <td style="color:#888">${n + 1}</td>
-      <td style="font-weight:600">${_esc(f.cuadro) || '—'}</td>
+      ? `<td style="padding:3px 4px">${_esc(f.tipoVigueta) || '—'}</td>`
+      : `<td style="padding:3px 4px;text-align:center">${f.ancho || 0}</td>`;
+    return `<tr style="border-bottom:1px solid #EDF2F7">
+      <td style="padding:3px 4px;color:#999">${n + 1}</td>
+      <td style="padding:3px 4px;font-weight:600">${_esc(f.cuadro) || '—'}</td>
       ${colEspecifica}
-      <td style="text-align:center">${hilosTxt}</td>
-      <td style="text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>
-      <td style="text-align:center;font-weight:700">${cantidad}</td>
-      <td style="text-align:right">${longTotal.toFixed(2)}</td>
-      <td style="min-width:65px"></td>
+      <td style="padding:3px 4px;text-align:center">${hilosTxt}</td>
+      <td style="padding:3px 4px;text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>
+      <td style="padding:3px 4px;text-align:center;font-weight:700">${cantidad}</td>
+      <td style="padding:3px 4px;min-width:45px"></td>
     </tr>`;
-  }).join('');
+  });
+  const detalleHTML = _cuadroDetalladoDosColsHTML(filas, _cuadroDetalladoTheadHTML(esVigueta, false));
 
   // "← Volver" reabre el modal en vez de solo mostrar la pantalla de atrás (2026-10-19, a
   // pedido del usuario: "cuando le doy imprimir y luego le doy volver, se me cierra la ventana
@@ -2170,20 +2218,8 @@ function _htmlProgramacionProduccion(l, p, sis, esVigueta, fecha, observaciones,
           </div>
           ${observaciones ? `<div style="margin-top:6px;font-size:10.5px"><b>OBSERVACIONES:</b> ${_esc(observaciones)}</div>` : ''}
         </div>
-        <table class="preview-tabla">
-          <thead><tr>
-            <th>#</th><th>Cuadro</th>
-            <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Hilos</th><th>Largo (m)</th><th>Cant. a programar</th><th>Long. tot. (m)</th><th>Observaciones (cant. real)</th>
-          </tr></thead>
-          <tbody>${filasHTML}</tbody>
-          <tfoot><tr class="total-row">
-            <td colspan="5" style="text-align:right">TOTALES</td>
-            <td style="text-align:center">${totalPiezas}</td>
-            <td style="text-align:right">${totalMetros.toFixed(2)}</td>
-            <td></td>
-          </tr></tfoot>
-        </table>
         ${_resumenPorMedidasHTML(lineas, l)}
+        ${detalleHTML}
         <div class="preview-firma" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
           <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Programado por</div>
           <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Recibido en planta</div>
@@ -2908,31 +2944,31 @@ function _htmlProgramacionDespacho(l, p, sis, esVigueta, fecha, observaciones, v
   // cálculo exacto de la pantalla normal), pero sobre la CANTIDAD que se está imprimiendo —
   // que puede ser menor a `f.cantidad` si solo se programa una parte de la fila — en vez de la
   // cantidad total de la fila.
-  let totalPiezas = 0, totalMetros = 0, totalPeso = 0;
-  // Columna "Hilos" (2026-10-22, ver nota en `_htmlProgramacionProduccion()` — mismo criterio,
-  // combinado "abajo+arriba" en una sola celda para vigueta).
-  const filasHTML = lineas.map(({ f, cantidad }, n) => {
-    const longTotal = (Number(f.dimension) || 0) * cantidad;
+  let totalPiezas = 0, totalPeso = 0;
+  // Cuadro detallado partido en 2 columnas, de menor jerarquía (2026-10-22, ver nota en
+  // `_htmlProgramacionProduccion()` — mismo criterio, con la columna de Peso que sí le sirve a
+  // Despacho para repartir la carga entre viajes, aunque el peso total ya se vea arriba en
+  // "Vehículo (X ton)" y en el RESUMEN POR MEDIDAS).
+  const filas = lineas.map(({ f, cantidad }, n) => {
     const peso = _pesoFila({ ...f, cantidad }, l);
     const hilosTxt = esVigueta ? `${Number(f.hilosAbajo) || 0}+${Number(f.hilosArriba) || 0}` : String(Number(f.hilos) || 0);
     totalPiezas += cantidad;
-    totalMetros += longTotal;
     totalPeso += peso;
     const colEspecifica = esVigueta
-      ? `<td>${_esc(f.tipoVigueta) || '—'}</td>`
-      : `<td style="text-align:center">${f.ancho || 0}</td>`;
-    return `<tr>
-      <td style="color:#888">${n + 1}</td>
-      <td style="font-weight:600">${_esc(f.cuadro) || '—'}</td>
+      ? `<td style="padding:3px 4px">${_esc(f.tipoVigueta) || '—'}</td>`
+      : `<td style="padding:3px 4px;text-align:center">${f.ancho || 0}</td>`;
+    return `<tr style="border-bottom:1px solid #EDF2F7">
+      <td style="padding:3px 4px;color:#999">${n + 1}</td>
+      <td style="padding:3px 4px;font-weight:600">${_esc(f.cuadro) || '—'}</td>
       ${colEspecifica}
-      <td style="text-align:center">${hilosTxt}</td>
-      <td style="text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>
-      <td style="text-align:center;font-weight:700">${cantidad}</td>
-      <td style="text-align:right">${longTotal.toFixed(2)}</td>
-      <td style="text-align:right">${peso.toFixed(1)}</td>
-      <td style="min-width:65px"></td>
+      <td style="padding:3px 4px;text-align:center">${hilosTxt}</td>
+      <td style="padding:3px 4px;text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>
+      <td style="padding:3px 4px;text-align:center;font-weight:700">${cantidad}</td>
+      <td style="padding:3px 4px;text-align:right">${peso.toFixed(1)}</td>
+      <td style="padding:3px 4px;min-width:45px"></td>
     </tr>`;
-  }).join('');
+  });
+  const detalleHTML = _cuadroDetalladoDosColsHTML(filas, _cuadroDetalladoTheadHTML(esVigueta, true));
 
   // "← Volver" reabre el modal — ver la nota junto al mismo botón en
   // `_htmlProgramacionProduccion()`, mismo motivo exacto. Solo si `origen === 'modal'`.
@@ -2963,21 +2999,8 @@ function _htmlProgramacionDespacho(l, p, sis, esVigueta, fecha, observaciones, v
           </div>
           ${observaciones ? `<div style="margin-top:6px;font-size:10.5px"><b>OBSERVACIONES:</b> ${_esc(observaciones)}</div>` : ''}
         </div>
-        <table class="preview-tabla">
-          <thead><tr>
-            <th>#</th><th>Cuadro</th>
-            <th>${esVigueta ? 'Vigueta' : 'Ancho (cm)'}</th><th>Hilos</th><th>Largo (m)</th><th>Cant. a programar</th><th>Long. tot. (m)</th><th>Peso (kg)</th><th>Observaciones (cant. real)</th>
-          </tr></thead>
-          <tbody>${filasHTML}</tbody>
-          <tfoot><tr class="total-row">
-            <td colspan="5" style="text-align:right">TOTALES</td>
-            <td style="text-align:center">${totalPiezas}</td>
-            <td style="text-align:right">${totalMetros.toFixed(2)}</td>
-            <td style="text-align:right">${totalPeso.toFixed(1)}</td>
-            <td></td>
-          </tr></tfoot>
-        </table>
         ${_resumenPorMedidasHTML(lineas, l)}
+        ${detalleHTML}
         <div class="preview-firma" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
           <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Programado por</div>
           <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Cargado por</div>
