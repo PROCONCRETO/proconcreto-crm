@@ -700,6 +700,68 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
       filtro sin ninguna coincidencia muestra "FILTRADO (0/3)" con los totales en 0, sin
       romperse; y editar Cantidad en vivo con un filtro dependiente de ella activo actualiza el
       badge y los totales de inmediato, en el orden correcto — sin errores de consola.
+    - **BUG real reportado (2026-10-22, "en proyectos, no me esta funcionando los subtotales de
+      los cuadros cuando filtro") — corregido**: el bloque anterior quedó verificado con 12/12
+      PASS pero el badge "FILTRADO (N/M)" nunca se veía al filtrar de verdad desde la pantalla.
+      Causa real: `_aplicarFiltrosProgramar(prefijo)` — la función que SÍ corre en cada tecla/
+      cambio de los campos propios del filtro (`oninput`/`onchange` armados en
+      `_filtroValorAreaHTML()`) — solo escondía/mostraba filas (`tr.style.display`); nunca
+      tocaba el `<tfoot>`. El refresco del pie solo vivía en `renderFilasProduccion()` (corre al
+      cargar/guardar/agregar fila) y en `_actualizarFilaProduccion(i)` (corre al editar una
+      fila) — ninguno de los dos se dispara al escribir en el propio filtro. La prueba anterior
+      no lo detectó porque su función auxiliar de prueba llamaba a `renderFilasProduccion()` a
+      mano después de fijar el filtro, un atajo que no ocurre en el uso real. Arreglo: el
+      refresco del `<tfoot>` (`_pieTotalesHTML(l) + (esProduccion ? _pieAvanceProduccionHTML() :
+      '')`) se movió DENTRO de `_aplicarFiltrosProgramar()`, acotado a `prefijo === 'fp'` (mpp/
+      mpd no tienen pie de totales); se quitó el refresco explícito ya redundante de
+      `renderFilasProduccion()` y de `_actualizarFilaProduccion(i)`, que ahora delegan en esa
+      misma llamada. Reverificado con un arnés nuevo que simula la interacción real (clic en
+      "+ Agregar filtro", `change` sobre el `<select>` de tipo, `change` sobre el valor Sí/No —
+      sin ningún `renderFilasProduccion()` manual de por medio): el pie sí actualiza al filtrar
+      así, y al quitar el filtro con el botón "✕" vuelve a los totales completos de inmediato;
+      más 2 aserciones de regresión confirmando que editar una fila en vivo y recargar la Losa
+      completa siguen refrescando el pie correctamente tras quitarles el refresco redundante.
+- **"Unidades faltantes"/"Long. total faltante (m)" en Producción, "Unidades por despachar"/
+  "Long. total por despachar (m)" en Despacho, con totales reales en el pie** (2026-10-22, a
+  pedido del usuario: "metamos una columna adicional de pendiente de producción y de despacho,
+  esa en metros lineales... en los totales de la parte inferior, incluyamos también los de las
+  columnas de unidades fabricadas, pendiente de producción (en unidades) y pendientes de
+  producción (en metros)... cambiemos los nombres de estas dos últimas, por unidades faltantes,
+  y metros/long total faltante") — antes "Pend. Producción"/"Pend. Despacho" solo mostraban
+  unidades: una fila con pocas piezas largas pendientes y otra con muchas piezas cortas podían
+  mostrar el mismo número de unidades y representar cantidades de concreto muy distintas.
+  - Columna nueva `<th>Long. total faltante (m)</th>`/`<th>Long. total por despachar (m)</th>`
+    justo al lado de la de unidades, = unidades faltantes × Dimensión de esa fila (todas las
+    piezas de una fila comparten la misma medida, mismo criterio que "Long. total (m)"). Celdas
+    `fp-pendprodm-${i}`/`fp-penddespm-${i}` (mismo patrón de ids que las columnas de unidades,
+    actualizadas tanto en `_filaProduccionHTML()` como quirúrgicamente en
+    `_actualizarFilaProduccion(i)`, aunque en la práctica esta última solo corre con `<input>`
+    reales — modo Lista — donde estas columnas ni se muestran; queda ahí por consistencia/
+    por si algún día se dispara desde otro lugar).
+  - Renombre de las columnas de unidades: "Pend. Producción" → "Unidades faltantes", "Pend.
+    Despacho" → "Unidades por despachar" — el nombre de Despacho es análogo por decisión
+    explícita del usuario (solo mencionó Producción en el pedido, pero confirmó que aplica
+    igual a Despachos para que ambas vistas queden consistentes). La etiqueta del FILTRO
+    Sí/No ("Pendiente de producción"/"Pendiente de despacho", `TIPOS_FILTRO_PROGRAMAR`) NO
+    cambia — ahí la pregunta sigue siendo "¿tiene pendiente?", un concepto distinto al nombre
+    de la columna que se ve en la tabla.
+  - **El pie de TOTALES ya no deja esas columnas en blanco** — antes quedaban dentro de un
+    `colspan` vacío (nunca se sumaban); ahora `_pieTotalesHTML()` suma "Unidades
+    fabricadas"/"Disponible despacho" (`totalColFabricada`), "Unidades faltantes"/"Unidades
+    por despachar" (`totalFaltanteUnidades`) y la nueva columna de metros
+    (`totalFaltanteMetros`) en celdas reales, respetando el mismo filtro/badge "FILTRADO
+    (N/M)" que ya tenían Cantidad/Long. total/m²/Peso. Modo Lista sigue sin estas columnas
+    (no aplica, igual que antes).
+  - `exportarFilasLosaExcel()` actualizado para exportar exactamente las mismas 3 columnas
+    con los mismos nombres nuevos, con su propia fila de TOTALES — mismo criterio ya
+    establecido de que el Excel reproduce fielmente lo que se ve en pantalla en el modo activo.
+  - Verificado con un arnés real — 20 aserciones: encabezados renombrados correctos en
+    Producción y Despacho (y que el nombre viejo ya no aparece); valores de metros faltantes
+    por fila correctos contra un caso con fabricado parcial real (fila con 10 de cantidad, 6
+    fabricadas, dimensión 2.0 m → 4 unidades / 8.00 m faltantes); totales del pie exactos en
+    ambos modos; modo Lista sin ninguna columna de seguimiento (regresión); encabezado y fila
+    de TOTALES del Excel exportado con los mismos nombres y números (XLSX.writeFile
+    interceptado en la prueba para no disparar una descarga real).
 - **Encabezado fijo al bajar, en las TRES vistas** (clase `.tabla-items.fija-al-bajar`,
   `css/estilos.css`, 2026-10-17, a pedido del usuario: "bloquea las primeras filas... pues al
   bajar se pierden los títulos y no sabe uno qué está viendo") — `renderFilasProduccion()`

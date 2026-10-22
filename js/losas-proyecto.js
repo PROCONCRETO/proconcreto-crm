@@ -796,18 +796,31 @@ function renderFilasProduccion() {
   // "m²" (2026-10-17, a pedido del usuario: "incluyamos una nueva fila de m2, que es el
   // resultado de multiplicar el largo por el ancho") — solo en prelosa/placa alveolar, vigueta
   // no tiene un "ancho" real (se mide en metros lineales, no en área) así que no aplica.
+  // Columna de metros lineales pendientes + renombre (2026-10-22, a pedido del usuario: "metamos
+  // una columna adicional de pendiente de producción y de despacho, esa en metros lineales...
+  // cambiemos los nombres de estas dos últimas, por unidades faltantes, y metros long total
+  // faltante") — antes "Pend. Producción"/"Pend. Despacho" solo mostraban unidades; una fila con
+  // piezas largas pendientes y otra con piezas cortas pendientes podían mostrar el mismo número
+  // de unidades y significar cantidades de concreto muy distintas. Se agrega "Long. total
+  // faltante (m)"/"Long. total por despachar (m)" (= unidades faltantes × Dimensión de esa
+  // fila) justo al lado, y se renombran las columnas de unidades para que "pendiente" (que
+  // sonaba a "en curso") quede claro como "lo que falta". El nombre de Despacho ("Unidades por
+  // despachar"/"Long. total por despachar") es análogo, aunque el usuario solo mencionó
+  // Producción explícitamente — confirmado con el usuario que aplica igual a Despachos.
   thead.innerHTML = `<tr>
     <th>#</th><th>Cuadro</th><th>Ejes numéricos</th><th>Ejes alfabéticos</th>
     ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
     <th>Dimensión (m)</th><th>Cantidad</th><th>Long. total (m)</th>${esVigueta ? '' : '<th>m²</th>'}<th>Peso (kg)</th>
-    ${esLista ? '' : (esProduccion ? '<th>Unidades fabricadas</th><th>Pend. Producción</th>' : '<th>Disponible despacho</th><th>Pend. Despacho</th>')}
+    ${esLista ? '' : (esProduccion
+      ? '<th>Unidades fabricadas</th><th>Unidades faltantes</th><th>Long. total faltante (m)</th>'
+      : '<th>Disponible despacho</th><th>Unidades por despachar</th><th>Long. total por despachar (m)</th>')}
     <th>Observaciones</th><th></th>
   </tr>`;
   const tbody = document.getElementById('fp-filas-body');
   const tfoot = document.getElementById('filas-produccion-tfoot');
   if (!_filasLosaActual.length) {
     tbody.style.display = '';
-    tbody.innerHTML = `<tr><td colspan="16" class="empty-state"><div class="icono">📋</div><div>No hay filas todavía — agrega una a mano, pégalas desde Excel o importa el archivo.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="17" class="empty-state"><div class="icono">📋</div><div>No hay filas todavía — agrega una a mano, pégalas desde Excel o importa el archivo.</div></td></tr>`;
     if (tfoot) tfoot.innerHTML = '';
     return;
   }
@@ -825,12 +838,12 @@ function renderFilasProduccion() {
   // filas nuevas; el estado del filtro en sí (los `<select>`/`<input>` de `#fp-filtros-lista`)
   // vive FUERA del `<tbody>`, así que sobrevive solo al re-render — ver `abrirLosaDetalle()`
   // para dónde se reinicia (una sola vez por navegación, mismo criterio que `_filasColapsadas`).
+  // Fila de TOTALES/avance (2026-10-17/2026-10-20) — `_aplicarFiltrosProgramar('fp')` YA arma
+  // el pie completo por dentro (`_pieTotalesHTML()` + `_pieAvanceProduccionHTML()` solo en
+  // producción, ver esa función — se agregó ahí para que escribir en los campos del filtro
+  // también lo recalcule en vivo, no solo un render completo como este), así que no hace falta
+  // repetirlo acá aparte.
   _aplicarFiltrosProgramar('fp');
-  // Fila de TOTALES (2026-10-17, a pedido del usuario: "incluyamos al final del cuadro... una
-  // fila de totales, donde totalicemos unidades, los metros lineales como los metros
-  // cuadrados") — en las TRES vistas (lista/producción/despacho), a diferencia del avance
-  // ponderado de abajo, que sigue siendo solo de producción.
-  if (tfoot) tfoot.innerHTML = _pieTotalesHTML(l) + (esProduccion ? _pieAvanceProduccionHTML() : '');
 }
 // Click en la barra "▶/▼ Ver/Ocultar tabla..." — ver la nota junto a `_filasColapsadas` y en
 // `renderFilasProduccion()`.
@@ -859,10 +872,19 @@ function _pieTotalesHTML(l) {
   const esVigueta = l.sistema === 'vigueta_bovedilla';
   const esLista = _MODO_FLUJO_LOSA === 'lista';
   const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
+  const esDespacho = _MODO_FLUJO_LOSA === 'despacho';
   const filasVisibles = _filasVisiblesFp();
   const filtroActivo = filasVisibles !== null;
   const filas = filtroActivo ? filasVisibles : _filasLosaActual;
   let totalUnidades = 0, totalMetros = 0, totalM2 = 0, totalPeso = 0;
+  // Totales de las columnas de seguimiento (2026-10-22, a pedido del usuario: "en los totales
+  // de la parte inferior, incluyamos también los de las columnas de unidades fabricadas,
+  // pendiente de producción (en unidades) y pendientes de producción (en metros)") — antes esas
+  // columnas quedaban en blanco dentro de `colspanFinal` (nunca se sumaban). `totalColFabricada`
+  // = "Unidades fabricadas" en Producción / "Disponible despacho" en Despacho (mismo lugar en la
+  // tabla, significado distinto). Aplica igual a Despachos, aunque el usuario solo mencionó
+  // Producción explícitamente (confirmado con el usuario).
+  let totalColFabricada = 0, totalFaltanteUnidades = 0, totalFaltanteMetros = 0;
   filas.forEach(f => {
     const dim = Number(f.dimension) || 0;
     const cant = Number(f.cantidad) || 0;
@@ -870,16 +892,29 @@ function _pieTotalesHTML(l) {
     totalMetros += dim * cant;
     if (!esVigueta) totalM2 += (Number(f.ancho) || 0) / 100 * dim * cant;
     totalPeso += _pesoFila(f, l);
+    if (esProduccion) {
+      const pendProd = _pendienteProduccionFila(f);
+      totalColFabricada += cant - pendProd;
+      totalFaltanteUnidades += pendProd;
+      totalFaltanteMetros += pendProd * dim;
+    } else if (esDespacho) {
+      const pendDesp = _pendienteDespachoFila(f, _despachosLosaActual);
+      totalColFabricada += _disponibleDespachoFila(f, _despachosLosaActual);
+      totalFaltanteUnidades += pendDesp;
+      totalFaltanteMetros += pendDesp * dim;
+    }
   });
   // # + Cuadro + Ejes num. + Ejes alfa. = 4, + columnas propias del sistema (3 vigueta / 2
   // prelosa), + Dimensión (m) = 1.
   const colspanInicial = 4 + (esVigueta ? 3 : 2) + 1;
-  // Unidades fabricadas/Pend. Producción (2) o Disponible despacho/Pend. Despacho (2, desde
-  // 2026-10-19) o nada en Lista (0), + Observaciones = 1, + columna de acciones = 1 — todo lo
-  // que queda DESPUÉS de Peso (kg), que ahora (2026-10-18, a pedido del usuario: "en el total
-  // de la última fila de los cuadros, incluyamos también el total del peso") lleva su propia
-  // celda de total, igual que Cantidad/Long. total/m².
-  const colspanFinal = (esLista ? 0 : 2) + 1 + 1;
+  // Observaciones (1) + columna de acciones (1) — todo lo que queda DESPUÉS de las columnas de
+  // seguimiento, que desde 2026-10-22 ya llevan su propia celda de total (ver arriba) en vez de
+  // quedar vacías dentro de este colspan.
+  const colspanFinal = 1 + 1;
+  const columnasSeguimiento = esLista ? '' : `
+    <td style="padding:10px;text-align:center;color:var(--azul)">${totalColFabricada}</td>
+    <td style="padding:10px;text-align:center;color:var(--azul)">${totalFaltanteUnidades}</td>
+    <td style="padding:10px;text-align:right;color:var(--azul)">${totalFaltanteMetros.toFixed(2)}</td>`;
   const badgeFiltro = filtroActivo
     ? ` <span style="font-size:10px;font-weight:700;color:var(--naranja);background:#FFF3E0;padding:2px 7px;border-radius:8px;vertical-align:middle" title="Estos totales son solo de las filas que pasan el filtro activo, no de toda la Losa">⚠️ FILTRADO (${filas.length}/${_filasLosaActual.length})</span>`
     : '';
@@ -889,6 +924,7 @@ function _pieTotalesHTML(l) {
     <td style="padding:10px;text-align:right;color:var(--azul)">${totalMetros.toFixed(2)}</td>
     ${esVigueta ? '' : `<td style="padding:10px;text-align:right;color:var(--azul)">${totalM2.toFixed(2)}</td>`}
     <td style="padding:10px;text-align:right;color:var(--azul)">${totalPeso.toFixed(1)}</td>
+    ${columnasSeguimiento}
     <td colspan="${colspanFinal}"></td>
   </tr>`;
 }
@@ -922,11 +958,16 @@ function exportarFilasLosaExcel() {
     'Dimensión (m)', 'Cantidad', 'Long. total (m)',
     ...(esVigueta ? [] : ['m²']),
     'Peso (kg)',
-    ...(esLista ? [] : (esProduccion ? ['Unidades fabricadas', 'Pend. Producción'] : ['Disponible despacho', 'Pend. Despacho'])),
+    // Columna de metros lineales faltantes + renombre (2026-10-22, ver nota en
+    // `renderFilasProduccion()`) — mismas 3 columnas y mismos nombres que ya se ven en pantalla.
+    ...(esLista ? [] : (esProduccion
+      ? ['Unidades fabricadas', 'Unidades faltantes', 'Long. total faltante (m)']
+      : ['Disponible despacho', 'Unidades por despachar', 'Long. total por despachar (m)'])),
     'Observaciones',
   ];
 
   let totalUnidades = 0, totalMetros = 0, totalM2 = 0, totalPeso = 0;
+  let totalColFabricada = 0, totalFaltanteUnidades = 0, totalFaltanteMetros = 0;
   const filas = _filasLosaActual.map((f, i) => {
     const dim = Number(f.dimension) || 0;
     const cant = Number(f.cantidad) || 0;
@@ -937,13 +978,17 @@ function exportarFilasLosaExcel() {
     const pendProd = _pendienteProduccionFila(f);
     const pendDesp = _pendienteDespachoFila(f, _despachosLosaActual);
     const dispDesp = _disponibleDespachoFila(f, _despachosLosaActual);
+    const pendProdM = pendProd * dim;
+    const pendDespM = pendDesp * dim;
+    if (esProduccion) { totalColFabricada += cant - pendProd; totalFaltanteUnidades += pendProd; totalFaltanteMetros += pendProdM; }
+    else if (!esLista) { totalColFabricada += dispDesp; totalFaltanteUnidades += pendDesp; totalFaltanteMetros += pendDespM; }
     return [
       i + 1, f.cuadro || '', f.ejesEntre || '', f.laterales || '',
       ...(esVigueta ? [f.tipoVigueta || '', Number(f.hilosAbajo) || 0, Number(f.hilosArriba) || 0] : [Number(f.ancho) || 0, Number(f.hilos) || 0]),
       dim, cant, longTotal,
       ...(esVigueta ? [] : [m2]),
       peso,
-      ...(esLista ? [] : (esProduccion ? [cant - pendProd, pendProd] : [dispDesp, pendDesp])),
+      ...(esLista ? [] : (esProduccion ? [cant - pendProd, pendProd, pendProdM] : [dispDesp, pendDesp, pendDespM])),
       f.observaciones || '',
     ];
   });
@@ -955,7 +1000,7 @@ function exportarFilasLosaExcel() {
     '', totalUnidades, totalMetros,
     ...(esVigueta ? [] : [totalM2]),
     totalPeso,
-    ...(esLista ? [] : ['', '']),
+    ...(esLista ? [] : [totalColFabricada, totalFaltanteUnidades, totalFaltanteMetros]),
     '',
   ];
 
@@ -1026,6 +1071,10 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
   const pendProd = _pendienteProduccionFila(f);
   const pendDesp = _pendienteDespachoFila(f, _despachosLosaActual);
   const dispDesp = _disponibleDespachoFila(f, _despachosLosaActual);
+  // Long. total faltante/por despachar (2026-10-22) = unidades faltantes × Dimensión de ESTA
+  // fila — todas las piezas de una fila comparten la misma medida, igual que "Long. total (m)".
+  const pendProdM = pendProd * (Number(f.dimension) || 0);
+  const pendDespM = pendDesp * (Number(f.dimension) || 0);
   const esLista = _MODO_FLUJO_LOSA === 'lista';
   // Candado de medidas ya fabricadas (2026-10-20, a pedido del usuario: "me preocupa que se
   // modifique la lista y se cambie algo que ya está fabricado o despachado... el ancho, largo,
@@ -1106,8 +1155,8 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     ${esVigueta ? '' : `<td id="fp-m2-${i}" style="text-align:right">${m2.toFixed(2)}</td>`}
     <td id="fp-peso-${i}" style="text-align:right">${peso.toFixed(1)}</td>
     ${esLista ? '' : (_MODO_FLUJO_LOSA === 'produccion'
-      ? `<td style="text-align:right">${(Number(f.cantidad) || 0) - pendProd}</td><td id="fp-pendprod-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProd}</td>`
-      : `<td id="fp-dispdesp-${i}" style="text-align:right;font-weight:600;color:${dispDesp > 0 ? 'var(--verde)' : 'var(--gris-medio)'}">${dispDesp}</td><td id="fp-penddesp-${i}" style="text-align:right;font-weight:600;color:${pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendDesp}</td>`)}
+      ? `<td style="text-align:right">${(Number(f.cantidad) || 0) - pendProd}</td><td id="fp-pendprod-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProd}</td><td id="fp-pendprodm-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProdM.toFixed(2)}</td>`
+      : `<td id="fp-dispdesp-${i}" style="text-align:right;font-weight:600;color:${dispDesp > 0 ? 'var(--verde)' : 'var(--gris-medio)'}">${dispDesp}</td><td id="fp-penddesp-${i}" style="text-align:right;font-weight:600;color:${pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendDesp}</td><td id="fp-penddespm-${i}" style="text-align:right;font-weight:600;color:${pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendDespM.toFixed(2)}</td>`)}
     <td>${txt(f.observaciones, 'observaciones', 90)}</td>
     <td style="white-space:nowrap">
       ${esLista
@@ -1167,12 +1216,17 @@ function _actualizarFilaProduccion(i) {
   const pendProd = _pendienteProduccionFila(f);
   const pendDesp = _pendienteDespachoFila(f, _despachosLosaActual);
   const dispDesp = _disponibleDespachoFila(f, _despachosLosaActual);
+  // Long. total faltante/por despachar en metros (2026-10-22, ver nota en `_filaProduccionHTML()`).
+  const pendProdM = pendProd * (Number(f.dimension) || 0);
+  const pendDespM = pendDesp * (Number(f.dimension) || 0);
   const elLong = document.getElementById(`fp-longtotal-${i}`); if (elLong) elLong.textContent = longTotal.toFixed(2);
   const elM2 = document.getElementById(`fp-m2-${i}`); if (elM2) elM2.textContent = m2.toFixed(2);
   const elPeso = document.getElementById(`fp-peso-${i}`); if (elPeso) elPeso.textContent = peso.toFixed(1);
   const elPP = document.getElementById(`fp-pendprod-${i}`); if (elPP) { elPP.textContent = pendProd; elPP.style.color = pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'; }
+  const elPPM = document.getElementById(`fp-pendprodm-${i}`); if (elPPM) { elPPM.textContent = pendProdM.toFixed(2); elPPM.style.color = pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'; }
   const elDD = document.getElementById(`fp-dispdesp-${i}`); if (elDD) { elDD.textContent = dispDesp; elDD.style.color = dispDesp > 0 ? 'var(--verde)' : 'var(--gris-medio)'; }
   const elPD = document.getElementById(`fp-penddesp-${i}`); if (elPD) { elPD.textContent = pendDesp; elPD.style.color = pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'; }
+  const elPDM = document.getElementById(`fp-penddespm-${i}`); if (elPDM) { elPDM.textContent = pendDespM.toFixed(2); elPDM.style.color = pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'; }
   // Filtros (2026-10-20) — mientras se edita una fila en Lista (Cuadro/Ejes/Ancho/Hilos, los
   // mismos campos que ofrece el filtro), el `data-*` del `<tr>` que lee `_aplicarFiltrosProgramar()`
   // quedaría desactualizado sin esto (esta función solo toca celdas puntuales, nunca reconstruye
@@ -1198,14 +1252,10 @@ function _actualizarFilaProduccion(i) {
     tr.dataset.pendDesp = pendDesp;
     tr.dataset.disponible = dispDesp;
   }
+  // La fila de TOTALES depende de TODAS las filas, no solo de esta — `_aplicarFiltrosProgramar('fp')`
+  // ya la refresca por dentro (ver esa función), así que no hace falta repetirlo acá; sigue sin
+  // tocar el <tbody>, así no se pierde el foco de ningún input a mitad de tecleo.
   _aplicarFiltrosProgramar('fp');
-  // La fila de TOTALES depende de TODAS las filas, no solo de esta — se refresca aparte (sin
-  // tocar el <tbody>, así no se pierde el foco de ningún input a mitad de tecleo).
-  const tfoot = document.getElementById('filas-produccion-tfoot');
-  if (tfoot) {
-    const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
-    tfoot.innerHTML = _pieTotalesHTML(l) + (esProduccion ? _pieAvanceProduccionHTML() : '');
-  }
 }
 
 // Recompone el valor combinado ("1-1´", "I-G"...) de Ejes numéricos/Ejes alfabéticos a partir
@@ -1813,6 +1863,25 @@ function _aplicarFiltrosProgramar(prefijo) {
   document.querySelectorAll(`#${prefijo}-filas-body tr[data-cuadro]`).forEach(tr => {
     tr.style.display = filtros.every(f => _filaPasaFiltroProgramar(tr, f)) ? '' : 'none';
   });
+  // Bug real reportado (2026-10-22, "no me está funcionando los subtotales de los cuadros
+  // cuando filtro"): esta función (disparada por cada tecla/cambio en los campos del filtro,
+  // ver `_filtroValorAreaHTML()`) solo escondía/mostraba filas — nunca refrescaba el pie de
+  // TOTALES/avance, que solo se recalculaba en un `renderFilasProduccion()` completo (guardar,
+  // cargar, agregar fila...) o en `_actualizarFilaProduccion()` (editar una fila). Filtrar
+  // escribiendo en los campos del filtro no pasa por NINGUNO de esos dos caminos, así que el
+  // pie se quedaba con los totales de antes de filtrar — el filtro "visualmente" escondía filas
+  // bien, pero el aviso ⚠️ FILTRADO (ver `_pieTotalesHTML()`) y los números de abajo nunca
+  // llegaban a reflejarlo. Solo aplica al cuadro principal (prefijo `fp` — los modales `mpp`/
+  // `mpd` no tienen un pie de TOTALES equivalente, sus resúmenes de bancos/peso ya se
+  // actualizan aparte, desde el `oninput` de cada cantidad, sin depender del filtro).
+  if (prefijo === 'fp') {
+    const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+    const tfoot = document.getElementById('filas-produccion-tfoot');
+    if (l && tfoot) {
+      const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
+      tfoot.innerHTML = _pieTotalesHTML(l) + (esProduccion ? _pieAvanceProduccionHTML() : '');
+    }
+  }
 }
 // Subconjunto de `_filasLosaActual` que pasa el filtro activo del cuadro principal (prefijo
 // `fp`) — `null` cuando no hay ningún filtro configurado (ver `_filtrosProgramarActivos()`),

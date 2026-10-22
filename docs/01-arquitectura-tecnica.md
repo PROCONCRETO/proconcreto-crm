@@ -187,6 +187,47 @@ El usuario reportó que "en vivo" no funciona de verdad — hay que hacer Ctrl+F
 
 **Causa real, del lado de Supabase, no del código de la app**: Postgres Realtime exige `REPLICA IDENTITY FULL` en cualquier tabla con RLS habilitado para poder evaluar la política sobre los eventos de replicación lógica — sin esto, Realtime puede filtrar (no entregar) esos eventos aun con una política totalmente permisiva (`using (true)`), porque la fila que le llega no trae datos suficientes para evaluarla. Ninguno de los scripts que activaron RLS el 2026-08-04 (`sql/2026-08-04_rls_*.sql`, ver Auditoría de seguridad arriba) incluía este paso — coincide con que el problema apareció justo después de esa fecha. Corregido en `sql/2026-08-21_reparar_realtime_con_rls.sql` — pendiente de que el usuario lo corra en el SQL Editor de Supabase (no se puede aplicar con la anon key). El script también revalida que esas tablas sigan en la publicación `supabase_realtime`, por si alguna se hubiera quedado afuera.
 
+## Tablas nuevas después del 30 de octubre de 2026 necesitan GRANT explícito (2026-10-21)
+
+Aviso real de Supabase (correo recibido por el usuario 2026-10-21): desde el **30 de octubre de
+2026**, Supabase deja de otorgar automáticamente acceso a la Data API (supabase-js/PostgREST/
+GraphQL) a las tablas nuevas del schema `public` — hasta ahora era automático. **Las tablas que
+ya existen a esa fecha NO se ven afectadas** (conservan su acceso actual); el cambio es solo
+para tablas creadas DESDE esa fecha en adelante, incluidas las que recrea una migración (branch
+nuevo, proyecto nuevo, `supabase db reset`). Sin el GRANT explícito, cualquier intento de leer/
+escribir esa tabla desde la app falla con "permission denied" — ANTES incluso de que RLS entre
+a evaluar nada (GRANT y RLS son dos capas distintas: GRANT decide si el rol puede intentar
+tocar la tabla; RLS decide qué filas ve/edita una vez que ya pudo entrar).
+
+**Impacto real en este repo**: los 3 scripts de este proyecto que crean una tabla con `create
+table if not exists public.*` (`sql/2026-09-17_dias_atipicos_produccion.sql`,
+`sql/2026-10-11_losas_proyecto.sql`, `sql/2026-10-11_proyectos.sql`) son anteriores al 30 de
+octubre, así que ya quedan protegidos por el otorgamiento automático de siempre — no hace falta
+correr nada retroactivo sobre esas tres. El cambio real es para ADELANTE: **toda tabla nueva que
+se cree en Supabase para este proyecto de aquí en más necesita su propio bloque GRANT**, igual
+de obligatorio como ya lo son `enable row level security` + la política + `replica identity
+full` (ver sección de arriba) en el molde que ya usa cada script nuevo.
+
+**Plantilla de GRANT para este proyecto** (a diferencia del ejemplo genérico del correo de
+Supabase, que incluye `anon` — este proyecto NO tiene ningún acceso anónimo, toda la app exige
+sesión iniciada, confirmado revisando las RLS de las 17 tablas en la Auditoría de seguridad de
+arriba: ninguna política usa `to anon`) — agregar esto justo después de crear la tabla y antes
+de `enable row level security`, con el nombre real de la tabla:
+
+```sql
+grant select, insert, update, delete
+on public.nombre_de_la_tabla
+to authenticated;
+
+grant select, insert, update, delete
+on public.nombre_de_la_tabla
+to service_role;
+```
+
+Solo el usuario puede correr esto en el SQL Editor del dashboard de Supabase (igual que el
+resto de scripts de `sql/` — no se puede aplicar con la anon key, ver nota de la sección de
+RLS/Realtime de arriba).
+
 ## Por qué seguir así por ahora
 
 Es el stack que ya está en producción, sin deuda de infraestructura (sin servidor que mantener, sin build) y le ha funcionado a la operación. No se propone una reescritura salvo que el usuario decida migrar a un stack moderno (Next.js, etc.) — si eso se decide, se documentará como un ADR nuevo en [docs/decisiones/](decisiones/).
