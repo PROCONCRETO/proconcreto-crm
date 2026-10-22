@@ -393,6 +393,46 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
         ninguno deja un `<select>`/`<input>` seleccionable en el área de valor; quitar el
         filtro vuelve a mostrar todo; y "Entre cuadros" (Desde/Hasta) sigue intacto —
         regresión, sin verse afectado por el cambio.
+      - **Filtro nuevo "Despachado"** (2026-10-22, a pedido del usuario: "agreguemos un filtro
+        nuevo, con la misma lógica, que sea Despachado, que muestre las unidades despachadas
+        parciales o totales") — mismo tipo `soloSiNo` y mismo criterio de un clic que los otros
+        4 (`despachado > 0`, sin distinguir parcial de total). Nuevo `data-despachado="${...}"`
+        en el `<tr>` de las tres tablas que ya traían los otros 4 `data-*` de seguimiento (el
+        cuadro principal `fp`, y los modales `mpp`/`mpd`), calculado con `_despachadoFila(f.id,
+        _despachosLosaActual)` (ya existía, usada hasta ahora solo para derivar
+        Disponible/Pendiente de despacho). Sincronizado también en
+        `_actualizarFilaProduccion(i)`, mismo criterio que Fabricado (no cambia al editar la
+        fila, depende de `losa.despachos[]`, pero se sincroniza igual por consistencia).
+        Verificado con un arnés real — 5 aserciones: el tipo aparece en la lista de opciones;
+        un clic filtra correcto a las filas con despacho parcial o total (sin mezclar la que no
+        tiene nada despachado); sin segundo campo seleccionable; quitar el filtro restaura
+        todo; y el modal "Programar producción" (mpp, filtro compartido) también lo ofrecía en
+        ese momento — ver el siguiente punto, que lo retira de ahí el mismo día.
+      - **Los 5 filtros de estado (Fabricado/Pendiente de producción/Pendiente de
+        despacho/Disponible para despacho/Despachado) ya NO aparecen dentro de los modales
+        "Programar producción"/"Programar despacho" — solo en el cuadro principal** (2026-10-22,
+        a pedido del usuario, primero sobre el recién agregado "Despachado": "pero en los
+        modales de programar no deberíamos mostrar solamente lo faltante? para que voy a
+        programar fabricación/despacho algo que ya se fabricó/despachó?", y confirmado para los
+        otros 4 también: "en programación de producción, solo deberíamos mostrar lo pendiente
+        de producción, y en programación de despachos, solo deberíamos mostrar lo pendiente de
+        despacho"). La razón de fondo: la LISTA DE FILAS de estos dos modales ya viene
+        pre-filtrada en el origen a lo único que tiene sentido programar ahí —
+        `conPendiente` en `abrirModalProgramarProduccion()` (solo filas con
+        `_pendienteProduccionFila(f) > 0`) y `conDisponible` en `abrirModalProgramarDespacho()`
+        (solo filas con `_disponibleDespachoFila(f, ...) > 0`) — así que ofrecer ahí un filtro
+        de estado adicional sería o redundante ("Pendiente de producción" dentro de `mpp` sería
+        siempre Sí, porque la lista entera ya lo es) o derechamente contrario al propósito del
+        modal ("Despachado" invita a programar algo que ya salió). Propiedad nueva
+        `soloPrefijos` en `TIPOS_FILTRO_PROGRAMAR` (ej. `soloPrefijos: ['fp']`) — sin ella, un
+        tipo sigue disponible en los 3 lugares (como Cuadro/Ejes/Ancho/Hilos, que sí son
+        posición/medida y siguen siendo relevantes en cualquier pantalla);
+        `_filaFiltroProgramarHTML(prefijo, esVigueta)` filtra las opciones de la lista por esta
+        propiedad además de la ya existente `soloConAncho`. Verificado con un arnés real — 26
+        aserciones: el cuadro principal (`fp`) sigue ofreciendo los 5 (regresión); ninguno de
+        los dos modales ofrece ninguno de los 5; ambos siguen ofreciendo los 5 filtros
+        estructurales (Cuadro/Ejes num./Ejes alfa./Ancho/Hilos); y "Entre cuadros" sigue
+        filtrando bien dentro de `mpp` — regresión, sin verse afectado por el cambio.
   - **Columnas "Ancho (cm)"/"Hilos" (o "Vigueta"/"Hilos Abajo"/"Hilos Arriba" en vigueta y
     bovedilla) en la tabla del propio modal** (2026-10-16, a pedido del usuario: "en la ventana
     que se abre de programación de producción y programación de despachos, incluyamos las filas
