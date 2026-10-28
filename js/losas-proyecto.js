@@ -1139,7 +1139,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
       <input type="text" value="${_escAttr(b)}" oninput="_actualizarParEje(${i},'${campo}',1,this.value)" style="width:28px;text-align:center;padding:4px 2px">
     </div>`;
   };
-  return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-fabricado="${fabricado}" data-pend-prod="${pendProd}" data-pend-desp="${pendDesp}" data-disponible="${dispDesp}" data-despachado="${despachado}">
+  return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-fabricado="${fabricado}" data-pend-prod="${pendProd}" data-pend-desp="${pendDesp}" data-disponible="${dispDesp}" data-despachado="${despachado}">
     <td>${i + 1}</td>
     <td>${txt(f.cuadro, 'cuadro', 48, false, true)}</td>
     <td>${par(f.ejesEntre, 'ejesEntre')}</td>
@@ -1247,6 +1247,7 @@ function _actualizarFilaProduccion(i) {
     tr.dataset.ejeAlfa = f.laterales || '';
     tr.dataset.ancho = f.ancho || 0;
     tr.dataset.hilos = f.hilos || 0;
+    tr.dataset.dimension = f.dimension || 0;
     // Fabricado no cambia por editar esta fila (depende de fila.produccion[], no de lo
     // planeado) — pero pendiente/disponible SÍ dependen de Cantidad, que es la única de las
     // "importantes" que sigue editable incluso ya fabricada (ver candado más arriba).
@@ -1586,7 +1587,7 @@ function abrirModalProgramarProduccion(programacionId) {
       const colEspecifica = esVigueta
         ? `<td>${_esc(f.tipoVigueta) || '—'}</td><td style="text-align:center">${f.hilosAbajo || 0}</td><td style="text-align:center">${f.hilosArriba || 0}</td>`
         : `<td style="text-align:center">${f.ancho || 0}</td><td style="text-align:center">${f.hilos || 0}</td>`;
-      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-fabricado="${_fabricadoFila(f)}" data-pend-prod="${pend}" data-pend-desp="${_pendienteDespachoFila(f, _despachosLosaActual)}" data-disponible="${_disponibleDespachoFila(f, _despachosLosaActual)}" data-despachado="${_despachadoFila(f.id, _despachosLosaActual)}">
+      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-fabricado="${_fabricadoFila(f)}" data-pend-prod="${pend}" data-pend-desp="${_pendienteDespachoFila(f, _despachosLosaActual)}" data-disponible="${_disponibleDespachoFila(f, _despachosLosaActual)}" data-despachado="${_despachadoFila(f.id, _despachosLosaActual)}">
         <td><input type="checkbox" class="mpp-chk-fila" onchange="_marcarFilaProgramar(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
         <td>${_esc(f.ejesEntre) || '—'}</td>
@@ -1739,6 +1740,14 @@ const TIPOS_FILTRO_PROGRAMAR = [
   { id: 'ejeAlfa', label: 'Entre ejes alfabéticos' },
   { id: 'ancho', label: 'Ancho de prelosa', soloConAncho: true, soloValorUnico: true },
   { id: 'hilos', label: 'Número de hilos', soloConAncho: true, soloValorUnico: true },
+  // "Largo de pieza" (2026-10-27, a pedido del usuario: "agreguemos el filtro a los cuadros de
+  // las ventanas de proyectos... de largo de la pieza para los diferentes sistemas") — mismo
+  // mecanismo exacto que Ancho/Hilos (desplegable con los valores de `f.dimension` que de
+  // verdad existen en esta Losa, `soloValorUnico`), pero SIN `soloConAncho`: a diferencia de
+  // Ancho/Hilos (que vigueta no tiene como campo escalar — ahí son Hilos Abajo/Arriba),
+  // `dimension` SÍ existe igual en los 3 sistemas (prelosa, vigueta, placa alveolar) — "para los
+  // diferentes sistemas" en las propias palabras del usuario.
+  { id: 'dimension', label: 'Largo de pieza', soloValorUnico: true },
   // `soloPrefijos` (2026-10-22, a pedido del usuario: "en los modales de programar no
   // deberíamos mostrar solamente lo faltante?... en programación de producción, solo deberíamos
   // mostrar lo pendiente de producción, y en programación de despachos, solo deberíamos mostrar
@@ -1834,7 +1843,12 @@ function _parRangoFiltro(valor, numerico) {
 }
 function _filaPasaFiltroProgramar(tr, filtro) {
   const { tipo, desde, hasta, valorUnico } = filtro;
-  if (tipo === 'ancho' || tipo === 'hilos') {
+  // Generalizado a cualquier tipo `soloValorUnico` (2026-10-27, antes hardcodeado a
+  // `tipo === 'ancho' || tipo === 'hilos'` — se agregó "Largo de pieza" con el mismo mecanismo,
+  // sin tener que volver a listar su id acá) — el id del tipo siempre coincide con la clave del
+  // dataset (`data-dimension` → `dataset.dimension`), mismo criterio que los demás.
+  const tDef = TIPOS_FILTRO_PROGRAMAR.find(t => t.id === tipo);
+  if (tDef && tDef.soloValorUnico) {
     const v = parseFloat(tr.dataset[tipo]);
     return !isNaN(v) && v === valorUnico;
   }
@@ -2809,7 +2823,7 @@ function abrirModalProgramarDespacho(despachoProgramadoId) {
       const colEspecifica = esVigueta
         ? `<td>${_esc(f.tipoVigueta) || '—'}</td><td style="text-align:center">${f.hilosAbajo || 0}</td><td style="text-align:center">${f.hilosArriba || 0}</td>`
         : `<td style="text-align:center">${f.ancho || 0}</td><td style="text-align:center">${f.hilos || 0}</td>`;
-      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-fabricado="${_fabricadoFila(f)}" data-pend-prod="${_pendienteProduccionFila(f)}" data-pend-desp="${_pendienteDespachoFila(f, _despachosLosaActual)}" data-disponible="${disp}" data-despachado="${_despachadoFila(f.id, _despachosLosaActual)}">
+      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-fabricado="${_fabricadoFila(f)}" data-pend-prod="${_pendienteProduccionFila(f)}" data-pend-desp="${_pendienteDespachoFila(f, _despachosLosaActual)}" data-disponible="${disp}" data-despachado="${_despachadoFila(f.id, _despachosLosaActual)}">
         <td><input type="checkbox" class="mpd-chk-fila" onchange="_marcarFilaProgramarDespacho(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
         <td>${_esc(f.ejesEntre) || '—'}</td>

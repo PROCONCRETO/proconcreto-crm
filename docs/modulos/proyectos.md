@@ -433,6 +433,30 @@ define qué se va a fabricar, después se confirma qué se fabricó de verdad.
         los dos modales ofrece ninguno de los 5; ambos siguen ofreciendo los 5 filtros
         estructurales (Cuadro/Ejes num./Ejes alfa./Ancho/Hilos); y "Entre cuadros" sigue
         filtrando bien dentro de `mpp` — regresión, sin verse afectado por el cambio.
+      - **Filtro nuevo "Largo de pieza"** (2026-10-27, a pedido del usuario: "agreguemos el
+        filtro a los cuadros de las ventanas de proyectos (lista de producción, producción y
+        despachos) de largo de la pieza para los diferentes sistemas") — mismo mecanismo exacto
+        que Ancho/Hilos (`soloValorUnico`: desplegable con los valores de `f.dimension` que de
+        verdad existen en esa Losa, ordenados), pero **sin** `soloConAncho`: a diferencia de
+        Ancho/Hilos (que vigueta no tiene como campo escalar — ahí son Hilos Abajo/Arriba),
+        `dimension` existe igual en los 3 sistemas (prelosa, vigueta, placa alveolar) — "para
+        los diferentes sistemas", en las propias palabras del usuario — así que este filtro NO
+        se oculta en vigueta como sí les pasa a Ancho/Hilos. Tampoco lleva `soloPrefijos`
+        (disponible en `fp`/`mpp`/`mpd` los tres, como Cuadro/Ejes/Ancho/Hilos — es posición/
+        medida, no un filtro de estado como los 5 del bullet anterior). Nuevo `data-dimension=
+        "${f.dimension || 0}"` en el `<tr>` de las tres tablas (`fp`, `mpp`, `mpd`), sincronizado
+        también en `_actualizarFilaProduccion(i)` (el Largo SÍ es editable en vivo en modo
+        Lista, antes de que la fila tenga algo fabricado — a diferencia de Fabricado/Pendiente/
+        Disponible/Despachado, que nunca cambian por editar la fila). `_filaPasaFiltroProgramar()`
+        de paso se generalizó: la rama `soloValorUnico` ya no revisa `tipo === 'ancho' ||
+        tipo === 'hilos'` a mano, sino `TIPOS_FILTRO_PROGRAMAR.find(t => t.id ===
+        tipo)?.soloValorUnico` — así un tercer tipo de este estilo (como "Largo de pieza") no
+        necesita que nadie vuelva a tocar esa función. Verificado con un arnés real — 12
+        aserciones: el tipo aparece en la lista de `fp`/`mpp`/`mpd`; el desplegable trae los
+        largos reales de la Losa, ordenados; filtrar por un largo muestra solo los cuadros con
+        esa medida; quitar el filtro restaura todo; en vigueta SÍ sigue disponible mientras
+        Ancho/Hilos siguen ocultos como siempre (regresión); y editar el Largo de una fila en
+        vivo (modo Lista) sincroniza `data-dimension` de inmediato.
   - **Columnas "Ancho (cm)"/"Hilos" (o "Vigueta"/"Hilos Abajo"/"Hilos Arriba" en vigueta y
     bovedilla) en la tabla del propio modal** (2026-10-16, a pedido del usuario: "en la ventana
     que se abre de programación de producción y programación de despachos, incluyamos las filas

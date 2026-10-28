@@ -237,7 +237,15 @@ function renderEstadisticasProduccion() {
   const totalIntentado = totalPrimera + totalMerma + totalSegundas;
   const pctDeficiencia = totalIntentado > 0 ? ((totalMerma + totalSegundas) / totalIntentado) * 100 : 0;
   const totalCemento = vibrocompactados.reduce((s, p) => s + (Number(p.consumoCemento) || 0), 0);
+  // `consumoCemento` (y por lo tanto `_cementoTeoricoPorUnidad()`) sigue guardado/calculado en
+  // KG, mismo dato que descuenta el inventario de Materias Primas — acá solo se CONVIERTE a
+  // gramos para mostrar (2026-10-23, a pedido del usuario: "pongamos el dato de consumo
+  // promedio de cemento, en gramos y no en kilogramos" — a esta escala, kg con 1 decimal
+  // (ej. "0,8 kg") escondía diferencias reales entre piezas chicas; en gramos se ve el número
+  // completo sin decimales, ej. "818 g"). `cementoPorUnidad` (kg) se sigue usando tal cual en
+  // cualquier cálculo que lo necesite en esa unidad; `cementoPorUnidadG` es solo para pantalla.
   const cementoPorUnidad = totalPrimera > 0 && totalCemento > 0 ? totalCemento / totalPrimera : null;
+  const cementoPorUnidadG = cementoPorUnidad !== null ? cementoPorUnidad * 1000 : null;
 
   // Variación del promedio real vs. el estándar de "Ciclos/día" del Costeo — solo con un producto
   // filtrado (ver _ciclosDiaEstandarPorProducto()); en la vista general no hay un único estándar
@@ -251,7 +259,8 @@ function renderEstadisticasProduccion() {
   // costeo-producto.js, sin tocarla). Menos que el estándar es lo bueno acá (`masEsMejor=false`),
   // al revés que el rendimiento — más cemento del que pide la receta es sobreconsumo, no un logro.
   const cementoEstandar = productoFiltro ? _cementoTeoricoPorUnidad(productoFiltro) : null;
-  const subCementoPromedio = productoFiltro ? _tarjetaSubVsEstandar(cementoPorUnidad, cementoEstandar, 'kg', false) : '';
+  const cementoEstandarG = cementoEstandar !== null ? cementoEstandar * 1000 : null;
+  const subCementoPromedio = productoFiltro ? _tarjetaSubVsEstandar(cementoPorUnidadG, cementoEstandarG, 'g', false, 0) : '';
 
   const tarjetas = document.getElementById('est-prod-tarjetas');
   if (tarjetas) {
@@ -263,7 +272,7 @@ function renderEstadisticasProduccion() {
       + _tarjetaKPI(totalMerma.toLocaleString(), 'Merma (ud)', totalMerma ? 'var(--rojo)' : null)
       + _tarjetaKPI(totalSegundas.toLocaleString(), 'Segundas (ud)', totalSegundas ? 'var(--naranja)' : null)
       + _tarjetaKPI(pctDeficiencia.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + '%', '% Deficiencia', totalIntentado ? _colorDeficiencia(pctDeficiencia) : null)
-      + _tarjetaKPI(cementoPorUnidad !== null ? cementoPorUnidad.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' kg' : '—', 'Cemento / unidad (primera)', null, subCementoPromedio);
+      + _tarjetaKPI(cementoPorUnidadG !== null ? cementoPorUnidadG.toLocaleString('es-CO', { maximumFractionDigits: 0 }) + ' g' : '—', 'Cemento / unidad (primera)', null, subCementoPromedio);
   }
 
   const nota = document.getElementById('est-prod-nota-sin-clasificar');
@@ -605,6 +614,9 @@ function _chartRankingDeficiencia(vibrocompactados) {
 // Mismo criterio ya establecido en Producción Diaria: el divisor de cada día es SOLO la cantidad
 // de primera de ese día, nunca merma+segundas. Omite días sin cantidad de primera o sin consumo
 // de cemento registrado (no hay nada que dividir).
+// En gramos, no en kg (2026-10-23, ver nota junto a `cementoPorUnidadG` más arriba) — `consumoCemento`
+// sigue guardado en kg, acá solo se multiplica ×1000 al armar la serie, redondeado a gramos
+// enteros (antes 2 decimales de kg).
 let _chartCementoPorUnidadInst = null;
 function _chartCementoPorUnidad(vibrocompactados, periodoDias) {
   const ctx = document.getElementById('chart-prod-cemento-unidad');
@@ -623,7 +635,7 @@ function _chartCementoPorUnidad(vibrocompactados, periodoDias) {
     const cemento = delDia.reduce((s, p) => s + (Number(p.consumoCemento) || 0), 0);
     if (!primera || !cemento) continue;
     labels.push(new Date(f + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }));
-    valores.push(Math.round((cemento / primera) * 100) / 100);
+    valores.push(Math.round((cemento / primera) * 1000));
   }
   if (_chartCementoPorUnidadInst) _chartCementoPorUnidadInst.destroy();
   _chartCementoPorUnidadInst = new Chart(ctx, {
@@ -637,7 +649,7 @@ function _chartCementoPorUnidad(vibrocompactados, periodoDias) {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: (c) => ` ${c.parsed.y} kg/ud` } },
+        tooltip: { callbacks: { label: (c) => ` ${c.parsed.y} g/ud` } },
       },
       scales: {
         x: { grid: { display: false }, ticks: { color: '#898781', maxRotation: 0, autoSkip: true, maxTicksLimit: 10, font: { size: 10 } } },
@@ -649,22 +661,24 @@ function _chartCementoPorUnidad(vibrocompactados, periodoDias) {
 
 // ── Consumo de cemento por unidad — por referencia, con media y desviación (2026-09-18, a pedido
 // del usuario) ──
-// Mismo criterio de siempre ("kg de cemento / unidad de PRIMERA", nunca merma+segundas), pero acá
-// por PRODUCTO y por REGISTRO — cada registro con cantidad y consumo de cemento aporta un dato
+// Mismo criterio de siempre ("cemento / unidad de PRIMERA", nunca merma+segundas), pero acá por
+// PRODUCTO y por REGISTRO — cada registro con cantidad y consumo de cemento aporta un dato
 // (cemento del registro / cantidad del registro), y se calcula la media y la desviación estándar
 // de esos datos por producto — para ver qué tan consistente es la dosificación real entre lotes
 // de una misma referencia, no solo el promedio agregado que ya muestra la tarjeta "Cemento /
 // unidad (primera)" de arriba. Reusa _desviacionEstandar() (2026-09-16) tal cual. Consumida por
 // _renderTablaEstandaresCiclos() (js/produccion-atipicos.js) — el usuario pidió que este dato
 // viviera en la misma tabla "Estándar de ciclos/día por producto (para costeo)", no en una tabla
-// aparte, así que no tiene su propia función de render acá.
+// aparte, así que no tiene su propia función de render acá. Devuelve media/desviación en GRAMOS
+// (2026-10-23, ver nota junto a `cementoPorUnidadG` más arriba) — `consumoCemento` sigue
+// guardado en kg, se convierte ×1000 al armar cada dato individual, antes de promediar.
 function _calcularCementoPorReferencia(vibrocompactados) {
   const porProducto = {};
   vibrocompactados.forEach(p => {
     const cantidad = Number(p.cantidad) || 0;
     const cemento = Number(p.consumoCemento) || 0;
     if (!(cantidad > 0) || !(cemento > 0)) return;
-    (porProducto[p.producto] = porProducto[p.producto] || []).push(cemento / cantidad);
+    (porProducto[p.producto] = porProducto[p.producto] || []).push((cemento / cantidad) * 1000);
   });
   const resultado = {};
   Object.keys(porProducto).forEach(producto => {

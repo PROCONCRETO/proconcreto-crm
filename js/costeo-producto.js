@@ -1840,8 +1840,10 @@ function _aplicarPreciosCatalogo(codigo, nuevoLista, nuevoMinimo) {
   nuevoMinimo = Math.round(nuevoMinimo);
   const ok = confirm(`¿Actualizar los precios de "${producto.nombre}" en el catálogo?\n\nPrecio Lista: ${_fmt(producto.lista)} → ${_fmt(nuevoLista)}\nPrecio Mínimo: ${_fmt(producto.minimo)} → ${_fmt(nuevoMinimo)}\n\nEsto afecta las cotizaciones nuevas de inmediato.`);
   if (!ok) return;
-  actualizarPrecioProducto(codigo, 'lista', nuevoLista);
-  actualizarPrecioProducto(codigo, 'minimo', nuevoMinimo);
+  // Una sola escritura con los dos campos (2026-10-27, ver nota junto a
+  // `_actualizarPreciosProducto()` en catalogo.js) — dos `actualizarPrecioProducto()` seguidas
+  // acá mismo eran la causa real del bug "solo me arrastra Lista, no Mínimo".
+  _actualizarPreciosProducto(codigo, nuevoLista, nuevoMinimo);
   alert('Precios actualizados en el catálogo.');
 }
 
@@ -1932,9 +1934,10 @@ function _revisarImpactoPrecios(origenLabel, filtro) {
 }
 
 function confirmarImpactoPrecios() {
+  // Una sola escritura por producto (2026-10-27, mismo motivo que `_aplicarPreciosCatalogo()`
+  // más arriba — ver nota junto a `_actualizarPreciosProducto()` en catalogo.js).
   _impactoPreciosActual.forEach(a => {
-    actualizarPrecioProducto(a.codigo, 'lista', a.listaNueva);
-    actualizarPrecioProducto(a.codigo, 'minimo', a.minimoNueva);
+    _actualizarPreciosProducto(a.codigo, a.listaNueva, a.minimoNueva);
   });
   const n = _impactoPreciosActual.length;
   _impactoPreciosActual = [];

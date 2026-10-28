@@ -614,6 +614,27 @@ function actualizarPrecioProducto(codigo, campo, valor) {
   _upsertProducto(p).then(({ error }) => { if (error) { console.error(error.message); alert('No se pudo guardar el precio: ' + error.message); } });
 }
 
+// Actualiza Lista Y Mínimo de un producto en UNA sola escritura (2026-10-27, bug real reportado
+// por el usuario: "al aplicar el precio del costeo, solo me arrastra los precios de lista pero
+// no el precio mínimo") — causa raíz: llamar `actualizarPrecioProducto()` dos veces seguidas
+// para el MISMO producto (una para 'lista', otra para 'minimo') dispara dos upserts de la fila
+// COMPLETA en paralelo (`_upsertProducto()` sube todos los campos, no solo el que cambió); como
+// no hay garantía de que las dos respuestas lleguen a Supabase en el mismo orden en que se
+// enviaron, la que llega de última "gana" y pisa el campo que la otra ya había actualizado con
+// el valor viejo que llevaba en su propia foto de ese momento — en la práctica Lista casi
+// siempre sobrevive (las dos fotos coinciden en ese valor), pero Mínimo puede quedar revertido.
+// Usada por `_aplicarPreciosCatalogo()` (costeo-producto.js, botón "Aplicar precios al
+// catálogo") y `confirmarImpactoPrecios()` (misma actualización masiva cuando cambia un insumo
+// compartido) — los dos únicos lugares que tocaban Lista Y Mínimo del mismo producto de una.
+function _actualizarPreciosProducto(codigo, nuevoLista, nuevoMinimo) {
+  const p = CATALOGO.find(x => x.codigo === codigo);
+  if (!p) return;
+  p.lista = parseFloat(nuevoLista) || 0;
+  p.minimo = parseFloat(nuevoMinimo) || 0;
+  PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
+  _upsertProducto(p).then(({ error }) => { if (error) { console.error(error.message); alert('No se pudo guardar el precio: ' + error.message); } });
+}
+
 function toggleOcultarProducto(codigo, ocultar) {
   const p = CATALOGO.find(x => x.codigo === codigo);
   if (!p) return;

@@ -152,14 +152,18 @@ function _tarjetaKPI(valor, etiqueta, color, subHtml) {
 // bancos, unidades/día) MÁS que el estándar es bueno (verde); en consumo (cemento/pieza) es al
 // revés — MENOS que el estándar es lo bueno, mismo criterio que ya distingue _colorDeficiencia()
 // de _colorSemaforo() en este mismo archivo.
-function _tarjetaSubVsEstandar(promedioReal, estandar, unidadLabel, masEsMejor = true) {
+// `maximumFractionDigits` (2026-10-23, a pedido del usuario: "pongamos el dato de consumo
+// promedio de cemento, en gramos y no en kilogramos" — en gramos no tiene sentido mostrar
+// decimales, a diferencia de ciclos/bancos/kg, que sí los traían) — opcional, sigue en 1 por
+// defecto para no afectar a ningún llamador existente.
+function _tarjetaSubVsEstandar(promedioReal, estandar, unidadLabel, masEsMejor = true, maximumFractionDigits = 1) {
   if (promedioReal === null || !(estandar > 0)) return '';
   const diferencia = promedioReal - estandar;
   const pct = (diferencia / estandar) * 100;
   const signo = diferencia >= 0 ? '+' : '';
   const favorable = masEsMejor ? diferencia >= 0 : diferencia <= 0;
   const color = favorable ? 'var(--verde)' : 'var(--rojo)';
-  return `<span style="color:${color};font-weight:600">${signo}${diferencia.toLocaleString('es-CO', { maximumFractionDigits: 1 })} ${unidadLabel} (${signo}${pct.toLocaleString('es-CO', { maximumFractionDigits: 1 })}%)</span> vs. estándar del Costeo (${estandar.toLocaleString('es-CO', { maximumFractionDigits: 1 })})`;
+  return `<span style="color:${color};font-weight:600">${signo}${diferencia.toLocaleString('es-CO', { maximumFractionDigits })} ${unidadLabel} (${signo}${pct.toLocaleString('es-CO', { maximumFractionDigits: 1 })}%)</span> vs. estándar del Costeo (${estandar.toLocaleString('es-CO', { maximumFractionDigits })})`;
 }
 
 // Semáforo genérico: verde si ya alcanzó la meta, ámbar a medias, rojo si va mal.
