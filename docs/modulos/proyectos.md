@@ -1654,3 +1654,57 @@ las cuchilla, regresión completa de Prelosa) — además de una captura de pant
 imprimible completo (con el membrete y el pie reales de la app) con las 5 clasificaciones a la
 vez, para confirmar visualmente que las tarjetas y el detalle se ven bien juntos — sin errores
 de consola en ninguna de las 7 tandas.
+
+### "Cuadro" → "N° Panel", y "Cantidad" fija en 1 (2026-10-30)
+
+A pedido del usuario, el mismo día siguiente a la entrega inicial: *"para los paneles, no
+tenemos cuadros, pero si tenemos un número para cada panel. con esto podemos cambiar el cuadro
+por panel y la cantidad sobra porque se hace uno a uno"* — en Prelosa/Vigueta, una fila de la
+lista representa un GRUPO de piezas idénticas (un "cuadro" del plano, con una Cantidad de
+piezas iguales); en Paneles cada fila es **una sola pieza física**, identificada por su propio
+número — "Cantidad" no tiene nada que decidir, siempre es 1.
+
+- **"Cuadro" se reutiliza tal cual** (mismo dato, mismo `f.cuadro`, sin campo nuevo ni migración)
+  para el número propio de cada panel — solo cambia el RÓTULO visible a "N° Panel" cuando
+  `l.sistema === 'paneles_cerramiento'`, en todos los lugares que ya mostraban "Cuadro": thead
+  de `renderFilasProduccion()`, los 2 modales de Programar, los 2 imprimibles
+  (`_cuadroDetalladoTheadHTML()`, que ya tenía el parámetro `esPanel` de la entrega anterior —
+  solo le faltaba aplicarlo acá; además "Detalle por cuadro" → "Detalle por panel" en el título
+  de esa sección, `_cuadroDetalladoDosColsHTML()` gana un 3er parámetro `esPanel`), Excel
+  (`exportarFilasLosaExcel()`), y los 2 modales de "Ver detalle" de una programación ya guardada
+  (`verDetalleProduccionRegistrada()`/`verDetalleDespachoRegistrado()`). El filtro "Entre
+  cuadros" (`TIPOS_FILTRO_PROGRAMAR`, tipo `cuadro`) también pasa a decir "Entre N° Panel" para
+  este sistema — como es el único tipo de filtro cuya etiqueta depende del sistema (todos los
+  demás tienen un `label` fijo), se resolvió con un helper nuevo, `_etiquetaFiltroTipo(t,
+  sistema)`, en vez de agregarle un campo a todo `TIPOS_FILTRO_PROGRAMAR` para un solo caso.
+  - **Gap conocido, sin resolver todavía**: `abrirMatrizProduccionDiaria()`/
+    `abrirMatrizDespachoDiaria()` (las matrices fila×fecha de "Producción diaria"/"Despacho
+    diario") siguen mostrando "Cuadro" literal y las columnas Ancho/Hilos aunque la Losa sea de
+    Paneles — no se tocaron en esta vuelta (son las funciones más grandes y complejas del
+    archivo, con anchos de columna fijos en píxeles para el `position:sticky` horizontal;
+    extenderlas a Paneles es un trabajo de tamaño comparable al de los 2 modales de Programar de
+    la entrega anterior) — no rompen con una Losa de Paneles, solo se ven incompletas/con la
+    terminología vieja. Se completa si se pide más adelante.
+- **"Cantidad" deja de ser editable para Paneles** — la celda de la tabla principal
+  (`_filaProduccionHTML()`) pasa de un `<input type="number">` a un texto fijo "1" (gris, con
+  `title` explicando el porqué), sin quitar la columna de la tabla — así ningún `colspan` de la
+  fila de TOTALES, de los imprimibles, ni de los modales de Programar necesita recalcularse (ya
+  dependían de este mismo número de columnas). `agregarFilaProduccion()` arranca cada fila nueva
+  de Panel en `cantidad: 1` directamente (en vez de 0, como el resto de los sistemas, donde el
+  usuario sí la digita). `guardarListaProduccion()` además fuerza `cantidad = 1` en TODAS las
+  filas de una Unidad de Paneles justo antes de guardar, como refuerzo defensivo — por si algún
+  dato llega con otro valor por una vía distinta a la UI normal (ej. Pegar/Importar el día que se
+  construyan para este sistema, hoy todavía fuera de alcance).
+- Los mensajes de validación de ancho (`_validarAnchoPanel()`, y el bloqueo al guardar en
+  `guardarListaProduccion()`) se ajustaron para no seguir diciendo "Cuadro" en el texto del
+  aviso — ahora dicen "panel" / "(sin número)".
+
+Verificado con un arnés real — 14 aserciones: el thead dice "N° Panel" y ya no "Cuadro"; la
+celda de Cantidad muestra "1" fijo sin ningún `<input>`; una fila nueva arranca en cantidad=1;
+`guardarListaProduccion()` revierte a 1 una cantidad que se hubiera puesto en otro valor a mano
+(simulando un dato corrupto); el filtro dice "Entre N° Panel"; el imprimible trae "N° Panel" en
+el encabezado del detalle y "Detalle por panel — orden de referencia" en el título de esa
+sección; `verDetalleProduccionRegistrada()` también dice "N° Panel"; el Excel exporta "N° Panel"
+como encabezado de columna; y Prelosa sigue exactamente igual que antes en los 4 mismos puntos
+(thead con "Cuadro", Cantidad como `<input>` editable normal, filtro "Entre cuadros") —
+regresión, sin errores de consola.

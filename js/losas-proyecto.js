@@ -871,7 +871,7 @@ function renderFilasProduccion() {
   // despachar"/"Long. total por despachar") es análogo, aunque el usuario solo mencionó
   // Producción explícitamente — confirmado con el usuario que aplica igual a Despachos.
   thead.innerHTML = `<tr>
-    <th>#</th><th>Cuadro</th><th>Ejes numéricos</th><th>Ejes alfabéticos</th>
+    <th>#</th><th>${esPanel ? 'N° Panel' : 'Cuadro'}</th><th>Ejes numéricos</th><th>Ejes alfabéticos</th>
     ${esVigueta
       ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>'
       : esPanel
@@ -1021,7 +1021,7 @@ function exportarFilasLosaExcel() {
   const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
 
   const encabezado = [
-    '#', 'Cuadro', 'Ejes numéricos', 'Ejes alfabéticos',
+    '#', esPanel ? 'N° Panel' : 'Cuadro', 'Ejes numéricos', 'Ejes alfabéticos',
     ...(esVigueta ? ['Vigueta', 'Hilos Abajo', 'Hilos Arriba'] : esPanel ? ['Clasificación', 'Ancho (cm)', 'Largo A (m)', 'Largo B (m)'] : ['Ancho (cm)', 'Hilos']),
     'Dimensión (m)', 'Cantidad', 'Long. total (m)',
     ...(esVigueta ? [] : ['m²']),
@@ -1237,6 +1237,17 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     }
     return `<input type="number" step="0.01" value="${valor || ''}" oninput="_filasLosaActual[${i}].${campo}=parseFloat(this.value)||0;_sincronizarLargosPanel(${i})" style="width:50px">`;
   };
+  // Paneles de Cerramiento (2026-10-30, a pedido del usuario: "no tenemos cuadros, pero si
+  // tenemos un número para cada panel. con esto podemos cambiar el cuadro por panel y la
+  // cantidad sobra porque se hace uno a uno") — el campo "Cuadro" se reutiliza tal cual (mismo
+  // dato, `f.cuadro`) para el número propio de cada panel, solo con el título de la columna
+  // cambiado a "N° Panel" (thead de `renderFilasProduccion()`, más arriba en el archivo) — no
+  // hace falta un campo nuevo, ni tocar filtros/Excel/impresos que ya leen `f.cuadro`, solo el
+  // rótulo visible. "Cantidad" deja de ser editable para este sistema (celda fija en "1", más
+  // abajo) — un panel es una pieza, no un grupo de piezas idénticas como en Prelosa/Vigueta — la
+  // columna de la tabla NO se quita (sigue ahí, solo de solo lectura) para no tener que
+  // recalcular el `colspan` de la fila de TOTALES ni de los imprimibles/modales que ya dependen
+  // de este mismo número de columnas.
   return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-clasificacion="${_escAttr(f.clasificacion || '')}" data-fabricado="${fabricado}" data-pend-prod="${pendProd}" data-pend-desp="${pendDesp}" data-disponible="${dispDesp}" data-despachado="${despachado}">
     <td>${i + 1}</td>
     <td>${txt(f.cuadro, 'cuadro', 48, false, true)}</td>
@@ -1258,7 +1269,9 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     ${esPanel
       ? `<td id="fp-dimension-${i}" style="text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>`
       : `<td>${num(f.dimension, 'dimension', 58, true, '', true)}</td>`}
-    <td>${num(f.cantidad, 'cantidad', 50, true, `_validarCantidadMinima(${i})`)}</td>
+    ${esPanel
+      ? `<td style="text-align:center;color:var(--gris-medio)" title="Cada panel se fabrica uno a uno — siempre es 1">1</td>`
+      : `<td>${num(f.cantidad, 'cantidad', 50, true, `_validarCantidadMinima(${i})`)}</td>`}
     <td id="fp-longtotal-${i}" style="text-align:right">${longTotal.toFixed(2)}</td>
     ${esVigueta ? '' : `<td id="fp-m2-${i}" style="text-align:right">${m2.toFixed(2)}</td>`}
     <td id="fp-peso-${i}" style="text-align:right">${peso.toFixed(1)}</td>
@@ -1299,7 +1312,7 @@ function _validarAnchoPanel(i) {
   const f = _filasLosaActual[i];
   if (!f || !f.ancho) return;
   if (!ANCHOS_ESTANDAR_PANEL.includes(Number(f.ancho))) {
-    alert(`El ancho de un panel debe ser 25 o 50 cm por estandarización — no se admiten medidas intermedias. Corrige el ancho de la fila "Cuadro ${f.cuadro || i + 1}".`);
+    alert(`El ancho de un panel debe ser 25 o 50 cm por estandarización — no se admiten medidas intermedias. Corrige el ancho del panel "${f.cuadro || i + 1}".`);
     f.ancho = 0;
     renderFilasProduccion();
   }
@@ -1435,7 +1448,13 @@ function _actualizarParEje(i, campo, parte, valor) {
 }
 
 function agregarFilaProduccion() {
-  _filasLosaActual.push({ id: _nuevoIdFila(), cuadro: '', ejesEntre: '', laterales: '', ancho: 0, hilos: 0, tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0, clasificacion: 'panel', largoA: 0, largoB: 0, dimension: 0, cantidad: 0, observaciones: '', produccion: [] });
+  // Paneles de Cerramiento (2026-10-30) — "la cantidad sobra porque se hace uno a uno": cada
+  // fila nueva ya arranca en `cantidad: 1` (en vez de 0, como el resto de los sistemas, donde el
+  // usuario sí la digita) — no hay ningún campo en pantalla para cambiarla (ver
+  // `_filaProduccionHTML()`), así que se fija acá de una vez.
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const esPanel = l?.sistema === 'paneles_cerramiento';
+  _filasLosaActual.push({ id: _nuevoIdFila(), cuadro: '', ejesEntre: '', laterales: '', ancho: 0, hilos: 0, tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0, clasificacion: 'panel', largoA: 0, largoB: 0, dimension: 0, cantidad: esPanel ? 1 : 0, observaciones: '', produccion: [] });
   renderFilasProduccion();
 }
 
@@ -1556,6 +1575,13 @@ function guardarListaProduccion() {
   // de la digitación manual (que ya avisa al vuelo en `_validarAnchoPrelosa()`), para que no se
   // cuele una medida intermedia por ninguna de las 3 vías de carga.
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  // "La cantidad sobra porque se hace uno a uno" (2026-10-30) — refuerzo defensivo acá además
+  // del default de `agregarFilaProduccion()`: cualquier fila de Panel se guarda siempre con
+  // `cantidad: 1`, sin importar por qué vía haya llegado (a mano, Pegar, Importar — estas 2
+  // últimas, cuando existan para Panel, no van a traer una columna de Cantidad que respetar).
+  if (l && l.sistema === 'paneles_cerramiento') {
+    _filasLosaActual.forEach(f => { f.cantidad = 1; });
+  }
   if (l && l.sistema === 'prelosa') {
     const invalidas = _filasLosaActual.filter(f => !ANCHOS_ESTANDAR_PRELOSA.includes(Number(f.ancho)));
     if (invalidas.length) {
@@ -1567,7 +1593,7 @@ function guardarListaProduccion() {
   if (l && l.sistema === 'paneles_cerramiento') {
     const invalidas = _filasLosaActual.filter(f => !ANCHOS_ESTANDAR_PANEL.includes(Number(f.ancho)));
     if (invalidas.length) {
-      alert(`El ancho de un panel debe ser 25 o 50 cm por estandarización. Corrige el ancho de: ${invalidas.map(f => f.cuadro || '(sin cuadro)').join(', ')}.`);
+      alert(`El ancho de un panel debe ser 25 o 50 cm por estandarización. Corrige el ancho de: ${invalidas.map(f => f.cuadro || '(sin número)').join(', ')}.`);
       return;
     }
   }
@@ -1723,7 +1749,7 @@ function abrirModalProgramarProduccion(programacionId) {
   // muestra Clasificación/Ancho/Largo A/Largo B, de solo lectura — mismo criterio.
   document.getElementById('mpp-filas-thead').innerHTML = `<tr>
     <th style="width:28px"><input type="checkbox" onchange="_marcarTodasFilasProgramar(this.checked)"></th>
-    <th>Cuadro</th><th>Ejes num.</th><th>Ejes alfa.</th>
+    <th>${esPanel ? 'N° Panel' : 'Cuadro'}</th><th>Ejes num.</th><th>Ejes alfa.</th>
     ${esVigueta
       ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>'
       : esPanel
@@ -2023,11 +2049,20 @@ function _filtroValorAreaHTML(tipo, prefijo) {
   return `<input type="${esAlfa ? 'text' : 'number'}" placeholder="Desde" data-rol="desde" oninput="_aplicarFiltrosProgramar('${prefijo}')" style="width:80px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio)">
     <input type="${esAlfa ? 'text' : 'number'}" placeholder="Hasta" data-rol="hasta" oninput="_aplicarFiltrosProgramar('${prefijo}')" style="width:80px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio)">`;
 }
+// "Entre cuadros" no tiene sentido literal en Paneles (2026-10-30, mismo cambio de "Cuadro" →
+// "N° Panel" del resto de la pantalla, ver `renderFilasProduccion()`) — único tipo cuya etiqueta
+// depende del sistema además de su `id`, así que no amerita agregarle un campo nuevo a
+// `TIPOS_FILTRO_PROGRAMAR` (que ya usa `label` como texto fijo en todos los demás) — se resuelve
+// acá, en el único lugar que arma el texto visible del desplegable de tipo.
+function _etiquetaFiltroTipo(t, sistema) {
+  if (t.id === 'cuadro' && sistema === 'paneles_cerramiento') return 'Entre N° Panel';
+  return t.label;
+}
 function _filaFiltroProgramarHTML(prefijo, sistema) {
   const opciones = TIPOS_FILTRO_PROGRAMAR
     .filter(t => !t.soloPrefijos || t.soloPrefijos.includes(prefijo))
     .filter(t => !t.sistemas || t.sistemas.includes(sistema))
-    .map(t => `<option value="${t.id}">${t.label}</option>`).join('');
+    .map(t => `<option value="${t.id}">${_etiquetaFiltroTipo(t, sistema)}</option>`).join('');
   return `<div class="filtro-programar-fila" style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
     <select data-tipo onchange="_cambiarTipoFiltroProgramar(this,'${prefijo}')" style="flex:1;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:12px">${opciones}</select>
     <span class="filtro-valor-area" style="display:flex;gap:6px">${_filtroValorAreaHTML('cuadro', prefijo)}</span>
@@ -2404,9 +2439,9 @@ function _cuadroDetalladoTheadHTML(esVigueta, esPanel, conPeso) {
   const colsPropias = esPanel
     ? th('Clasif.') + th('Ancho', 'center') + th('Largo A', 'right') + th('Largo B', 'right')
     : th(esVigueta ? 'Vigueta' : 'Ancho', 'center') + th('Hilos', 'center') + th('Largo', 'right');
-  return th('#') + th('Cuadro') + colsPropias + th('Cant.', 'center') + (conPeso ? th('Peso', 'right') : '') + th('Observ.');
+  return th('#') + th(esPanel ? 'N° Panel' : 'Cuadro') + colsPropias + th('Cant.', 'center') + (conPeso ? th('Peso', 'right') : '') + th('Observ.');
 }
-function _cuadroDetalladoDosColsHTML(filasHTML, theadRowHTML) {
+function _cuadroDetalladoDosColsHTML(filasHTML, theadRowHTML, esPanel) {
   if (!filasHTML.length) return '';
   const mitad = Math.ceil(filasHTML.length / 2);
   const col = subset => `<table style="width:100%;border-collapse:collapse;font-size:9.5px">
@@ -2415,8 +2450,10 @@ function _cuadroDetalladoDosColsHTML(filasHTML, theadRowHTML) {
   </table>`;
   const izquierda = filasHTML.slice(0, mitad);
   const derecha = filasHTML.slice(mitad);
+  // "Detalle por panel" en vez de "por cuadro" (2026-10-30) — mismo cambio de terminología que
+  // el resto de la pantalla para este sistema.
   return `<div style="display:flex;flex-direction:column;gap:6px;padding-top:6px;border-top:1px dashed #CBD5E0;margin-top:4px">
-    <div style="font-size:9px;font-weight:700;color:#8898AA;text-transform:uppercase;letter-spacing:0.08em">Detalle por cuadro — orden de referencia</div>
+    <div style="font-size:9px;font-weight:700;color:#8898AA;text-transform:uppercase;letter-spacing:0.08em">Detalle por ${esPanel ? 'panel' : 'cuadro'} — orden de referencia</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       ${col(izquierda)}
       ${derecha.length ? col(derecha) : '<div></div>'}
@@ -2479,7 +2516,7 @@ function _htmlProgramacionProduccion(l, p, sis, esVigueta, fecha, observaciones,
       <td style="padding:3px 4px;min-width:45px"></td>
     </tr>`;
   });
-  const detalleHTML = _cuadroDetalladoDosColsHTML(filas, _cuadroDetalladoTheadHTML(esVigueta, esPanel, false));
+  const detalleHTML = _cuadroDetalladoDosColsHTML(filas, _cuadroDetalladoTheadHTML(esVigueta, esPanel, false), esPanel);
 
   // "← Volver" reabre el modal en vez de solo mostrar la pantalla de atrás (2026-10-19, a
   // pedido del usuario: "cuando le doy imprimir y luego le doy volver, se me cierra la ventana
@@ -2818,10 +2855,11 @@ function verDetalleProduccionRegistrada(id) {
   if (!p) return;
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
+  const esPanel = !!l && l.sistema === 'paneles_cerramiento';
   document.getElementById('vdp-fecha').textContent = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—';
   document.getElementById('vdp-observaciones').textContent = p.observaciones || '—';
   document.getElementById('vdp-thead').innerHTML = `<tr>
-    <th>Cuadro</th>
+    <th>${esPanel ? 'N° Panel' : 'Cuadro'}</th>
     ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
     <th>Largo (m)</th>
     <th>Programado</th><th>Producido</th>
@@ -3090,7 +3128,7 @@ function abrirModalProgramarDespacho(despachoProgramadoId) {
   // Encabezado dinámico — ver la misma nota en `abrirModalProgramarProduccion()`.
   document.getElementById('mpd-filas-thead').innerHTML = `<tr>
     <th style="width:28px"><input type="checkbox" onchange="_marcarTodasFilasProgramarDespacho(this.checked)"></th>
-    <th>Cuadro</th><th>Ejes num.</th><th>Ejes alfa.</th>
+    <th>${esPanel ? 'N° Panel' : 'Cuadro'}</th><th>Ejes num.</th><th>Ejes alfa.</th>
     ${esVigueta
       ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>'
       : esPanel
@@ -3288,7 +3326,7 @@ function _htmlProgramacionDespacho(l, p, sis, esVigueta, fecha, observaciones, v
       <td style="padding:3px 4px;min-width:45px"></td>
     </tr>`;
   });
-  const detalleHTML = _cuadroDetalladoDosColsHTML(filas, _cuadroDetalladoTheadHTML(esVigueta, esPanel, true));
+  const detalleHTML = _cuadroDetalladoDosColsHTML(filas, _cuadroDetalladoTheadHTML(esVigueta, esPanel, true), esPanel);
 
   // "← Volver" reabre el modal — ver la nota junto al mismo botón en
   // `_htmlProgramacionProduccion()`, mismo motivo exacto. Solo si `origen === 'modal'`.
@@ -3598,11 +3636,12 @@ function verDetalleDespachoRegistrado(id) {
   if (!p) return;
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
+  const esPanel = !!l && l.sistema === 'paneles_cerramiento';
   document.getElementById('vdd-remision').textContent = p.remision || '—';
   document.getElementById('vdd-fecha').textContent = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—';
   document.getElementById('vdd-observaciones').textContent = p.observaciones || '—';
   document.getElementById('vdd-thead').innerHTML = `<tr>
-    <th>Cuadro</th>
+    <th>${esPanel ? 'N° Panel' : 'Cuadro'}</th>
     ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
     <th>Largo (m)</th>
     <th>Programado</th><th>Despachado</th>
