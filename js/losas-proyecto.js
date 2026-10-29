@@ -1983,7 +1983,13 @@ const TIPOS_FILTRO_PROGRAMAR = [
   // verdad existen en esta Losa, `soloValorUnico`), pero sin `sistemas`: a diferencia de
   // Ancho/Hilos, `dimension` SÍ existe igual en los 4 sistemas — "para los diferentes sistemas"
   // en las propias palabras del usuario.
-  { id: 'dimension', label: 'Largo de pieza', soloValorUnico: true },
+  // `multiple` (2026-10-31, a pedido del usuario: "pongamosle la opción de poder pinchar varias
+  // medidas del listado en el mismo filtro" — pedido específico de ESTE filtro, no de
+  // Ancho/Hilos/Clasificación) — en vez de un `<select>` de una sola opción, renderiza un
+  // popover de checkboxes (ver `_filtroValorAreaHTML()`/`_toggleFiltroMultiPanel()`); la fila
+  // pasa el filtro si su `dimension` coincide con CUALQUIERA de los valores marcados (OR, no
+  // AND) — ver `_filaPasaFiltroProgramar()`.
+  { id: 'dimension', label: 'Largo de pieza', soloValorUnico: true, multiple: true },
   // `soloPrefijos` (2026-10-22, a pedido del usuario: "en los modales de programar no
   // deberíamos mostrar solamente lo faltante?... en programación de producción, solo deberíamos
   // mostrar lo pendiente de producción, y en programación de despachos, solo deberíamos mostrar
@@ -2032,6 +2038,23 @@ function _valoresDisponiblesFiltro(tipo) {
 }
 function _filtroValorAreaHTML(tipo, prefijo) {
   const t = TIPOS_FILTRO_PROGRAMAR.find(x => x.id === tipo);
+  // Popover de checkboxes (2026-10-31, ver nota junto a `{ id: 'dimension', ... multiple: true
+  // }`) — permite marcar varios valores a la vez, a diferencia del `<select>` de una sola
+  // opción que sigue usando cualquier otro tipo `soloValorUnico` (Ancho/Hilos/Clasificación).
+  if (t && t.soloValorUnico && t.multiple) {
+    const valores = _valoresDisponiblesFiltro(tipo);
+    const opciones = valores.map(v => `<label style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:12px;white-space:nowrap;cursor:pointer">
+        <input type="checkbox" data-rol="valor-multi" value="${v}" onchange="_actualizarResumenFiltroMulti(this);_aplicarFiltrosProgramar('${prefijo}')">${v}
+      </label>`).join('');
+    return `<div class="filtro-multi" style="position:relative">
+      <button type="button" onclick="_toggleFiltroMultiPanel(this)" style="width:170px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:12px;background:#fff;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:4px;cursor:pointer">
+        <span class="filtro-multi-resumen">Todos</span><span style="font-size:9px;color:var(--gris-texto)">&#9660;</span>
+      </button>
+      <div class="filtro-multi-panel" style="display:none;position:absolute;z-index:60;top:100%;left:0;margin-top:2px;background:#fff;border:1px solid var(--gris-borde);border-radius:var(--radio);box-shadow:var(--sombra-md);padding:4px;min-width:170px;max-height:220px;overflow-y:auto">
+        ${opciones}
+      </div>
+    </div>`;
+  }
   if (t && t.soloValorUnico) {
     const valores = _valoresDisponiblesFiltro(tipo);
     const opciones = valores.map(v => `<option value="${v}">${tipo === 'clasificacion' ? _etiquetaClasificacionPanel(v) : v}</option>`).join('');
@@ -2048,6 +2071,31 @@ function _filtroValorAreaHTML(tipo, prefijo) {
   const esAlfa = tipo === 'ejeAlfa';
   return `<input type="${esAlfa ? 'text' : 'number'}" placeholder="Desde" data-rol="desde" oninput="_aplicarFiltrosProgramar('${prefijo}')" style="width:80px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio)">
     <input type="${esAlfa ? 'text' : 'number'}" placeholder="Hasta" data-rol="hasta" oninput="_aplicarFiltrosProgramar('${prefijo}')" style="width:80px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio)">`;
+}
+// Abre/cierra el popover de checkboxes de un filtro `multiple` (2026-10-31) — mismo patrón de
+// "un solo desplegable abierto a la vez" que ya usan los buscadores de cliente (ver
+// `document.addEventListener('click', ...)` en js/proyectos.js), adaptado a que puede haber
+// varios filtros `multiple` simultáneos en la misma pantalla (uno por fila de filtro agregada).
+function _toggleFiltroMultiPanel(btn) {
+  const panel = btn.nextElementSibling;
+  const yaAbierto = panel.style.display === 'block';
+  document.querySelectorAll('.filtro-multi-panel').forEach(p => p.style.display = 'none');
+  panel.style.display = yaAbierto ? 'none' : 'block';
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.filtro-multi')) {
+    document.querySelectorAll('.filtro-multi-panel').forEach(p => p.style.display = 'none');
+  }
+});
+// Texto del botón del popover ("Todos" / valores elegidos / "N seleccionados") — se actualiza
+// al marcar o desmarcar cualquier checkbox del mismo filtro.
+function _actualizarResumenFiltroMulti(checkboxEl) {
+  const cont = checkboxEl.closest('.filtro-multi');
+  if (!cont) return;
+  const marcados = Array.from(cont.querySelectorAll('[data-rol="valor-multi"]:checked')).map(c => c.value);
+  const resumen = cont.querySelector('.filtro-multi-resumen');
+  if (!resumen) return;
+  resumen.textContent = marcados.length === 0 ? 'Todos' : marcados.length <= 2 ? marcados.join(', ') : `${marcados.length} seleccionados`;
 }
 // "Entre cuadros" no tiene sentido literal en Paneles (2026-10-30, mismo cambio de "Cuadro" →
 // "N° Panel" del resto de la pantalla, ver `renderFilasProduccion()`) — único tipo cuya etiqueta
@@ -2091,12 +2139,23 @@ function _parRangoFiltro(valor, numerico) {
   return pa <= pb ? [pa, pb] : [pb, pa];
 }
 function _filaPasaFiltroProgramar(tr, filtro) {
-  const { tipo, desde, hasta, valorUnico } = filtro;
+  const { tipo, desde, hasta, valorUnico, valoresMultiples } = filtro;
   // Generalizado a cualquier tipo `soloValorUnico` (2026-10-27, antes hardcodeado a
   // `tipo === 'ancho' || tipo === 'hilos'` — se agregó "Largo de pieza" con el mismo mecanismo,
   // sin tener que volver a listar su id acá) — el id del tipo siempre coincide con la clave del
   // dataset (`data-dimension` → `dataset.dimension`), mismo criterio que los demás.
   const tDef = TIPOS_FILTRO_PROGRAMAR.find(t => t.id === tipo);
+  // Multi-select (2026-10-31, "Largo de pieza") — la fila pasa si su valor coincide con
+  // CUALQUIERA de los marcados (OR dentro del mismo filtro; sigue siendo AND contra los demás
+  // filtros de la lista, ver `_aplicarFiltrosProgramar()`).
+  if (tDef && tDef.soloValorUnico && tDef.multiple && valoresMultiples) {
+    const raw = tr.dataset[tipo];
+    if (typeof valoresMultiples[0] === 'number') {
+      const v = parseFloat(raw);
+      return !isNaN(v) && valoresMultiples.includes(v);
+    }
+    return valoresMultiples.includes(raw);
+  }
   if (tDef && tDef.soloValorUnico) {
     // Texto o número (2026-10-29, "Clasificación" de Paneles es de texto) — si `valorUnico` ya
     // es un número (Ancho/Hilos/Largo de pieza), compara numérico como siempre; si no, compara
@@ -2133,6 +2192,12 @@ function _filtrosProgramarActivos(prefijo) {
   return Array.from(document.querySelectorAll(`#${prefijo}-filtros-lista .filtro-programar-fila`)).map(fila => {
     const tipo = fila.querySelector('[data-tipo]').value;
     const t = TIPOS_FILTRO_PROGRAMAR.find(x => x.id === tipo);
+    if (t && t.soloValorUnico && t.multiple) {
+      const marcados = Array.from(fila.querySelectorAll('[data-rol="valor-multi"]:checked')).map(c => c.value);
+      if (!marcados.length) return { tipo, valoresMultiples: null };
+      const nums = marcados.map(v => parseFloat(v));
+      return { tipo, valoresMultiples: nums.some(isNaN) ? marcados : nums };
+    }
     if (t && t.soloValorUnico) {
       const valorRaw = fila.querySelector('[data-rol="valor"]').value;
       if (valorRaw === '') return { tipo, valorUnico: null };
@@ -2152,7 +2217,7 @@ function _filtrosProgramarActivos(prefijo) {
       desde: desdeRaw === '' ? null : (esAlfa ? desdeRaw.toUpperCase() : parseFloat(desdeRaw)),
       hasta: hastaRaw === '' ? null : (esAlfa ? hastaRaw.toUpperCase() : parseFloat(hastaRaw)),
     };
-  }).filter(f => f.desde != null || f.hasta != null || f.valorUnico != null || f.siNo != null);
+  }).filter(f => f.desde != null || f.hasta != null || f.valorUnico != null || f.siNo != null || (f.valoresMultiples && f.valoresMultiples.length > 0));
 }
 function _aplicarFiltrosProgramar(prefijo) {
   const filtros = _filtrosProgramarActivos(prefijo);

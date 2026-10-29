@@ -1708,3 +1708,57 @@ sección; `verDetalleProduccionRegistrada()` también dice "N° Panel"; el Excel
 como encabezado de columna; y Prelosa sigue exactamente igual que antes en los 4 mismos puntos
 (thead con "Cuadro", Cantidad como `<input>` editable normal, filtro "Entre cuadros") —
 regresión, sin errores de consola.
+
+### Filtro "Largo de pieza" — multi-select con popover de checkboxes (2026-10-31)
+
+A pedido del usuario: *"el filtro que tenemos de largo de pieza, me abre un desplegable con las
+que se tienen y me permite escoger solo una medida. pongamosle la opción de poder pinchar varias
+medidas del listado en el mismo filtro"* — pedido acotado explícitamente a ESTE filtro
+(`dimension`/"Largo de pieza"), no a los demás `soloValorUnico` (Ancho, Número de hilos,
+Clasificación), que siguen siendo un `<select>` de una sola opción.
+
+Se investigó primero si ya existía algún patrón de "elegir varios valores de una lista" en el
+resto de la app (chips, checkboxes-en-popover, `<select multiple>`) para reutilizarlo — no hay
+ninguno: los "chips" de Costeo/Estadísticas/Referencias son de selección única (pestañas con
+estilo de chip), y los checkboxes existentes son filtros booleanos independientes o selección de
+filas para una acción masiva, no "varios valores del mismo campo". Se construyó desde cero,
+siguiendo el estilo visual de los desplegables de cliente ya existentes (`#mpy-cliente-resultados`
+en `js/proyectos.js`): un popover con `position:absolute`, `z-index:60` y
+`box-shadow:var(--sombra-md)`.
+
+- **Nueva propiedad `multiple: true`** en la definición de `dimension` dentro de
+  `TIPOS_FILTRO_PROGRAMAR` — mecanismo genérico (cualquier tipo `soloValorUnico` podría marcarse
+  `multiple` en el futuro), pero por ahora solo "Largo de pieza" la tiene, tal como se pidió.
+- **`_filtroValorAreaHTML()`**: para un tipo `soloValorUnico` con `multiple`, en vez del
+  `<select data-rol="valor">` de siempre, renderiza un botón (`.filtro-multi`) que muestra
+  "Todos" / los valores marcados / "N seleccionados", y un panel (`.filtro-multi-panel`) con un
+  `<input type="checkbox" data-rol="valor-multi">` por cada valor real presente en la Losa
+  (mismos valores que ya calculaba `_valoresDisponiblesFiltro()`, sin cambios ahí).
+- **`_toggleFiltroMultiPanel(btn)`** (nueva) abre/cierra el panel, cerrando cualquier otro que
+  haya quedado abierto. Un `document.addEventListener('click', ...)` nuevo (una sola vez, a nivel
+  de módulo) cierra cualquier panel abierto al hacer clic fuera de `.filtro-multi` — mismo patrón
+  ya usado por los buscadores de cliente, adaptado a que puede haber varias filas de filtro
+  `multiple` abiertas en pantalla a la vez.
+- **`_actualizarResumenFiltroMulti(checkboxEl)`** (nueva) recalcula el texto del botón cada vez
+  que se marca/desmarca un checkbox.
+- **`_filtrosProgramarActivos()`**: para un filtro `multiple`, lee los checkboxes marcados del
+  panel en vez del `.value` de un `<select>`, y devuelve `{ tipo, valoresMultiples: [...] }` (sin
+  marcar ninguno = filtro inactivo, igual criterio que "Todos" en el `<select>` simple).
+- **`_filaPasaFiltroProgramar()`**: para `valoresMultiples`, la fila pasa si su valor coincide
+  con CUALQUIERA de los marcados (OR dentro de este filtro — sigue siendo AND contra los demás
+  filtros de la lista, sin cambios en `_aplicarFiltrosProgramar()`).
+
+Como `TIPOS_FILTRO_PROGRAMAR`/`_filaFiltroProgramarHTML()`/`_agregarFiltroProgramar()` ya eran
+100% genéricos por `prefijo` (compartidos entre el cuadro principal `fp` y ambos modales de
+Programar `mpp`/`mpd`), el popover queda disponible en los tres lugares sin tocar nada aparte —
+tal como pidió el usuario ("tanto en las programaciones como en los cuadros").
+
+Verificado con un arnés real — 31 aserciones: el popover reemplaza al `<select>` solo para
+"Largo de pieza" (Ancho sigue con `<select>` simple, regresión); muestra los valores reales y
+distintos de `dimension` de la Losa; marcar 2 valores filtra las filas por OR (ambos valores,
+ninguno de los demás) y el botón resume "2.04, 3"; marcar un tercero cambia el resumen a "3
+seleccionados"; desmarcar todos vuelve a "Todos" y a mostrar todas las filas;
+`_filtrosProgramarActivos()` refleja `valoresMultiples` correctamente y lo excluye cuando no hay
+nada marcado; abrir/cerrar el panel con el botón y cerrarlo con un clic afuera (evento real de
+clic en `document.body`); el mismo popover funciona igual dentro de "Programar producción"
+(`mpp`) sin errores; y quitar la fila de filtro limpia todo. Sin regresión en Ancho/Prelosa.
