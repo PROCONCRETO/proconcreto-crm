@@ -1337,6 +1337,7 @@
         <option value="prelosa">Prelosa</option>
         <option value="vigueta_bovedilla">Vigueta y Bovedilla</option>
         <option value="placa_alveolar">Placa Alveolar</option>
+        <option value="paneles_cerramiento">Paneles de Cerramiento</option>
       </select>
     </div>
     <div id="ml-bloque-prelosa" class="form-grid" style="margin-bottom:10px">
@@ -1345,6 +1346,19 @@
     </div>
     <div id="ml-bloque-vigueta" class="form-grupo" style="margin-bottom:10px">
       <label>Peso por metro lineal (kg/ml)</label><input type="number" step="0.1" id="ml-factor-vigueta" placeholder="Ej: 21.5 (H11)">
+    </div>
+    <!-- Paneles de Cerramiento (2026-10-29) — espesor con <select> de 2 opciones fijas (4/8cm),
+         no un número libre como Prelosa, porque son las dos únicas medidas reales que se
+         fabrican; densidad reusa el mismo criterio que Prelosa/Placa Alveolar (_pesoFila() ya
+         las comparte, ver losas-proyecto.js). -->
+    <div id="ml-bloque-panel" class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Espesor</label>
+        <select id="ml-espesor-panel" style="width:100%;padding:8px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:13px">
+          <option value="4">4 cm (macizo)</option>
+          <option value="8">8 cm (alveolar)</option>
+        </select>
+      </div>
+      <div class="form-grupo"><label>Densidad concreto (kg/m³)</label><input type="number" id="ml-densidad-panel"></div>
     </div>
     <div class="form-grupo" style="margin-bottom:10px"><label>Plano (PDF, opcional)</label>
       <div style="border:2px dashed var(--gris-borde);border-radius:var(--radio);padding:10px;text-align:center;background:#FAFBFC;cursor:pointer" onclick="document.getElementById('losa-plano-input').click()" ondragover="onArrastreSobreArchivoLosa(event)" ondragleave="onArrastreFueraArchivoLosa(event)" ondrop="onSoltarArchivoLosa('plano',event)">
@@ -3437,7 +3451,7 @@
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20261023a"></script>
 <script src="js/proyectos.js?v=20261016b"></script>
-<script src="js/losas-proyecto.js?v=20261027a"></script>
+<script src="js/losas-proyecto.js?v=20261029a"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20261016a"></script>
 <script src="js/cotizador.js?v=20261020a"></script>

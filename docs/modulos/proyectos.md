@@ -1482,3 +1482,175 @@ por remisión, confirmando que una fila NO incluida en una remisión conserva su
 intacto; Bovedilla (entradas/salidas, rechazo de un despacho sin remisión); adjuntar un PDF
 real (firma `%PDF-` válida) y el rechazo de uno sin esa firma; eliminar una Losa con Deshacer —
 sin errores de consola.
+
+## Paneles de Cerramiento — 4º sistema (2026-10-29)
+
+A pedido del usuario: "para proyectos, metamos otra opción que serían los paneles de
+cerramiento. estos se hacen en los mismos bancos de pretensado, por lo que tendrían las mismas
+condiciones. estos se hacen de 4cm de espesor macizo o de 8cm alveolares. una condición
+particular, es que algunos vienen con dos largos, el de un lado y el del otro, para conformar
+un lado con pendiente y generar cuchillas... los anchos de los paneles son estandar de 25 y 50
+cm... los clasificamos como: Panel, Panel cuchilla, Dintel, Dintel cuchilla, Antepecho...
+organicemos la estructura tomando como principio lo que ya tenemos de estructura de prelosa,
+agregandole los requerimientos que te planteo" — a diferencia de los otros 3 sistemas
+(entrepiso, horizontales), los paneles son de fachada/muro, VERTICALES (casas, colegios,
+bodegas), y se fabrican en los mismos bancos de pretensado (Centro de Costos, módulo aparte —
+solo comparten la condición física de producción, no ningún dato).
+
+Antes de implementarlo se armó un plan completo (3 rondas de preguntas al usuario, cada una
+confirmada antes de tocar código):
+- Espesor (4cm macizo/8cm alveolar): **un solo valor por registro completo**, igual que
+  `espesorCm` ya es hoy para Prelosa/Placa Alveolar — *"para un proyecto, pueden cambiar los
+  espesores, pero por unidad constructiva se conservan por lo general los espesores"*.
+- Los dos largos (piezas cuchilla): **dos campos por fila** (`largoA`/`largoB`), mismo patrón
+  que ya usa Vigueta con Hilos Abajo/Hilos Arriba — con la aclaración: *"debes hacer los
+  cálculos de ocupación del banco o la cinta con el más largo"*.
+- Tope de bancos: **sí**, replicar el mismo tipo de límite que ya tiene Prelosa, con el mismo
+  número — *"mismo numero de la prelosa, por siempre a no ser que lo corrijamos"* — pero en
+  constantes independientes, para poder ajustarlo sin afectar a Prelosa.
+
+### Terminología: "Losa" → "Unidad", acotado a los textos visibles
+
+*"no lo llamemos por losa, si no por unidad, pues en este caso no hacemos losas sino casas,
+escuelas, bodegas, etc, y se utilizan de manera vertical"* — `_etiquetaRegistroLosa(sistema)`
+(`js/losas-proyecto.js`) devuelve `"Unidad"` para `paneles_cerramiento` y `"Losa"` para los
+demás. **Solo se tocó donde ya hay un sistema puntual conocido en ese momento**:
+- Título del modal `#modal-losa-titulo`, recalculado dentro de `_alCambiarSistemaLosa()` (que ya
+  corre al abrir el modal Y en cada `onchange` del `<select>` de sistema) — cambia en vivo a
+  "🏗️ Nueva Unidad"/"✏️ Editar Unidad — X" apenas se elige Paneles, sin esperar a guardar.
+  Variables transitorias `_modalLosaEsEdit`/`_modalLosaNombreActual` (mismo criterio que
+  `_archivosLosaPendientes`/`_archivosLosaExistentes`) para que el título se pueda recalcular
+  sin tener que releer el DOM completo cada vez.
+- `eliminarLosa()`: el `confirm()` y el mensaje de `_ofrecerDeshacer()` usan la etiqueta
+  correcta ("¿Eliminar la unidad...?"/"Unidad... eliminada").
+
+**NO se tocó** (decisión explícita): el botón "+ Nueva Losa" y el empty-state de
+`renderLosasProyecto()` (genéricos a TODO el proyecto, que puede mezclar Losas de entrepiso y
+Unidades de Paneles a la vez — sin un sistema puntual conocido en ese momento); ningún nombre
+interno (`LOSAS_PROYECTO`, tabla `losas_proyecto`, `_LOSA_ACTIVA_ID`, `_filasLosaActual`,
+`abrirLosaDetalle()`, `guardarLosa()`, `SISTEMAS_ENTREPISO`), ni los comentarios de código.
+
+### Modelo de datos
+
+`SISTEMAS_ENTREPISO` (línea ~82) gana un 4º elemento, `{clave: 'paneles_cerramiento', etiqueta:
+'Paneles de Cerramiento'}`. Nueva constante de catálogo:
+```js
+const CLASIFICACIONES_PANEL = [
+  { clave: 'panel', etiqueta: 'Panel', cuchilla: false },
+  { clave: 'panel_cuchilla', etiqueta: 'Panel cuchilla', cuchilla: true },
+  { clave: 'dintel', etiqueta: 'Dintel', cuchilla: false },
+  { clave: 'dintel_cuchilla', etiqueta: 'Dintel cuchilla', cuchilla: true },
+  { clave: 'antepecho', etiqueta: 'Antepecho', cuchilla: false },
+];
+```
+El flag `cuchilla` embebido evita repetir `.endsWith('_cuchilla')` por todo el código.
+`ANCHOS_ESTANDAR_PANEL = [25, 50]` y `ESPESORES_ESTANDAR_PANEL = [4, 8]`, mismo patrón que
+`ANCHOS_ESTANDAR_PRELOSA`.
+
+Campos nuevos por fila (sumados a los que ya existen siempre en TODAS las filas, mismo patrón
+que Vigueta): `clasificacion`, `largoA`, `largoB`. `dimension` se sigue derivando/guardando en
+cada edición como el **promedio** de `largoA`/`largoB` (`_sincronizarLargosPanel(i)`, junto a
+`_actualizarFilaProduccion()`) — es la fórmula físicamente exacta del volumen de un trapecio
+(ancho constante, altura variando linealmente entre los dos largos), y con esto **todo** el
+código compartido que ya lee `f.dimension` (peso, Long. total, filtro "Largo de pieza", resumen
+por medidas, impresos, Excel) sigue funcionando sin tocarlo — el ÚNICO lugar que usa el MÁXIMO
+en vez del promedio es la ocupación de banco/cinta (ver más abajo), por instrucción explícita
+del usuario. Si la clasificación NO es cuchilla, `largoB` copia automáticamente a `largoA` cada
+vez que se sincroniza.
+
+### Formulario de fila — Clasificación antepuesta a las medidas
+
+`_filaProduccionHTML()`: rama nueva de 3 vías (antes `esVigueta ? X : Y`, ahora `esVigueta ? X :
+esPanel ? Z : Y`) con, en orden: `<select>` de Clasificación (`_alCambiarClasificacionFilaPanel`,
+en realidad inline: `onchange` fija `f.clasificacion` y llama a `_sincronizarLargosPanel(i)`),
+Ancho (mismo helper `num()` de siempre, validado con `_validarAnchoPanel(i)` contra
+`ANCHOS_ESTANDAR_PANEL`), Largo A, y Largo B — esta última en una celda con id propio
+(`fp-largob-${i}`) que `_actualizarFilaProduccion()` repinta completa (no solo el texto) cada
+vez que cambia la Clasificación, porque su estado habilitado/deshabilitado cambia: deshabilitada
+y copiando Largo A mientras la clasificación no es cuchilla, editable e independiente apenas se
+elige una "...cuchilla". La columna "Dimensión (m)" deja de ser un `<input>` editable para
+Panel — pasa a ser una celda de solo lectura (`fp-dimension-${i}`) que muestra el promedio
+calculado, porque editarla a mano no tendría cómo repartirse de vuelta entre los dos largos
+reales. El candado de medidas ya fabricadas (`fabricado > 0`) se extendió para bloquear también
+Clasificación/Largo A/Largo B, mismo criterio que ya bloqueaba Ancho/Hilos en los otros sistemas.
+
+Mismas 4 columnas (Clasif./Ancho/Largo A/Largo B) en los 2 modales de Programar
+(`abrirModalProgramarProduccion()`/`abrirModalProgramarDespacho()`, de solo lectura ahí), en el
+thead de `renderFilasProduccion()`, y en `exportarFilasLosaExcel()`. Sin columna "Hilos" — no se
+pidió ese campo para Paneles.
+
+### Tope de bancos — constantes independientes de Prelosa
+
+`BANCO_PANEL_METROS_UTILES = 98`, `BANCO_PANEL_NUM_CINTAS = 2`, `BANCO_PANEL_MAX_ANCHOS = 2` —
+mismo valor que Prelosa hoy, pero constantes separadas a propósito (ajustar una no mueve la
+otra). Nuevo `_configBancoSistema(sistema)` — único punto que sabe qué sistema tiene tope y con
+qué números (`null` para Vigueta/Placa Alveolar, sin tope) — generaliza `_topeMetrosBanco()`
+(ahora recibe `cfg` en vez de leer las constantes de Prelosa a fuego),
+`_metrosPorAnchoProgramar()`, `_actualizarResumenBancosProgramar()` (renombrada de
+`_actualizarResumenBancosPrelosa()`) y la validación dura en `guardarProgramacionProduccion()` —
+una sola función/flujo parametrizado por config en los 4 sitios, sin duplicar ninguno.
+
+**Ocupación con el largo MÁS LARGO, no el promedio** — `_metrosPorAnchoProgramar()` calcula, para
+Panel, `Math.max(largoA, largoB) × cantidad` en vez de `dimension × cantidad`: el molde/la cinta
+reserva espacio físico según el lado más largo de la pieza cuchilla, sin importar que el otro
+lado sea más corto (instrucción explícita del usuario, distinta del criterio de peso/Long.
+total, que sí usa el promedio).
+
+### Resumen por medidas e imprimibles — tarjetas por ancho + clasificación
+
+`_resumenPorMedidasHTML()`: para Panel, la clave de AGRUPACIÓN interna (dentro de una tarjeta)
+incluye `largoA`/`largoB` explícitos, no solo `dimension` — dos piezas cuchilla con el mismo
+promedio pero largos reales distintos (ej. 3.0/3.0 vs 2.5/3.5) no son la misma pieza y no deben
+agruparse como si lo fueran. La clave de BLOQUE (tarjeta) es `ancho + clasificación` (en vez de
+`ancho + hilos`) — título "ANCHO 50 CM · PANEL" vs "ANCHO 50 CM · DINTEL CUCHILLA", separando
+piezas que se arman distinto en planta, mismo criterio exacto que ya separaba anchos distintos
+el 2026-10-22. Las tarjetas de clasificación "...cuchilla" muestran **Largo A | Largo B** como 2
+columnas separadas (en vez de un solo "Largo") — mostrar el promedio ahí solo confundiría.
+Orden de las tarjetas: `[ancho, posición en CLASIFICACIONES_PANEL, largoA]` — Panel → Panel
+cuchilla → Dintel → Dintel cuchilla → Antepecho, el orden en que el operario agrupa el trabajo.
+
+`_cuadroDetalladoTheadHTML()` gana un parámetro `esPanel` (reestructurado a un array de columnas
+en vez de concatenación lineal, para insertar/omitir limpio la rama de Panel); los 2 imprimibles
+(`_htmlProgramacionProduccion()`/`_htmlProgramacionDespacho()`) arman su fila de detalle con una
+rama propia para Panel (Clasif./Ancho/Largo A/Largo B, sin "Hilos").
+
+### Filtros — `soloConAncho` ya no alcanza con 4 sistemas
+
+`TIPOS_FILTRO_PROGRAMAR`: **Ancho** debe verse en Panel (tiene ancho real 25/50cm) pero **Número
+de hilos** NO (no existe ese campo ahí) — el booleano `soloConAncho` (2 vías) no distinguía esto.
+Reemplazado por `sistemas: [...]` (lista explícita de sistemas donde el tipo aplica; sin
+`sistemas`, disponible en los 4, como Cuadro/Ejes/"Largo de pieza"/los 5 de estado). Nuevo filtro
+**"Clasificación"** (`soloValorUnico`, solo para `paneles_cerramiento`) — primer filtro de TEXTO
+de este sistema (hasta ahora Ancho/Hilos/Largo de pieza eran todos numéricos): `Number()`
+siempre da `NaN` para una clave como `"panel_cuchilla"`, así que `_valoresDisponiblesFiltro()`,
+`_filtrosProgramarActivos()` y `_filaPasaFiltroProgramar()` se generalizaron para aceptar texto
+o número según corresponda, sin romper ningún filtro numérico existente. Etiqueta de "ancho"
+simplificada de "Ancho de prelosa" a "Ancho" (ya no es exclusivo de esa — lo comparte también
+Placa Alveolar y ahora Panel). `_filaFiltroProgramarHTML()`/`_agregarFiltroProgramar()` pasan a
+recibir el `sistema` completo en vez de solo el booleano `esVigueta`.
+
+### Fuera de alcance en esta vuelta (a propósito)
+
+- Pegar desde Excel / Importar archivo para filas de Panel (`onPasteFilasProduccion()`/
+  `onSeleccionImportarFilas()`) — agregar una fila a mano cubre el caso mínimo; se completa si
+  se pide más adelante.
+- Validación defensiva del espesor contra `ESPESORES_ESTANDAR_PANEL` en `guardarLosa()` — el
+  `<select>` de 2 opciones ya restringe la UI, la validación en código es solo cinturón-y-tirantes.
+
+Verificado con un arnés real en 7 tandas (una por paso de implementación) — 68 aserciones en
+total: catálogo de sistema y modal de creación (título dinámico "Nueva Unidad", bloque de
+espesor/densidad propio, validación de espesor 4/8, regresión de Prelosa sin cambios); modelo de
+fila y formulario en modo Lista (Clasificación antepuesta, Largo B copiando/independiente según
+cuchilla, Dimensión derivada repintándose en vivo, Peso/Long. total calculados sobre el
+promedio — no el máximo —, candado de medidas fabricadas, validación de ancho 25/50 al guardar
+la lista); exportación a Excel; filtros (Ancho sí, Hilos no, Clasificación con las etiquetas
+reales en el desplegable, regresión completa de Prelosa/Vigueta); los 2 modales de Programar;
+tope de bancos (el caso crítico: 5 piezas cuchilla 2.0/3.0 dan 15.00 m de ocupación —
+`5 × 3.0`, el máximo — no 12.50 m que daría el promedio; 1 solo ancho topa en 196m, 2 anchos
+distintos topan en 98m cada uno; bloqueo duro al guardar si se excede; constantes
+`BANCO_PANEL_*`/`BANCO_PRELOSA_*` verificadas independientes entre sí); y el resumen por medidas
+con los 2 imprimibles (tarjetas separadas por clasificación, columnas Largo A/Largo B solo en
+las cuchilla, regresión completa de Prelosa) — además de una captura de pantalla real del
+imprimible completo (con el membrete y el pie reales de la app) con las 5 clasificaciones a la
+vez, para confirmar visualmente que las tarjetas y el detalle se ven bien juntos — sin errores
+de consola en ninguna de las 7 tandas.

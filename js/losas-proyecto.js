@@ -83,7 +83,41 @@ const SISTEMAS_ENTREPISO = [
   { clave: 'prelosa', etiqueta: 'Prelosa' },
   { clave: 'vigueta_bovedilla', etiqueta: 'Vigueta y Bovedilla' },
   { clave: 'placa_alveolar', etiqueta: 'Placa Alveolar' },
+  { clave: 'paneles_cerramiento', etiqueta: 'Paneles de Cerramiento' },
 ];
+// Paneles de Cerramiento (2026-10-29, a pedido del usuario: "metamos otra opción que serían los
+// paneles de cerramiento... se hacen en los mismos bancos de pretensado") — a diferencia de los
+// otros 3 (sistemas de ENTREPISO, horizontales), los paneles son de fachada/muro, verticales
+// (casas, colegios, bodegas) — por eso el usuario pidió que el registro que acá se sigue
+// llamando "Losa" internamente (`LOSAS_PROYECTO`, sin cambios, ver `_etiquetaRegistroLosa()`
+// más abajo) se vea como "Unidad" en los textos visibles para este sistema: "no lo llamemos por
+// losa, si no por unidad, pues en este caso no hacemos losas sino casas, escuelas, bodegas...".
+// Clasificación de cada pieza — a diferencia de Vigueta (`tipoVigueta`, texto libre), acá son 5
+// categorías FIJAS, así que van en un `<select>`, no un input libre. `cuchilla: true` marca las
+// 2 que llevan dos largos distintos (un lado con pendiente) — ver `_esClasificacionCuchilla()`
+// y `_sincronizarLargosPanel()`.
+const CLASIFICACIONES_PANEL = [
+  { clave: 'panel', etiqueta: 'Panel', cuchilla: false },
+  { clave: 'panel_cuchilla', etiqueta: 'Panel cuchilla', cuchilla: true },
+  { clave: 'dintel', etiqueta: 'Dintel', cuchilla: false },
+  { clave: 'dintel_cuchilla', etiqueta: 'Dintel cuchilla', cuchilla: true },
+  { clave: 'antepecho', etiqueta: 'Antepecho', cuchilla: false },
+];
+function _esClasificacionCuchilla(clave) {
+  return CLASIFICACIONES_PANEL.find(c => c.clave === clave)?.cuchilla || false;
+}
+function _etiquetaClasificacionPanel(clave) {
+  return CLASIFICACIONES_PANEL.find(c => c.clave === clave)?.etiqueta || clave || '—';
+}
+// "Losa" → "Unidad" solo en los textos VISIBLES de Paneles (confirmado con el usuario, acotado
+// a propósito) — nombres internos (`LOSAS_PROYECTO`, tabla `losas_proyecto`, `_LOSA_ACTIVA_ID`,
+// `_filasLosaActual`, `abrirLosaDetalle()`, `guardarLosa()`, etc.) NO se tocan. El botón
+// "+ Nueva Losa" y el empty-state de `renderLosasProyecto()` tampoco — son genéricos a TODO el
+// proyecto (que puede mezclar Losas de entrepiso y Unidades de Paneles a la vez), sin un sistema
+// puntual conocido en ese momento para decidir la palabra.
+function _etiquetaRegistroLosa(sistema) {
+  return sistema === 'paneles_cerramiento' ? 'Unidad' : 'Losa';
+}
 
 // ── Cálculos — pendiente/peso (mismo criterio ya usado en Logística/Órdenes de Producción:
 // total − Σ(eventos), nunca cacheado, siempre recalculado en el momento) ──
@@ -527,7 +561,13 @@ function renderLosasProyecto() {
 function abrirModalLosa(id) {
   const esEdit = !!id;
   const l = esEdit ? LOSAS_PROYECTO.find(x => x.id === id) : null;
-  document.getElementById('modal-losa-titulo').textContent = esEdit ? `✏️ Editar Losa — ${l?.nombre || ''}` : '🏗️ Nueva Losa';
+  // Título dinámico por sistema (2026-10-29, "Losa"/"Unidad") — `_modalLosaEsEdit`/
+  // `_modalLosaNombreActual` son variables transitorias (mismo criterio que
+  // `_archivosLosaPendientes`/`_archivosLosaExistentes`) para que `_alCambiarSistemaLosa()`
+  // pueda recalcular el título cada vez que cambia el `<select>` de sistema, sin tener que
+  // volver a leer `esEdit`/`l?.nombre` ahí.
+  _modalLosaEsEdit = esEdit;
+  _modalLosaNombreActual = l?.nombre || '';
   document.getElementById('ml-id').value = id || '';
   document.getElementById('ml-nombre').value = l?.nombre || '';
   document.getElementById('ml-ubicacion').value = l?.ubicacion || '';
@@ -535,6 +575,8 @@ function abrirModalLosa(id) {
   document.getElementById('ml-estado').value = l?.estado || 'Planeación';
   document.getElementById('ml-espesor').value = l?.espesorCm || 5;
   document.getElementById('ml-densidad').value = l?.densidadKgM3 || 2400;
+  document.getElementById('ml-espesor-panel').value = (l?.sistema === 'paneles_cerramiento' && l?.espesorCm) || 4;
+  document.getElementById('ml-densidad-panel').value = l?.densidadKgM3 || 2400;
   document.getElementById('ml-factor-vigueta').value = l?.pesoFactorKgM || '';
   _archivosLosaPendientes = { plano: null, memoria: null };
   _archivosLosaExistentes = {
@@ -546,16 +588,31 @@ function abrirModalLosa(id) {
   _alCambiarSistemaLosa();
   document.getElementById('modal-losa').classList.add('abierto');
 }
+let _modalLosaEsEdit = false;
+let _modalLosaNombreActual = '';
 function _alCambiarSistemaLosa() {
-  const esVigueta = document.getElementById('ml-sistema').value === 'vigueta_bovedilla';
-  document.getElementById('ml-bloque-prelosa').style.display = esVigueta ? 'none' : '';
+  const sistema = document.getElementById('ml-sistema').value;
+  const esVigueta = sistema === 'vigueta_bovedilla';
+  const esPanel = sistema === 'paneles_cerramiento';
+  document.getElementById('ml-bloque-prelosa').style.display = (esVigueta || esPanel) ? 'none' : '';
   document.getElementById('ml-bloque-vigueta').style.display = esVigueta ? '' : 'none';
+  document.getElementById('ml-bloque-panel').style.display = esPanel ? '' : 'none';
+  const etiqueta = _etiquetaRegistroLosa(sistema);
+  document.getElementById('modal-losa-titulo').textContent = _modalLosaEsEdit
+    ? `✏️ Editar ${etiqueta} — ${_modalLosaNombreActual}`
+    : `🏗️ Nueva ${etiqueta}`;
 }
 
 async function guardarLosa() {
   const nombre = document.getElementById('ml-nombre').value.trim();
-  if (!nombre) { alert('Completa el Nombre de la losa.'); return; }
   const sistema = document.getElementById('ml-sistema').value;
+  if (!nombre) { alert(`Completa el Nombre de ${sistema === 'paneles_cerramiento' ? 'la unidad' : 'la losa'}.`); return; }
+  // Espesor estándar de Paneles — 4cm (macizo) u 8cm (alveolar), ya restringido por el propio
+  // <select> (#ml-espesor-panel) a esas 2 opciones; esta validación es solo cinturón-y-tirantes.
+  if (sistema === 'paneles_cerramiento' && !ESPESORES_ESTANDAR_PANEL.includes(parseFloat(document.getElementById('ml-espesor-panel').value))) {
+    alert(`El espesor de un panel debe ser ${ESPESORES_ESTANDAR_PANEL.join(' o ')} cm.`);
+    return;
+  }
   const idOrig = document.getElementById('ml-id').value;
   const existente = idOrig ? LOSAS_PROYECTO.find(x => x.id === idOrig) : null;
   const idFinal = idOrig || String(Date.now());
@@ -583,8 +640,12 @@ async function guardarLosa() {
     ubicacion: document.getElementById('ml-ubicacion').value.trim(),
     sistema,
     estado: document.getElementById('ml-estado').value,
-    espesorCm: parseFloat(document.getElementById('ml-espesor').value) || 0,
-    densidadKgM3: parseFloat(document.getElementById('ml-densidad').value) || 0,
+    espesorCm: sistema === 'paneles_cerramiento'
+      ? parseFloat(document.getElementById('ml-espesor-panel').value) || 0
+      : parseFloat(document.getElementById('ml-espesor').value) || 0,
+    densidadKgM3: sistema === 'paneles_cerramiento'
+      ? parseFloat(document.getElementById('ml-densidad-panel').value) || 0
+      : parseFloat(document.getElementById('ml-densidad').value) || 0,
     pesoFactorKgM: parseFloat(document.getElementById('ml-factor-vigueta').value) || 0,
     planoPath, planoNombre, memoriaCalculoPath, memoriaCalculoNombre,
     filas: existente?.filas || [],
@@ -612,11 +673,12 @@ async function guardarLosa() {
 function eliminarLosa(id) {
   const l = LOSAS_PROYECTO.find(x => x.id === id);
   if (!l) return;
-  if (!confirm(`¿Eliminar la losa "${l.nombre}"? Se pierde toda su lista de producción y su control de despacho.`)) return;
+  const etiqueta = _etiquetaRegistroLosa(l.sistema);
+  if (!confirm(`¿Eliminar ${etiqueta === 'Unidad' ? 'la unidad' : 'la losa'} "${l.nombre}"? Se pierde toda su lista de producción y su control de despacho.`)) return;
   const idx = LOSAS_PROYECTO.findIndex(x => x.id === id);
   LOSAS_PROYECTO = LOSAS_PROYECTO.filter(x => x.id !== id);
   renderLosasProyecto();
-  _ofrecerDeshacer(`🗑️ Losa "${l.nombre}" eliminada`,
+  _ofrecerDeshacer(`🗑️ ${etiqueta} "${l.nombre}" eliminada`,
     () => { sb.from('losas_proyecto').delete().eq('id', id).then(({ error }) => { if (error) { console.error(error.message); alert('No se pudo eliminar: ' + error.message); } }); },
     () => { LOSAS_PROYECTO.splice(Math.min(idx, LOSAS_PROYECTO.length), 0, l); renderLosasProyecto(); }
   );
@@ -740,6 +802,7 @@ function renderFilasProduccion() {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   if (!l) return;
   const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const esPanel = l.sistema === 'paneles_cerramiento';
   // La tabla de "Listas de Producción" (Ingeniería) pasa TAL CUAL a Producción y a Despachos,
   // de solo lectura — cada una solo le suma la ÚNICA columna de pendiente que le importa a esa
   // área (2026-10-13, a pedido del usuario): Producción ve Pend. Producción (no le compete
@@ -809,7 +872,11 @@ function renderFilasProduccion() {
   // Producción explícitamente — confirmado con el usuario que aplica igual a Despachos.
   thead.innerHTML = `<tr>
     <th>#</th><th>Cuadro</th><th>Ejes numéricos</th><th>Ejes alfabéticos</th>
-    ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
+    ${esVigueta
+      ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>'
+      : esPanel
+        ? '<th>Clasificación</th><th>Ancho (cm)</th><th>Largo A (m)</th><th>Largo B (m)</th>'
+        : '<th>Ancho (cm)</th><th>Hilos</th>'}
     <th>Dimensión (m)</th><th>Cantidad</th><th>Long. total (m)</th>${esVigueta ? '' : '<th>m²</th>'}<th>Peso (kg)</th>
     ${esLista ? '' : (esProduccion
       ? '<th>Unidades fabricadas</th><th>Unidades faltantes</th><th>Long. total faltante (m)</th>'
@@ -947,6 +1014,7 @@ function exportarFilasLosaExcel() {
   if (!l) return;
   if (!_filasLosaActual.length) { alert('No hay filas para exportar.'); return; }
   const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const esPanel = l.sistema === 'paneles_cerramiento';
   const esLista = _MODO_FLUJO_LOSA === 'lista';
   const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
   const proy = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
@@ -954,7 +1022,7 @@ function exportarFilasLosaExcel() {
 
   const encabezado = [
     '#', 'Cuadro', 'Ejes numéricos', 'Ejes alfabéticos',
-    ...(esVigueta ? ['Vigueta', 'Hilos Abajo', 'Hilos Arriba'] : ['Ancho (cm)', 'Hilos']),
+    ...(esVigueta ? ['Vigueta', 'Hilos Abajo', 'Hilos Arriba'] : esPanel ? ['Clasificación', 'Ancho (cm)', 'Largo A (m)', 'Largo B (m)'] : ['Ancho (cm)', 'Hilos']),
     'Dimensión (m)', 'Cantidad', 'Long. total (m)',
     ...(esVigueta ? [] : ['m²']),
     'Peso (kg)',
@@ -984,7 +1052,11 @@ function exportarFilasLosaExcel() {
     else if (!esLista) { totalColFabricada += dispDesp; totalFaltanteUnidades += pendDesp; totalFaltanteMetros += pendDespM; }
     return [
       i + 1, f.cuadro || '', f.ejesEntre || '', f.laterales || '',
-      ...(esVigueta ? [f.tipoVigueta || '', Number(f.hilosAbajo) || 0, Number(f.hilosArriba) || 0] : [Number(f.ancho) || 0, Number(f.hilos) || 0]),
+      ...(esVigueta
+        ? [f.tipoVigueta || '', Number(f.hilosAbajo) || 0, Number(f.hilosArriba) || 0]
+        : esPanel
+          ? [_etiquetaClasificacionPanel(f.clasificacion), Number(f.ancho) || 0, Number(f.largoA) || 0, Number(f.largoB) || 0]
+          : [Number(f.ancho) || 0, Number(f.hilos) || 0]),
       dim, cant, longTotal,
       ...(esVigueta ? [] : [m2]),
       peso,
@@ -996,7 +1068,7 @@ function exportarFilasLosaExcel() {
   const filaTotales = [
     'TOTALES', '', '',
     '',
-    ...(esVigueta ? ['', '', ''] : ['', '']),
+    ...(esVigueta ? ['', '', ''] : esPanel ? ['', '', '', ''] : ['', '']),
     '', totalUnidades, totalMetros,
     ...(esVigueta ? [] : [totalM2]),
     totalPeso,
@@ -1061,6 +1133,7 @@ function _pieAvanceProduccionHTML() {
 // (🏗️ producción, abajo el botón de despacho), nunca tocar cuadro/dimensión/cantidad, que son
 // el insumo que recibe de Ingeniería.
 function _filaProduccionHTML(f, i, l, esVigueta) {
+  const esPanel = l.sistema === 'paneles_cerramiento';
   const longTotal = (Number(f.dimension) || 0) * (Number(f.cantidad) || 0);
   // m² (2026-10-17, a pedido del usuario) = ancho(m) × largo × cantidad — mismo patrón que
   // "Long. total (m)" (multiplica por cantidad, no es un valor por unidad), para que sumarla
@@ -1139,7 +1212,32 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
       <input type="text" value="${_escAttr(b)}" oninput="_actualizarParEje(${i},'${campo}',1,this.value)" style="width:28px;text-align:center;padding:4px 2px">
     </div>`;
   };
-  return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-fabricado="${fabricado}" data-pend-prod="${pendProd}" data-pend-desp="${pendDesp}" data-disponible="${dispDesp}" data-despachado="${despachado}">
+  // Paneles de Cerramiento (2026-10-29) — Clasificación antepuesta a las medidas (a pedido del
+  // usuario), y los dos largos (`largoA`/`largoB`) en vez de una sola "Dimensión" editable:
+  // `dimension` pasa a ser un valor DERIVADO (promedio de los dos, ver `_sincronizarLargosPanel()`),
+  // así que para Panel esa columna se muestra de solo lectura (celda `fp-dimension-${i}`,
+  // repintada por `_actualizarFilaProduccion()`), nunca como `<input>` editable directo — editar
+  // el promedio a mano no tendría cómo repartirse de vuelta entre los dos largos reales.
+  const selClasif = (valor) => {
+    const opciones = CLASIFICACIONES_PANEL.map(c => `<option value="${c.clave}" ${c.clave === valor ? 'selected' : ''}>${c.etiqueta}</option>`).join('');
+    if (esLista && bloqueado) {
+      return `<select disabled title="${TITULO_BLOQUEO}" style="width:118px;padding:4px;background:var(--gris-fondo);color:var(--gris-medio)">${opciones}</select>`;
+    }
+    return esLista
+      ? `<select onchange="_filasLosaActual[${i}].clasificacion=this.value;_sincronizarLargosPanel(${i})" style="width:118px;padding:4px;border:1px solid var(--gris-borde);border-radius:4px">${opciones}</select>`
+      : _etiquetaClasificacionPanel(valor);
+  };
+  const largoNum = (valor, campo, deshabilitado) => {
+    if (esLista && bloqueado) {
+      return `<input type="number" value="${valor || 0}" disabled title="${TITULO_BLOQUEO}" style="width:50px;background:var(--gris-fondo);color:var(--gris-medio);cursor:not-allowed">`;
+    }
+    if (!esLista) return _esc(valor != null && valor !== '' ? valor : '—');
+    if (deshabilitado) {
+      return `<input type="number" value="${valor || 0}" disabled title="Se copia automáticamente de Largo A — solo editable si la clasificación es 'cuchilla'" style="width:50px;background:var(--gris-fondo);color:var(--gris-medio);cursor:not-allowed">`;
+    }
+    return `<input type="number" step="0.01" value="${valor || ''}" oninput="_filasLosaActual[${i}].${campo}=parseFloat(this.value)||0;_sincronizarLargosPanel(${i})" style="width:50px">`;
+  };
+  return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-clasificacion="${_escAttr(f.clasificacion || '')}" data-fabricado="${fabricado}" data-pend-prod="${pendProd}" data-pend-desp="${pendDesp}" data-disponible="${dispDesp}" data-despachado="${despachado}">
     <td>${i + 1}</td>
     <td>${txt(f.cuadro, 'cuadro', 48, false, true)}</td>
     <td>${par(f.ejesEntre, 'ejesEntre')}</td>
@@ -1148,11 +1246,18 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     <td>${txt(f.tipoVigueta, 'tipoVigueta', 54, true)}</td>
     <td>${num(f.hilosAbajo, 'hilosAbajo', 44, false, '', true)}</td>
     <td>${num(f.hilosArriba, 'hilosArriba', 44, false, '', true)}</td>
+    ` : esPanel ? `
+    <td>${selClasif(f.clasificacion)}</td>
+    <td>${num(f.ancho, 'ancho', 54, true, `_validarAnchoPanel(${i})`, true)}</td>
+    <td>${largoNum(f.largoA, 'largoA', false)}</td>
+    <td id="fp-largob-${i}">${largoNum(f.largoB, 'largoB', !_esClasificacionCuchilla(f.clasificacion))}</td>
     ` : `
     <td>${num(f.ancho, 'ancho', 54, true, l.sistema === 'prelosa' ? `_validarAnchoPrelosa(${i})` : '', true)}</td>
     <td>${num(f.hilos, 'hilos', 44, true, '', true)}</td>
     `}
-    <td>${num(f.dimension, 'dimension', 58, true, '', true)}</td>
+    ${esPanel
+      ? `<td id="fp-dimension-${i}" style="text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>`
+      : `<td>${num(f.dimension, 'dimension', 58, true, '', true)}</td>`}
     <td>${num(f.cantidad, 'cantidad', 50, true, `_validarCantidadMinima(${i})`)}</td>
     <td id="fp-longtotal-${i}" style="text-align:right">${longTotal.toFixed(2)}</td>
     ${esVigueta ? '' : `<td id="fp-m2-${i}" style="text-align:right">${m2.toFixed(2)}</td>`}
@@ -1185,6 +1290,20 @@ function _validarAnchoPrelosa(i) {
     renderFilasProduccion();
   }
 }
+// Paneles de Cerramiento (2026-10-29) — anchos estándar 25 y 50 cm (corregidos por el usuario;
+// el espesor, 4 u 8 cm, se valida a nivel de la Unidad completa, ver `guardarLosa()`, no por
+// fila). Mismo patrón exacto de `_validarAnchoPrelosa()`.
+const ANCHOS_ESTANDAR_PANEL = [25, 50];
+const ESPESORES_ESTANDAR_PANEL = [4, 8];
+function _validarAnchoPanel(i) {
+  const f = _filasLosaActual[i];
+  if (!f || !f.ancho) return;
+  if (!ANCHOS_ESTANDAR_PANEL.includes(Number(f.ancho))) {
+    alert(`El ancho de un panel debe ser 25 o 50 cm por estandarización — no se admiten medidas intermedias. Corrige el ancho de la fila "Cuadro ${f.cuadro || i + 1}".`);
+    f.ancho = 0;
+    renderFilasProduccion();
+  }
+}
 // Piso de Cantidad = lo ya fabricado (2026-10-20, a pedido del usuario: "la cantidad... la
 // respuesta es que la editemos hasta el piso de lo ya fabricado") — a diferencia de
 // ancho/largo/hilos (bloqueados del todo una vez hay fabricación, ver `_filaProduccionHTML()`),
@@ -1213,6 +1332,7 @@ function _actualizarFilaProduccion(i) {
   const f = _filasLosaActual[i];
   if (!l || !f) return;
   const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const esPanel = l.sistema === 'paneles_cerramiento';
   const longTotal = (Number(f.dimension) || 0) * (Number(f.cantidad) || 0);
   const m2 = esVigueta ? 0 : (Number(f.ancho) || 0) / 100 * (Number(f.dimension) || 0) * (Number(f.cantidad) || 0);
   const peso = _pesoFila(f, l);
@@ -1230,6 +1350,21 @@ function _actualizarFilaProduccion(i) {
   const elDD = document.getElementById(`fp-dispdesp-${i}`); if (elDD) { elDD.textContent = dispDesp; elDD.style.color = dispDesp > 0 ? 'var(--verde)' : 'var(--gris-medio)'; }
   const elPD = document.getElementById(`fp-penddesp-${i}`); if (elPD) { elPD.textContent = pendDesp; elPD.style.color = pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'; }
   const elPDM = document.getElementById(`fp-penddespm-${i}`); if (elPDM) { elPDM.textContent = pendDespM.toFixed(2); elPDM.style.color = pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'; }
+  // Paneles de Cerramiento (2026-10-29) — "Dimensión" es derivada (promedio de largoA/largoB,
+  // ver `_sincronizarLargosPanel()`), así que necesita repintarse acá igual que Long. total/m²/
+  // Peso; Largo B necesita repintar la CELDA completa (no solo el texto), porque su estado
+  // habilitado/deshabilitado cambia según la Clasificación elegida.
+  if (esPanel) {
+    const elDim = document.getElementById(`fp-dimension-${i}`);
+    if (elDim) elDim.textContent = (Number(f.dimension) || 0).toFixed(2);
+    const elLargoB = document.getElementById(`fp-largob-${i}`);
+    if (elLargoB) {
+      const esCuchilla = _esClasificacionCuchilla(f.clasificacion);
+      elLargoB.innerHTML = esCuchilla
+        ? `<input type="number" step="0.01" value="${f.largoB || ''}" oninput="_filasLosaActual[${i}].largoB=parseFloat(this.value)||0;_sincronizarLargosPanel(${i})" style="width:50px">`
+        : `<input type="number" value="${f.largoB || 0}" disabled title="Se copia automáticamente de Largo A — solo editable si la clasificación es 'cuchilla'" style="width:50px;background:var(--gris-fondo);color:var(--gris-medio);cursor:not-allowed">`;
+    }
+  }
   // Filtros (2026-10-20) — mientras se edita una fila en Lista (Cuadro/Ejes/Ancho/Hilos, los
   // mismos campos que ofrece el filtro), el `data-*` del `<tr>` que lee `_aplicarFiltrosProgramar()`
   // quedaría desactualizado sin esto (esta función solo toca celdas puntuales, nunca reconstruye
@@ -1248,6 +1383,7 @@ function _actualizarFilaProduccion(i) {
     tr.dataset.ancho = f.ancho || 0;
     tr.dataset.hilos = f.hilos || 0;
     tr.dataset.dimension = f.dimension || 0;
+    tr.dataset.clasificacion = f.clasificacion || '';
     // Fabricado no cambia por editar esta fila (depende de fila.produccion[], no de lo
     // planeado) — pero pendiente/disponible SÍ dependen de Cantidad, que es la única de las
     // "importantes" que sigue editable incluso ya fabricada (ver candado más arriba).
@@ -1263,6 +1399,24 @@ function _actualizarFilaProduccion(i) {
   // ya la refresca por dentro (ver esa función), así que no hace falta repetirlo acá; sigue sin
   // tocar el <tbody>, así no se pierde el foco de ningún input a mitad de tecleo.
   _aplicarFiltrosProgramar('fp');
+}
+
+// Paneles de Cerramiento (2026-10-29) — único punto de entrada que mantiene Largo A/Largo B/
+// Dimensión consistentes entre sí, llamado desde el oninput de Largo A, el oninput de Largo B y
+// el onchange de Clasificación (ver `_filaProduccionHTML()`). Si la clasificación NO es
+// "cuchilla" (Panel/Dintel/Antepecho), Largo B siempre copia a Largo A — no hay dos largos
+// reales que guardar. `dimension` = promedio de los dos, la fórmula exacta del volumen de un
+// trapecio (ancho constante, altura variando linealmente entre los dos largos) — es el único
+// campo que el resto del código (peso, Long. total, filtro "Largo de pieza", resumen por
+// medidas, impresos, Excel) necesita conocer; ningún otro lugar se entera de que hay 2 largos,
+// salvo el cálculo de ocupación de banco/cinta, que a propósito usa el MÁXIMO en vez del
+// promedio (ver `_metrosPorAnchoProgramar()`, más abajo — instrucción explícita del usuario).
+function _sincronizarLargosPanel(i) {
+  const f = _filasLosaActual[i];
+  if (!f) return;
+  if (!_esClasificacionCuchilla(f.clasificacion)) f.largoB = f.largoA;
+  f.dimension = ((Number(f.largoA) || 0) + (Number(f.largoB) || 0)) / 2;
+  _actualizarFilaProduccion(i);
 }
 
 // Recompone el valor combinado ("1-1´", "I-G"...) de Ejes numéricos/Ejes alfabéticos a partir
@@ -1281,7 +1435,7 @@ function _actualizarParEje(i, campo, parte, valor) {
 }
 
 function agregarFilaProduccion() {
-  _filasLosaActual.push({ id: _nuevoIdFila(), cuadro: '', ejesEntre: '', laterales: '', ancho: 0, hilos: 0, tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0, dimension: 0, cantidad: 0, observaciones: '', produccion: [] });
+  _filasLosaActual.push({ id: _nuevoIdFila(), cuadro: '', ejesEntre: '', laterales: '', ancho: 0, hilos: 0, tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0, clasificacion: 'panel', largoA: 0, largoB: 0, dimension: 0, cantidad: 0, observaciones: '', produccion: [] });
   renderFilasProduccion();
 }
 
@@ -1409,6 +1563,14 @@ function guardarListaProduccion() {
       return;
     }
   }
+  // Mismo bloqueo, anchos propios de Paneles (2026-10-29).
+  if (l && l.sistema === 'paneles_cerramiento') {
+    const invalidas = _filasLosaActual.filter(f => !ANCHOS_ESTANDAR_PANEL.includes(Number(f.ancho)));
+    if (invalidas.length) {
+      alert(`El ancho de un panel debe ser 25 o 50 cm por estandarización. Corrige el ancho de: ${invalidas.map(f => f.cuadro || '(sin cuadro)').join(', ')}.`);
+      return;
+    }
+  }
   // Bloqueo real de medidas ya fabricadas (2026-10-20) — cubre Pegar/Importar y cualquier otra
   // vía que mute `_filasLosaActual` directo, además de la UI de solo lectura de
   // `_filaProduccionHTML()` (que ya evita que se puedan tocar a mano). Compara contra la
@@ -1416,8 +1578,13 @@ function guardarListaProduccion() {
   // si un campo bloqueado de verdad cambió en esta sesión de edición.
   if (l) {
     const esVigueta = l.sistema === 'vigueta_bovedilla';
-    const camposBloqueados = esVigueta ? ['dimension', 'tipoVigueta', 'hilosAbajo', 'hilosArriba'] : ['dimension', 'ancho', 'hilos'];
-    const ETIQUETA_CAMPO = { dimension: 'largo', ancho: 'ancho', hilos: 'número de hilos', tipoVigueta: 'tipo de vigueta', hilosAbajo: 'hilos abajo', hilosArriba: 'hilos arriba' };
+    const esPanel = l.sistema === 'paneles_cerramiento';
+    const camposBloqueados = esVigueta
+      ? ['dimension', 'tipoVigueta', 'hilosAbajo', 'hilosArriba']
+      : esPanel
+        ? ['dimension', 'ancho', 'clasificacion', 'largoA', 'largoB']
+        : ['dimension', 'ancho', 'hilos'];
+    const ETIQUETA_CAMPO = { dimension: 'largo', ancho: 'ancho', hilos: 'número de hilos', tipoVigueta: 'tipo de vigueta', hilosAbajo: 'hilos abajo', hilosArriba: 'hilos arriba', clasificacion: 'clasificación', largoA: 'largo A', largoB: 'largo B' };
     const originales = l.filas || [];
     for (const f of _filasLosaActual) {
       const fabricado = _fabricadoFila(f);
@@ -1546,20 +1713,26 @@ function abrirModalProgramarProduccion(programacionId) {
   document.getElementById('modal-programar-produccion-titulo').textContent = editando ? '✏️ Editar programación de producción' : '📋 Programar producción';
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
+  const esPanel = !!l && l.sistema === 'paneles_cerramiento';
   const conPendiente = _filasLosaActual.filter(f => _pendienteProduccionFila(f) > 0);
   document.getElementById('mpp-fecha').value = editando ? (editando.fecha || _fmtISO(new Date())) : _fmtISO(new Date());
   document.getElementById('mpp-observaciones').value = editando ? (editando.observaciones || '') : '';
   document.getElementById('mpp-filtros-lista').innerHTML = '';
   // Encabezado dinámico: columnas de ancho/hilos cambian según el sistema, igual que la tabla
-  // principal (ver nota junto a las columnas más abajo).
+  // principal (ver nota junto a las columnas más abajo). Paneles de Cerramiento (2026-10-29)
+  // muestra Clasificación/Ancho/Largo A/Largo B, de solo lectura — mismo criterio.
   document.getElementById('mpp-filas-thead').innerHTML = `<tr>
     <th style="width:28px"><input type="checkbox" onchange="_marcarTodasFilasProgramar(this.checked)"></th>
     <th>Cuadro</th><th>Ejes num.</th><th>Ejes alfa.</th>
-    ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
+    ${esVigueta
+      ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>'
+      : esPanel
+        ? '<th>Clasif.</th><th>Ancho (cm)</th><th>Largo A</th><th>Largo B</th>'
+        : '<th>Ancho (cm)</th><th>Hilos</th>'}
     <th>Dimensión</th><th>Pendiente</th><th>A programar</th>
   </tr>`;
   const tbody = document.getElementById('mpp-filas-body');
-  const colspanVacio = esVigueta ? 10 : 9;
+  const colspanVacio = esVigueta ? 10 : esPanel ? 11 : 9;
   if (!conPendiente.length) {
     tbody.innerHTML = `<tr><td colspan="${colspanVacio}" style="text-align:center;color:var(--gris-medio);padding:10px">No hay filas con saldo pendiente de producción.</td></tr>`;
   } else {
@@ -1570,7 +1743,7 @@ function abrirModalProgramarProduccion(programacionId) {
     // si se quiere programar solo una parte. Los `data-*` alimentan los filtros de abajo (2026-
     // 10-15, a pedido del usuario: "hagamos que pueda uno seleccionar el tipo de filtro a
     // aplicar" — cuadro, ejes numéricos/alfabéticos, ancho, hilos). `oninput` recalcula el
-    // resumen de bancos de prelosa (2026-10-19, ver `_actualizarResumenBancosPrelosa()`).
+    // resumen de bancos (2026-10-19, ver `_actualizarResumenBancosProgramar()`).
     // Columnas "Ejes num."/"Ejes alfa." (2026-10-19, a pedido del usuario: "agreguemos
     // nuevamente los ejes numéricos y alfabéticos en el cuadro que se abre de programación de
     // despachos y de producción") y "Ancho"/"Hilos" (o "Vigueta"/"Hilos Abajo"/"Hilos Arriba",
@@ -1586,8 +1759,10 @@ function abrirModalProgramarProduccion(programacionId) {
       const valorInicial = lineaExistente ? lineaExistente.cantidadProgramada : 0;
       const colEspecifica = esVigueta
         ? `<td>${_esc(f.tipoVigueta) || '—'}</td><td style="text-align:center">${f.hilosAbajo || 0}</td><td style="text-align:center">${f.hilosArriba || 0}</td>`
-        : `<td style="text-align:center">${f.ancho || 0}</td><td style="text-align:center">${f.hilos || 0}</td>`;
-      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-fabricado="${_fabricadoFila(f)}" data-pend-prod="${pend}" data-pend-desp="${_pendienteDespachoFila(f, _despachosLosaActual)}" data-disponible="${_disponibleDespachoFila(f, _despachosLosaActual)}" data-despachado="${_despachadoFila(f.id, _despachosLosaActual)}">
+        : esPanel
+          ? `<td>${_etiquetaClasificacionPanel(f.clasificacion)}</td><td style="text-align:center">${f.ancho || 0}</td><td style="text-align:right">${(Number(f.largoA) || 0).toFixed(2)} m</td><td style="text-align:right">${(Number(f.largoB) || 0).toFixed(2)} m</td>`
+          : `<td style="text-align:center">${f.ancho || 0}</td><td style="text-align:center">${f.hilos || 0}</td>`;
+      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-clasificacion="${_escAttr(f.clasificacion || '')}" data-fabricado="${_fabricadoFila(f)}" data-pend-prod="${pend}" data-pend-desp="${_pendienteDespachoFila(f, _despachosLosaActual)}" data-disponible="${_disponibleDespachoFila(f, _despachosLosaActual)}" data-despachado="${_despachadoFila(f.id, _despachosLosaActual)}">
         <td><input type="checkbox" class="mpp-chk-fila" onchange="_marcarFilaProgramar(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
         <td>${_esc(f.ejesEntre) || '—'}</td>
@@ -1595,17 +1770,17 @@ function abrirModalProgramarProduccion(programacionId) {
         ${colEspecifica}
         <td>${f.dimension || 0} m</td>
         <td>${pend}</td>
-        <td><input type="number" min="0" max="${pend}" value="${valorInicial}" data-fila-id="${_escAttr(f.id)}" data-pendiente="${pend}" oninput="_actualizarResumenBancosPrelosa()" style="width:70px"></td>
+        <td><input type="number" min="0" max="${pend}" value="${valorInicial}" data-fila-id="${_escAttr(f.id)}" data-pendiente="${pend}" oninput="_actualizarResumenBancosProgramar()" style="width:70px"></td>
       </tr>`;
     }).join('');
   }
   document.getElementById('modal-programar-produccion').classList.add('abierto');
-  _actualizarResumenBancosPrelosa();
+  _actualizarResumenBancosProgramar();
 }
 function _marcarFilaProgramar(checkbox) {
   const input = checkbox.closest('tr').querySelector('input[data-fila-id]');
   if (input) input.value = checkbox.checked ? input.dataset.pendiente : 0;
-  _actualizarResumenBancosPrelosa();
+  _actualizarResumenBancosProgramar();
 }
 // Bancos de producción de prelosa (2026-10-19, a pedido del usuario: "los bancos de producción
 // de prelosa son dos cintas de 96 metros útiles por cinta. Lo más común es programar un banco
@@ -1629,10 +1804,34 @@ function _marcarFilaProgramar(checkbox) {
 const BANCO_PRELOSA_METROS_UTILES = 98;
 const BANCO_PRELOSA_NUM_CINTAS = 2;
 const BANCO_PRELOSA_MAX_ANCHOS = 2;
-function _topeMetrosBanco(cantidadAnchos) {
-  return cantidadAnchos <= 1 ? BANCO_PRELOSA_METROS_UTILES * BANCO_PRELOSA_NUM_CINTAS : BANCO_PRELOSA_METROS_UTILES;
+// Paneles de Cerramiento (2026-10-29, a pedido del usuario: "se hacen en los mismos bancos de
+// pretensado, por lo que tendrían las mismas condiciones"; y al preguntar los números reales:
+// "mismo numero de la prelosa, por siempre a no ser que lo corrijamos") — mismo valor hoy, pero
+// constantes INDEPENDIENTES a propósito, para poder ajustar una sin tocar la otra más adelante.
+const BANCO_PANEL_METROS_UTILES = 98;
+const BANCO_PANEL_NUM_CINTAS = 2;
+const BANCO_PANEL_MAX_ANCHOS = 2;
+// Único punto que sabe qué sistema tiene tope de bancos y con qué números — `null` = sin tope
+// (Vigueta/Placa Alveolar). Generaliza `_topeMetrosBanco()`/`_metrosPorAnchoProgramar()`/
+// `_actualizarResumenBancosProgramar()`/la validación de `guardarProgramacionProduccion()` para
+// que sirvan igual en Prelosa y en Paneles sin duplicar ninguna de esas 4 funciones.
+function _configBancoSistema(sistema) {
+  if (sistema === 'prelosa') return { metrosUtiles: BANCO_PRELOSA_METROS_UTILES, numCintas: BANCO_PRELOSA_NUM_CINTAS, maxAnchos: BANCO_PRELOSA_MAX_ANCHOS };
+  if (sistema === 'paneles_cerramiento') return { metrosUtiles: BANCO_PANEL_METROS_UTILES, numCintas: BANCO_PANEL_NUM_CINTAS, maxAnchos: BANCO_PANEL_MAX_ANCHOS };
+  return null;
 }
+function _topeMetrosBanco(cantidadAnchos, cfg) {
+  return cantidadAnchos <= 1 ? cfg.metrosUtiles * cfg.numCintas : cfg.metrosUtiles;
+}
+// Metros de ocupación por ancho de lo que se está programando AHORA en el modal — para Paneles,
+// el usuario pidió explícitamente usar el MÁXIMO de los dos largos de cada pieza cuchilla, no el
+// promedio (`dimension`, que sí es correcto para peso/Long. total — ver `_sincronizarLargosPanel()`):
+// "debes hacer los cálculos de ocupación del banco o la cinta con el más largo" — el molde/la
+// cinta reserva espacio físico según el lado más largo de la pieza, sin importar que el otro
+// lado sea más corto.
 function _metrosPorAnchoProgramar(prefijo) {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const esPanel = !!l && l.sistema === 'paneles_cerramiento';
   const porAncho = new Map();
   document.querySelectorAll(`#${prefijo}-filas-body input[data-fila-id]`).forEach(inp => {
     const cantidad = parseFloat(inp.value) || 0;
@@ -1640,26 +1839,28 @@ function _metrosPorAnchoProgramar(prefijo) {
     const f = _filasLosaActual.find(x => x.id === inp.dataset.filaId);
     if (!f) return;
     const ancho = Number(f.ancho) || 0;
-    const metros = (Number(f.dimension) || 0) * cantidad;
+    const largo = esPanel ? Math.max(Number(f.largoA) || 0, Number(f.largoB) || 0) : (Number(f.dimension) || 0);
+    const metros = largo * cantidad;
     porAncho.set(ancho, (porAncho.get(ancho) || 0) + metros);
   });
   return porAncho;
 }
-function _actualizarResumenBancosPrelosa() {
+function _actualizarResumenBancosProgramar() {
   const cont = document.getElementById('mpp-resumen-bancos');
   if (!cont) return;
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
-  if (!l || l.sistema !== 'prelosa') { cont.innerHTML = ''; return; }
+  const cfg = l && _configBancoSistema(l.sistema);
+  if (!cfg) { cont.innerHTML = ''; return; }
   const porAncho = _metrosPorAnchoProgramar('mpp');
   if (!porAncho.size) { cont.innerHTML = ''; return; }
   const anchos = Array.from(porAncho.keys()).sort((a, b) => a - b);
-  const excesoAnchos = anchos.length > BANCO_PRELOSA_MAX_ANCHOS;
-  const tope = _topeMetrosBanco(anchos.length);
+  const excesoAnchos = anchos.length > cfg.maxAnchos;
+  const tope = _topeMetrosBanco(anchos.length, cfg);
   const filasHTML = anchos.map(a => {
     const m = porAncho.get(a);
     const excedido = m > tope;
     return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;padding:2px 0;color:${excedido ? 'var(--rojo)' : 'var(--gris-texto)'}">
-      <span>${a} cm${anchos.length <= 1 ? ' (2 cintas)' : ' (1 cinta)'}</span>
+      <span>${a} cm${anchos.length <= 1 ? ` (${cfg.numCintas} cintas)` : ' (1 cinta)'}</span>
       <span style="display:flex;align-items:center;gap:6px">
         <span style="font-weight:700">${m.toFixed(2)} / ${tope} m${excedido ? ' ⚠️' : ''}</span>
         <button type="button" title="Quitar el ancho ${a} cm de esta programación (incluye filas escondidas por el filtro)" onclick="_quitarAnchoProgramar(${a})" style="border:none;background:none;color:var(--gris-medio);cursor:pointer;font-size:13px;line-height:1;padding:0 2px">✕</button>
@@ -1667,9 +1868,9 @@ function _actualizarResumenBancosPrelosa() {
     </div>`;
   }).join('');
   cont.innerHTML = `<div style="margin:4px 0 8px;padding:8px 10px;background:var(--gris-fondo);border-radius:var(--radio)">
-    <div style="font-size:11px;font-weight:700;color:var(--gris-medio);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px">Bancos de producción (2 cintas de ${BANCO_PRELOSA_METROS_UTILES} m c/u)</div>
+    <div style="font-size:11px;font-weight:700;color:var(--gris-medio);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px">Bancos de producción (${cfg.numCintas} cintas de ${cfg.metrosUtiles} m c/u)</div>
     ${filasHTML}
-    ${excesoAnchos ? `<div style="font-size:11.5px;color:var(--rojo);font-weight:600;margin-top:4px">⚠️ Solo se pueden programar ${BANCO_PRELOSA_MAX_ANCHOS} anchos distintos por día (una cinta por ancho) — hay ${anchos.length}.</div>` : ''}
+    ${excesoAnchos ? `<div style="font-size:11.5px;color:var(--rojo);font-weight:600;margin-top:4px">⚠️ Solo se pueden programar ${cfg.maxAnchos} anchos distintos por día (una cinta por ancho) — hay ${anchos.length}.</div>` : ''}
   </div>`;
 }
 // Quita de la programación todas las cantidades de un ancho específico (2026-10-16, a pedido
@@ -1688,7 +1889,7 @@ function _quitarAnchoProgramar(ancho) {
     const chk = tr.querySelector('.mpp-chk-fila');
     if (chk) chk.checked = false;
   });
-  _actualizarResumenBancosPrelosa();
+  _actualizarResumenBancosProgramar();
 }
 // "Marcar todas" solo actúa sobre las filas visibles — si hay un filtro de rango de cuadro
 // activo, respeta ese recorte (coincide con lo que el usuario está viendo, no con la lista
@@ -1738,15 +1939,24 @@ const TIPOS_FILTRO_PROGRAMAR = [
   { id: 'cuadro', label: 'Entre cuadros' },
   { id: 'ejeNum', label: 'Entre ejes numéricos' },
   { id: 'ejeAlfa', label: 'Entre ejes alfabéticos' },
-  { id: 'ancho', label: 'Ancho de prelosa', soloConAncho: true, soloValorUnico: true },
-  { id: 'hilos', label: 'Número de hilos', soloConAncho: true, soloValorUnico: true },
+  // `sistemas` (2026-10-29 — reemplaza a `soloConAncho`, que ya no alcanzaba con 4 sistemas:
+  // "Ancho" sí debe verse en Paneles (tiene ancho real 25/50cm) pero "Número de hilos" NO (no
+  // existe ese campo ahí) — un booleano de 2 vías no distingue eso) — lista explícita de
+  // sistemas donde el tipo aplica; sin `sistemas`, disponible en los 4 (como Cuadro/Ejes/
+  // "Largo de pieza"/los 5 de estado). Etiqueta de "ancho" ya no dice "de prelosa" — hace
+  // tiempo que también lo comparte Placa Alveolar, y ahora Paneles.
+  { id: 'ancho', label: 'Ancho', soloValorUnico: true, sistemas: ['prelosa', 'placa_alveolar', 'paneles_cerramiento'] },
+  { id: 'hilos', label: 'Número de hilos', soloValorUnico: true, sistemas: ['prelosa', 'placa_alveolar'] },
+  // Paneles de Cerramiento (2026-10-29) — mismo mecanismo `soloValorUnico` (desplegable con los
+  // valores reales presentes), pero de TEXTO en vez de número — ver `_valoresDisponiblesFiltro()`/
+  // `_filaPasaFiltroProgramar()`, generalizados para aceptar ambos tipos de valor.
+  { id: 'clasificacion', label: 'Clasificación', soloValorUnico: true, sistemas: ['paneles_cerramiento'] },
   // "Largo de pieza" (2026-10-27, a pedido del usuario: "agreguemos el filtro a los cuadros de
   // las ventanas de proyectos... de largo de la pieza para los diferentes sistemas") — mismo
   // mecanismo exacto que Ancho/Hilos (desplegable con los valores de `f.dimension` que de
-  // verdad existen en esta Losa, `soloValorUnico`), pero SIN `soloConAncho`: a diferencia de
-  // Ancho/Hilos (que vigueta no tiene como campo escalar — ahí son Hilos Abajo/Arriba),
-  // `dimension` SÍ existe igual en los 3 sistemas (prelosa, vigueta, placa alveolar) — "para los
-  // diferentes sistemas" en las propias palabras del usuario.
+  // verdad existen en esta Losa, `soloValorUnico`), pero sin `sistemas`: a diferencia de
+  // Ancho/Hilos, `dimension` SÍ existe igual en los 4 sistemas — "para los diferentes sistemas"
+  // en las propias palabras del usuario.
   { id: 'dimension', label: 'Largo de pieza', soloValorUnico: true },
   // `soloPrefijos` (2026-10-22, a pedido del usuario: "en los modales de programar no
   // deberíamos mostrar solamente lo faltante?... en programación de producción, solo deberíamos
@@ -1781,19 +1991,24 @@ const TIPOS_FILTRO_PROGRAMAR = [
 // (`tr.dataset[tipo]`, vía `data-pend-prod`/`data-pend-desp` → `pendProd`/`pendDesp` en
 // camelCase automático del DOM) para no necesitar un mapeo aparte.
 const TIPOS_FILTRO_SI_NO = ['fabricado', 'pendProd', 'pendDesp', 'disponible', 'despachado'];
+// Generalizado para texto (2026-10-29, "Clasificación" de Paneles) — hasta ahora todo tipo
+// `soloValorUnico` (Ancho/Hilos/Largo de pieza) era numérico; `clasificacion` guarda una clave
+// de texto (`f.clasificacion`, ej. "panel_cuchilla"), que `Number()` siempre convierte a NaN.
 function _valoresDisponiblesFiltro(tipo) {
   const set = new Set();
   _filasLosaActual.forEach(f => {
-    const v = Number(f[tipo]);
-    if (!isNaN(v) && v !== 0) set.add(v);
+    const raw = f[tipo];
+    const v = Number(raw);
+    if (!isNaN(v) && v !== 0) { set.add(v); return; }
+    if (typeof raw === 'string' && raw.trim()) set.add(raw);
   });
-  return Array.from(set).sort((a, b) => a - b);
+  return Array.from(set).sort((a, b) => typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b)));
 }
 function _filtroValorAreaHTML(tipo, prefijo) {
   const t = TIPOS_FILTRO_PROGRAMAR.find(x => x.id === tipo);
   if (t && t.soloValorUnico) {
     const valores = _valoresDisponiblesFiltro(tipo);
-    const opciones = valores.map(v => `<option value="${v}">${v}</option>`).join('');
+    const opciones = valores.map(v => `<option value="${v}">${tipo === 'clasificacion' ? _etiquetaClasificacionPanel(v) : v}</option>`).join('');
     return `<select data-rol="valor" onchange="_aplicarFiltrosProgramar('${prefijo}')" style="width:170px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:12px">
       <option value="">Todos</option>${opciones}
     </select>`;
@@ -1808,10 +2023,10 @@ function _filtroValorAreaHTML(tipo, prefijo) {
   return `<input type="${esAlfa ? 'text' : 'number'}" placeholder="Desde" data-rol="desde" oninput="_aplicarFiltrosProgramar('${prefijo}')" style="width:80px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio)">
     <input type="${esAlfa ? 'text' : 'number'}" placeholder="Hasta" data-rol="hasta" oninput="_aplicarFiltrosProgramar('${prefijo}')" style="width:80px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio)">`;
 }
-function _filaFiltroProgramarHTML(prefijo, esVigueta) {
+function _filaFiltroProgramarHTML(prefijo, sistema) {
   const opciones = TIPOS_FILTRO_PROGRAMAR
     .filter(t => !t.soloPrefijos || t.soloPrefijos.includes(prefijo))
-    .filter(t => !t.soloConAncho || !esVigueta)
+    .filter(t => !t.sistemas || t.sistemas.includes(sistema))
     .map(t => `<option value="${t.id}">${t.label}</option>`).join('');
   return `<div class="filtro-programar-fila" style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
     <select data-tipo onchange="_cambiarTipoFiltroProgramar(this,'${prefijo}')" style="flex:1;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:12px">${opciones}</select>
@@ -1821,8 +2036,7 @@ function _filaFiltroProgramarHTML(prefijo, esVigueta) {
 }
 function _agregarFiltroProgramar(prefijo) {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
-  const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
-  document.getElementById(`${prefijo}-filtros-lista`).insertAdjacentHTML('beforeend', _filaFiltroProgramarHTML(prefijo, esVigueta));
+  document.getElementById(`${prefijo}-filtros-lista`).insertAdjacentHTML('beforeend', _filaFiltroProgramarHTML(prefijo, l?.sistema));
 }
 function _cambiarTipoFiltroProgramar(select, prefijo) {
   select.closest('.filtro-programar-fila').querySelector('.filtro-valor-area').innerHTML = _filtroValorAreaHTML(select.value, prefijo);
@@ -1849,8 +2063,15 @@ function _filaPasaFiltroProgramar(tr, filtro) {
   // dataset (`data-dimension` → `dataset.dimension`), mismo criterio que los demás.
   const tDef = TIPOS_FILTRO_PROGRAMAR.find(t => t.id === tipo);
   if (tDef && tDef.soloValorUnico) {
-    const v = parseFloat(tr.dataset[tipo]);
-    return !isNaN(v) && v === valorUnico;
+    // Texto o número (2026-10-29, "Clasificación" de Paneles es de texto) — si `valorUnico` ya
+    // es un número (Ancho/Hilos/Largo de pieza), compara numérico como siempre; si no, compara
+    // el dataset crudo tal cual (string contra string).
+    const raw = tr.dataset[tipo];
+    if (typeof valorUnico === 'number') {
+      const v = parseFloat(raw);
+      return !isNaN(v) && v === valorUnico;
+    }
+    return raw === valorUnico;
   }
   // Contra un único `data-*` numérico (ver `TIPOS_FILTRO_SI_NO`, mismo id de tipo que la clave
   // del dataset) — elegir el tipo ya significa "mayor a 0" (2026-10-22, ya no hay un "No"
@@ -1879,7 +2100,11 @@ function _filtrosProgramarActivos(prefijo) {
     const t = TIPOS_FILTRO_PROGRAMAR.find(x => x.id === tipo);
     if (t && t.soloValorUnico) {
       const valorRaw = fila.querySelector('[data-rol="valor"]').value;
-      return { tipo, valorUnico: valorRaw === '' ? null : parseFloat(valorRaw) };
+      if (valorRaw === '') return { tipo, valorUnico: null };
+      // Texto o número (2026-10-29, ver nota en `_filaPasaFiltroProgramar()`) — "Clasificación"
+      // llega como clave de texto (ej. "panel_cuchilla"), que `parseFloat()` no sabe convertir.
+      const num = parseFloat(valorRaw);
+      return { tipo, valorUnico: isNaN(num) ? valorRaw : num };
     }
     // Sin `<select>` de valor que leer (2026-10-22) — elegir el tipo en la lista YA es el
     // criterio completo, siempre activo mientras esta fila de filtro exista.
@@ -1943,28 +2168,34 @@ function guardarProgramacionProduccion() {
     if (cantidadProgramada > 0) lineas.push({ filaId: inp.dataset.filaId, cantidadProgramada, cantidadReal: null });
   });
   if (!lineas.length) { alert('Ingresa al menos una cantidad a programar.'); return; }
-  // Tope duro de bancos de prelosa (2026-10-19) — mismo cálculo que
-  // `_actualizarResumenBancosPrelosa()`, pero recalculado contra `lineas` (lo que de verdad se
+  // Tope duro de bancos (2026-10-19, generalizado 2026-10-29 para Paneles de Cerramiento —
+  // mismo tope, constantes propias, ver `_configBancoSistema()`) — mismo cálculo que
+  // `_actualizarResumenBancosProgramar()`, pero recalculado contra `lineas` (lo que de verdad se
   // va a guardar) en vez de confiar en lo que se veía en pantalla.
-  if (l && l.sistema === 'prelosa') {
+  const cfgBanco = l && _configBancoSistema(l.sistema);
+  if (cfgBanco) {
+    const esPanel = l.sistema === 'paneles_cerramiento';
     const porAncho = new Map();
     lineas.forEach(ln => {
       const f = _filasLosaActual.find(x => x.id === ln.filaId);
       if (!f) return;
       const ancho = Number(f.ancho) || 0;
-      const metros = (Number(f.dimension) || 0) * ln.cantidadProgramada;
+      // Ocupación con el largo MÁS LARGO en piezas cuchilla, no el promedio (2026-10-29,
+      // instrucción explícita del usuario — ver nota en `_metrosPorAnchoProgramar()`).
+      const largo = esPanel ? Math.max(Number(f.largoA) || 0, Number(f.largoB) || 0) : (Number(f.dimension) || 0);
+      const metros = largo * ln.cantidadProgramada;
       porAncho.set(ancho, (porAncho.get(ancho) || 0) + metros);
     });
-    if (porAncho.size > BANCO_PRELOSA_MAX_ANCHOS) {
-      alert(`Solo se pueden programar ${BANCO_PRELOSA_MAX_ANCHOS} anchos distintos por día (una cinta por ancho) — esta programación tiene ${porAncho.size}: ${Array.from(porAncho.keys()).sort((a, b) => a - b).join(', ')} cm. Quita cantidades de alguno de los anchos antes de guardar.`);
+    if (porAncho.size > cfgBanco.maxAnchos) {
+      alert(`Solo se pueden programar ${cfgBanco.maxAnchos} anchos distintos por día (una cinta por ancho) — esta programación tiene ${porAncho.size}: ${Array.from(porAncho.keys()).sort((a, b) => a - b).join(', ')} cm. Quita cantidades de alguno de los anchos antes de guardar.`);
       return;
     }
-    const tope = _topeMetrosBanco(porAncho.size);
+    const tope = _topeMetrosBanco(porAncho.size, cfgBanco);
     for (const [ancho, metros] of porAncho) {
       if (metros > tope) {
         const explicacion = porAncho.size <= 1
-          ? `usa las 2 cintas completas (2 × ${BANCO_PRELOSA_METROS_UTILES} = ${tope} m)`
-          : `solo tiene disponible 1 cinta de ${BANCO_PRELOSA_METROS_UTILES} m útiles (hay otro ancho programado ese día, cada uno usa una sola cinta)`;
+          ? `usa las ${cfgBanco.numCintas} cintas completas (${cfgBanco.numCintas} × ${cfgBanco.metrosUtiles} = ${tope} m)`
+          : `solo tiene disponible 1 cinta de ${cfgBanco.metrosUtiles} m útiles (hay otro ancho programado ese día, cada uno usa una sola cinta)`;
         alert(`El ancho ${ancho} cm suma ${metros.toFixed(2)} m, pero ${explicacion} — reduce las cantidades programadas de ese ancho antes de guardar.`);
         return;
       }
@@ -2021,24 +2252,33 @@ function guardarProgramacionProduccion() {
 // bloque, ya no hace falta la rama `conMedidaHilos` que alternaba entre columnas y título).
 function _resumenPorMedidasHTML(lineas, l) {
   const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const esPanel = l.sistema === 'paneles_cerramiento';
   // "Hilos" (2026-10-19, a pedido del usuario: "incluir una columna con el número de hilos") —
   // entra también en la CLAVE de agrupación, no solo como columna — dos líneas del mismo
   // ancho/vigueta y dimensión pero con distinto número de hilos NO son la misma pieza
   // (distinto refuerzo), así que agruparlas bajo un solo número de hilos sería engañoso.
   // Vigueta no tiene un único campo "hilos" (son dos: Abajo/Arriba) — se muestra combinado
   // "2+1", mismo formato corto que ya se usa en el resto de la pantalla para esos dos campos.
+  // Paneles de Cerramiento (2026-10-29) — la clave de agrupación usa Clasificación en vez de
+  // Hilos (no aplica), y a diferencia de los demás sistemas, la clave de FILA (dentro de una
+  // tarjeta) incluye `largoA`/`largoB` por separado, no solo `dimension` (el promedio): dos
+  // piezas cuchilla con el mismo promedio pero largos reales distintos (ej. 3.0/3.0 vs 2.5/3.5)
+  // podrían agruparse como si fueran la misma pieza si solo se mirara el promedio, y no lo son.
   const grupos = new Map();
   let totalPiezasAll = 0, totalMetrosAll = 0, totalPesoAll = 0;
   lineas.forEach(({ f, cantidad }) => {
     const dim = Number(f.dimension) || 0;
     const medida = esVigueta ? (f.tipoVigueta || '—') : (Number(f.ancho) || 0);
     const hilosTxt = esVigueta ? `${Number(f.hilosAbajo) || 0}+${Number(f.hilosArriba) || 0}` : String(Number(f.hilos) || 0);
+    const largoA = Number(f.largoA) || 0, largoB = Number(f.largoB) || 0;
     const peso = _pesoFila({ ...f, cantidad }, l);
     totalPiezasAll += cantidad;
     totalMetrosAll += dim * cantidad;
     totalPesoAll += peso;
-    const clave = `${medida}__${hilosTxt}__${dim.toFixed(2)}`;
-    if (!grupos.has(clave)) grupos.set(clave, { medida, hilosTxt, dim, cantidad: 0, peso: 0 });
+    const clave = esPanel
+      ? `${medida}__${f.clasificacion || ''}__${largoA.toFixed(2)}__${largoB.toFixed(2)}`
+      : `${medida}__${hilosTxt}__${dim.toFixed(2)}`;
+    if (!grupos.has(clave)) grupos.set(clave, { medida, hilosTxt, dim, clasificacion: f.clasificacion, largoA, largoB, cantidad: 0, peso: 0 });
     const g = grupos.get(clave);
     g.cantidad += cantidad;
     // Mismo peso por unidad para todas las líneas de un mismo grupo (comparten ancho/vigueta y
@@ -2046,22 +2286,33 @@ function _resumenPorMedidasHTML(lineas, l) {
     // por línea da el mismo resultado que peso-por-unidad × cantidad total del grupo.
     g.peso += peso;
   });
-  const filas = Array.from(grupos.values()).sort((a, b) => a.dim - b.dim || String(a.medida).localeCompare(String(b.medida)));
+  // Orden: Panel por [ancho, orden natural de CLASIFICACIONES_PANEL, largoA] — Panel → Panel
+  // cuchilla → Dintel → Dintel cuchilla → Antepecho, el orden en que el operario agrupa el
+  // trabajo; los demás sistemas, orden alfanumérico de siempre.
+  const filas = Array.from(grupos.values()).sort((a, b) => {
+    if (esPanel) {
+      const ia = CLASIFICACIONES_PANEL.findIndex(c => c.clave === a.clasificacion);
+      const ib = CLASIFICACIONES_PANEL.findIndex(c => c.clave === b.clasificacion);
+      return (a.medida - b.medida) || (ia - ib) || (a.largoA - b.largoA);
+    }
+    return a.dim - b.dim || String(a.medida).localeCompare(String(b.medida));
+  });
 
-  // Un cuadro aparte por cada ancho/hilos distinto (2026-10-22, a pedido del usuario: "cuando se
-  // tengan dos anchos o dos cantidades de hilos diferentes, independiza en un cuadro una medida
-  // y en el otro otra medida, para facilidad del operario al momento de producir") — agrupa las
-  // filas ya calculadas (por ancho/vigueta + hilos + dimensión) en un nivel más arriba, por
-  // ancho/vigueta + hilos SOLAMENTE (sin la dimensión): cada combinación de esas dos se separa
-  // en su propia tarjeta con su propio título y su propia fila TOTAL, en vez de una sola tabla
-  // mezclando filas de distinta medida — coincide con el caso real que lo motivó: los "bancos
-  // de producción de prelosa" (ver `_topeMetrosBanco()`), donde cada cinta se arma con un ancho
-  // fijo, así que ver de un vistazo "esto es lo de la cinta de 50cm, esto lo de la de 30cm" es
-  // justo lo que facilita el montaje.
+  // Un cuadro aparte por cada ancho/hilos (o ancho/clasificación en Panel) distinto (2026-10-22,
+  // a pedido del usuario: "cuando se tengan dos anchos o dos cantidades de hilos diferentes,
+  // independiza en un cuadro una medida y en el otro otra medida, para facilidad del operario al
+  // momento de producir") — agrupa las filas ya calculadas en un nivel más arriba, SIN la
+  // dimensión/largos: cada combinación distinta se separa en su propia tarjeta con su propio
+  // título y su propia fila TOTAL, en vez de una sola tabla mezclando filas de distinta medida —
+  // coincide con el caso real que lo motivó: los "bancos de producción de prelosa" (ver
+  // `_topeMetrosBanco()`), donde cada cinta se arma con un ancho fijo, así que ver de un vistazo
+  // "esto es lo de la cinta de 50cm, esto lo de la de 30cm" es justo lo que facilita el montaje.
+  // En Panel, la misma lógica separa además "Panel" de "Dintel" de "Panel cuchilla" — piezas que
+  // se arman distinto en planta, mismo criterio exacto.
   const bloquesMap = new Map();
   filas.forEach(g => {
-    const claveBloque = `${g.medida}__${g.hilosTxt}`;
-    if (!bloquesMap.has(claveBloque)) bloquesMap.set(claveBloque, { medida: g.medida, hilosTxt: g.hilosTxt, filas: [], cantidad: 0 });
+    const claveBloque = esPanel ? `${g.medida}__${g.clasificacion}` : `${g.medida}__${g.hilosTxt}`;
+    if (!bloquesMap.has(claveBloque)) bloquesMap.set(claveBloque, { medida: g.medida, hilosTxt: g.hilosTxt, clasificacion: g.clasificacion, filas: [], cantidad: 0 });
     const b = bloquesMap.get(claveBloque);
     b.filas.push(g);
     b.cantidad += g.cantidad;
@@ -2069,21 +2320,33 @@ function _resumenPorMedidasHTML(lineas, l) {
   const bloques = Array.from(bloquesMap.values());
 
   function tarjetaHTML(b) {
+    // Piezas cuchilla llevan Largo A/Largo B como 2 columnas separadas (en vez de un solo
+    // "Largo") — son dos largos reales distintos, mostrar el promedio solo confundiría.
+    const conDosLargos = esPanel && _esClasificacionCuchilla(b.clasificacion);
     const titulo = esVigueta
       ? `VIGUETA ${_esc(b.medida)} · ${b.hilosTxt} HILOS`
-      : `ANCHO ${b.medida} CM · ${b.hilosTxt} HILOS`;
+      : esPanel
+        ? `ANCHO ${b.medida} CM · ${_etiquetaClasificacionPanel(b.clasificacion).toUpperCase()}`
+        : `ANCHO ${b.medida} CM · ${b.hilosTxt} HILOS`;
     let totMetros = 0, totPeso = 0;
     const filasHTML = b.filas.map(g => {
       const longTotal = g.dim * g.cantidad;
       totMetros += longTotal;
       totPeso += g.peso;
+      const colMedida = conDosLargos
+        ? `<td style="padding:4px 0">${g.largoA.toFixed(2)} m</td><td style="padding:4px 0">${g.largoB.toFixed(2)} m</td>`
+        : `<td style="padding:4px 0">${g.dim.toFixed(2)} m</td>`;
       return `<tr style="border-top:1px solid #EDF2F7">
-        <td style="padding:4px 0">${g.dim.toFixed(2)} m</td>
+        ${colMedida}
         <td style="padding:4px 0;text-align:center;font-weight:700">${g.cantidad}</td>
         <td style="padding:4px 0;text-align:right">${longTotal.toFixed(2)} m</td>
         <td style="padding:4px 0;text-align:right">${g.peso.toFixed(1)} kg</td>
       </tr>`;
     }).join('');
+    const theadMedida = conDosLargos
+      ? `<th style="padding:3px 0;font-weight:700;font-size:10px">Largo A</th><th style="padding:3px 0;font-weight:700;font-size:10px">Largo B</th>`
+      : `<th style="padding:3px 0;font-weight:700;font-size:10px">Largo</th>`;
+    const colspanTotal = conDosLargos ? 2 : 1;
     return `<div style="background:#fff;border:1px solid #CBD5E0;border-left:5px solid #1565C0;border-radius:8px;padding:12px 14px;box-shadow:0 2px 6px rgba(0,63,127,0.08)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div style="font-size:13px;font-weight:800;color:#003F7F">${titulo}</div>
@@ -2091,14 +2354,14 @@ function _resumenPorMedidasHTML(lineas, l) {
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="color:#4A5568;text-align:left">
-          <th style="padding:3px 0;font-weight:700;font-size:10px">Largo</th>
+          ${theadMedida}
           <th style="padding:3px 0;font-weight:700;font-size:10px;text-align:center">Cant.</th>
           <th style="padding:3px 0;font-weight:700;font-size:10px;text-align:right">Long. tot.</th>
           <th style="padding:3px 0;font-weight:700;font-size:10px;text-align:right">Peso</th>
         </tr></thead>
         <tbody>${filasHTML}</tbody>
         <tfoot><tr style="background:#E3F0FB">
-          <td style="padding:6px 0 6px 6px;font-weight:800;color:#003F7F;border-radius:4px 0 0 4px">TOTAL</td>
+          <td colspan="${colspanTotal}" style="padding:6px 0 6px 6px;font-weight:800;color:#003F7F;border-radius:4px 0 0 4px">TOTAL</td>
           <td style="padding:6px 0;text-align:center;font-weight:800;color:#003F7F;font-size:14px">${b.cantidad}</td>
           <td style="padding:6px 0;text-align:right;font-weight:800;color:#003F7F;font-size:14px">${totMetros.toFixed(2)} m</td>
           <td style="padding:6px 6px 6px 0;text-align:right;font-weight:800;color:#003F7F;font-size:14px;border-radius:0 4px 4px 0">${totPeso.toFixed(1)} kg</td>
@@ -2133,9 +2396,15 @@ function _resumenPorMedidasHTML(lineas, l) {
 // Encabezado + partido en 2 columnas del cuadro detallado (2026-10-22, ver nota en
 // `_htmlProgramacionProduccion()`) — compartido entre Producción y Despacho, que solo difieren
 // en si llevan columna de Peso o no (`conPeso`) y en qué `<td>`s arma cada `<tr>` el que llama.
-function _cuadroDetalladoTheadHTML(esVigueta, conPeso) {
+// `esPanel` (2026-10-29) reestructura las columnas propias a un array en vez de concatenación
+// lineal — Clasif./Ancho/Largo A/Largo B en vez de Ancho(o Vigueta)/Hilos/Largo, sin "Hilos"
+// (no aplica a Paneles).
+function _cuadroDetalladoTheadHTML(esVigueta, esPanel, conPeso) {
   const th = (txt, align) => `<th style="padding:3px 4px;text-align:${align || 'left'};font-weight:700">${txt}</th>`;
-  return th('#') + th('Cuadro') + th(esVigueta ? 'Vigueta' : 'Ancho', 'center') + th('Hilos', 'center') + th('Largo', 'right') + th('Cant.', 'center') + (conPeso ? th('Peso', 'right') : '') + th('Observ.');
+  const colsPropias = esPanel
+    ? th('Clasif.') + th('Ancho', 'center') + th('Largo A', 'right') + th('Largo B', 'right')
+    : th(esVigueta ? 'Vigueta' : 'Ancho', 'center') + th('Hilos', 'center') + th('Largo', 'right');
+  return th('#') + th('Cuadro') + colsPropias + th('Cant.', 'center') + (conPeso ? th('Peso', 'right') : '') + th('Observ.');
 }
 function _cuadroDetalladoDosColsHTML(filasHTML, theadRowHTML) {
   if (!filasHTML.length) return '';
@@ -2168,6 +2437,7 @@ let _fechaProgramacionImpresa = null;
 // 2026-10-19 más abajo); si se imprimió directo desde la tarjeta, no había ningún modal abierto
 // que reabrir, así que solo regresa a la pantalla de la Losa.
 function _htmlProgramacionProduccion(l, p, sis, esVigueta, fecha, observaciones, lineas, origen) {
+  const esPanel = l.sistema === 'paneles_cerramiento';
   let totalPiezas = 0;
   // Cuadro detallado partido en 2 columnas, de menor jerarquía (2026-10-22, a pedido del
   // usuario: "el cuadro resumen es más importante que el cuadro detallado al momento de
@@ -2180,8 +2450,22 @@ function _htmlProgramacionProduccion(l, p, sis, esVigueta, fecha, observaciones,
   // solo como referencia rápida de "qué cuadro es cuál", con la columna "Observaciones (cant.
   // real)" en blanco para que planta anote a mano la cantidad real lograda.
   const filas = lineas.map(({ f, cantidad }, n) => {
-    const hilosTxt = esVigueta ? `${Number(f.hilosAbajo) || 0}+${Number(f.hilosArriba) || 0}` : String(Number(f.hilos) || 0);
     totalPiezas += cantidad;
+    // Paneles de Cerramiento (2026-10-29) — fila propia, sin "Hilos" (no aplica): Clasificación,
+    // Ancho, Largo A y Largo B en vez de Ancho(o Vigueta)/Hilos/Largo.
+    if (esPanel) {
+      return `<tr style="border-bottom:1px solid #EDF2F7">
+        <td style="padding:3px 4px;color:#999">${n + 1}</td>
+        <td style="padding:3px 4px;font-weight:600">${_esc(f.cuadro) || '—'}</td>
+        <td style="padding:3px 4px">${_etiquetaClasificacionPanel(f.clasificacion)}</td>
+        <td style="padding:3px 4px;text-align:center">${f.ancho || 0}</td>
+        <td style="padding:3px 4px;text-align:right">${(Number(f.largoA) || 0).toFixed(2)}</td>
+        <td style="padding:3px 4px;text-align:right">${(Number(f.largoB) || 0).toFixed(2)}</td>
+        <td style="padding:3px 4px;text-align:center;font-weight:700">${cantidad}</td>
+        <td style="padding:3px 4px;min-width:45px"></td>
+      </tr>`;
+    }
+    const hilosTxt = esVigueta ? `${Number(f.hilosAbajo) || 0}+${Number(f.hilosArriba) || 0}` : String(Number(f.hilos) || 0);
     const colEspecifica = esVigueta
       ? `<td style="padding:3px 4px">${_esc(f.tipoVigueta) || '—'}</td>`
       : `<td style="padding:3px 4px;text-align:center">${f.ancho || 0}</td>`;
@@ -2195,7 +2479,7 @@ function _htmlProgramacionProduccion(l, p, sis, esVigueta, fecha, observaciones,
       <td style="padding:3px 4px;min-width:45px"></td>
     </tr>`;
   });
-  const detalleHTML = _cuadroDetalladoDosColsHTML(filas, _cuadroDetalladoTheadHTML(esVigueta, false));
+  const detalleHTML = _cuadroDetalladoDosColsHTML(filas, _cuadroDetalladoTheadHTML(esVigueta, esPanel, false));
 
   // "← Volver" reabre el modal en vez de solo mostrar la pantalla de atrás (2026-10-19, a
   // pedido del usuario: "cuando le doy imprimir y luego le doy volver, se me cierra la ventana
@@ -2798,6 +3082,7 @@ function abrirModalProgramarDespacho(despachoProgramadoId) {
   document.getElementById('modal-programar-despacho-titulo').textContent = editando ? '✏️ Editar programación de despacho' : '📋 Programar despacho';
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
+  const esPanel = !!l && l.sistema === 'paneles_cerramiento';
   const conDisponible = _filasLosaActual.filter(f => _disponibleDespachoFila(f, _despachosLosaActual) > 0);
   document.getElementById('mpd-fecha').value = editando ? (editando.fecha || _fmtISO(new Date())) : _fmtISO(new Date());
   document.getElementById('mpd-observaciones').value = editando ? (editando.observaciones || '') : '';
@@ -2806,11 +3091,15 @@ function abrirModalProgramarDespacho(despachoProgramadoId) {
   document.getElementById('mpd-filas-thead').innerHTML = `<tr>
     <th style="width:28px"><input type="checkbox" onchange="_marcarTodasFilasProgramarDespacho(this.checked)"></th>
     <th>Cuadro</th><th>Ejes num.</th><th>Ejes alfa.</th>
-    ${esVigueta ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>' : '<th>Ancho (cm)</th><th>Hilos</th>'}
+    ${esVigueta
+      ? '<th>Vigueta</th><th>Hilos Abajo</th><th>Hilos Arriba</th>'
+      : esPanel
+        ? '<th>Clasif.</th><th>Ancho (cm)</th><th>Largo A</th><th>Largo B</th>'
+        : '<th>Ancho (cm)</th><th>Hilos</th>'}
     <th>Dimensión</th><th>Disponible</th><th>A programar</th>
   </tr>`;
   const tbody = document.getElementById('mpd-filas-body');
-  const colspanVacio = esVigueta ? 10 : 9;
+  const colspanVacio = esVigueta ? 10 : esPanel ? 11 : 9;
   if (!conDisponible.length) {
     tbody.innerHTML = `<tr><td colspan="${colspanVacio}" style="text-align:center;color:var(--gris-medio);padding:10px">No hay piezas disponibles para despacho todavía (nada fabricado pendiente de despachar).</td></tr>`;
   } else {
@@ -2822,8 +3111,10 @@ function abrirModalProgramarDespacho(despachoProgramadoId) {
       const valorInicial = lineaExistente ? lineaExistente.cantidadProgramada : 0;
       const colEspecifica = esVigueta
         ? `<td>${_esc(f.tipoVigueta) || '—'}</td><td style="text-align:center">${f.hilosAbajo || 0}</td><td style="text-align:center">${f.hilosArriba || 0}</td>`
-        : `<td style="text-align:center">${f.ancho || 0}</td><td style="text-align:center">${f.hilos || 0}</td>`;
-      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-fabricado="${_fabricadoFila(f)}" data-pend-prod="${_pendienteProduccionFila(f)}" data-pend-desp="${_pendienteDespachoFila(f, _despachosLosaActual)}" data-disponible="${disp}" data-despachado="${_despachadoFila(f.id, _despachosLosaActual)}">
+        : esPanel
+          ? `<td>${_etiquetaClasificacionPanel(f.clasificacion)}</td><td style="text-align:center">${f.ancho || 0}</td><td style="text-align:right">${(Number(f.largoA) || 0).toFixed(2)} m</td><td style="text-align:right">${(Number(f.largoB) || 0).toFixed(2)} m</td>`
+          : `<td style="text-align:center">${f.ancho || 0}</td><td style="text-align:center">${f.hilos || 0}</td>`;
+      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-clasificacion="${_escAttr(f.clasificacion || '')}" data-fabricado="${_fabricadoFila(f)}" data-pend-prod="${_pendienteProduccionFila(f)}" data-pend-desp="${_pendienteDespachoFila(f, _despachosLosaActual)}" data-disponible="${disp}" data-despachado="${_despachadoFila(f.id, _despachosLosaActual)}">
         <td><input type="checkbox" class="mpd-chk-fila" onchange="_marcarFilaProgramarDespacho(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
         <td>${_esc(f.ejesEntre) || '—'}</td>
@@ -2951,6 +3242,7 @@ function guardarProgramacionDespacho() {
 // directo desde la tarjeta "Despachos programados", sin abrir el modal
 // (`imprimirProgramacionDespachoGuardada()`, más abajo).
 function _htmlProgramacionDespacho(l, p, sis, esVigueta, fecha, observaciones, vehiculo, lineas, origen) {
+  const esPanel = l.sistema === 'paneles_cerramiento';
   // Peso como columna adicional (2026-10-17, a pedido del usuario: "en el imprimible de
   // despachos, a diferencia del de producción, es muy importante incluir el peso... " —
   // logística necesita saber cuánto pesa lo que va en cada viaje, a producción no le hace
@@ -2965,9 +3257,23 @@ function _htmlProgramacionDespacho(l, p, sis, esVigueta, fecha, observaciones, v
   // "Vehículo (X ton)" y en el RESUMEN POR MEDIDAS).
   const filas = lineas.map(({ f, cantidad }, n) => {
     const peso = _pesoFila({ ...f, cantidad }, l);
-    const hilosTxt = esVigueta ? `${Number(f.hilosAbajo) || 0}+${Number(f.hilosArriba) || 0}` : String(Number(f.hilos) || 0);
     totalPiezas += cantidad;
     totalPeso += peso;
+    // Paneles de Cerramiento (2026-10-29) — ver nota análoga en `_htmlProgramacionProduccion()`.
+    if (esPanel) {
+      return `<tr style="border-bottom:1px solid #EDF2F7">
+        <td style="padding:3px 4px;color:#999">${n + 1}</td>
+        <td style="padding:3px 4px;font-weight:600">${_esc(f.cuadro) || '—'}</td>
+        <td style="padding:3px 4px">${_etiquetaClasificacionPanel(f.clasificacion)}</td>
+        <td style="padding:3px 4px;text-align:center">${f.ancho || 0}</td>
+        <td style="padding:3px 4px;text-align:right">${(Number(f.largoA) || 0).toFixed(2)}</td>
+        <td style="padding:3px 4px;text-align:right">${(Number(f.largoB) || 0).toFixed(2)}</td>
+        <td style="padding:3px 4px;text-align:center;font-weight:700">${cantidad}</td>
+        <td style="padding:3px 4px;text-align:right">${peso.toFixed(1)}</td>
+        <td style="padding:3px 4px;min-width:45px"></td>
+      </tr>`;
+    }
+    const hilosTxt = esVigueta ? `${Number(f.hilosAbajo) || 0}+${Number(f.hilosArriba) || 0}` : String(Number(f.hilos) || 0);
     const colEspecifica = esVigueta
       ? `<td style="padding:3px 4px">${_esc(f.tipoVigueta) || '—'}</td>`
       : `<td style="padding:3px 4px;text-align:center">${f.ancho || 0}</td>`;
@@ -2982,7 +3288,7 @@ function _htmlProgramacionDespacho(l, p, sis, esVigueta, fecha, observaciones, v
       <td style="padding:3px 4px;min-width:45px"></td>
     </tr>`;
   });
-  const detalleHTML = _cuadroDetalladoDosColsHTML(filas, _cuadroDetalladoTheadHTML(esVigueta, true));
+  const detalleHTML = _cuadroDetalladoDosColsHTML(filas, _cuadroDetalladoTheadHTML(esVigueta, esPanel, true));
 
   // "← Volver" reabre el modal — ver la nota junto al mismo botón en
   // `_htmlProgramacionProduccion()`, mismo motivo exacto. Solo si `origen === 'modal'`.
