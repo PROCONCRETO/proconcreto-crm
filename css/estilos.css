@@ -314,10 +314,17 @@
   .buscador-input { padding: 8px 12px; border: 1px solid var(--gris-borde); border-radius: var(--radio); font-size: 13px; width: 260px; }
 
   /* ── MODAL ── */
-  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; }
+  /* Ventanas flotantes, no bloqueantes (2026-10-30, ver js/ventanas-flotantes.js) — el
+     `.modal-overlay` ya NO oscurece ni bloquea el resto de la pantalla (`pointer-events: none`,
+     sin fondo) para poder seguir trabajando en el resto de ProSuite con la ventana abierta (ej.
+     crear una Materia Prima nueva sin cerrar el Costeo que la necesita); solo centra inicialmente
+     al propio `.modal` por flex, que recupera `pointer-events: auto` para seguir siendo
+     clickeable. El arrastre convierte `.modal` a `position: fixed` con `left/top` explícitos —
+     ver `_traerModalAlFrente()`/el listener de `mousedown` en ese archivo. */
+  .modal-overlay { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 200; align-items: center; justify-content: center; }
   .modal-overlay.abierto { display: flex; }
-  .modal { background: white; border-radius: 8px; padding: 24px; width: 480px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: var(--sombra-md); }
-  .modal-titulo { font-size: 16px; font-weight: 700; color: var(--azul); margin-bottom: 16px; }
+  .modal { background: white; border-radius: 8px; padding: 24px; width: 480px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: var(--sombra-md); pointer-events: auto; }
+  .modal-titulo { font-size: 16px; font-weight: 700; color: var(--azul); margin-bottom: 16px; cursor: grab; user-select: none; }
   .modal-acciones { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 
   /* ── VISTA PREVIA PDF ── */

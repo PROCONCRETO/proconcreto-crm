@@ -30,6 +30,71 @@ A pedido del usuario ("una marca de agua sutil que muestre el logo grande en tod
 
 A pedido del usuario ("se pincha afuera con el mouse y se cierra automáticamente la ventana y se pierde el trabajo adelantado") — se quitó, en `js/historico-clientes-stats.js`, un listener genérico que estaba puesto sobre TODOS los `.modal-overlay` de la app (clic en el fondo oscuro → `classList.remove('abierto')`, sin pasar por `cerrarModal()`). Era el único mecanismo de cierre por clic-afuera en todo el código (no había nada por Escape ni por-modal aparte). Ahora una ventana solo se cierra con su propio botón de Guardar/Cancelar/✕ — comportamiento parejo para las 25 pantallas `.modal-overlay` del aplicativo (creación de cliente, Diseño de Mezcla, Costeo de Producto, etc.), sin tener que tocarlas una por una.
 
+## Ventanas flotantes: modales arrastrables y no bloqueantes (`js/ventanas-flotantes.js`, 2026-10-30)
+
+A pedido del usuario, dos cambios juntos sobre los mismos ~39 `.modal-overlay` de la app:
+
+1. **"Permite que las ventanas secundarias... se puedan mover del centro de la pantalla con el
+   mouse sostenido"** — ahora se pueden arrastrar agarrando el título (`.modal-titulo`, presente
+   en los 39 modales sin excepción).
+2. **"Permite que se pueda, teniendo estas ventanas abiertas, y dando clic por fuera de esta
+   ventana, hacer otras cosas en el prosuite sin necesidad de cerrarla"** — ejemplo real del
+   usuario: editando un Costeo, se da cuenta que falta una Materia Prima en el catálogo; antes
+   tocaba guardar/cerrar el Costeo, ir a Materias Primas, crearla, y volver a abrir el Costeo
+   para seguir. Ahora puede abrir "Materias primas" (u otra ventana) ENCIMA, sin perder el
+   Costeo abierto ni su progreso sin guardar.
+
+**No es lo mismo que el cierre por clic-afuera que se quitó en 2026-08-25** (ver sección de
+arriba) — esa decisión sigue vigente sin cambios: un modal sigue sin cerrarse solo por clic
+afuera, ni antes ni ahora. Lo que cambia es que antes, aunque el clic afuera no cerrara nada,
+tampoco llegaba a ningún otro lado — el `.modal-overlay` seguía ahí tapando/bloqueando toda la
+pantalla con su fondo oscuro (`pointer-events` por defecto), así que un clic afuera simplemente
+no hacía nada. Ahora SÍ llega al resto de la app.
+
+**Mecanismo, genérico para los 39 modales a la vez** (confirmado antes de construirlo: los 39
+`.modal-overlay` comparten exactamente la misma estructura `.modal-overlay` > `.modal` >
+`.modal-titulo`, sin excepciones, y ningún `.modal-titulo` tiene un botón/input adentro) — no
+hizo falta tocar ninguno de los ~30 `abrirXxx()` que ya existen repartidos por el resto del
+código:
+
+- **`css/estilos.css`**: `.modal-overlay` pasa a `pointer-events: none` y pierde su fondo oscuro
+  (antes `rgba(0,0,0,0.45)`) — ya no intercepta clics en ningún punto de la pantalla. `.modal`
+  (el cuadro blanco en sí) recupera `pointer-events: auto` para seguir siendo clickeable. Esto
+  también habilita, como efecto directo, que dos o más modales queden abiertos a la vez — cada
+  uno flota independiente, y ya no tiene sentido un fondo oscuro de pantalla completa por cada
+  uno (se verían oscurecimientos que se suman).
+- **`js/ventanas-flotantes.js`** (nuevo, un solo archivo para los 39):
+  - Un `mousedown` sobre `.modal-titulo` convierte ESE `.modal` de "centrado por flex" (su
+    comportamiento normal) a `position: fixed` con `left`/`top` explícitos, capturados de su
+    posición real en pantalla en ese instante (no salta al empezar a arrastrar); el `mousemove`
+    los va actualizando pegado al punto exacto donde se agarró, con límites para no poder
+    soltarlo fuera de la pantalla.
+  - Cualquier clic dentro de un `.modal` (no solo el título) sube su `z-index` por encima de los
+    demás modales abiertos — así, con dos ventanas flotando, la que se usa por última vez queda
+    al frente.
+  - Un `MutationObserver` liviano POR modal (no uno global sobre todo `document.body`, que
+    dispararía con cualquier cambio de clase en cualquier parte de la app — chips, pestañas,
+    filtros, etc.) detecta cuándo se le agrega/quita la clase `abierto` a su `.modal-overlay`
+    para resetear la posición arrastrada — sin esto, un modal que quedó movido a un lado se
+    abriría ahí la próxima vez en vez de centrado.
+- **Límite aceptado, no un bug**: reabrir el MISMO modal (mismo id) para un registro distinto
+  mientras ya está abierto sin guardar (ej. dos clics que disparan `abrirCosteoProducto()` con
+  códigos distintos) sigue sobrescribiendo su contenido tal como ya pasaba antes de este cambio
+  — cada modal sigue siendo un único nodo del DOM, no una instancia nueva por apertura. Lo nuevo
+  es que esta situación ahora es ALCANZABLE sin querer (antes era imposible porque había que
+  cerrar cualquier modal abierto antes de poder hacer cualquier otra cosa); el ejemplo real del
+  usuario (Costeo + Materias Primas) usa dos modales DISTINTOS, no este caso.
+
+Verificado con un arnés real — 23 aserciones: el overlay de Costeo con `pointer-events:none` y
+el `.modal` con `pointer-events:auto`; un punto de la pantalla fuera del modal resuelve al
+elemento de fondo real (`document.elementFromPoint`) y un clic ahí sí llega, con el modal
+abierto; arrastrar el título mueve el modal exactamente lo que se movió el mouse, y soltar
+(`mouseup`) lo deja fijo; arrastrar fuera de los límites de la pantalla lo topa en los bordes;
+abrir un segundo modal (Materia Prima) con el primero (Costeo) todavía abierto no lo cierra, y
+el nuevo queda al frente; un clic dentro del cuerpo de Costeo (no el título) lo trae de vuelta al
+frente sin moverlo; cerrar y reabrir Costeo limpia la posición arrastrada (nace centrado otra
+vez). Sin errores de consola.
+
 ## Calculadora en campos numéricos (`js/calculadora-inputs.js`, 2026-08-25)
 
 A pedido del usuario ("donde se escriban datos numéricos, poder hacer operaciones básicas") — cualquier `<input type="number">` de TODA la app admite escribir una operación (`+ - * /`, con paréntesis y precedencia normal) en vez de solo el resultado ya calculado, ej. escribir `1500+320` y que al salir del campo quede `1820`.
