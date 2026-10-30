@@ -63,12 +63,20 @@ document.addEventListener('mousedown', (e) => {
   document.body.style.userSelect = 'none';
   e.preventDefault();
 });
+// A pedido del usuario (2026-10-30): antes la ventana quedaba totalmente encerrada en la
+// pantalla, lo que no dejaba despejar la pantalla principal detrás de ella. Ahora se puede
+// arrastrar parcialmente afuera (izquierda, derecha o abajo) para dejar ver lo de atrás — con
+// un margen mínimo (MARGEN_VISIBLE_ARRASTRE) siempre visible para poder volver a agarrarla.
+// Arriba se mantiene el límite en 0: el título vive en el borde superior del modal, así que
+// subirlo de más lo saca de la pantalla y ya no se podría volver a agarrar.
+const MARGEN_VISIBLE_ARRASTRE = 60;
 document.addEventListener('mousemove', (e) => {
   if (!_modalArrastrando) return;
   const modal = _modalArrastrando;
-  const maxLeft = Math.max(0, window.innerWidth - modal.offsetWidth);
-  const maxTop = Math.max(0, window.innerHeight - modal.offsetHeight);
-  modal.style.left = `${Math.min(Math.max(e.clientX - _dragOffsetX, 0), maxLeft)}px`;
+  const minLeft = -(modal.offsetWidth - MARGEN_VISIBLE_ARRASTRE);
+  const maxLeft = window.innerWidth - MARGEN_VISIBLE_ARRASTRE;
+  const maxTop = window.innerHeight - MARGEN_VISIBLE_ARRASTRE;
+  modal.style.left = `${Math.min(Math.max(e.clientX - _dragOffsetX, minLeft), maxLeft)}px`;
   modal.style.top = `${Math.min(Math.max(e.clientY - _dragOffsetY, 0), maxTop)}px`;
 });
 document.addEventListener('mouseup', () => {

@@ -67,8 +67,14 @@ código:
   - Un `mousedown` sobre `.modal-titulo` convierte ESE `.modal` de "centrado por flex" (su
     comportamiento normal) a `position: fixed` con `left`/`top` explícitos, capturados de su
     posición real en pantalla en ese instante (no salta al empezar a arrastrar); el `mousemove`
-    los va actualizando pegado al punto exacto donde se agarró, con límites para no poder
-    soltarlo fuera de la pantalla.
+    los va actualizando pegado al punto exacto donde se agarró.
+  - **Límites de arrastre (ajustado 2026-10-30, mismo día)**: a pedido del usuario — "se puede
+    mover la ventana secundaria, pero limitada al tamaño de la pantalla... esto limita lo que se
+    puede ver en la pantalla principal" — ya NO queda encerrada dentro de la pantalla. Se puede
+    arrastrar parcialmente afuera por la izquierda, la derecha o abajo (dejando siempre
+    `MARGEN_VISIBLE_ARRASTRE = 60px` visibles para poder volver a agarrarla), despejando así la
+    pantalla principal detrás. Arriba sigue topando en 0: el título vive en el borde superior del
+    modal, así que subirlo de más lo saca de la pantalla y ya no se podría volver a agarrar.
   - Cualquier clic dentro de un `.modal` (no solo el título) sube su `z-index` por encima de los
     demás modales abiertos — así, con dos ventanas flotando, la que se usa por última vez queda
     al frente.
@@ -89,11 +95,17 @@ Verificado con un arnés real — 23 aserciones: el overlay de Costeo con `point
 el `.modal` con `pointer-events:auto`; un punto de la pantalla fuera del modal resuelve al
 elemento de fondo real (`document.elementFromPoint`) y un clic ahí sí llega, con el modal
 abierto; arrastrar el título mueve el modal exactamente lo que se movió el mouse, y soltar
-(`mouseup`) lo deja fijo; arrastrar fuera de los límites de la pantalla lo topa en los bordes;
-abrir un segundo modal (Materia Prima) con el primero (Costeo) todavía abierto no lo cierra, y
-el nuevo queda al frente; un clic dentro del cuerpo de Costeo (no el título) lo trae de vuelta al
-frente sin moverlo; cerrar y reabrir Costeo limpia la posición arrastrada (nace centrado otra
-vez). Sin errores de consola.
+(`mouseup`) lo deja fijo; abrir un segundo modal (Materia Prima) con el primero (Costeo) todavía
+abierto no lo cierra, y el nuevo queda al frente; un clic dentro del cuerpo de Costeo (no el
+título) lo trae de vuelta al frente sin moverlo; cerrar y reabrir Costeo limpia la posición
+arrastrada (nace centrado otra vez). Sin errores de consola.
+
+Los límites de arrastre ajustados el mismo día se verificaron por separado — 7 aserciones:
+arrastrar bien a la izquierda deja `left = -(anchoModal - 60)` (parte del modal fuera de
+pantalla por la izquierda); arrastrar bien a la derecha topa en `left = anchoPantalla - 60`;
+arrastrar bien abajo topa en `top = altoPantalla - 60`; intentar subirlo por encima de la
+pantalla sigue topando en `top = 0`; cerrar limpia la posición igual que antes. Sin errores de
+consola.
 
 ## Calculadora en campos numéricos (`js/calculadora-inputs.js`, 2026-08-25)
 
