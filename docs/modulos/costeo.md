@@ -626,6 +626,32 @@ como hicimos ayer en las otras ventanas"):
   cada arrastre), el orden manual que se arrastre en Cuadrillas Productivas aparece ahí también,
   sin ningún cambio en `costeo-referencia.js`.
 
+## Editar un Costeo de Producto ya no pierde su orden manual (2026-10-31)
+
+A pedido del usuario: "cuando actualicemos un costeo, no lo mandemos al final de la lista...
+dejemoslo en el orden que estaba". `guardarCosteoProducto()` reconstruye el registro desde cero
+con `_leerFormularioCosteo()` — que no incluye `orden` porque no es un campo del formulario — y
+luego lo reemplaza entero dentro de `COSTEO_PRODUCTOS[idx]`. Eso borraba, en cada edición, el
+`orden` manual que el usuario hubiera fijado arrastrando la fila (ver sección de arriba). Al
+recargar (realtime), `_normalizarOrdenLista()` (`js/config.js`) rellena cualquier `orden` faltante
+con la posición del registro en el orden de CREACIÓN (`creado` en Supabase, no el de arrastre) —
+así que un costeo creado hace tiempo pero subido a mano cerca del principio del listado, al
+editarlo, "saltaba" de vuelta hacia abajo (a menudo cerca del final, si era de los más viejos).
+
+Arreglo acotado a `guardarCosteoProducto()` (`js/costeo-producto.js`): antes de reemplazar el
+registro, se copia `orden` del que ya existía en `COSTEO_PRODUCTOS[idx]` hacia el nuevo objeto
+— en las dos ramas (producto sin cambiar, y producto cambiado con `codigoAnterior`). Si el
+registro nunca tuvo un `orden` explícito (nunca se arrastró), sigue sin tenerlo después de
+editar, exactamente como antes — el arreglo solo evita que se PIERDA un orden que sí existía.
+
+Verificado con un arnés real — se sembró `COSTEO_PRODUCTOS` con 5 costeos donde el `orden`
+manual no coincide con el orden de los códigos (P2 con `orden:4`, el más alto, simulando que fue
+arrastrado hacia el final a propósito), se abrió "Editar" sobre P2, se cambió el % de
+desperdicio y se guardó: P2 conserva `orden:4` y su posición dentro del arreglo no cambia; el
+campo editado sí se guardó. Como control, se corrió el mismo test contra una copia del archivo
+con el arreglo revertido — ahí sí falla (`orden` queda `undefined`), confirmando que el test
+detecta el problema real. 5/5 PASS con el arreglo puesto, sin errores de consola.
+
 ### Pendiente (no bloquea el uso de Vibrocompactados, Reforzados ni Pretensados)
 
 - Pretensados Moldeados — ni empezado. Requiere revisar `BD MEZCLA AMOBLAMIENTO` en el Excel (probablemente otra estructura distinta a la de banco de pretensado).

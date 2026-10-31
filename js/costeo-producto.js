@@ -2189,11 +2189,15 @@ function guardarCosteoProducto() {
   if (codigoAnterior && codigoAnterior !== c.productoCodigo) {
     // Cambió el producto: borrar el registro viejo e insertar el nuevo (mismo patrón que Maquinaria/Clases Salariales).
     const idx = COSTEO_PRODUCTOS.findIndex(x => x.productoCodigo === codigoAnterior);
-    if (idx >= 0) COSTEO_PRODUCTOS[idx] = c; else COSTEO_PRODUCTOS.push(c);
+    // Conservar el `orden` del registro que se reemplaza (2026-10-31, a pedido del usuario: "no
+    // lo mandemos al final de la lista... dejemoslo en el orden que estaba") — _leerFormularioCosteo()
+    // no trae `orden` (no es un campo del formulario), así que sin esto se perdía el orden
+    // manual (arrastrado con el ☰) cada vez que se editaba un costeo.
+    if (idx >= 0) { c.orden = COSTEO_PRODUCTOS[idx].orden; COSTEO_PRODUCTOS[idx] = c; } else COSTEO_PRODUCTOS.push(c);
     sb.from('costeo_productos').delete().eq('producto_codigo', codigoAnterior).then(guardarEnSupabase);
   } else {
     const idx = COSTEO_PRODUCTOS.findIndex(x => x.productoCodigo === c.productoCodigo);
-    if (idx >= 0) COSTEO_PRODUCTOS[idx] = c; else COSTEO_PRODUCTOS.push(c);
+    if (idx >= 0) { c.orden = COSTEO_PRODUCTOS[idx].orden; COSTEO_PRODUCTOS[idx] = c; } else COSTEO_PRODUCTOS.push(c);
     guardarEnSupabase();
   }
   cerrarModal('modal-costeo-producto');
