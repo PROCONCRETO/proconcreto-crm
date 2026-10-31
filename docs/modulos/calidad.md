@@ -53,6 +53,42 @@ El usuario aclaró que "el metacaolín en realidad es una adición, y pueden exi
 
 **Capacidad de cochada de la mezcladora** (`maquinaria_equipos`, campo `capacidadCochadaM3`, en `js/costeo-maquinaria.js`): el volumen que mezcla una tanda de la mezcladora — dato de la **máquina**, no del diseño ni del producto (ej. "Mezcladora Columbia" = 0,6 m³). Solo aplica a mezcladoras; el resto de máquinas queda en 0. Sirve para que Costeo de Producto convierta un Diseño de Mezcla (dado por m³) a "por cochada" y saque cuántas unidades de producto rinde cada tanda — ver `docs/modulos/costeo.md`.
 
+### Aditivos: ahora se digita el % de Cemento, no la Dosis (g) (2026-10-31)
+
+A pedido del usuario: "los aditivos se calculan como un porcentaje de la cantidad de cemento que
+se le aplica a la mezcla... modifiquemos la estructura... para que el valor a ingresar sea un
+porcentaje, y al frente calcule la cantidad del aditivo" — hasta ahora la Dosis (g) se escribía
+directo (ver bullet de arriba, 2026-08-25); ahora se escribe el **% de Cemento** y la pantalla
+calcula sola la Dosis (g) al frente, en función del Cemento (kg) del mismo formulario.
+
+- Cada fila de `materiales.aditivos[]` suma un campo nuevo, `pctCemento` — el `dosis` (gramos)
+  que ya existía **sigue siendo lo único que lee el resto de la app** (`sumaPorTipo()` en Ajuste
+  Diario, las 3 funciones de costeo en `costeo-producto.js`): se sigue calculando y guardando
+  igual que antes, solo que ahora es un campo DERIVADO (`pctCemento / 100 * cemento_kg * 1000`),
+  no el que se digita. Ese código no necesitó ningún cambio.
+- `renderAditivosDiseno()` (`js/calidad-mezclas.js`) pinta el % como el `<input>` editable y la
+  Dosis (g) como una celda de solo lectura calculada en vivo contra el Cemento (kg) del
+  formulario — cambiar el Cemento (nuevo `oninput` en `m-diseno-cemento`) recalcula la Dosis de
+  TODOS los aditivos sin tocar sus %, porque el % es lo que de verdad se conserva al variar la
+  mezcla. `guardarDiseno()` recalcula `dosis` de cada fila justo antes de guardar, con el Cemento
+  final del formulario — la validación de "producto obligatorio" ahora mira `pctCemento > 0`, no
+  `dosis > 0` (para que siga disparando aunque el Cemento esté en 0 momentáneamente).
+- **No se alteró ningún diseño ya creado**: `_normalizarDiseno()` (mismo lugar que ya migraba
+  `agregados`/`adiciones` de formatos viejos) backfillea `pctCemento` en memoria, al cargar, SOLO
+  si el aditivo no lo tiene todavía — derivándolo de la `dosis` y el Cemento que YA tenía ese
+  diseño (`pctCemento = dosis_g / (cemento_kg × 1000) × 100`). Así, un diseño guardado antes de
+  este cambio muestra el % que reproduce EXACTAMENTE su dosis de siempre, sin que nadie tenga
+  que volver a digitar nada — el backfill es perezoso (en memoria), igual que ya documentaba
+  "Orden manual" más abajo para `orden`; el primer guardado real de cada diseño es el que
+  persiste `pctCemento` en Supabase por primera vez.
+- Verificado con un arnés real: un diseño sembrado con `dosis: 3500` (g) y `cemento: 350` (kg),
+  SIN `pctCemento`, al pasar por `_normalizarDiseno()` queda en `pctCemento: 1` (1% de 350 kg =
+  3.500 g, exacto); al abrir "Editar" y guardar sin tocar nada, la Dosis sigue en 3500 g. Subir
+  el % a 1.5 sin cambiar el Cemento calcula 5.250 g en vivo antes de guardar, y guarda `dosis:
+  5250`. Cambiar el Cemento a 400 kg con el % en 1 recalcula la Dosis mostrada a 4.000 g, sin
+  tocar el %. Un aditivo con % > 0 y sin Producto bloquea el guardado con el mismo mensaje que
+  antes. Sin errores de consola.
+
 ### Orden manual de los diseños (2026-08-27)
 
 A pedido del usuario ("permite que pueda subir o bajar diseños de mezcla para darle el orden que necesite"): mismo patrón de arrastre ya usado en Costeo de Producto/Costos de Referencia/Maquinaria (ver `docs/modulos/costeo.md`, "Reordenamiento manual") — handle `☰` a la izquierda de cada fila (`iniciarArrastreDiseno`/`terminarArrastreDiseno`/`permitirSoltarDiseno`/`quitarResaltadoSoltarDiseno`/`soltarDisenoSobreDiseno` en `js/calidad-mezclas.js`), reordena vía el helper genérico `_reordenarPorArrastre()` (`js/config.js`), clave por `id`. Reemplaza el orden anterior (más reciente primero, por `creadoEn`) — `DISENOS_MEZCLA` ahora llega ordenado por `orden` desde la carga (`_normalizarOrdenLista()`, ver `js/datos-realtime.js`, en `cargarDatosSupabase()` y `recargarDisenosRT()`). El reordenamiento se aplica sobre `DISENOS_MEZCLA` completo, no la vista filtrada por el buscador, así que sigue siendo consistente aunque haya una búsqueda activa. Verificado ejecutando el flujo real (no solo revisión de código): con diseños sin `orden` previo, `_normalizarOrdenLista()` los numera en orden de llegada; arrastrar uno y soltarlo sobre otro reordena `DISENOS_MEZCLA` correctamente, renumera `orden` de todo el arreglo y guarda los 3 registros afectados en Supabase, con la vista reflejando el nuevo orden tras volver a renderizar.

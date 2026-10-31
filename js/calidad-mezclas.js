@@ -44,6 +44,26 @@ function _normalizarDiseno(d) {
     }
     m.adiciones = adiciones;
   }
+  // Migración ultra-vieja (de antes de la lista repetible `aditivos`, un solo aditivo de texto
+  // libre) — mismo caso que ya migraba editarDiseno() a mano; se mueve acá para que quede
+  // normalizado desde que se carga, igual que agregados/adiciones arriba.
+  if (!Array.isArray(m.aditivos)) {
+    m.aditivos = m.aditivo ? [{ tipo: 'Superplastificante', dosis: Number(m.dosisAditivo) || 0 }] : [];
+  }
+  // % de Cemento (2026-10-31, a pedido del usuario: "que el valor a ingresar sea un porcentaje
+  // de la cantidad de cemento... calcula el porcentaje en función de lo que se está aplicando
+  // actualmente, para que no nos altere los diseños actuales") — antes se digitaba la Dosis (g)
+  // directo; ahora se digita el % de Cemento y la pantalla calcula sola la Dosis. Un aditivo que
+  // ya tenía `dosis` pero nunca tuvo `pctCemento` (diseño guardado antes de este cambio) se
+  // backfillea acá, derivando el % a partir de ESA MISMA dosis y el cemento de este diseño — así
+  // el % que aparece reproduce exactamente la dosis que ya tenía, sin alterarla. Si el diseño no
+  // tiene cemento cargado (caso raro), queda en 0% para no dividir por cero.
+  const cementoKg = Number(m.cemento) || 0;
+  m.aditivos.forEach(a => {
+    if (a.pctCemento === undefined || a.pctCemento === null) {
+      a.pctCemento = cementoKg > 0 ? ((Number(a.dosis) || 0) / (cementoKg * 1000)) * 100 : 0;
+    }
+  });
   return d;
 }
 
@@ -229,25 +249,33 @@ function soltarDisenoSobreDiseno(event, idDestino) {
 
 let _aditivosDisenoActual = [];
 
+// Cemento (kg) tal como está en este momento en el formulario — la Dosis de cada aditivo se
+// calcula en vivo contra este valor, así que cambiar el Cemento recalcula todas las dosis sin
+// tocar los % (ver oninput de `m-diseno-cemento`).
+function _cementoKgFormularioDiseno() {
+  return parseFloat(document.getElementById('m-diseno-cemento')?.value) || 0;
+}
+
 function renderAditivosDiseno() {
   const tbody = document.getElementById('aditivos-diseno-body');
   if (!tbody) return;
   if (!_aditivosDisenoActual.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega los aditivos usados en esta mezcla (opcional)</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:10px;color:var(--gris-medio);font-size:12px">Agrega los aditivos usados en esta mezcla (opcional)</td></tr>`;
     return;
   }
   // "Tipo" es la categoría funcional que usa Ajuste Diario de Mezcla para sumar dosis
   // (sumaPorTipo('Superplastificante')/('Acelerante') en calidad-ajuste-mezcla.js) — no se
   // puede volver un producto libre sin romper ese cálculo. "Producto" es aparte: el ítem
   // real de Costos de Referencia que le da precio a esta dosis específica.
-  // Dosis en GRAMOS (2026-08-25, a pedido del usuario — antes decía "kg o %", pero el "%" nunca
-  // se implementó en ningún cálculo real, y el resto de la app (Ajuste Diario/Formato de
-  // Producción, ver calidad-ajuste-mezcla.js) ya mostraba esta misma cantidad como gramos —
-  // unificar en gramos evita decimales confusos para el operario en dosis típicamente pequeñas.
-  // Costeo de Producto hace la conversión g→kg al costear (ver _precioInsumoPorNombre() en
-  // costeo-producto.js), porque el insumo se sigue vendiendo y registrando en Costos de
-  // Referencia en kg (así lo factura el proveedor).
-  tbody.innerHTML = _aditivosDisenoActual.map((a, i) => `
+  // % de Cemento (2026-10-31) — lo que se digita es el % de Cemento, no la Dosis directo; la
+  // Dosis (g) de la última columna es de solo lectura, calculada en vivo a partir de ese % y el
+  // Cemento (kg) del formulario. `dosis` en GRAMOS sigue siendo lo que se guarda y lo que lee el
+  // resto de la app (Ajuste Diario/Costeo de Producto) — se recalcula a partir de `pctCemento`
+  // justo antes de guardar (ver guardarDiseno()), así que esta pantalla es la única que cambió.
+  const cementoKg = _cementoKgFormularioDiseno();
+  tbody.innerHTML = _aditivosDisenoActual.map((a, i) => {
+    const dosisCalculada = (Number(a.pctCemento) || 0) / 100 * cementoKg * 1000;
+    return `
     <tr>
       <td>
         <select onchange="_aditivosDisenoActual[${i}].tipo=this.value">
@@ -257,13 +285,15 @@ function renderAditivosDiseno() {
         </select>
       </td>
       <td><select onchange="_aditivosDisenoActual[${i}].producto=this.value">${_opcionesProductoCatalogo(a.producto || '', 'aditivo')}</select></td>
-      <td><input type="number" value="${a.dosis}" min="0" step="1" onchange="_aditivosDisenoActual[${i}].dosis=parseFloat(this.value)||0"></td>
+      <td><input type="number" value="${a.pctCemento || 0}" min="0" step="0.01" onchange="_aditivosDisenoActual[${i}].pctCemento=parseFloat(this.value)||0;renderAditivosDiseno()" style="width:90px"></td>
+      <td style="text-align:right;color:var(--gris-medio)">${dosisCalculada.toLocaleString('es-CO', { maximumFractionDigits: 1 })}</td>
       <td><button class="btn btn-rojo btn-xs" onclick="eliminarAditivoDiseno(${i})">✕</button></td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function agregarAditivoDiseno() {
-  _aditivosDisenoActual.push({ tipo: 'Superplastificante', producto: '', dosis: 0 });
+  _aditivosDisenoActual.push({ tipo: 'Superplastificante', producto: '', pctCemento: 0 });
   renderAditivosDiseno();
 }
 
@@ -311,8 +341,9 @@ function editarDiseno(id) {
   });
   _agregadosDisenoActual = JSON.parse(JSON.stringify(d.materiales?.agregados || []));
   renderAgregadosDiseno();
-  // Migración: diseños antiguos con un solo aditivo de texto libre → lista nueva
-  _aditivosDisenoActual = JSON.parse(JSON.stringify(d.materiales?.aditivos || (d.materiales?.aditivo ? [{ tipo: 'Superplastificante', dosis: d.materiales.dosisAditivo || 0 }] : [])));
+  // La migración de formatos viejos (aditivo de texto libre, % de Cemento faltante) ya la hace
+  // _normalizarDiseno() al cargar — `d` llega siempre con `materiales.aditivos` como lista.
+  _aditivosDisenoActual = JSON.parse(JSON.stringify(d.materiales?.aditivos || []));
   renderAditivosDiseno();
   _adicionesDisenoActual = JSON.parse(JSON.stringify(d.materiales?.adiciones || []));
   renderAdicionesDiseno();
@@ -362,9 +393,13 @@ function guardarDiseno() {
       return;
     }
   }
+  // Recalcula la Dosis (g) de cada aditivo a partir de su % de Cemento, con el Cemento (kg)
+  // que quedó en el formulario — `dosis` sigue siendo lo único que lee el resto de la app
+  // (Ajuste Diario, Costeo de Producto), así que ese código no necesitó cambios.
+  _aditivosDisenoActual.forEach(a => { a.dosis = (Number(a.pctCemento) || 0) / 100 * cantidadesMat.cemento * 1000; });
   for (let i = 0; i < _aditivosDisenoActual.length; i++) {
     const a = _aditivosDisenoActual[i];
-    if ((Number(a.dosis) || 0) > 0 && !a.producto) {
+    if ((Number(a.pctCemento) || 0) > 0 && !a.producto) {
       alert(`Selecciona el producto del aditivo #${i + 1} (${a.tipo}) antes de guardar — si todavía no existe, créalo primero en Costeo → Costos de Referencia.`);
       return;
     }

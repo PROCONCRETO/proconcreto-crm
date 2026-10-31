@@ -2234,7 +2234,7 @@
           <tr>
             <td style="font-weight:600">Cemento (kg)</td>
             <td><select id="m-diseno-cemento-producto" style="width:100%"></select></td>
-            <td><input type="number" id="m-diseno-cemento" min="0" step="0.1"></td>
+            <td><input type="number" id="m-diseno-cemento" min="0" step="0.1" oninput="renderAditivosDiseno()"></td>
             <td style="text-align:center;color:var(--gris-medio)">—</td>
             <td style="text-align:center;color:var(--gris-medio)">—</td>
           </tr>
@@ -2276,10 +2276,11 @@
     </div>
     <div style="overflow-x:auto;margin-bottom:10px">
       <table class="tabla-items" style="width:100%">
-        <thead><tr><th>Tipo de aditivo</th><th>Producto (Costos de Referencia)</th><th style="width:130px">Dosis (g)</th><th style="width:36px"></th></tr></thead>
+        <thead><tr><th>Tipo de aditivo</th><th>Producto (Costos de Referencia)</th><th style="width:110px">% de Cemento</th><th style="width:100px">Dosis (g)</th><th style="width:36px"></th></tr></thead>
         <tbody id="aditivos-diseno-body"></tbody>
       </table>
     </div>
+    <div style="font-size:11px;color:var(--gris-medio);margin:0 0 10px">El <b>% de Cemento</b> es el dato que se digita — la <b>Dosis (g)</b> la calcula sola la pantalla, en función del Cemento (kg) de arriba (ej. 1% de 350 kg de cemento = 3.500 g).</div>
 
     <div style="font-size:12px;font-weight:700;color:var(--gris-medio);margin:14px 0 8px;display:flex;justify-content:space-between;align-items:center">
       <span>ADICIONES <span style="font-weight:400;text-transform:none">(cementantes — ej. Metacaolín, Puzolana, Escoria)</span></span>
@@ -3445,7 +3446,7 @@
 <script src="js/costeo-maquinaria.js?v=20260920a"></script>
 <script src="js/costeo-referencia.js?v=20260821a"></script>
 <script src="js/costeo-producto.js?v=20261031a"></script>
-<script src="js/calidad-mezclas.js?v=20261011c"></script>
+<script src="js/calidad-mezclas.js?v=20261031a"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
 <script src="js/logistica.js?v=20261011c"></script>
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
