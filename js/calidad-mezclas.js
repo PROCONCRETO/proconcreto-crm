@@ -205,6 +205,7 @@ function renderDisenosMezcla() {
       <td>
         <div class="flex-gap">
           <button class="btn btn-primario btn-xs" onclick="editarDiseno('${d.id}')">✏️ Editar</button>
+          <button class="btn btn-secundario btn-xs" onclick="duplicarDiseno('${d.id}')" title="Duplicar como base de un diseño nuevo">📋</button>
           <button class="btn btn-rojo btn-xs" onclick="eliminarDiseno('${d.id}')">🗑️</button>
         </div>
       </td>
@@ -350,6 +351,23 @@ function editarDiseno(id) {
   document.getElementById('m-diseno-estado').value = d.estado || 'Activo';
   document.getElementById('m-diseno-obs').value = d.observaciones || '';
   document.getElementById('modal-diseno').classList.add('abierto');
+}
+
+// Diseños que comparten receta base y solo cambian por un aditivo agregado (ej. un pigmento de
+// color, donde hay 3 "colores" del mismo bloque) — "Duplicar" evita rearmar todo desde cero
+// (2026-11-03, a pedido del usuario). Reutiliza TODO el prellenado de campos de editarDiseno()
+// (para no duplicar esa lógica) y solo corrige lo que distingue una copia de una edición real:
+// el `id` queda vacío (para que guardarDiseno() cree un registro NUEVO en vez de reemplazar el
+// de origen, ver el `idx`/`unshift` más abajo) y el Código se recalcula, porque a diferencia de
+// Costeo de Producto (donde el campo que se limpia es el Producto) el Código de un diseño es
+// texto libre y único — dejarlo igual al de origen dispararía la alerta de colisión al guardar.
+function duplicarDiseno(id) {
+  const d = DISENOS_MEZCLA.find(x => String(x.id) === String(id));
+  if (!d) return;
+  editarDiseno(id);
+  document.getElementById('m-diseno-id').value = '';
+  document.getElementById('m-diseno-codigo').value = siguienteCodigoDiseno();
+  document.getElementById('modal-diseno-titulo').textContent = `🧪 Nuevo Diseño de Mezcla (basado en ${d.codigo} — ${d.nombre})`;
 }
 
 function guardarDiseno() {

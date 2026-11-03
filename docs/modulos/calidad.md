@@ -89,6 +89,34 @@ calcula sola la Dosis (g) al frente, en función del Cemento (kg) del mismo form
   tocar el %. Un aditivo con % > 0 y sin Producto bloquea el guardado con el mismo mensaje que
   antes. Sin errores de consola.
 
+### "Duplicar" un Diseño de Mezcla (2026-11-03)
+
+Caso de uso: variantes del mismo diseño base que solo cambian por un aditivo agregado — ej. un
+mismo bloque que viene en 3 colores, cada color siendo el mismo diseño más un pigmento distinto
+como aditivo. En vez de modelar esto como un "diseño padre + variantes" (que hubiera obligado a
+tocar cada sitio que lee `DISENOS_MEZCLA` para resolver la herencia), se resolvió con la misma
+idea que ya existía en Costeo de Producto: **"Duplicar" crea un diseño nuevo e independiente**,
+precargado con todo el de origen — el usuario solo agrega el pigmento como una fila más de
+Aditivos (con su % de Cemento) y ajusta el Nombre.
+
+- Botón nuevo (📋) junto a "Editar"/🗑️ en cada fila de la tabla de Diseños de Mezcla.
+- `duplicarDiseno(id)` reutiliza `editarDiseno(id)` para precargar el modal completo (agregados,
+  aditivos con su `pctCemento`, adiciones, materiales, todo) y solo corrige dos campos: el `id`
+  queda vacío (para que `guardarDiseno()` cree un registro NUEVO en vez de reemplazar el de
+  origen) y el Código se recalcula con `siguienteCodigoDiseno()` — a diferencia de Costeo de
+  Producto (donde el campo que se limpia es el Producto, elegido de un desplegable), el Código
+  de un diseño es texto libre y único, así que dejarlo igual al de origen hubiera disparado la
+  alerta de colisión al guardar.
+- El diseño de origen queda intacto: no se le manda ningún `upsert`, solo se guarda el nuevo.
+  La copia arranca con su propio historial de revisiones vacío y su propio `creadoPor`/`creadoEn`
+  (no hereda los del origen), igual que cualquier diseño nuevo.
+- Verificado con un arnés real: se sembró un diseño "DM-001" con cemento/agua/agregados/un
+  aditivo con `pctCemento`; "Duplicar" deja el id vacío, sugiere el código "DM-002", copia
+  nombre/cemento/agregados/aditivos y el título del modal dice "basado en DM-001"; tras cambiar
+  el Nombre y guardar, quedan 2 diseños (el original intacto con su código y nombre de siempre,
+  la copia con el nombre nuevo y el aditivo copiado) y se mandó exactamente un `upsert` a
+  Supabase, con el `id` de la copia — nunca el del origen. Sin errores de consola.
+
 ### Orden manual de los diseños (2026-08-27)
 
 A pedido del usuario ("permite que pueda subir o bajar diseños de mezcla para darle el orden que necesite"): mismo patrón de arrastre ya usado en Costeo de Producto/Costos de Referencia/Maquinaria (ver `docs/modulos/costeo.md`, "Reordenamiento manual") — handle `☰` a la izquierda de cada fila (`iniciarArrastreDiseno`/`terminarArrastreDiseno`/`permitirSoltarDiseno`/`quitarResaltadoSoltarDiseno`/`soltarDisenoSobreDiseno` en `js/calidad-mezclas.js`), reordena vía el helper genérico `_reordenarPorArrastre()` (`js/config.js`), clave por `id`. Reemplaza el orden anterior (más reciente primero, por `creadoEn`) — `DISENOS_MEZCLA` ahora llega ordenado por `orden` desde la carga (`_normalizarOrdenLista()`, ver `js/datos-realtime.js`, en `cargarDatosSupabase()` y `recargarDisenosRT()`). El reordenamiento se aplica sobre `DISENOS_MEZCLA` completo, no la vista filtrada por el buscador, así que sigue siendo consistente aunque haya una búsqueda activa. Verificado ejecutando el flujo real (no solo revisión de código): con diseños sin `orden` previo, `_normalizarOrdenLista()` los numera en orden de llegada; arrastrar uno y soltarlo sobre otro reordena `DISENOS_MEZCLA` correctamente, renumera `orden` de todo el arreglo y guarda los 3 registros afectados en Supabase, con la vista reflejando el nuevo orden tras volver a renderizar.
