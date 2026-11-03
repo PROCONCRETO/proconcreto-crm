@@ -268,6 +268,9 @@ function renderAditivosDiseno() {
   // (sumaPorTipo('Superplastificante')/('Acelerante') en calidad-ajuste-mezcla.js) — no se
   // puede volver un producto libre sin romper ese cálculo. "Producto" es aparte: el ítem
   // real de Costos de Referencia que le da precio a esta dosis específica.
+  // "Pigmento" (2026-11-03, a pedido del usuario) es una categoría más de esta misma lista —
+  // no participa de ningún sumaPorTipo() (no es un plastificante/acelerante que Ajuste Diario
+  // necesite corregir), así que agregarla no le cambia nada a ese cálculo.
   // % de Cemento (2026-10-31) — lo que se digita es el % de Cemento, no la Dosis directo; la
   // Dosis (g) de la última columna es de solo lectura, calculada en vivo a partir de ese % y el
   // Cemento (kg) del formulario. `dosis` en GRAMOS sigue siendo lo que se guarda y lo que lee el
@@ -283,6 +286,7 @@ function renderAditivosDiseno() {
           <option value="Superplastificante" ${a.tipo === 'Superplastificante' ? 'selected' : ''}>Superplastificante</option>
           <option value="Retardante" ${a.tipo === 'Retardante' ? 'selected' : ''}>Retardante</option>
           <option value="Acelerante" ${a.tipo === 'Acelerante' ? 'selected' : ''}>Acelerante</option>
+          <option value="Pigmento" ${a.tipo === 'Pigmento' ? 'selected' : ''}>Pigmento</option>
         </select>
       </td>
       <td><select onchange="_aditivosDisenoActual[${i}].producto=this.value">${_opcionesProductoCatalogo(a.producto || '', 'aditivo')}</select></td>

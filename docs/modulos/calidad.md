@@ -89,6 +89,27 @@ calcula sola la Dosis (g) al frente, en función del Cemento (kg) del mismo form
   tocar el %. Un aditivo con % > 0 y sin Producto bloquea el guardado con el mismo mensaje que
   antes. Sin errores de consola.
 
+### "Pigmento" como categoría más de "Tipo de aditivo" (2026-11-03)
+
+Reporte del usuario: creó un pigmento como Materia Prima en Costos de Referencia con "Rol en
+Diseño de Mezcla" = Aditivo, pero al ir a usarlo en un Diseño de Mezcla "no aparece dentro de
+las opciones" — resultó ser que el selector que miraba era **"Tipo de aditivo"** (el de la
+izquierda, Superplastificante/Retardante/Acelerante), no "Producto (Costos de Referencia)" (el
+de la derecha, que sí lee el catálogo y ya mostraba el pigmento correctamente — verificado con
+un arnés real antes de tocar nada). "Tipo" es la categoría FUNCIONAL que usa Ajuste Diario de
+Mezcla para sumar dosis (`sumaPorTipo()`), así que hasta ahora era una lista cerrada de 3
+opciones fijas, sin relación con el catálogo de Costos de Referencia.
+
+- `renderAditivosDiseno()` (`js/calidad-mezclas.js`) suma **Pigmento** como 4ª opción fija del
+  `<select>` de Tipo. No participa de ningún `sumaPorTipo()` (no es algo que Ajuste Diario
+  necesite corregir como un plastificante/acelerante), así que agregarla no le cambia nada a ese
+  cálculo ni a los diseños ya guardados con los 3 tipos de siempre.
+- Verificado con un arnés real: se sembró un Pigmento en `INSUMOS_COSTOS` con `rolDiseno:
+  'aditivo'`; al agregar una fila de Aditivo en un Diseño de Mezcla nuevo, "Pigmento" aparece y
+  queda seleccionable en "Tipo de aditivo" junto a los 3 de siempre; guardar con Tipo=Pigmento y
+  reabrir para editar conserva el Tipo; la Dosis (g) se sigue calculando bien desde el % de
+  Cemento igual que con cualquier otro tipo. Sin errores de consola.
+
 ### "Duplicar" un Diseño de Mezcla (2026-11-03)
 
 Caso de uso: variantes del mismo diseño base que solo cambian por un aditivo agregado — ej. un
