@@ -1762,3 +1762,57 @@ seleccionados"; desmarcar todos vuelve a "Todos" y a mostrar todas las filas;
 nada marcado; abrir/cerrar el panel con el botón y cerrarlo con un clic afuera (evento real de
 clic en `document.body`); el mismo popover funciona igual dentro de "Programar producción"
 (`mpp`) sin errores; y quitar la fila de filtro limpia todo. Sin regresión en Ancho/Prelosa.
+
+### "Paneles de Cerramiento" se separa en 3 sistemas propios (2026-11-04)
+
+A pedido del usuario: *"especifiquemos los paneles de cerramiento, así: Paneles de cerramiento
+macizos 4cm / Paneles de cerramiento alveolares 8cm / Paneles de cerramiento alveolares 15cm...
+los que tenemos actualmente en el ProSuite incluidos, son de 4cm para que los tipifiques como
+tal. De la información específica de cada panel para 8 y 15, que no tengamos datos, ponlos en
+cero"* — hasta ahora había un único sistema genérico `paneles_cerramiento` con el espesor (4 u
+8cm) como un campo más a elegir dentro del mismo registro; ahora son **3 sistemas propios** en
+el desplegable "Sistema" del modal de creación (`SISTEMAS_ENTREPISO` pasa de 4 a 6 entradas),
+porque en la práctica el espesor va amarrado al tipo de panel, no es una variable libre.
+
+- Claves nuevas: `paneles_macizo_4cm`, `paneles_alveolar_8cm`, `paneles_alveolar_15cm`
+  (reemplazan a `paneles_cerramiento`). Los 3 comparten TODO el resto del comportamiento
+  (clasificación, anchos, cuchilla, tope de bancos) — se tratan como una sola familia con un
+  helper nuevo, `_esSistemaPanel(sistema)` (`js/losas-proyecto.js`), que reemplaza las ~25
+  comparaciones sueltas `sistema === 'paneles_cerramiento'` que había por todo el archivo (mismo
+  patrón `esVigueta`/`esPanel` ya usado en el resto del código, solo que ahora `esPanel` cubre 3
+  claves en vez de 1).
+- El Espesor **ya no se digita** — lo define el Sistema elegido (`ESPESOR_DENSIDAD_DEFAULT_PANEL`,
+  un mapa `clave → {espesorCm, densidadKgM3}`); el campo "Espesor" del modal pasó de un
+  `<select>` de 2 opciones a un `<input disabled>` puramente informativo que se actualiza solo
+  al cambiar de sistema. La Densidad sigue siendo editable, pero con un default distinto por
+  sistema: **2.400 kg/m³ para Macizos 4cm** (dato real, es el que ya usan las Unidades
+  existentes) y **0 para Alveolares 8cm/15cm**, porque todavía no hay ficha técnica propia de
+  esos dos — el usuario puede corregirlo a mano apenas tenga el dato real. El default solo se
+  autocompleta al CREAR una Unidad nueva; al EDITAR una ya existente se respeta la Densidad real
+  ya guardada, aunque el usuario cambie de sistema a mitad de la edición (no se pisa un dato real
+  con el genérico del sistema nuevo).
+- **Migración de las Unidades ya existentes**: `_normalizarLosaProyecto(l)` (nueva, llamada
+  desde `cargarDatosSupabase()` y `recargarLosasProyectoRT()` en `js/datos-realtime.js`, mismo
+  criterio que `_normalizarDiseno()` en Calidad) reclasifica en memoria, al cargar, cualquier
+  registro que todavía tenga la clave vieja `paneles_cerramiento` — por el espesor REAL que ya
+  tenía guardado (4→Macizo 4cm, 8→Alveolar 8cm), no a ciegas asumiendo que todas eran de 4cm,
+  aunque en la práctica el usuario confirmó que sí lo eran. Es una migración perezosa: corrige la
+  pantalla de inmediato, y el primer guardado real de cada Unidad (editarla y darle Guardar)
+  persiste la clave nueva en Supabase — mismo tradeoff ya aceptado para el backfill de `orden` y
+  de `pctCemento` en otros módulos.
+- Filtros (`TIPOS_FILTRO_PROGRAMAR`) y tope de bancos (`_configBancoSistema()`) generalizados
+  para aceptar las 3 claves nuevas en vez de la única de antes (`sistemas: [...SISTEMAS_PANEL_CERRAMIENTO]`
+  en vez de `['paneles_cerramiento']`) — los 3 sistemas comparten exactamente el mismo tope de
+  banco (`BANCO_PANEL_*`, sin cambios), porque la ocupación de la cinta depende del largo de la
+  pieza, no de su espesor.
+
+Verificado con un arnés real — 27 aserciones: migración de un registro viejo de 4cm y de uno de
+8cm a sus claves nuevas respectivas; crear una Unidad nueva muestra "4 cm"/2.400 al elegir
+Macizo, "8 cm"/0 al elegir Alveolar 8cm, "15 cm"/0 al elegir Alveolar 15cm; guardar una Unidad
+Alveolar 15cm persiste `sistema`/`espesorCm`/`densidadKgM3` correctos con un solo upsert; editar
+una Unidad existente con Densidad real 2.350 la conserva (no la pisa con el default); regresión
+completa de Prelosa (título "Nueva Losa", bloques correctos); los 3 sistemas de panel comparten
+la misma config de tope de bancos, Vigueta sigue sin tope y Prelosa conserva la suya propia; los
+filtros Ancho/Clasificación están disponibles en los 3 sistemas de panel y Número de hilos en
+ninguno; la lista de Unidades muestra las 3 etiquetas nuevas correctamente. Sin errores de
+consola.

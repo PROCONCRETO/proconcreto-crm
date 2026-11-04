@@ -83,8 +83,45 @@ const SISTEMAS_ENTREPISO = [
   { clave: 'prelosa', etiqueta: 'Prelosa' },
   { clave: 'vigueta_bovedilla', etiqueta: 'Vigueta y Bovedilla' },
   { clave: 'placa_alveolar', etiqueta: 'Placa Alveolar' },
-  { clave: 'paneles_cerramiento', etiqueta: 'Paneles de Cerramiento' },
+  { clave: 'paneles_macizo_4cm', etiqueta: 'Paneles de Cerramiento Macizos 4cm' },
+  { clave: 'paneles_alveolar_8cm', etiqueta: 'Paneles de Cerramiento Alveolares 8cm' },
+  { clave: 'paneles_alveolar_15cm', etiqueta: 'Paneles de Cerramiento Alveolares 15cm' },
 ];
+// Antes un único sistema genérico 'paneles_cerramiento' con el espesor (4/8cm) como un campo
+// más a elegir — ahora 3 sistemas propios en el desplegable (2026-11-04, a pedido del usuario:
+// "especifiquemos los paneles de cerramiento, así: Macizos 4cm / Alveolares 8cm / Alveolares
+// 15cm"), porque el espesor en la práctica va amarrado al tipo de panel, no es una variable
+// libre dentro de un mismo registro. Los 3 comparten TODO el resto del comportamiento
+// (clasificación, anchos, cuchilla, tope de bancos) — por eso se tratan como una sola familia
+// con este helper (mismo patrón `esVigueta`/`esPanel` ya usado en el resto del archivo), en vez
+// de triplicar cada rama de código.
+const SISTEMAS_PANEL_CERRAMIENTO = ['paneles_macizo_4cm', 'paneles_alveolar_8cm', 'paneles_alveolar_15cm'];
+function _esSistemaPanel(sistema) {
+  return SISTEMAS_PANEL_CERRAMIENTO.includes(sistema);
+}
+// Espesor fijo por sistema (ya no se digita — lo define el Sistema elegido, ver
+// `_alCambiarSistemaLosa()`/`guardarLosa()`) y densidad por defecto: 2.400 kg/m³ para Macizos
+// 4cm (dato real, los paneles que ya existían en ProSuite son todos de este tipo — "los que
+// tenemos actualmente... son de 4cm para que los tipifiques como tal"); 0 para Alveolares 8cm y
+// 15cm porque todavía no hay ficha técnica propia de esos dos ("de la información específica de
+// cada panel para 8 y 15, que no tengamos datos, ponlos en cero").
+const ESPESOR_DENSIDAD_DEFAULT_PANEL = {
+  paneles_macizo_4cm:    { espesorCm: 4,  densidadKgM3: 2400 },
+  paneles_alveolar_8cm:  { espesorCm: 8,  densidadKgM3: 0 },
+  paneles_alveolar_15cm: { espesorCm: 15, densidadKgM3: 0 },
+};
+// Migración perezosa de Unidades ya guardadas con el sistema genérico viejo (antes de la
+// separación en 3 sistemas) — mismo criterio que `_normalizarDiseno()` en calidad-mezclas.js: se
+// corrige en memoria al cargar (ver cargarDatosSupabase()/recargarLosasProyectoRT() en
+// datos-realtime.js), y el primer guardado real de cada Unidad persiste la clave nueva en
+// Supabase. Reclasifica por el espesor REAL que ya tenía guardado (no a ciegas por "eran todas
+// de 4cm"), por si alguna quedó con 8cm.
+function _normalizarLosaProyecto(l) {
+  if (l && l.sistema === 'paneles_cerramiento') {
+    l.sistema = Number(l.espesorCm) === 8 ? 'paneles_alveolar_8cm' : 'paneles_macizo_4cm';
+  }
+  return l;
+}
 // Paneles de Cerramiento (2026-10-29, a pedido del usuario: "metamos otra opción que serían los
 // paneles de cerramiento... se hacen en los mismos bancos de pretensado") — a diferencia de los
 // otros 3 (sistemas de ENTREPISO, horizontales), los paneles son de fachada/muro, verticales
@@ -116,7 +153,7 @@ function _etiquetaClasificacionPanel(clave) {
 // proyecto (que puede mezclar Losas de entrepiso y Unidades de Paneles a la vez), sin un sistema
 // puntual conocido en ese momento para decidir la palabra.
 function _etiquetaRegistroLosa(sistema) {
-  return sistema === 'paneles_cerramiento' ? 'Unidad' : 'Losa';
+  return _esSistemaPanel(sistema) ? 'Unidad' : 'Losa';
 }
 
 // ── Cálculos — pendiente/peso (mismo criterio ya usado en Logística/Órdenes de Producción:
@@ -575,8 +612,10 @@ function abrirModalLosa(id) {
   document.getElementById('ml-estado').value = l?.estado || 'Planeación';
   document.getElementById('ml-espesor').value = l?.espesorCm || 5;
   document.getElementById('ml-densidad').value = l?.densidadKgM3 || 2400;
-  document.getElementById('ml-espesor-panel').value = (l?.sistema === 'paneles_cerramiento' && l?.espesorCm) || 4;
-  document.getElementById('ml-densidad-panel').value = l?.densidadKgM3 || 2400;
+  // Si se está editando una Unidad de Paneles, se respeta la Densidad real ya guardada (no el
+  // valor por defecto del sistema) — `_alCambiarSistemaLosa()` solo autocompleta el default
+  // cuando se está CREANDO, para no pisar un dato real con un 0/2400 genérico.
+  document.getElementById('ml-densidad-panel').value = l?.densidadKgM3 ?? (ESPESOR_DENSIDAD_DEFAULT_PANEL[l?.sistema]?.densidadKgM3 ?? 2400);
   document.getElementById('ml-factor-vigueta').value = l?.pesoFactorKgM || '';
   _archivosLosaPendientes = { plano: null, memoria: null };
   _archivosLosaExistentes = {
@@ -593,10 +632,18 @@ let _modalLosaNombreActual = '';
 function _alCambiarSistemaLosa() {
   const sistema = document.getElementById('ml-sistema').value;
   const esVigueta = sistema === 'vigueta_bovedilla';
-  const esPanel = sistema === 'paneles_cerramiento';
+  const esPanel = _esSistemaPanel(sistema);
   document.getElementById('ml-bloque-prelosa').style.display = (esVigueta || esPanel) ? 'none' : '';
   document.getElementById('ml-bloque-vigueta').style.display = esVigueta ? '' : 'none';
   document.getElementById('ml-bloque-panel').style.display = esPanel ? '' : 'none';
+  if (esPanel) {
+    const def = ESPESOR_DENSIDAD_DEFAULT_PANEL[sistema];
+    document.getElementById('ml-espesor-panel-display').value = `${def.espesorCm} cm`;
+    // Solo autocompleta la Densidad por defecto al CREAR — al editar se respeta el valor real
+    // ya guardado (lo pone `abrirModalLosa()`), aunque el usuario cambie de sistema a mitad de
+    // la edición, para no pisar un dato real con el genérico del sistema nuevo.
+    if (!_modalLosaEsEdit) document.getElementById('ml-densidad-panel').value = def.densidadKgM3;
+  }
   const etiqueta = _etiquetaRegistroLosa(sistema);
   document.getElementById('modal-losa-titulo').textContent = _modalLosaEsEdit
     ? `✏️ Editar ${etiqueta} — ${_modalLosaNombreActual}`
@@ -606,13 +653,7 @@ function _alCambiarSistemaLosa() {
 async function guardarLosa() {
   const nombre = document.getElementById('ml-nombre').value.trim();
   const sistema = document.getElementById('ml-sistema').value;
-  if (!nombre) { alert(`Completa el Nombre de ${sistema === 'paneles_cerramiento' ? 'la unidad' : 'la losa'}.`); return; }
-  // Espesor estándar de Paneles — 4cm (macizo) u 8cm (alveolar), ya restringido por el propio
-  // <select> (#ml-espesor-panel) a esas 2 opciones; esta validación es solo cinturón-y-tirantes.
-  if (sistema === 'paneles_cerramiento' && !ESPESORES_ESTANDAR_PANEL.includes(parseFloat(document.getElementById('ml-espesor-panel').value))) {
-    alert(`El espesor de un panel debe ser ${ESPESORES_ESTANDAR_PANEL.join(' o ')} cm.`);
-    return;
-  }
+  if (!nombre) { alert(`Completa el Nombre de ${_esSistemaPanel(sistema) ? 'la unidad' : 'la losa'}.`); return; }
   const idOrig = document.getElementById('ml-id').value;
   const existente = idOrig ? LOSAS_PROYECTO.find(x => x.id === idOrig) : null;
   const idFinal = idOrig || String(Date.now());
@@ -640,10 +681,13 @@ async function guardarLosa() {
     ubicacion: document.getElementById('ml-ubicacion').value.trim(),
     sistema,
     estado: document.getElementById('ml-estado').value,
-    espesorCm: sistema === 'paneles_cerramiento'
-      ? parseFloat(document.getElementById('ml-espesor-panel').value) || 0
+    // Espesor de Paneles: ya no se digita, lo define el sistema elegido (fijo por clave, ver
+    // ESPESOR_DENSIDAD_DEFAULT_PANEL) — Densidad sigue siendo editable (0 por defecto en
+    // Alveolares 8/15cm hasta que haya ficha técnica real).
+    espesorCm: _esSistemaPanel(sistema)
+      ? (ESPESOR_DENSIDAD_DEFAULT_PANEL[sistema]?.espesorCm || 0)
       : parseFloat(document.getElementById('ml-espesor').value) || 0,
-    densidadKgM3: sistema === 'paneles_cerramiento'
+    densidadKgM3: _esSistemaPanel(sistema)
       ? parseFloat(document.getElementById('ml-densidad-panel').value) || 0
       : parseFloat(document.getElementById('ml-densidad').value) || 0,
     pesoFactorKgM: parseFloat(document.getElementById('ml-factor-vigueta').value) || 0,
@@ -802,7 +846,7 @@ function renderFilasProduccion() {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   if (!l) return;
   const esVigueta = l.sistema === 'vigueta_bovedilla';
-  const esPanel = l.sistema === 'paneles_cerramiento';
+  const esPanel = _esSistemaPanel(l.sistema);
   // La tabla de "Listas de Producción" (Ingeniería) pasa TAL CUAL a Producción y a Despachos,
   // de solo lectura — cada una solo le suma la ÚNICA columna de pendiente que le importa a esa
   // área (2026-10-13, a pedido del usuario): Producción ve Pend. Producción (no le compete
@@ -1014,7 +1058,7 @@ function exportarFilasLosaExcel() {
   if (!l) return;
   if (!_filasLosaActual.length) { alert('No hay filas para exportar.'); return; }
   const esVigueta = l.sistema === 'vigueta_bovedilla';
-  const esPanel = l.sistema === 'paneles_cerramiento';
+  const esPanel = _esSistemaPanel(l.sistema);
   const esLista = _MODO_FLUJO_LOSA === 'lista';
   const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
   const proy = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
@@ -1133,7 +1177,7 @@ function _pieAvanceProduccionHTML() {
 // (🏗️ producción, abajo el botón de despacho), nunca tocar cuadro/dimensión/cantidad, que son
 // el insumo que recibe de Ingeniería.
 function _filaProduccionHTML(f, i, l, esVigueta) {
-  const esPanel = l.sistema === 'paneles_cerramiento';
+  const esPanel = _esSistemaPanel(l.sistema);
   const longTotal = (Number(f.dimension) || 0) * (Number(f.cantidad) || 0);
   // m² (2026-10-17, a pedido del usuario) = ancho(m) × largo × cantidad — mismo patrón que
   // "Long. total (m)" (multiplica por cantidad, no es un valor por unidad), para que sumarla
@@ -1304,10 +1348,9 @@ function _validarAnchoPrelosa(i) {
   }
 }
 // Paneles de Cerramiento (2026-10-29) — anchos estándar 25 y 50 cm (corregidos por el usuario;
-// el espesor, 4 u 8 cm, se valida a nivel de la Unidad completa, ver `guardarLosa()`, no por
-// fila). Mismo patrón exacto de `_validarAnchoPrelosa()`.
+// el espesor ya no se valida acá — lo fija el sistema elegido a nivel de la Unidad completa,
+// ver ESPESOR_DENSIDAD_DEFAULT_PANEL). Mismo patrón exacto de `_validarAnchoPrelosa()`.
 const ANCHOS_ESTANDAR_PANEL = [25, 50];
-const ESPESORES_ESTANDAR_PANEL = [4, 8];
 function _validarAnchoPanel(i) {
   const f = _filasLosaActual[i];
   if (!f || !f.ancho) return;
@@ -1345,7 +1388,7 @@ function _actualizarFilaProduccion(i) {
   const f = _filasLosaActual[i];
   if (!l || !f) return;
   const esVigueta = l.sistema === 'vigueta_bovedilla';
-  const esPanel = l.sistema === 'paneles_cerramiento';
+  const esPanel = _esSistemaPanel(l.sistema);
   const longTotal = (Number(f.dimension) || 0) * (Number(f.cantidad) || 0);
   const m2 = esVigueta ? 0 : (Number(f.ancho) || 0) / 100 * (Number(f.dimension) || 0) * (Number(f.cantidad) || 0);
   const peso = _pesoFila(f, l);
@@ -1453,7 +1496,7 @@ function agregarFilaProduccion() {
   // usuario sí la digita) — no hay ningún campo en pantalla para cambiarla (ver
   // `_filaProduccionHTML()`), así que se fija acá de una vez.
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
-  const esPanel = l?.sistema === 'paneles_cerramiento';
+  const esPanel = _esSistemaPanel(l?.sistema);
   _filasLosaActual.push({ id: _nuevoIdFila(), cuadro: '', ejesEntre: '', laterales: '', ancho: 0, hilos: 0, tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0, clasificacion: 'panel', largoA: 0, largoB: 0, dimension: 0, cantidad: esPanel ? 1 : 0, observaciones: '', produccion: [] });
   renderFilasProduccion();
 }
@@ -1579,7 +1622,7 @@ function guardarListaProduccion() {
   // del default de `agregarFilaProduccion()`: cualquier fila de Panel se guarda siempre con
   // `cantidad: 1`, sin importar por qué vía haya llegado (a mano, Pegar, Importar — estas 2
   // últimas, cuando existan para Panel, no van a traer una columna de Cantidad que respetar).
-  if (l && l.sistema === 'paneles_cerramiento') {
+  if (l && _esSistemaPanel(l.sistema)) {
     _filasLosaActual.forEach(f => { f.cantidad = 1; });
   }
   if (l && l.sistema === 'prelosa') {
@@ -1590,7 +1633,7 @@ function guardarListaProduccion() {
     }
   }
   // Mismo bloqueo, anchos propios de Paneles (2026-10-29).
-  if (l && l.sistema === 'paneles_cerramiento') {
+  if (l && _esSistemaPanel(l.sistema)) {
     const invalidas = _filasLosaActual.filter(f => !ANCHOS_ESTANDAR_PANEL.includes(Number(f.ancho)));
     if (invalidas.length) {
       alert(`El ancho de un panel debe ser 25 o 50 cm por estandarización. Corrige el ancho de: ${invalidas.map(f => f.cuadro || '(sin número)').join(', ')}.`);
@@ -1604,7 +1647,7 @@ function guardarListaProduccion() {
   // si un campo bloqueado de verdad cambió en esta sesión de edición.
   if (l) {
     const esVigueta = l.sistema === 'vigueta_bovedilla';
-    const esPanel = l.sistema === 'paneles_cerramiento';
+    const esPanel = _esSistemaPanel(l.sistema);
     const camposBloqueados = esVigueta
       ? ['dimension', 'tipoVigueta', 'hilosAbajo', 'hilosArriba']
       : esPanel
@@ -1739,7 +1782,7 @@ function abrirModalProgramarProduccion(programacionId) {
   document.getElementById('modal-programar-produccion-titulo').textContent = editando ? '✏️ Editar programación de producción' : '📋 Programar producción';
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
-  const esPanel = !!l && l.sistema === 'paneles_cerramiento';
+  const esPanel = !!l && _esSistemaPanel(l.sistema);
   const conPendiente = _filasLosaActual.filter(f => _pendienteProduccionFila(f) > 0);
   document.getElementById('mpp-fecha').value = editando ? (editando.fecha || _fmtISO(new Date())) : _fmtISO(new Date());
   document.getElementById('mpp-observaciones').value = editando ? (editando.observaciones || '') : '';
@@ -1843,7 +1886,7 @@ const BANCO_PANEL_MAX_ANCHOS = 2;
 // que sirvan igual en Prelosa y en Paneles sin duplicar ninguna de esas 4 funciones.
 function _configBancoSistema(sistema) {
   if (sistema === 'prelosa') return { metrosUtiles: BANCO_PRELOSA_METROS_UTILES, numCintas: BANCO_PRELOSA_NUM_CINTAS, maxAnchos: BANCO_PRELOSA_MAX_ANCHOS };
-  if (sistema === 'paneles_cerramiento') return { metrosUtiles: BANCO_PANEL_METROS_UTILES, numCintas: BANCO_PANEL_NUM_CINTAS, maxAnchos: BANCO_PANEL_MAX_ANCHOS };
+  if (_esSistemaPanel(sistema)) return { metrosUtiles: BANCO_PANEL_METROS_UTILES, numCintas: BANCO_PANEL_NUM_CINTAS, maxAnchos: BANCO_PANEL_MAX_ANCHOS };
   return null;
 }
 function _topeMetrosBanco(cantidadAnchos, cfg) {
@@ -1857,7 +1900,7 @@ function _topeMetrosBanco(cantidadAnchos, cfg) {
 // lado sea más corto.
 function _metrosPorAnchoProgramar(prefijo) {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
-  const esPanel = !!l && l.sistema === 'paneles_cerramiento';
+  const esPanel = !!l && _esSistemaPanel(l.sistema);
   const porAncho = new Map();
   document.querySelectorAll(`#${prefijo}-filas-body input[data-fila-id]`).forEach(inp => {
     const cantidad = parseFloat(inp.value) || 0;
@@ -1971,12 +2014,12 @@ const TIPOS_FILTRO_PROGRAMAR = [
   // sistemas donde el tipo aplica; sin `sistemas`, disponible en los 4 (como Cuadro/Ejes/
   // "Largo de pieza"/los 5 de estado). Etiqueta de "ancho" ya no dice "de prelosa" — hace
   // tiempo que también lo comparte Placa Alveolar, y ahora Paneles.
-  { id: 'ancho', label: 'Ancho', soloValorUnico: true, sistemas: ['prelosa', 'placa_alveolar', 'paneles_cerramiento'] },
+  { id: 'ancho', label: 'Ancho', soloValorUnico: true, sistemas: ['prelosa', 'placa_alveolar', ...SISTEMAS_PANEL_CERRAMIENTO] },
   { id: 'hilos', label: 'Número de hilos', soloValorUnico: true, sistemas: ['prelosa', 'placa_alveolar'] },
   // Paneles de Cerramiento (2026-10-29) — mismo mecanismo `soloValorUnico` (desplegable con los
   // valores reales presentes), pero de TEXTO en vez de número — ver `_valoresDisponiblesFiltro()`/
   // `_filaPasaFiltroProgramar()`, generalizados para aceptar ambos tipos de valor.
-  { id: 'clasificacion', label: 'Clasificación', soloValorUnico: true, sistemas: ['paneles_cerramiento'] },
+  { id: 'clasificacion', label: 'Clasificación', soloValorUnico: true, sistemas: [...SISTEMAS_PANEL_CERRAMIENTO] },
   // "Largo de pieza" (2026-10-27, a pedido del usuario: "agreguemos el filtro a los cuadros de
   // las ventanas de proyectos... de largo de la pieza para los diferentes sistemas") — mismo
   // mecanismo exacto que Ancho/Hilos (desplegable con los valores de `f.dimension` que de
@@ -2103,7 +2146,7 @@ function _actualizarResumenFiltroMulti(checkboxEl) {
 // `TIPOS_FILTRO_PROGRAMAR` (que ya usa `label` como texto fijo en todos los demás) — se resuelve
 // acá, en el único lugar que arma el texto visible del desplegable de tipo.
 function _etiquetaFiltroTipo(t, sistema) {
-  if (t.id === 'cuadro' && sistema === 'paneles_cerramiento') return 'Entre N° Panel';
+  if (t.id === 'cuadro' && _esSistemaPanel(sistema)) return 'Entre N° Panel';
   return t.label;
 }
 function _filaFiltroProgramarHTML(prefijo, sistema) {
@@ -2274,7 +2317,7 @@ function guardarProgramacionProduccion() {
   // va a guardar) en vez de confiar en lo que se veía en pantalla.
   const cfgBanco = l && _configBancoSistema(l.sistema);
   if (cfgBanco) {
-    const esPanel = l.sistema === 'paneles_cerramiento';
+    const esPanel = _esSistemaPanel(l.sistema);
     const porAncho = new Map();
     lineas.forEach(ln => {
       const f = _filasLosaActual.find(x => x.id === ln.filaId);
@@ -2352,7 +2395,7 @@ function guardarProgramacionProduccion() {
 // bloque, ya no hace falta la rama `conMedidaHilos` que alternaba entre columnas y título).
 function _resumenPorMedidasHTML(lineas, l) {
   const esVigueta = l.sistema === 'vigueta_bovedilla';
-  const esPanel = l.sistema === 'paneles_cerramiento';
+  const esPanel = _esSistemaPanel(l.sistema);
   // "Hilos" (2026-10-19, a pedido del usuario: "incluir una columna con el número de hilos") —
   // entra también en la CLAVE de agrupación, no solo como columna — dos líneas del mismo
   // ancho/vigueta y dimensión pero con distinto número de hilos NO son la misma pieza
@@ -2539,7 +2582,7 @@ let _fechaProgramacionImpresa = null;
 // 2026-10-19 más abajo); si se imprimió directo desde la tarjeta, no había ningún modal abierto
 // que reabrir, así que solo regresa a la pantalla de la Losa.
 function _htmlProgramacionProduccion(l, p, sis, esVigueta, fecha, observaciones, lineas, origen) {
-  const esPanel = l.sistema === 'paneles_cerramiento';
+  const esPanel = _esSistemaPanel(l.sistema);
   let totalPiezas = 0;
   // Cuadro detallado partido en 2 columnas, de menor jerarquía (2026-10-22, a pedido del
   // usuario: "el cuadro resumen es más importante que el cuadro detallado al momento de
@@ -2920,7 +2963,7 @@ function verDetalleProduccionRegistrada(id) {
   if (!p) return;
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
-  const esPanel = !!l && l.sistema === 'paneles_cerramiento';
+  const esPanel = !!l && _esSistemaPanel(l.sistema);
   document.getElementById('vdp-fecha').textContent = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—';
   document.getElementById('vdp-observaciones').textContent = p.observaciones || '—';
   document.getElementById('vdp-thead').innerHTML = `<tr>
@@ -3185,7 +3228,7 @@ function abrirModalProgramarDespacho(despachoProgramadoId) {
   document.getElementById('modal-programar-despacho-titulo').textContent = editando ? '✏️ Editar programación de despacho' : '📋 Programar despacho';
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
-  const esPanel = !!l && l.sistema === 'paneles_cerramiento';
+  const esPanel = !!l && _esSistemaPanel(l.sistema);
   const conDisponible = _filasLosaActual.filter(f => _disponibleDespachoFila(f, _despachosLosaActual) > 0);
   document.getElementById('mpd-fecha').value = editando ? (editando.fecha || _fmtISO(new Date())) : _fmtISO(new Date());
   document.getElementById('mpd-observaciones').value = editando ? (editando.observaciones || '') : '';
@@ -3345,7 +3388,7 @@ function guardarProgramacionDespacho() {
 // directo desde la tarjeta "Despachos programados", sin abrir el modal
 // (`imprimirProgramacionDespachoGuardada()`, más abajo).
 function _htmlProgramacionDespacho(l, p, sis, esVigueta, fecha, observaciones, vehiculo, lineas, origen) {
-  const esPanel = l.sistema === 'paneles_cerramiento';
+  const esPanel = _esSistemaPanel(l.sistema);
   // Peso como columna adicional (2026-10-17, a pedido del usuario: "en el imprimible de
   // despachos, a diferencia del de producción, es muy importante incluir el peso... " —
   // logística necesita saber cuánto pesa lo que va en cada viaje, a producción no le hace
@@ -3701,7 +3744,7 @@ function verDetalleDespachoRegistrado(id) {
   if (!p) return;
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
-  const esPanel = !!l && l.sistema === 'paneles_cerramiento';
+  const esPanel = !!l && _esSistemaPanel(l.sistema);
   document.getElementById('vdd-remision').textContent = p.remision || '—';
   document.getElementById('vdd-fecha').textContent = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : '—';
   document.getElementById('vdd-observaciones').textContent = p.observaciones || '—';
