@@ -924,6 +924,7 @@ function agregarDiligenciaViaje() {
 }
 
 function eliminarDiligenciaViaje(di) {
+  if (!confirm('¿Quitar esta diligencia?')) return;
   _diligenciasViajeActual.splice(di, 1);
   renderDiligenciasViaje();
 }
@@ -1078,6 +1079,7 @@ function agregarEntregaViaje() {
 }
 
 function eliminarEntregaViaje(ei) {
+  if (!confirm('¿Quitar esta entrega del viaje?')) return;
   _entregasViajeActual.splice(ei, 1);
   renderEntregasViaje();
 }
@@ -1088,6 +1090,7 @@ function agregarProductoEntrega(ei) {
 }
 
 function eliminarProductoEntrega(ei, pi) {
+  if (!confirm('¿Quitar este producto de la entrega?')) return;
   const productos = _entregasViajeActual[ei].productos;
   productos.splice(pi, 1);
   if (!productos.length) productos.push(_lineaVaciaEntrega());

@@ -1707,6 +1707,19 @@
   </div>
 </div>
 
+<!-- Cambios sin guardar al salir de la Lista de producción (2026-11-04) — ver _conGuardiaSalirLista() en js/losas-proyecto.js -->
+<div class="modal-overlay" id="modal-salir-lista-sin-guardar">
+  <div class="modal" style="width:420px;max-width:95vw">
+    <div class="modal-titulo">⚠️ Cambios sin guardar</div>
+    <div style="font-size:13px;color:var(--gris-medio);margin-bottom:18px">Hiciste cambios en la Lista de producción que todavía no se han guardado. ¿Qué deseas hacer antes de salir?</div>
+    <div class="modal-acciones" style="flex-direction:column;align-items:stretch;gap:8px">
+      <button class="btn btn-primario" onclick="_salirListaGuardando()">💾 Guardar y salir</button>
+      <button class="btn btn-rojo" onclick="_salirListaDescartando()">🗑️ Descartar cambios y salir</button>
+      <button class="btn btn-secundario" onclick="_cancelarSalirLista()">Seguir editando</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════════════
      PANTALLA: PRODUCTOS (CATÁLOGO / ADMIN)
 ═══════════════════════════════════════ -->
@@ -3473,7 +3486,7 @@
 <script src="js/config.js?v=20261011c"></script>
 <script src="js/calculadora-inputs.js?v=20260825a"></script>
 <script src="js/catalogo.js?v=20261027a"></script>
-<script src="js/navegacion.js?v=20261016a"></script>
+<script src="js/navegacion.js?v=20261104a"></script>
 <script src="js/ordenes-produccion.js?v=20261011c"></script>
 <script src="js/produccion-diaria.js?v=20260917a"></script>
 <script src="js/produccion-materia-prima.js?v=20260909a"></script>
@@ -3481,22 +3494,22 @@
 <script src="js/estadisticas-produccion-pretensado.js?v=20260921c"></script>
 <script src="js/estadisticas-produccion-volumen.js?v=20260921d"></script>
 <script src="js/produccion-atipicos.js?v=20261023a"></script>
-<script src="js/calidad-ajuste-mezcla.js?v=20261020a"></script>
-<script src="js/costeo-mano-obra.js?v=20260825a"></script>
+<script src="js/calidad-ajuste-mezcla.js?v=20261104a"></script>
+<script src="js/costeo-mano-obra.js?v=20261104a"></script>
 <script src="js/costeo-maquinaria.js?v=20260920a"></script>
 <script src="js/costeo-referencia.js?v=20260821a"></script>
-<script src="js/costeo-producto.js?v=20261031a"></script>
-<script src="js/calidad-mezclas.js?v=20261103b"></script>
+<script src="js/costeo-producto.js?v=20261104a"></script>
+<script src="js/calidad-mezclas.js?v=20261104c"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
-<script src="js/logistica.js?v=20261011c"></script>
+<script src="js/logistica.js?v=20261104a"></script>
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20261023a"></script>
 <script src="js/proyectos.js?v=20261016b"></script>
-<script src="js/losas-proyecto.js?v=20261104c"></script>
+<script src="js/losas-proyecto.js?v=20261104e"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20261104a"></script>
-<script src="js/cotizador.js?v=20261020a"></script>
-<script src="js/historico-clientes-stats.js?v=20261011c"></script>
+<script src="js/cotizador.js?v=20261104a"></script>
+<script src="js/historico-clientes-stats.js?v=20261104a"></script>
 <script src="js/retenciones.js?v=20260809c"></script>
 <!-- Temporal — migración única de consecutivos, borrar este script y el archivo tras usarla -->
 <script src="js/migracion-consecutivos.js?v=20260804a"></script>

@@ -132,6 +132,7 @@ function agregarAgregadoDiseno() {
 }
 
 function eliminarAgregadoDiseno(i) {
+  if (!confirm('¿Quitar este agregado?')) return;
   _agregadosDisenoActual.splice(i, 1);
   renderAgregadosDiseno();
 }
@@ -164,6 +165,7 @@ function agregarAdicionDiseno() {
 }
 
 function eliminarAdicionDiseno(i) {
+  if (!confirm('¿Quitar esta adición?')) return;
   _adicionesDisenoActual.splice(i, 1);
   renderAdicionesDiseno();
 }
@@ -303,6 +305,7 @@ function agregarAditivoDiseno() {
 }
 
 function eliminarAditivoDiseno(i) {
+  if (!confirm('¿Quitar este aditivo?')) return;
   _aditivosDisenoActual.splice(i, 1);
   renderAditivosDiseno();
 }
@@ -1151,6 +1154,7 @@ function agregarResultadoEnsayo() {
 }
 
 function eliminarResultadoEnsayo(i) {
+  if (!confirm('¿Quitar este resultado de ensayo? Se pierden las resistencias ya digitadas de esta edad.')) return;
   _resultadosEnsayoActual.splice(i, 1);
   renderResultadosEnsayo();
 }
@@ -1318,6 +1322,7 @@ function onSoltarLaboratorio(event) {
 }
 
 function quitarPdfLaboratorio() {
+  if ((_pdfLaboratorioPendiente || _pdfLaboratorioExistente) && !confirm('¿Quitar el informe de laboratorio adjunto?')) return;
   _pdfLaboratorioPendiente = null;
   _pdfLaboratorioExistente = null;
   _ultimaLecturaInforme = null;

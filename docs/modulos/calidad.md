@@ -247,3 +247,15 @@ Las 4 pantallas del subnav de Calidad (🧱 Materia Prima, 🔗 Trazabilidad, �
 ## Qué hace
 
 Gestiona el diseño técnico de cada mezcla de concreto, sus ajustes y los ensayos de calidad (resistencia, etc.). El registro de materia prima recibida vive ahora en Producción — ver `docs/modulos/produccion.md`.
+
+### Confirmación antes de borrar (2026-11-04)
+
+A pedido del usuario, tras un incidente real en Proyectos donde se borró una fila sin ningún
+aviso ("abramos una ventana de confirmación a todas las opciones que tenemos de borrar en el
+ProSuite") — se auditaron todos los botones de borrar/quitar de la app; los que ya tenían
+`confirm()` (Diseño de Mezcla, Ensayo, Ajuste Diario) quedaron igual. Se le agregó `confirm()` a
+los que NO lo tenían, todos filas sueltas dentro de un formulario en edición (Agregado, Adición,
+Aditivo de un Diseño de Mezcla; Resultado de ensayo; Cliente/Producto adicional de un Ajuste
+Diario) y al informe de laboratorio adjunto (`quitarPdfLaboratorio()` — solo pregunta si de
+verdad hay algo adjunto que perder). Verificado con un arnés real — cada función respeta
+`confirm()=false` (no quita nada) y `confirm()=true` (sí quita), sin errores de consola.

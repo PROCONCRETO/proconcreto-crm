@@ -92,6 +92,7 @@ function agregarClienteAdicionalAjuste() {
 }
 
 function eliminarClienteAdicionalAjuste(i) {
+  if (!confirm('¿Quitar este cliente adicional?')) return;
   _clientesAdicionalesAjuste.splice(i, 1);
   renderClientesAdicionalesAjuste();
 }
@@ -198,6 +199,7 @@ function agregarProductoAdicionalAjuste() {
 }
 
 function eliminarProductoAdicionalAjuste(i) {
+  if (!confirm('¿Quitar este producto adicional?')) return;
   _productosAdicionalesAjuste.splice(i, 1);
   renderProductosAdicionalesAjuste();
 }

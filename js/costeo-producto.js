@@ -459,11 +459,17 @@ function renderMateriaPrimaExtraCosteo() {
       <td style="color:var(--gris-medio);white-space:nowrap">${precio}</td>
       <td><input type="number" value="${row.cantidad}" min="0" step="0.001" oninput="_materiaPrimaExtraCosteoActual[${i}].cantidad=parseFloat(this.value)||0;_actualizarResumenCosteo()"></td>
       <td>${_botonNotaFila(row, '_materiaPrimaExtraCosteoActual', i, 'renderMateriaPrimaExtraCosteo')}</td>
-      <td><button class="btn btn-rojo btn-xs" onclick="_materiaPrimaExtraCosteoActual.splice(${i},1);renderMateriaPrimaExtraCosteo();_actualizarResumenCosteo()">✕</button></td>
+      <td><button class="btn btn-rojo btn-xs" onclick="eliminarMateriaPrimaExtraCosteo(${i})">✕</button></td>
     </tr>`;
   }).join('');
 }
 function agregarMateriaPrimaExtraCosteo() { _materiaPrimaExtraCosteoActual.push({ nombre: '', cantidad: 0 }); renderMateriaPrimaExtraCosteo(); }
+function eliminarMateriaPrimaExtraCosteo(i) {
+  if (!confirm('¿Quitar esta materia prima?')) return;
+  _materiaPrimaExtraCosteoActual.splice(i, 1);
+  renderMateriaPrimaExtraCosteo();
+  _actualizarResumenCosteo();
+}
 
 // ── Despiece de Acero Figurado (solo Reforzado, 2026-10-09) ──
 // A pedido del usuario: "pongamos un (+) Incluir despiece... donde podamos de acuerdo a la
@@ -542,7 +548,7 @@ function renderDespieceAcero() {
       <td style="text-align:right;color:var(--gris-medio)" id="despiece-long-total-${i}">${_longitudTotalBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 })}</td>
       <td style="text-align:right;color:var(--gris-medio)" id="despiece-peso-unit-${i}">${_pesoUnitarioBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 })}</td>
       <td style="text-align:right;font-weight:600" id="despiece-peso-total-${i}">${_pesoBarraDespieceAcero(row).toLocaleString('es-CO', { maximumFractionDigits: 2 })}</td>
-      <td><button class="btn btn-rojo btn-xs" onclick="_despieceAceroActual.splice(${i},1);renderDespieceAcero()">✕</button></td>
+      <td><button class="btn btn-rojo btn-xs" onclick="eliminarFilaDespieceAcero(${i})">✕</button></td>
     </tr>`).join('');
   }
   document.getElementById('despiece-acero-total').textContent = _pesoTotalDespieceAcero(_despieceAceroActual).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' kg';
@@ -567,6 +573,11 @@ function _actualizarFilaDespieceAcero(i) {
   document.getElementById('despiece-acero-total').textContent = _pesoTotalDespieceAcero(_despieceAceroActual).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' kg';
 }
 function agregarFilaDespieceAcero() { _despieceAceroActual.push({ codigo: '', ubicacion: '', diametro: '', longitud: 0, cantidad: 0 }); renderDespieceAcero(); }
+function eliminarFilaDespieceAcero(i) {
+  if (!confirm('¿Eliminar esta fila del despiece?')) return;
+  _despieceAceroActual.splice(i, 1);
+  renderDespieceAcero();
+}
 function guardarDespieceAcero() {
   // Ya NO se descartan las filas sin Diámetro/Cantidad todavía (2026-10-13, a pedido del
   // usuario: "permitamos que al momento de yo agregar una nueva fila, ya quede guardada dentro
@@ -758,7 +769,7 @@ function renderMaquinasCosteo() {
       ${celdasReforzado}
       <td><button class="btn btn-secundario btn-xs" title="Asignar operario en Mano de Obra" onclick="_asignarOperarioMaquina(${i})">👷</button></td>
       <td>${_botonNotaFila(row, '_maquinasCosteoActual', i, 'renderMaquinasCosteo')}</td>
-      <td><button class="btn btn-rojo btn-xs" onclick="_maquinasCosteoActual.splice(${i},1);renderMaquinasCosteo();_actualizarResumenCosteo()">✕</button></td>
+      <td><button class="btn btn-rojo btn-xs" onclick="eliminarMaquinaCosteo(${i})">✕</button></td>
     </tr>`;
   }).join('');
 }
@@ -794,6 +805,12 @@ function _opcionesMaquinariaCosteo(seleccionado) {
   return '<option value="">— Selecciona —</option>' + MAQUINARIA_EQUIPOS.map(m => `<option value="${_escAttr(m.nombre)}" ${m.nombre === seleccionado ? 'selected' : ''}>${m.nombre}</option>`).join('');
 }
 function agregarMaquinaCosteo() { _maquinasCosteoActual.push({ nombre: '' }); renderMaquinasCosteo(); }
+function eliminarMaquinaCosteo(i) {
+  if (!confirm('¿Quitar esta máquina del costeo?')) return;
+  _maquinasCosteoActual.splice(i, 1);
+  renderMaquinasCosteo();
+  _actualizarResumenCosteo();
+}
 
 // ── Mano de obra involucrada (filas dinámicas) ──
 let _manoObraCosteoActual = [];
@@ -841,7 +858,7 @@ function renderManoObraCosteo() {
       ${celdaUnidadesDia}
       ${celdaMinutosUnidad}
       <td>${_botonNotaFila(row, '_manoObraCosteoActual', i, 'renderManoObraCosteo')}</td>
-      <td><button class="btn btn-rojo btn-xs" onclick="_manoObraCosteoActual.splice(${i},1);renderManoObraCosteo();_actualizarResumenCosteo()">✕</button></td>
+      <td><button class="btn btn-rojo btn-xs" onclick="eliminarManoObraCosteo(${i})">✕</button></td>
     </tr>`;
   }).join('');
 }
@@ -850,6 +867,12 @@ function _opcionesCuadrillaCosteo(seleccionado) {
   return '<option value="">— Selecciona —</option>' + CUADRILLAS_PRODUCTIVAS.map(c => `<option value="${_escAttr(c.nombre)}" ${c.nombre === seleccionado ? 'selected' : ''}>${c.nombre}</option>`).join('');
 }
 function agregarManoObraCosteo() { _manoObraCosteoActual.push({ nombre: '' }); renderManoObraCosteo(); }
+function eliminarManoObraCosteo(i) {
+  if (!confirm('¿Quitar esta mano de obra del costeo?')) return;
+  _manoObraCosteoActual.splice(i, 1);
+  renderManoObraCosteo();
+  _actualizarResumenCosteo();
+}
 
 // ── Insumos y consumos (empaque + energía/agua/combustible en una sola tabla) ──
 // Cada fila se reparte de una de dos formas: "Por estiba" (÷ Unidades/estiba — para empaque:
@@ -884,7 +907,7 @@ function renderInsumosCosteo() {
         ${(!estibaAplica && row.reparto === 'estiba') ? '<div style="color:var(--rojo);font-size:10px;margin-top:2px">⚠️ No aplica a este tipo — no suma costo</div>' : ''}
       </td>
       <td>${_botonNotaFila(row, '_insumosCosteoActual', i, 'renderInsumosCosteo')}</td>
-      <td><button class="btn btn-rojo btn-xs" onclick="_insumosCosteoActual.splice(${i},1);renderInsumosCosteo();_actualizarResumenCosteo()">✕</button></td>
+      <td><button class="btn btn-rojo btn-xs" onclick="eliminarInsumoCosteo(${i})">✕</button></td>
     </tr>`;
   }).join('');
 }
@@ -928,6 +951,12 @@ function agregarInsumoCosteo() {
   const repartoDefecto = (tipo === 'reforzado' || tipo === 'pretensado' || tipo === 'elemento_simple') ? 'dia' : 'estiba';
   _insumosCosteoActual.push({ nombre: '', cantidad: 0, reparto: repartoDefecto });
   renderInsumosCosteo();
+}
+function eliminarInsumoCosteo(i) {
+  if (!confirm('¿Quitar este insumo del costeo?')) return;
+  _insumosCosteoActual.splice(i, 1);
+  renderInsumosCosteo();
+  _actualizarResumenCosteo();
 }
 function _opcionesRepartoInsumoCosteo(seleccionado, estibaAplica) {
   const opciones = [

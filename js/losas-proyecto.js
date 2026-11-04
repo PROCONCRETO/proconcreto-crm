@@ -61,6 +61,10 @@ let _filasLosaActual = [];
 // round-trip, sin comportamiento compartido) en `abrirLosaDetalle()` y se vuelve a clonar tras
 // cada guardado exitoso, así que siempre refleja el último estado persistido de verdad.
 let _filasLosaBaseFecha = [];
+// Campos que de verdad importan para decidir si una fila "cambió" — mismo set que ya usaba
+// `guardarListaProduccion()` para sellar "Última modificación" (2026-11-04), hoisted acá para
+// que también lo use `_listaProduccionSinGuardar()` (ver más abajo) sin duplicar la lista.
+const CAMPOS_COMPARABLES_FILA = ['cuadro', 'ejesEntre', 'laterales', 'ancho', 'hilos', 'tipoVigueta', 'hilosAbajo', 'hilosArriba', 'clasificacion', 'largoA', 'largoB', 'dimension', 'cantidad', 'observaciones'];
 let _despachosLosaActual = [];
 let _bovedillaLosaActual = null;
 // Cimientos Prefabricados — el cimiento donde entra el panel es un producto DISTINTO del panel
@@ -589,21 +593,28 @@ function renderDocumentosProyecto() {
 }
 
 const _TITULOS_MODO_LOSA = { lista: '📄 Listas de Producción', produccion: '🏗️ Producción', despacho: '📦 Despachos' };
+// Envueltas en `_conGuardiaSalirLista()` (2026-11-04) — las pestañas Lista/Producción/Despacho
+// de la sub-nav de Proyectos quedan fijas en pantalla incluso dentro del detalle de una Losa, así
+// que son una salida real de la Lista de producción sin pasar por "← Volver".
 function abrirLosasDeProyecto(modo) {
-  _MODO_FLUJO_LOSA = modo;
-  document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
-  document.getElementById('pantalla-proyecto-losas').classList.add('activa');
-  document.getElementById('proyecto-losas-titulo').textContent = _TITULOS_MODO_LOSA[modo] || '';
-  document.getElementById('btn-nueva-losa').style.display = modo === 'lista' ? '' : 'none';
-  renderLosasProyecto();
-  _sincronizarSubnavProyecto(modo);
+  _conGuardiaSalirLista(() => {
+    _MODO_FLUJO_LOSA = modo;
+    document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
+    document.getElementById('pantalla-proyecto-losas').classList.add('activa');
+    document.getElementById('proyecto-losas-titulo').textContent = _TITULOS_MODO_LOSA[modo] || '';
+    document.getElementById('btn-nueva-losa').style.display = modo === 'lista' ? '' : 'none';
+    renderLosasProyecto();
+    _sincronizarSubnavProyecto(modo);
+  });
 }
 function volverALosasProyecto() {
-  _LOSA_ACTIVA_ID = null;
-  document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
-  document.getElementById('pantalla-proyecto-losas').classList.add('activa');
-  renderLosasProyecto();
-  _sincronizarSubnavProyecto(_MODO_FLUJO_LOSA);
+  _conGuardiaSalirLista(() => {
+    _LOSA_ACTIVA_ID = null;
+    document.querySelectorAll('.pantalla').forEach(el => el.classList.remove('activa'));
+    document.getElementById('pantalla-proyecto-losas').classList.add('activa');
+    renderLosasProyecto();
+    _sincronizarSubnavProyecto(_MODO_FLUJO_LOSA);
+  });
 }
 
 function renderLosasProyecto() {
@@ -809,6 +820,7 @@ function onSoltarArchivoLosa(tipo, event) {
   manejarArchivoLosaPDF(tipo, file);
 }
 function quitarArchivoLosa(tipo) {
+  if ((_archivosLosaPendientes[tipo] || _archivosLosaExistentes[tipo]) && !confirm(`¿Quitar ${tipo === 'plano' ? 'el plano' : 'la memoria de cálculo'} adjunto?`)) return;
   _archivosLosaPendientes[tipo] = null;
   _archivosLosaExistentes[tipo] = null;
   _renderZonaArchivoLosa(tipo);
@@ -1378,7 +1390,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
       ${esLista
         ? (bloqueado
           ? `<span title="${TITULO_BLOQUEO}" style="cursor:help">🔒</span>`
-          : `<button class="btn btn-rojo btn-xs" onclick="_filasLosaActual.splice(${i},1);renderFilasProduccion()">✕</button>`)
+          : `<button class="btn btn-rojo btn-xs" onclick="eliminarFilaProduccion(${i})">✕</button>`)
         : ''}
     </td>
   </tr>`;
@@ -1551,6 +1563,18 @@ function agregarFilaProduccion() {
   _filasLosaActual.push({ id: _nuevoIdFila(), cuadro: '', ejesEntre: '', laterales: '', ancho: 0, hilos: 0, tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0, clasificacion: 'panel', largoA: 0, largoB: 0, dimension: 0, cantidad: esPanel ? 1 : 0, observaciones: '', produccion: [] });
   renderFilasProduccion();
 }
+// Confirmación antes de borrar una fila (2026-11-04, a pedido del usuario tras un incidente
+// real: borró una fila de la Lista de producción del proyecto Vitra con el ✕, sin ningún aviso
+// — "abramos una ventana de confirmación a todas las opciones que tenemos de borrar en el
+// ProSuite"). El borrado sigue siendo solo en memoria hasta que se le da "Guardar" (ver el aviso
+// de "cambios sin guardar" más abajo, que cubre justo ese caso si se sale sin guardar).
+function eliminarFilaProduccion(i) {
+  const f = _filasLosaActual[i];
+  if (!f) return;
+  if (!confirm(`¿Eliminar la fila "${f.cuadro || '(sin cuadro)'}" de la lista?`)) return;
+  _filasLosaActual.splice(i, 1);
+  renderFilasProduccion();
+}
 
 // (b) Pegar desde Excel — columnas en el mismo orden que la tabla visible: Cuadro, Ejes
 // numéricos, Ejes alfabéticos, [Ancho, Hilos] o [Vigueta, Hilos Abajo, Hilos Arriba], Dimensión,
@@ -1661,6 +1685,11 @@ function onSeleccionImportarFilas(event) {
 
 // Solo descarta filas 100% vacías — igual criterio que `guardarDespieceAcero()` en Costeo de
 // Producto, para no perder una fila a medio llenar si se captura columna por columna.
+// Devuelve `true`/`false` según si de verdad guardó (2026-11-04, a pedido del usuario: "abramos
+// una ventana... que se confirme si desea guardar cambios... o descartar") — lo necesita
+// `_salirListaGuardando()` para saber si puede continuar con la salida o si debe quedarse en la
+// pantalla porque una validación (ancho inválido, medida ya fabricada, etc.) bloqueó el guardado
+// y ya mostró su propio `alert()` explicando por qué.
 function guardarListaProduccion() {
   _filasLosaActual = _filasLosaActual.filter(f =>
     (f.ejesEntre || '').trim() || (f.cuadro || '').trim() || (f.dimension || 0) > 0 || (f.cantidad || 0) > 0
@@ -1680,7 +1709,7 @@ function guardarListaProduccion() {
     const invalidas = _filasLosaActual.filter(f => !ANCHOS_ESTANDAR_PRELOSA.includes(Number(f.ancho)));
     if (invalidas.length) {
       alert(`El ancho de la prelosa debe ser 20, 30, 40 o 50 cm por estandarización. Corrige el ancho de: ${invalidas.map(f => f.cuadro || '(sin cuadro)').join(', ')}.`);
-      return;
+      return false;
     }
   }
   // Mismo bloqueo, anchos propios de Paneles (2026-10-29).
@@ -1688,7 +1717,7 @@ function guardarListaProduccion() {
     const invalidas = _filasLosaActual.filter(f => !ANCHOS_ESTANDAR_PANEL.includes(Number(f.ancho)));
     if (invalidas.length) {
       alert(`El ancho de un panel debe ser 25 o 50 cm por estandarización. Corrige el ancho de: ${invalidas.map(f => f.cuadro || '(sin número)').join(', ')}.`);
-      return;
+      return false;
     }
   }
   // Bloqueo real de medidas ya fabricadas (2026-10-20) — cubre Pegar/Importar y cualquier otra
@@ -1711,14 +1740,14 @@ function guardarListaProduccion() {
       if (fabricado <= 0) continue;
       if ((Number(f.cantidad) || 0) < fabricado) {
         alert(`El cuadro "${f.cuadro || '—'}" ya tiene ${fabricado} unidad(es) fabricada(s) — la cantidad no puede quedar por debajo de eso.`);
-        return;
+        return false;
       }
       const original = originales.find(x => x.id === f.id);
       if (!original) continue;
       const campoCambiado = camposBloqueados.find(c => String(f[c] ?? '') !== String(original[c] ?? ''));
       if (campoCambiado) {
         alert(`El cuadro "${f.cuadro || '—'}" ya tiene ${fabricado} unidad(es) fabricada(s) — no se puede cambiar su ${ETIQUETA_CAMPO[campoCambiado]}. Si necesitas una medida distinta, agrega una fila nueva con la medida correcta.`);
-        return;
+        return false;
       }
     }
     // Una fila ya fabricada no puede desaparecer de la lista (por ejemplo, al pegar un bloque
@@ -1728,7 +1757,7 @@ function guardarListaProduccion() {
     const borradaConHistorial = originales.find(f => !idsActuales.has(f.id) && _fabricadoFila(f) > 0);
     if (borradaConHistorial) {
       alert(`El cuadro "${borradaConHistorial.cuadro || '—'}" ya tiene unidades fabricadas y no puede eliminarse de la lista.`);
-      return;
+      return false;
     }
     // "Última modificación" por fila (2026-11-04, a pedido del usuario: "que las inclusiones o
     // cambios de la lista de producción, se vea cuando se hizo") — se sella la fecha/hora actual
@@ -1738,7 +1767,6 @@ function guardarListaProduccion() {
     // NUNCA contra `l.filas`/`originales` — esos quedan aliasing con `_filasLosaActual` apenas
     // corre `_guardarLosaActual()`, de modo que un segundo guardado en la misma visita compararía
     // una fila contra sí misma.
-    const CAMPOS_COMPARABLES_FILA = ['cuadro', 'ejesEntre', 'laterales', 'ancho', 'hilos', 'tipoVigueta', 'hilosAbajo', 'hilosArriba', 'clasificacion', 'largoA', 'largoB', 'dimension', 'cantidad', 'observaciones'];
     const ahoraISO = new Date().toISOString();
     _filasLosaActual.forEach(f => {
       const base = _filasLosaBaseFecha.find(x => x.id === f.id);
@@ -1751,7 +1779,63 @@ function guardarListaProduccion() {
   _filasLosaBaseFecha = JSON.parse(JSON.stringify(_filasLosaActual));
   renderFilasProduccion();
   alert('Lista de producción guardada.');
+  return true;
 }
+
+// Cambios sin guardar en la Lista de producción (2026-11-04, a pedido del usuario, después de
+// un incidente real: borró una fila con el ✕ y, como nunca le dio "Guardar", se pudo recuperar
+// solo porque no había guardado — "abramos una ventana cuando se modifique algo en la lista, y
+// se intente salir de ella sin guardar cambios, preguntando si desea guardar cambios... o por el
+// contrario descartar que se guarden") — compara `_filasLosaActual` contra `_filasLosaBaseFecha`
+// (la última versión realmente persistida, ver nota junto a su declaración) con el mismo criterio
+// de "cambió de verdad" que ya usa el sellado de "Última modificación": cantidad de filas
+// distinta (se agregó o se borró alguna) o algún campo comparable distinto en alguna fila que
+// sigue existiendo.
+function _listaProduccionSinGuardar() {
+  if (_LOSA_ACTIVA_ID == null) return false;
+  if (_filasLosaActual.length !== _filasLosaBaseFecha.length) return true;
+  return _filasLosaActual.some(f => {
+    const base = _filasLosaBaseFecha.find(x => x.id === f.id);
+    return !base || CAMPOS_COMPARABLES_FILA.some(c => String(f[c] ?? '') !== String(base[c] ?? ''));
+  });
+}
+// Guarda qué hacer DESPUÉS de resolver el aviso (guardar/descartar/cancelar) — las 3 funciones de
+// los botones del modal lo leen y lo limpian. Punto de entrada único: cualquier función que
+// pueda sacar al usuario de la Lista de producción (volver, cambiar de pestaña Lista/Producción/
+// Despacho, cambiar de módulo, ir a Inicio) envuelve su cuerpo real en esto en vez de llamarlo
+// directo.
+let _accionPendienteSalirLista = null;
+function _conGuardiaSalirLista(accionContinuar) {
+  if (!_listaProduccionSinGuardar()) { accionContinuar(); return; }
+  _accionPendienteSalirLista = accionContinuar;
+  document.getElementById('modal-salir-lista-sin-guardar').classList.add('abierto');
+}
+function _salirListaGuardando() {
+  if (!guardarListaProduccion()) return; // una validación bloqueó el guardado y ya mostró por qué — nos quedamos en la pantalla para que se corrija, el modal se cierra solo si el guardado sí procede
+  const accion = _accionPendienteSalirLista;
+  _accionPendienteSalirLista = null;
+  cerrarModal('modal-salir-lista-sin-guardar');
+  if (accion) accion();
+}
+function _salirListaDescartando() {
+  const accion = _accionPendienteSalirLista;
+  _accionPendienteSalirLista = null;
+  _filasLosaActual = JSON.parse(JSON.stringify(_filasLosaBaseFecha));
+  cerrarModal('modal-salir-lista-sin-guardar');
+  if (accion) accion();
+}
+function _cancelarSalirLista() {
+  _accionPendienteSalirLista = null;
+  cerrarModal('modal-salir-lista-sin-guardar');
+}
+// Cierre real del navegador/pestaña/recarga (F5, cerrar, escribir otra URL) — el mensaje de
+// Chrome/Edge es genérico y no se puede personalizar, pero sigue evitando perder la fila sin
+// querer, que es justo lo que pasó en el incidente real que motivó todo esto.
+window.addEventListener('beforeunload', function (e) {
+  if (!_listaProduccionSinGuardar()) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
 
 // Genera el PDF con el mismo membrete (cabecera repetida + pie con arco/datos de contacto) y la
 // misma paginación con corte en fila blanca que el resto de documentos oficiales — mismo

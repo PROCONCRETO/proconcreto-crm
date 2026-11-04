@@ -1912,3 +1912,80 @@ fecha en ninguna fila; editar una fila y guardar sella fecha solo en esa fila, l
 hay aliasing con el snapshot); una segunda edición real de la misma fila SÍ avanza la fecha; una
 fila nueva agregada y guardada queda sellada como inclusión; el `colspan` del empty-state quedó en
 18. Sin errores de consola.
+
+### Aviso de "cambios sin guardar" al salir de la Lista de producción (2026-11-04)
+
+Incidente real que lo motivó: el usuario borró una fila con el ✕ de la Lista de producción del
+proyecto Vitra, y como nunca le dio "Guardar", se pudo recuperar sin perder nada — pero solo
+porque no había guardado. A pedido del usuario: *"abramos una ventana cuando se modifique algo en
+la lista, y se intente salir de ella sin guardar cambios, preguntando si desea guardar cambios y
+garantizar que los cambios que se hagan queden guardados o por el contrario descartar que se
+guarden."*
+
+- **Detección de "sin guardar"**: `_listaProduccionSinGuardar()` (`js/losas-proyecto.js`) —
+  reutiliza exactamente el mismo snapshot y la misma lista de campos comparables
+  (`CAMPOS_COMPARABLES_FILA`, hoisted a nivel de módulo) que ya sostiene la columna "Última
+  modificación" (ver sección de arriba): hay cambios sin guardar si cambió la cantidad de filas
+  (se agregó o se borró alguna) o si algún campo relevante de alguna fila que sigue existiendo es
+  distinto al de `_filasLosaBaseFecha` (la última versión realmente persistida).
+- **Modal de 3 opciones** (`#modal-salir-lista-sin-guardar`, `cotizaciones.html`) — a propósito NO
+  es un `confirm()` nativo de 2 botones (eso solo deja "salir"/"quedarse", nunca "guardar"): tiene
+  "💾 Guardar y salir", "🗑️ Descartar cambios y salir" y "Seguir editando". `guardarListaProduccion()`
+  ahora devuelve `true`/`false` (antes no devolvía nada) para que "Guardar y salir" sepa si el
+  guardado de verdad procedió o si una validación lo bloqueó (ancho inválido, medida ya
+  fabricada...) — en ese caso el `alert()` de la validación ya explica por qué, el modal se queda
+  abierto y NO se navega, para que el usuario corrija antes de intentar salir otra vez. "Descartar
+  cambios y salir" repone `_filasLosaActual` desde el snapshot (sin tocar Supabase, nada que
+  deshacer ahí) y sí navega de una.
+- **Único punto de entrada**: `_conGuardiaSalirLista(accionContinuar)` — cualquier función que
+  pueda sacar al usuario de la Lista de producción envuelve su cuerpo real en esto en vez de
+  ejecutarlo directo; si no hay cambios sin guardar, corre `accionContinuar()` de inmediato (cero
+  cambio de comportamiento). Envueltas: `volverALosasProyecto()` y `abrirLosasDeProyecto(modo)`
+  (`js/losas-proyecto.js` — el botón "← Volver" y las 3 pestañas Lista/Producción/Despacho de la
+  sub-nav de Proyectos, que quedan fijas en pantalla incluso dentro del detalle de una Losa/
+  Unidad), y `activarModulo(modulo)`/`irInicio()` (`js/navegacion.js` — la barra de módulos y el
+  logo, también fijos en pantalla). `ir(pantalla)` y `volverAProyectos()` NO se envolvieron: no
+  son alcanzables directo desde el detalle de una Losa sin pasar antes por una de las funciones ya
+  envueltas, así que el aviso ya disparó antes de llegar a esos dos.
+- **Cierre real del navegador** (`beforeunload`) — recargar (F5), cerrar la pestaña o escribir
+  otra URL no pasan por ninguna función de este programa, así que se cubren aparte con un listener
+  de `beforeunload` que llama `e.preventDefault()`/`e.returnValue=''` cuando hay cambios sin
+  guardar. El mensaje que muestra el navegador es genérico (Chrome/Edge no permiten personalizarlo
+  por seguridad), pero sigue evitando perder una fila sin querer — justo el escenario real que
+  disparó todo esto.
+
+Verificado con un arnés real — 31 aserciones: sin cambios, "← Volver" navega directo sin mostrar
+el aviso; con cambios, se abre el aviso y NO navega; "Seguir editando" cierra el aviso, se queda
+en la pantalla y conserva la edición intacta; "Descartar cambios y salir" revierte la fila al
+snapshot, cierra el aviso y SÍ navega; "Guardar y salir" guarda de verdad (nuevo alert de
+"guardada"), cierra el aviso y navega; con una validación que bloquea el guardado (ancho inválido)
+"Guardar y salir" muestra el alert de la validación, el aviso se queda abierto y NO navega; las 3
+pestañas Lista/Producción/Despacho disparan el mismo aviso y, al descartar, sí cambian de pestaña
+con el modo correcto; el menú superior (`activarModulo('calidad')`) también dispara el aviso,
+respeta "cancelar" (se queda) y "descartar" (sí cambia de módulo); `beforeunload` llama
+`preventDefault()` solo cuando hay cambios sin guardar, nunca si no los hay. Sin errores de
+consola.
+
+### Confirmación antes de borrar en toda la app (2026-11-04)
+
+Mismo pedido de arriba, extendido: *"abramos una ventana de confirmación a todas las opciones que
+tenemos de borrar en el ProSuite de forma tal que se confirme si algo se quiere borrar"* — se
+auditaron todos los botones de borrar/quitar de TODA la app (no solo Proyectos), módulo por
+módulo (ver las secciones equivalentes en `calidad.md`, `costeo.md`, `cotizador-crm.md` y
+`logistica.md`). En Proyectos:
+
+- El ✕ de una fila de la Lista de producción — justo el botón que el usuario borró sin querer en
+  el incidente que disparó todo esto — pasó de `onclick="_filasLosaActual.splice(${i},1);..."`
+  inline (sin ningún aviso) a una función propia, `eliminarFilaProduccion(i)`, con
+  `confirm()` por delante. Sigue siendo un borrado solo en memoria hasta que se le da "Guardar" —
+  el aviso de "cambios sin guardar" de la sección de arriba ya cubre ese caso si se sale sin
+  guardar, así que ahora hay DOS capas: el `confirm()` al momento de hacer clic en ✕, y el aviso
+  de salir sin guardar si de todas formas se sale sin confirmar el guardado.
+- `quitarArchivoLosa(tipo)` (plano/memoria de cálculo adjuntos a una Losa/Unidad) — ahora pregunta
+  antes de quitar, pero SOLO si de verdad hay algo adjunto que perder (igual criterio que
+  `quitarDespieceAcero()`/`quitarPdfLaboratorio()`, que ya seguían ese mismo patrón).
+- `eliminarLosa()` y los 4 `eliminarX` de Programaciones/Registros de Producción/Despacho ya
+  tenían `confirm()` desde antes — quedaron igual.
+
+Verificado con un arnés real — cada función respeta `confirm()=false` (no quita nada) y
+`confirm()=true` (sí quita), sin errores de consola.

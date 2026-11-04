@@ -566,6 +566,7 @@ function agregarProyectoCliente() {
 }
 
 function eliminarProyectoCliente(i) {
+  if (!confirm('¿Quitar este proyecto/obra del cliente?')) return;
   _proyectosClienteActual.splice(i, 1);
   renderProyectosCliente();
 }

@@ -14,7 +14,14 @@ const _PANTALLAS_CENTRO_COSTOS = ['productos', 'costeo-mo', 'costeo-maquinaria',
 // Pantalla de aterrizaje siempre al abrir el programa, con un botón mediano-grande por cada
 // módulo — el logo de ProSuite en la barra superior (`.nav-logo`, `onclick="irInicio()"`) es el
 // botón de acceso para volver aquí desde cualquier pantalla.
+// Envueltas en `_conGuardiaSalirLista()` (js/losas-proyecto.js, 2026-11-04) — el logo y la barra
+// de módulos quedan fijos en pantalla incluso dentro del detalle de una Losa/Unidad de Proyectos,
+// así que son una salida real de la Lista de producción sin pasar por su botón "← Volver".
 function irInicio() {
+  if (typeof _conGuardiaSalirLista === 'function') { _conGuardiaSalirLista(_irInicioContinuar); return; }
+  _irInicioContinuar();
+}
+function _irInicioContinuar() {
   document.getElementById('vista-previa').style.display = 'none';
   document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
   document.querySelectorAll('.nav-modulo').forEach(b => b.classList.remove('activo'));
@@ -27,6 +34,10 @@ function irInicio() {
 }
 
 function activarModulo(modulo) {
+  if (typeof _conGuardiaSalirLista === 'function') { _conGuardiaSalirLista(() => _activarModuloContinuar(modulo)); return; }
+  _activarModuloContinuar(modulo);
+}
+function _activarModuloContinuar(modulo) {
   if (modulo === 'costeo' && !_esUsuarioCentroCostos()) { alert('No tienes acceso a Centro de Costos.'); return; }
   document.getElementById('vista-previa').style.display = 'none';
   document.querySelectorAll('.nav-modulo').forEach(b => b.classList.remove('activo'));

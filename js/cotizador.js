@@ -178,6 +178,7 @@ function actualizarItem(i, campo, val) {
 }
 
 function eliminarItem(i) {
+  if (!confirm('¿Quitar este ítem de la cotización?')) return;
   itemsActuales.splice(i, 1);
   renderItems();
 }
@@ -440,6 +441,7 @@ function actualizarItemOpcion(idx, i, campo, val) {
 }
 
 function eliminarItemOpcion(idx, i) {
+  if (!confirm('¿Quitar este ítem de la opción?')) return;
   opcionesExtra[idx].items.splice(i, 1);
   renderOpcionesExtra();
 }

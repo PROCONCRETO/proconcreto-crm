@@ -179,3 +179,15 @@ Lo que **no cambió**: el badge "🔁×N" que se ve en Cumplidos/tarjetas (`_cou
 ## Qué hace
 
 Calendario mensual de viajes programados (`renderCalendarioLogistica()`), con modal para crear/editar un viaje y sus entregas (`abrirModalViaje()` / `editarViaje()`), backlog de Cumplidos, dashboard de Estadísticas, e impresión/PDF de la programación de un día (`imprimirProgramacionDia()`) para el área de logística en planta — los viajes salen numerados (1, 2, 3…) en el mismo orden de prioridad del calendario (`viaje.orden`), no alfabético por vehículo, porque el impreso es lo único que ve esa área sin acceso al aplicativo.
+
+### Confirmación antes de borrar (2026-11-04)
+
+A pedido del usuario, tras un incidente real en Proyectos donde se borró una fila sin ningún
+aviso ("abramos una ventana de confirmación a todas las opciones que tenemos de borrar en el
+ProSuite") — se auditaron todos los botones de borrar/quitar del módulo; el de Viaje completo
+(`eliminarViaje()`) ya tenía `confirm()` y quedó igual. Se le agregó `confirm()` a los que no lo
+tenían: quitar una Diligencia (`eliminarDiligenciaViaje()`), una Entrega completa
+(`eliminarEntregaViaje()`) o un producto de una Entrega (`eliminarProductoEntrega()`) — las 3 eran
+filas sueltas dentro del modal de Viaje en edición, sin ningún aviso previo. Verificado con un
+arnés real — cada función respeta `confirm()=false` (no quita nada) y `confirm()=true` (sí
+quita), sin errores de consola.

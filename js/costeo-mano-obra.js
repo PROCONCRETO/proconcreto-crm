@@ -261,6 +261,7 @@ function agregarDotacionMO() {
 }
 
 function eliminarDotacionMO(i) {
+  if (!confirm('¿Eliminar este ítem de dotación?')) return;
   PARAMETROS_MO.dotacion.splice(i, 1);
   renderDotacionMO();
 }
@@ -611,6 +612,7 @@ function agregarRolCuadrilla() {
 }
 
 function eliminarRolCuadrilla(i) {
+  if (!confirm('¿Quitar este rol de la cuadrilla?')) return;
   _rolesCuadrillaActual.splice(i, 1);
   renderRolesCuadrilla();
 }

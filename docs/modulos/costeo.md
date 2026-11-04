@@ -657,3 +657,19 @@ detecta el problema real. 5/5 PASS con el arreglo puesto, sin errores de consola
 - Pretensados Moldeados — ni empezado. Requiere revisar `BD MEZCLA AMOBLAMIENTO` en el Excel (probablemente otra estructura distinta a la de banco de pretensado).
 - El tratamiento de "Ensayo de compresión/absorción" como línea CIF — la cantidad/unidad en el Excel (0,000356) no se ha explicado del todo (parece ligada a la frecuencia de muestreo de calidad, a confirmar con el usuario).
 - Los datos reales de Costos de Referencia (precios de agregados, insumos de empaque como estiba/zuncho/grapa, insumos de consumo como energía/agua/ACPM) todavía no están cargados en Supabase — sin esos precios el costeo calcula con ceros para esas líneas hasta que se creen en Costos de Referencia.
+
+### Confirmación antes de borrar (2026-11-04)
+
+A pedido del usuario, tras un incidente real en Proyectos donde se borró una fila sin ningún
+aviso ("abramos una ventana de confirmación a todas las opciones que tenemos de borrar en el
+ProSuite") — se auditaron todos los botones de borrar/quitar del módulo; los que ya tenían
+`confirm()` (Máquina, Clase salarial, Cuadrilla, Insumo de Costos de Referencia, Costeo de
+Producto completo) quedaron igual. Se le agregó `confirm()` a los que no lo tenían: en Dotación
+y Roles de Cuadrilla (`js/costeo-mano-obra.js`), y en las 5 tablas de filas sueltas del modal de
+Costeo de Producto — Materia Prima, Despiece de Acero, Máquinas, Mano de Obra e Insumos
+(`js/costeo-producto.js`), que antes borraban la fila con el ✕ sin avisar nada (antes eran
+`onclick` inline con `.splice()` directo; ahora son funciones propias —
+`eliminarMateriaPrimaExtraCosteo()`, `eliminarFilaDespieceAcero()`, `eliminarMaquinaCosteo()`,
+`eliminarManoObraCosteo()`, `eliminarInsumoCosteo()` — con el mismo `confirm()` por delante).
+Verificado con un arnés real — cada función respeta `confirm()=false` (no quita nada) y
+`confirm()=true` (sí quita), sin errores de consola.

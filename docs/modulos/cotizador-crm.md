@@ -215,3 +215,15 @@ Esta sugerencia solo se recalcula al activar la casilla o al cambiar de cliente 
 ## Qué hace
 
 Arma cotizaciones para clientes (producto, cantidad, transporte según municipio), las guarda en Supabase, lleva el pipeline comercial y genera estadísticas/histórico por cliente. Exporta a PDF con membrete de la empresa.
+
+### Confirmación antes de borrar (2026-11-04)
+
+A pedido del usuario, tras un incidente real en Proyectos donde se borró una fila sin ningún
+aviso ("abramos una ventana de confirmación a todas las opciones que tenemos de borrar en el
+ProSuite") — se auditaron todos los botones de borrar/quitar del módulo; los que ya tenían
+`confirm()` (Cotización, Cliente) quedaron igual. Se le agregó `confirm()` a los que no lo
+tenían: quitar un ítem de la cotización principal (`eliminarItem()`) o de una Opción adicional
+(`eliminarItemOpcion()`), y quitar un proyecto/obra de la ficha de un Cliente
+(`eliminarProyectoCliente()`) — las 3 eran filas sueltas dentro de un formulario en edición, sin
+ningún aviso previo. Verificado con un arnés real — cada función respeta `confirm()=false` (no
+quita nada) y `confirm()=true` (sí quita), sin errores de consola.
