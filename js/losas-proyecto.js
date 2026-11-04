@@ -52,6 +52,15 @@ let _filasColapsadas = false;
 // criterio que `_despieceAceroActual` en Costeo de Producto: se editan en memoria, y se
 // persisten completos (toda la Losa de una vez) con `_guardarLosaActual()`.
 let _filasLosaActual = [];
+// Snapshot independiente de `_filasLosaActual` tal como quedó en el ÚLTIMO guardado (2026-11-04,
+// ver nota junto a "Última modificación" en `guardarListaProduccion()`) — a propósito NO se usa
+// `l.filas` para esa comparación: `_guardarLosaActual()` asigna `filas: _filasLosaActual` por
+// REFERENCIA (no clona), así que después del primer guardado de una visita, `l.filas` pasa a
+// ser literalmente el mismo arreglo/objetos que `_filasLosaActual` — cualquier edición posterior
+// mutaría también "el original" antes de poder compararlo. Este snapshot se clona aparte (JSON
+// round-trip, sin comportamiento compartido) en `abrirLosaDetalle()` y se vuelve a clonar tras
+// cada guardado exitoso, así que siempre refleja el último estado persistido de verdad.
+let _filasLosaBaseFecha = [];
 let _despachosLosaActual = [];
 let _bovedillaLosaActual = null;
 // Cimientos Prefabricados — el cimiento donde entra el panel es un producto DISTINTO del panel
@@ -820,6 +829,7 @@ function abrirLosaDetalle(id) {
   if (!l) return;
   _LOSA_ACTIVA_ID = id;
   _filasLosaActual = JSON.parse(JSON.stringify(l.filas || []));
+  _filasLosaBaseFecha = JSON.parse(JSON.stringify(l.filas || []));
   _despachosLosaActual = JSON.parse(JSON.stringify(l.despachos || []));
   _bovedillaLosaActual = l.bovedilla ? JSON.parse(JSON.stringify(l.bovedilla)) : null;
   _cimientosLosaActual = l.cimientos ? JSON.parse(JSON.stringify(l.cimientos)) : null;
@@ -964,13 +974,13 @@ function renderFilasProduccion() {
     ${esLista ? '' : (esProduccion
       ? '<th>Unidades fabricadas</th><th>Unidades faltantes</th><th>Long. total faltante (m)</th>'
       : '<th>Disponible despacho</th><th>Unidades por despachar</th><th>Long. total por despachar (m)</th>')}
-    <th>Observaciones</th><th></th>
+    <th>Observaciones</th><th>Última modificación</th><th></th>
   </tr>`;
   const tbody = document.getElementById('fp-filas-body');
   const tfoot = document.getElementById('filas-produccion-tfoot');
   if (!_filasLosaActual.length) {
     tbody.style.display = '';
-    tbody.innerHTML = `<tr><td colspan="17" class="empty-state"><div class="icono">📋</div><div>No hay filas todavía — agrega una a mano, pégalas desde Excel o importa el archivo.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="18" class="empty-state"><div class="icono">📋</div><div>No hay filas todavía — agrega una a mano, pégalas desde Excel o importa el archivo.</div></td></tr>`;
     if (tfoot) tfoot.innerHTML = '';
     return;
   }
@@ -1057,10 +1067,10 @@ function _pieTotalesHTML(l) {
   // # + Cuadro + Ejes num. + Ejes alfa. = 4, + columnas propias del sistema (3 vigueta / 2
   // prelosa), + Dimensión (m) = 1.
   const colspanInicial = 4 + (esVigueta ? 3 : 2) + 1;
-  // Observaciones (1) + columna de acciones (1) — todo lo que queda DESPUÉS de las columnas de
-  // seguimiento, que desde 2026-10-22 ya llevan su propia celda de total (ver arriba) en vez de
-  // quedar vacías dentro de este colspan.
-  const colspanFinal = 1 + 1;
+  // Observaciones (1) + Última modificación (1, agregada 2026-11-04) + columna de acciones (1) —
+  // todo lo que queda DESPUÉS de las columnas de seguimiento, que desde 2026-10-22 ya llevan su
+  // propia celda de total (ver arriba) en vez de quedar vacías dentro de este colspan.
+  const colspanFinal = 1 + 1 + 1;
   const columnasSeguimiento = esLista ? '' : `
     <td style="padding:10px;text-align:center;color:var(--azul)">${totalColFabricada}</td>
     <td style="padding:10px;text-align:center;color:var(--azul)">${totalFaltanteUnidades}</td>
@@ -1114,7 +1124,7 @@ function exportarFilasLosaExcel() {
     ...(esLista ? [] : (esProduccion
       ? ['Unidades fabricadas', 'Unidades faltantes', 'Long. total faltante (m)']
       : ['Disponible despacho', 'Unidades por despachar', 'Long. total por despachar (m)'])),
-    'Observaciones',
+    'Observaciones', 'Última modificación',
   ];
 
   let totalUnidades = 0, totalMetros = 0, totalM2 = 0, totalPeso = 0;
@@ -1145,6 +1155,7 @@ function exportarFilasLosaExcel() {
       peso,
       ...(esLista ? [] : (esProduccion ? [cant - pendProd, pendProd, pendProdM] : [dispDesp, pendDesp, pendDespM])),
       f.observaciones || '',
+      f.actualizadoEn ? new Date(f.actualizadoEn).toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '',
     ];
   });
 
@@ -1156,7 +1167,7 @@ function exportarFilasLosaExcel() {
     ...(esVigueta ? [] : [totalM2]),
     totalPeso,
     ...(esLista ? [] : [totalColFabricada, totalFaltanteUnidades, totalFaltanteMetros]),
-    '',
+    '', '',
   ];
 
   const modoTxt = esLista ? 'Lista de producción' : (esProduccion ? 'Producción' : 'Despacho');
@@ -1362,6 +1373,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
       ? `<td style="text-align:right">${(Number(f.cantidad) || 0) - pendProd}</td><td id="fp-pendprod-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProd}</td><td id="fp-pendprodm-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProdM.toFixed(2)}</td>`
       : `<td id="fp-dispdesp-${i}" style="text-align:right;font-weight:600;color:${dispDesp > 0 ? 'var(--verde)' : 'var(--gris-medio)'}">${dispDesp}</td><td id="fp-penddesp-${i}" style="text-align:right;font-weight:600;color:${pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendDesp}</td><td id="fp-penddespm-${i}" style="text-align:right;font-weight:600;color:${pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendDespM.toFixed(2)}</td>`)}
     <td>${txt(f.observaciones, 'observaciones', 90)}</td>
+    <td style="white-space:nowrap;color:var(--gris-medio);font-size:12px">${f.actualizadoEn ? _esc(new Date(f.actualizadoEn).toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })) : '—'}</td>
     <td style="white-space:nowrap">
       ${esLista
         ? (bloqueado
@@ -1718,8 +1730,25 @@ function guardarListaProduccion() {
       alert(`El cuadro "${borradaConHistorial.cuadro || '—'}" ya tiene unidades fabricadas y no puede eliminarse de la lista.`);
       return;
     }
+    // "Última modificación" por fila (2026-11-04, a pedido del usuario: "que las inclusiones o
+    // cambios de la lista de producción, se vea cuando se hizo") — se sella la fecha/hora actual
+    // en las filas NUEVAS (sin fila base con ese `id`) o con algún campo comparable distinto al
+    // de la última versión persistida; una fila sin cambios conserva su `actualizadoEn` anterior.
+    // Se compara contra `_filasLosaBaseFecha` (snapshot propio, ver nota junto a su declaración),
+    // NUNCA contra `l.filas`/`originales` — esos quedan aliasing con `_filasLosaActual` apenas
+    // corre `_guardarLosaActual()`, de modo que un segundo guardado en la misma visita compararía
+    // una fila contra sí misma.
+    const CAMPOS_COMPARABLES_FILA = ['cuadro', 'ejesEntre', 'laterales', 'ancho', 'hilos', 'tipoVigueta', 'hilosAbajo', 'hilosArriba', 'clasificacion', 'largoA', 'largoB', 'dimension', 'cantidad', 'observaciones'];
+    const ahoraISO = new Date().toISOString();
+    _filasLosaActual.forEach(f => {
+      const base = _filasLosaBaseFecha.find(x => x.id === f.id);
+      if (!base || CAMPOS_COMPARABLES_FILA.some(c => String(f[c] ?? '') !== String(base[c] ?? ''))) {
+        f.actualizadoEn = ahoraISO;
+      }
+    });
   }
   _guardarLosaActual();
+  _filasLosaBaseFecha = JSON.parse(JSON.stringify(_filasLosaActual));
   renderFilasProduccion();
   alert('Lista de producción guardada.');
 }

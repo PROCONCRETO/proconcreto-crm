@@ -1869,3 +1869,46 @@ con remisión sí se guarda; una Unidad de Panel nueva arranca con `cimientos` y
 cantidad mostrada (requerido/producido/pendiente/despachado), mientras que Alveolares 8cm/15cm
 (peso 0, sin dato) muestran la cantidad sola, sin "(0 kg)". Sin errores de consola en ninguna de
 las 2 tandas.
+
+### Columna "Última modificación" en la Lista de producción (2026-11-04)
+
+A pedido del usuario: *"en los listados de listas de producción, producción y despachos, al lado
+de la columna de observaciones, pongamos una nueva columna que muestra la fecha de inclusión/
+modificación"* — acotado después a *"solo hazlo en la lista de producción como tal... que las
+inclusiones o cambios de la lista de producción, se vea cuando se hizo"*: el alcance quedó en la
+tabla de filas (`#tabla-filas-produccion`/`fp-filas-body`) de la pantalla de detalle de una Losa/
+Unidad, NO en los 4 cuadros de eventos de Producción/Despacho programados-y-registrados (esos ya
+muestran su propia "Fecha" operativa, que es otra cosa).
+
+- Campo nuevo por fila: `f.actualizadoEn` (timestamp ISO, mismo formato que `creadoEn` en el
+  resto de la app) — se sella en `guardarListaProduccion()` (único punto de guardado real de esta
+  tabla, cubre edición a mano, Pegar e Importar por igual) comparando cada fila contra un
+  snapshot de la ÚLTIMA versión guardada (`_filasLosaBaseFecha`, clonado en `abrirLosaDetalle()` y
+  reclonado tras cada guardado exitoso): sin snapshot con ese `id` (fila nueva → inclusión) o con
+  algún campo relevante distinto al del snapshot (cuadro/ejes/ancho/hilos/vigueta/clasificación/
+  largos/dimensión/cantidad/observaciones) → se sella `ahora`; sin cambios reales → conserva la
+  fecha que ya tenía.
+- **Por qué un snapshot propio y no comparar contra `l.filas` directo** (como ya hace el candado
+  de medidas ya fabricadas, más arriba en el mismo archivo): `_guardarLosaActual()` asigna
+  `filas: _filasLosaActual` por referencia, no clona — así que apenas corre el primer guardado de
+  una visita, `l.filas` pasa a ser literalmente el mismo arreglo/objetos que `_filasLosaActual`.
+  Para el candado de medidas esto no importa en la práctica (los campos que bloquea quedan
+  `disabled` en el HTML apenas hay algo fabricado, así que nunca llegan a editarse una segunda vez
+  en la misma visita), pero para esta fecha SÍ importa — Observaciones/Cantidad/etc. se pueden
+  editar y guardar varias veces en una misma visita, y sin un snapshot aparte la segunda edición
+  se compararía contra sí misma (siempre "sin cambios", la fecha se quedaría pegada en la primera).
+- Columna nueva en el `<thead>` y en cada `<tr>` (`_filaProduccionHTML()`), justo entre
+  Observaciones y la columna de acciones, siempre de solo lectura (nunca es un dato que se
+  digite): `f.actualizadoEn` formateado con `toLocaleString('es-CO', {day,month,year,hour,
+  minute})`, o "—" si la fila todavía no se ha guardado nunca. Visible en los 3 modos (Lista/
+  Producción/Despacho) de esta misma tabla, igual que ya es Observaciones. `colspan` del
+  empty-state (17→18) y de la celda final de la fila de TOTALES (+1) ajustados; Excel
+  (`exportarFilasLosaExcel()`) exporta la misma columna con el mismo formato de fecha.
+
+Verificado con un arnés real — 15 aserciones: el encabezado nuevo aparece después de
+Observaciones; una fila recién cargada (nunca guardada) muestra "—"; guardar sin cambios no sella
+fecha en ninguna fila; editar una fila y guardar sella fecha solo en esa fila, la otra sigue en
+"—"; un segundo guardado sin cambios nuevos conserva exactamente la misma fecha (confirma que no
+hay aliasing con el snapshot); una segunda edición real de la misma fila SÍ avanza la fecha; una
+fila nueva agregada y guardada queda sellada como inclusión; el `colspan` del empty-state quedó en
+18. Sin errores de consola.
