@@ -1475,6 +1475,30 @@
     </div>
   </div>
 
+  <!-- Cimientos Prefabricados (2026-11-04) — el cimiento donde entra el panel es un producto
+       distinto del panel mismo, con sus propias especificaciones, así que no es una fila más de
+       la lista — mismo patrón de Bovedilla (conteo simple: cantidad requerida + entradas/salidas
+       por remisión), solo que el nombre no se digita, lo fija el sistema de la Unidad. -->
+  <div id="losa-detalle-bloque-cimientos" class="card" style="margin-top:16px">
+    <div style="font-size:15px;font-weight:700;color:var(--azul);margin-bottom:4px">🧱 Cimientos Prefabricados</div>
+    <div id="cim-nombre" style="font-size:12.5px;color:var(--gris-medio);margin-bottom:10px"></div>
+    <div id="cim-campos-editables" class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Cantidad requerida</label><input type="number" min="0" id="cim-cantidad-requerida" onchange="guardarDatosCimientos()"></div>
+    </div>
+    <div id="cim-campos-solo-lectura" style="display:none;font-size:13px;margin-bottom:10px"></div>
+    <div id="cim-resumen" style="font-size:13px;font-weight:600;color:var(--gris-texto);margin-bottom:10px;display:none"></div>
+    <div id="cim-seguimiento" class="form-grid" style="display:none">
+      <div id="cim-columna-produccion">
+        <div class="flex-gap" style="margin-bottom:6px;justify-content:space-between"><div style="font-weight:600;font-size:12.5px">Entradas (producción)</div><button class="btn btn-secundario btn-xs" onclick="abrirModalEventoCimientos('produccion')">+ Registrar entrada</button></div>
+        <table class="tabla-cots"><thead><tr><th>Remisión</th><th>Fecha</th><th style="text-align:right">Cantidad</th></tr></thead><tbody id="cim-produccion-body"></tbody></table>
+      </div>
+      <div id="cim-columna-despacho">
+        <div class="flex-gap" style="margin-bottom:6px;justify-content:space-between"><div style="font-weight:600;font-size:12.5px">Salidas (despacho)</div><button class="btn btn-secundario btn-xs" onclick="abrirModalEventoCimientos('despacho')">+ Registrar despacho</button></div>
+        <table class="tabla-cots"><thead><tr><th>Remisión</th><th>Fecha</th><th style="text-align:right">Cantidad</th></tr></thead><tbody id="cim-despacho-body"></tbody></table>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <div class="modal-overlay" id="modal-programar-produccion">
@@ -1664,6 +1688,21 @@
     <div class="modal-acciones">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-evento-bovedilla')">Cancelar</button>
       <button class="btn btn-primario" onclick="guardarEventoBovedilla()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-evento-cimientos">
+  <div class="modal" style="width:420px;max-width:95vw">
+    <div class="modal-titulo" id="mec-titulo">📥 Registrar entrada de cimientos</div>
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="form-grupo"><label>Fecha</label><input type="date" id="mec-fecha"></div>
+      <div class="form-grupo"><label>Cantidad</label><input type="number" min="0" id="mec-cantidad"></div>
+    </div>
+    <div class="form-grupo" style="margin-bottom:16px"><label>N° Remisión</label><input type="text" id="mec-remision" placeholder="Ej: REM-5844"></div>
+    <div class="modal-acciones">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-evento-cimientos')">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarEventoCimientos()">Guardar</button>
     </div>
   </div>
 </div>
@@ -3453,7 +3492,7 @@
 <script src="js/logistica-ordenes-despacho.js?v=20260829a"></script>
 <script src="js/estadisticas-logistica.js?v=20261023a"></script>
 <script src="js/proyectos.js?v=20261016b"></script>
-<script src="js/losas-proyecto.js?v=20261104a"></script>
+<script src="js/losas-proyecto.js?v=20261104b"></script>
 <script src="js/auth.js?v=20260804a"></script>
 <script src="js/datos-realtime.js?v=20261104a"></script>
 <script src="js/cotizador.js?v=20261020a"></script>

@@ -1816,3 +1816,56 @@ la misma config de tope de bancos, Vigueta sigue sin tope y Prelosa conserva la 
 filtros Ancho/Clasificación están disponibles en los 3 sistemas de panel y Número de hilos en
 ninguno; la lista de Unidades muestra las 3 etiquetas nuevas correctamente. Sin errores de
 consola.
+
+### Cimientos Prefabricados — conteo aparte debajo del listado de Paneles (2026-11-04)
+
+A pedido del usuario: *"para cuando tengamos lista de paneles, incluyamos en un recuadro debajo
+del listado de paneles, donde podamos incluir la cantidad de cimientos prefabricados para dicha
+lista. El cimiento es un elemento en el cual entra el panel, por tanto es un producto distinto y
+especificaciones distintas que no entran en el listado de paneles"* — el cimiento no es una fila
+más de la lista de piezas (tiene su propia unidad de fabricación, no comparte banco/cinta con los
+paneles), así que se modeló como un bloque aparte en la pantalla de detalle de la Unidad, **con
+el mismo patrón exacto que ya usa Bovedilla**: sin control fila-por-fila, solo cantidad requerida
++ entradas (producción) / salidas (despacho) por remisión — confirmado con el usuario que quería
+el mismo nivel de seguimiento que Bovedilla, no un simple número sin registro.
+
+- Dato nuevo en la Losa: `l.cimientos = { cantidadRequerida, produccion: [], despacho: [] }` —
+  mismo molde exacto que `l.bovedilla`, sin el campo `tipo` (acá el nombre no se digita, lo fija
+  el sistema de la Unidad). `_cimientosLosaActual` (variable de trabajo en memoria, mismo
+  criterio que `_bovedillaLosaActual`) se persiste junto con el resto de la Losa en
+  `_guardarLosaActual()`. Una Unidad de Panel nueva arranca con `cimientos` ya inicializado en
+  `guardarLosa()` (mismo patrón que `bovedilla` para `vigueta_bovedilla`).
+- El nombre del cimiento es fijo por sistema, no un campo libre: *"serían: CIMIENTO PREFABRICADO
+  PARA PANEL DE 4 cm / 8 cm / 15 cm, respectivamente para cada sistema"* →
+  `NOMBRES_CIMIENTO_PANEL` (`js/losas-proyecto.js`), un mapa `clave → nombre`, consumido por
+  `_nombreCimientoPanel(sistema)`. Todavía **no está vinculado a un producto real del
+  Catálogo/Costeo** (decisión explícita del usuario) — por ahora es solo una cantidad con este
+  nombre fijo delante; vincularlo a un producto para poder costearlo queda fuera de alcance de
+  esta vuelta.
+- `renderCimientosLosa()` (análoga a `renderBovedillaLosa()`) controla las 3 vistas por modo: en
+  **Lista** (Ingeniería) se edita la Cantidad requerida, sin ver el seguimiento; en
+  **Producción** se ve de solo lectura + SOLO las entradas; en **Despacho**, igual pero con SOLO
+  las salidas — Producción y Despachos quedan tan separados acá como en Bovedilla y en las filas
+  normales. El bloque completo (`#losa-detalle-bloque-cimientos`) solo se muestra cuando
+  `_esSistemaPanel(l.sistema)` es verdadero — ninguna Losa de entrepiso (Prelosa/Vigueta/Placa
+  Alveolar) lo ve.
+- **Peso unitario** (2026-11-04, mismo día, a pedido del usuario: *"el cimiento para panel de
+  4cm pesa 40 kilogramos"*) — `PESO_UNITARIO_CIMIENTO_PANEL_KG`, mismo mapa `clave → número` que
+  `NOMBRES_CIMIENTO_PANEL`, con 0 para Alveolares 8cm/15cm (todavía sin dato real, mismo criterio
+  "ponlos en cero" ya aplicado a la Densidad de esos dos sistemas). Se usa solo para MOSTRAR el
+  peso total junto a cada cantidad (`_fmtCantidadConPeso()`: "24 (960 kg)") — nunca para calcular
+  ni alterar `cantidadRequerida` ni los eventos de producción/despacho, que se siguen guardando
+  en UNIDADES. Cuando el peso unitario es 0 (sin dato), se omite el "(0 kg)" en vez de mostrar un
+  número que no informa nada.
+
+Verificado con un arnés real — 36 aserciones en 2 tandas: el bloque de Cimientos es visible solo
+para Unidades de Panel (no para Prelosa, regresión); el nombre mostrado coincide con el sistema
+de la Unidad; en modo Lista se edita y persiste la cantidad requerida (un solo upsert); en modo
+Producción se ve de solo lectura con solo la columna de entradas, y registrar una entrada
+actualiza "Producido"/"Pendiente producción" en vivo; en modo Despacho, igual con solo salidas, y
+un despacho sin N° de remisión queda bloqueado con alerta (como ya exige Bovedilla) mientras que
+con remisión sí se guarda; una Unidad de Panel nueva arranca con `cimientos` ya inicializado en
+0; el peso unitario de 40 kg/u (Macizo 4cm) se refleja correctamente en el nombre y en cada
+cantidad mostrada (requerido/producido/pendiente/despachado), mientras que Alveolares 8cm/15cm
+(peso 0, sin dato) muestran la cantidad sola, sin "(0 kg)". Sin errores de consola en ninguna de
+las 2 tandas.

@@ -54,6 +54,16 @@ let _filasColapsadas = false;
 let _filasLosaActual = [];
 let _despachosLosaActual = [];
 let _bovedillaLosaActual = null;
+// Cimientos Prefabricados — el cimiento donde entra el panel es un producto DISTINTO del panel
+// mismo, con sus propias especificaciones (2026-11-04, a pedido del usuario: "el cimiento es un
+// elemento en el cual entra el panel, por tanto es un producto distinto... que no entran en el
+// listado de paneles"), así que no es una fila más de la lista de paneles — es un conteo simple
+// aparte, mismo criterio exacto que Bovedilla ("como fabricar un bloque de cemento": cantidad
+// requerida + entradas/salidas por remisión, sin control fila-por-fila). El "tipo" de cimiento
+// NO se digita (a diferencia de Bovedilla) — lo fija el sistema de la Unidad, ver
+// `_nombreCimientoPanel()`, porque el usuario dio un nombre fijo por sistema ("CIMIENTO
+// PREFABRICADO PARA PANEL DE 4/8/15 cm... respectivamente para cada sistema").
+let _cimientosLosaActual = null;
 // Producciones programadas (2026-10-15, a pedido del usuario) — flujo de dos pasos: "+
 // Programar producción" arma el lote (qué filas, cuánto se planea fabricar); "+ Cargar
 // producción" confirma, línea por línea, lo que REALMENTE se fabricó frente a lo programado —
@@ -110,6 +120,31 @@ const ESPESOR_DENSIDAD_DEFAULT_PANEL = {
   paneles_alveolar_8cm:  { espesorCm: 8,  densidadKgM3: 0 },
   paneles_alveolar_15cm: { espesorCm: 15, densidadKgM3: 0 },
 };
+// Nombre fijo del cimiento correspondiente a cada sistema de Panel (2026-11-04, a pedido del
+// usuario) — ver bloque "Cimientos Prefabricados" en `renderLosaDetalle()`/`renderCimientosLosa()`.
+// Todavía no está vinculado a un producto real del Catálogo/Costeo (a propósito, por ahora es
+// solo una cantidad con este nombre fijo delante).
+const NOMBRES_CIMIENTO_PANEL = {
+  paneles_macizo_4cm:    'CIMIENTO PREFABRICADO PARA PANEL DE 4 cm',
+  paneles_alveolar_8cm:  'CIMIENTO PREFABRICADO PARA PANEL DE 8 cm',
+  paneles_alveolar_15cm: 'CIMIENTO PREFABRICADO PARA PANEL DE 15 cm',
+};
+function _nombreCimientoPanel(sistema) {
+  return NOMBRES_CIMIENTO_PANEL[sistema] || '';
+}
+// Peso unitario del cimiento de cada sistema (2026-11-04, a pedido del usuario: "el cimiento
+// para panel de 4cm pesa 40 kilogramos") — mismo criterio que ESPESOR_DENSIDAD_DEFAULT_PANEL: 0
+// para 8cm/15cm porque todavía no hay dato real de esos dos. Se usa solo para mostrar el peso
+// total junto a cada cantidad en `renderCimientosLosa()` — no altera `cantidadRequerida` ni los
+// eventos de producción/despacho, que siguen guardándose en UNIDADES, no en kg.
+const PESO_UNITARIO_CIMIENTO_PANEL_KG = {
+  paneles_macizo_4cm:    40,
+  paneles_alveolar_8cm:  0,
+  paneles_alveolar_15cm: 0,
+};
+function _pesoUnitarioCimientoPanel(sistema) {
+  return PESO_UNITARIO_CIMIENTO_PANEL_KG[sistema] || 0;
+}
 // Migración perezosa de Unidades ya guardadas con el sistema genérico viejo (antes de la
 // separación en 3 sistemas) — mismo criterio que `_normalizarDiseno()` en calidad-mezclas.js: se
 // corrige en memoria al cargar (ver cargarDatosSupabase()/recargarLosasProyectoRT() en
@@ -695,6 +730,7 @@ async function guardarLosa() {
     filas: existente?.filas || [],
     despachos: existente?.despachos || [],
     bovedilla: sistema === 'vigueta_bovedilla' ? (existente?.bovedilla || { tipo: '', cantidadRequerida: 0, produccion: [], despacho: [] }) : null,
+    cimientos: _esSistemaPanel(sistema) ? (existente?.cimientos || { cantidadRequerida: 0, produccion: [], despacho: [] }) : null,
     creadoPor: existente?.creadoPor || (typeof USUARIO_ACTUAL !== 'undefined' ? USUARIO_ACTUAL?.email : '') || '',
     creadoEn: existente?.creadoEn || new Date().toISOString(),
   };
@@ -786,6 +822,7 @@ function abrirLosaDetalle(id) {
   _filasLosaActual = JSON.parse(JSON.stringify(l.filas || []));
   _despachosLosaActual = JSON.parse(JSON.stringify(l.despachos || []));
   _bovedillaLosaActual = l.bovedilla ? JSON.parse(JSON.stringify(l.bovedilla)) : null;
+  _cimientosLosaActual = l.cimientos ? JSON.parse(JSON.stringify(l.cimientos)) : null;
   _programacionesLosaActual = JSON.parse(JSON.stringify(l.produccionesProgramadas || []));
   _despachosProgramadosLosaActual = JSON.parse(JSON.stringify(l.despachosProgramados || []));
   // Tabla de filas colapsada por defecto en Producción/Despacho (2026-10-21, a pedido del
@@ -834,8 +871,10 @@ function renderLosaDetalle() {
   document.getElementById('losa-card-despacho-programado').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-card-despachos-registrados').style.display = esDespacho ? '' : 'none';
   document.getElementById('losa-detalle-bloque-bovedilla').style.display = l.sistema === 'vigueta_bovedilla' ? '' : 'none';
+  document.getElementById('losa-detalle-bloque-cimientos').style.display = _esSistemaPanel(l.sistema) ? '' : 'none';
   renderFilasProduccion();
   if (l.sistema === 'vigueta_bovedilla') renderBovedillaLosa();
+  if (_esSistemaPanel(l.sistema)) renderCimientosLosa();
   if (esProduccion) { renderProduccionProgramada(); renderProduccionRegistrada(); }
   if (esDespacho) { renderDespachoProgramado(); renderDespachosRegistrados(); }
 }
@@ -1753,7 +1792,7 @@ async function _descargarPDFConMembrete(contentElId, footerElId, nombreArchivo, 
 function _guardarLosaActual() {
   const idx = LOSAS_PROYECTO.findIndex(x => x.id === _LOSA_ACTIVA_ID);
   if (idx < 0) return;
-  const l = { ...LOSAS_PROYECTO[idx], filas: _filasLosaActual, despachos: _despachosLosaActual, bovedilla: _bovedillaLosaActual, produccionesProgramadas: _programacionesLosaActual, despachosProgramados: _despachosProgramadosLosaActual };
+  const l = { ...LOSAS_PROYECTO[idx], filas: _filasLosaActual, despachos: _despachosLosaActual, bovedilla: _bovedillaLosaActual, cimientos: _cimientosLosaActual, produccionesProgramadas: _programacionesLosaActual, despachosProgramados: _despachosProgramadosLosaActual };
   LOSAS_PROYECTO[idx] = l;
   sb.from('losas_proyecto').upsert({ id: l.id, datos: l, modificado: new Date().toISOString() }, { onConflict: 'id' })
     .then(({ error }) => { if (error) { console.error('Error guardando losa:', error.message); alert('No se pudo guardar: ' + error.message); } });
@@ -3848,4 +3887,89 @@ function guardarEventoBovedilla() {
   _guardarLosaActual();
   cerrarModal('modal-evento-bovedilla');
   renderBovedillaLosa();
+}
+
+// ── Cimientos Prefabricados — mismo patrón exacto de Bovedilla (conteo simple, sin control
+// fila-por-fila: cantidad requerida + entradas/salidas por remisión), solo que el "tipo" no se
+// digita — lo fija el sistema de la Unidad (`_nombreCimientoPanel()`). En modo 'lista'
+// (Ingeniería) se edita la cantidad requerida, sin ver el seguimiento. En modo 'produccion' se
+// ve de solo lectura + SOLO las entradas; en modo 'despacho', igual pero con SOLO las salidas. ──
+// `cant` en unidades, `pesoUnitario` en kg/unidad — si no hay peso unitario conocido (0,
+// Alveolares 8/15cm por ahora) se muestra solo la cantidad, sin un "(0 kg)" que no aporta nada.
+function _fmtCantidadConPeso(cant, pesoUnitario) {
+  if (!(pesoUnitario > 0)) return `${cant}`;
+  return `${cant} (${(cant * pesoUnitario).toLocaleString('es-CO')} kg)`;
+}
+function renderCimientosLosa() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const c = _cimientosLosaActual;
+  const esLista = _MODO_FLUJO_LOSA === 'lista';
+  const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
+  const esDespacho = _MODO_FLUJO_LOSA === 'despacho';
+  const pesoUnitario = l ? _pesoUnitarioCimientoPanel(l.sistema) : 0;
+  document.getElementById('cim-nombre').textContent = l
+    ? _nombreCimientoPanel(l.sistema) + (pesoUnitario > 0 ? ` · ${pesoUnitario.toLocaleString('es-CO')} kg/unidad` : '')
+    : '';
+  document.getElementById('cim-campos-editables').style.display = esLista ? '' : 'none';
+  document.getElementById('cim-campos-solo-lectura').style.display = esLista ? 'none' : '';
+  document.getElementById('cim-resumen').style.display = esLista ? 'none' : '';
+  document.getElementById('cim-seguimiento').style.display = esLista ? 'none' : '';
+  document.getElementById('cim-columna-produccion').style.display = esProduccion ? '' : 'none';
+  document.getElementById('cim-columna-despacho').style.display = esDespacho ? '' : 'none';
+  if (esLista) {
+    const elCant = document.getElementById('cim-cantidad-requerida');
+    if (elCant) elCant.value = c?.cantidadRequerida || 0;
+    return;
+  }
+  const req = Number(c?.cantidadRequerida) || 0;
+  document.getElementById('cim-campos-solo-lectura').textContent = `Cantidad requerida: ${_fmtCantidadConPeso(req, pesoUnitario)}`;
+  if (esProduccion) {
+    const prod = (c?.produccion || []).reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
+    document.getElementById('cim-resumen').textContent = `Producido: ${_fmtCantidadConPeso(prod, pesoUnitario)} · Pendiente producción: ${_fmtCantidadConPeso(Math.max(0, req - prod), pesoUnitario)}`;
+    _renderEventosCimientos('produccion', 'cim-produccion-body');
+  } else {
+    const desp = (c?.despacho || []).reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
+    document.getElementById('cim-resumen').textContent = `Despachado: ${_fmtCantidadConPeso(desp, pesoUnitario)} · Pendiente despacho: ${_fmtCantidadConPeso(Math.max(0, req - desp), pesoUnitario)}`;
+    _renderEventosCimientos('despacho', 'cim-despacho-body');
+  }
+}
+function _renderEventosCimientos(campo, tbodyId) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  const eventos = (_cimientosLosaActual && _cimientosLosaActual[campo]) || [];
+  if (!eventos.length) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--gris-medio);padding:8px">Sin registros.</td></tr>`; return; }
+  tbody.innerHTML = eventos.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(e => `<tr>
+    <td>${e.remision ? _esc(e.remision) : '—'}</td>
+    <td>${e.fecha ? new Date(e.fecha + 'T12:00').toLocaleDateString('es-CO') : '—'}</td>
+    <td style="text-align:right">${e.cantidad}</td>
+  </tr>`).join('');
+}
+function guardarDatosCimientos() {
+  if (!_cimientosLosaActual) _cimientosLosaActual = { cantidadRequerida: 0, produccion: [], despacho: [] };
+  _cimientosLosaActual.cantidadRequerida = parseFloat(document.getElementById('cim-cantidad-requerida').value) || 0;
+  _guardarLosaActual();
+  renderCimientosLosa();
+  alert('Cantidad de cimientos prefabricados guardada.');
+}
+let _TIPO_EVENTO_CIMIENTOS = null;
+function abrirModalEventoCimientos(tipo) {
+  _TIPO_EVENTO_CIMIENTOS = tipo; // 'produccion' | 'despacho'
+  document.getElementById('mec-titulo').textContent = tipo === 'produccion' ? '📥 Registrar entrada de cimientos' : '📦 Registrar despacho de cimientos';
+  document.getElementById('mec-remision').value = '';
+  document.getElementById('mec-fecha').value = _fmtISO(new Date());
+  document.getElementById('mec-cantidad').value = '';
+  document.getElementById('modal-evento-cimientos').classList.add('abierto');
+}
+function guardarEventoCimientos() {
+  const cantidad = parseFloat(document.getElementById('mec-cantidad').value) || 0;
+  if (cantidad <= 0) { alert('Ingresa una cantidad mayor a cero.'); return; }
+  const fecha = document.getElementById('mec-fecha').value;
+  if (!fecha) { alert('Elige una fecha.'); return; }
+  const remision = document.getElementById('mec-remision').value.trim();
+  if (_TIPO_EVENTO_CIMIENTOS === 'despacho' && !remision) { alert('Ingresa el número de remisión.'); return; }
+  if (!_cimientosLosaActual) _cimientosLosaActual = { cantidadRequerida: 0, produccion: [], despacho: [] };
+  _cimientosLosaActual[_TIPO_EVENTO_CIMIENTOS].push({ fecha, cantidad, remision: remision || null });
+  _guardarLosaActual();
+  cerrarModal('modal-evento-cimientos');
+  renderCimientosLosa();
 }
