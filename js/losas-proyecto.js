@@ -1382,7 +1382,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
       return `<select disabled title="${TITULO_BLOQUEO}" style="width:118px;padding:4px;background:var(--gris-fondo);color:var(--gris-medio)">${opciones}</select>`;
     }
     return esLista
-      ? `<select onchange="_filasLosaActual[${i}].clasificacion=this.value;_sincronizarLargosPanel(${i})" style="width:118px;padding:4px;border:1px solid var(--gris-borde);border-radius:4px">${opciones}</select>`
+      ? `<select onchange="_alCambiarClasificacionPanel(${i},this.value)" style="width:118px;padding:4px;border:1px solid var(--gris-borde);border-radius:4px">${opciones}</select>`
       : _etiquetaClasificacionPanel(valor);
   };
   const largoNum = (valor, campo, deshabilitado) => {
@@ -1592,6 +1592,22 @@ function _actualizarFilaProduccion(i) {
 // medidas, impresos, Excel) necesita conocer; ningún otro lugar se entera de que hay 2 largos,
 // salvo el cálculo de ocupación de banco/cinta, que a propósito usa el MÁXIMO en vez del
 // promedio (ver `_metrosPorAnchoProgramar()`, más abajo — instrucción explícita del usuario).
+// Cambiar la Clasificación a una "cuchilla" (2026-11-05, a pedido del usuario: "estas siempre
+// serán en diagonal, por tanto siempre serán dos medidas distintas... se vuelve tedioso... toca
+// borrar lo que ya se tiene por defecto") — si Largo A ya se había escrito mientras la fila
+// todavía era Panel/Dintel/Antepecho (no cuchilla), Largo B quedó mirando ese mismo valor (ver
+// `_sincronizarLargosPanel()`); al pasar a cuchilla, ese espejo deja de tener sentido, así que se
+// limpia a 0 en vez de dejarlo pre-llenado con un valor que SIEMPRE va a tener que borrarse a
+// mano. Solo limpia al entrar a cuchilla viniendo de no-cuchilla — cambiar entre dos cuchillas
+// (Panel cuchilla ↔ Dintel cuchilla) o salir de cuchilla no toca Largo B.
+function _alCambiarClasificacionPanel(i, valorNuevo) {
+  const f = _filasLosaActual[i];
+  if (!f) return;
+  const eraCuchilla = _esClasificacionCuchilla(f.clasificacion);
+  f.clasificacion = valorNuevo;
+  if (_esClasificacionCuchilla(valorNuevo) && !eraCuchilla) f.largoB = 0;
+  _sincronizarLargosPanel(i);
+}
 function _sincronizarLargosPanel(i) {
   const f = _filasLosaActual[i];
   if (!f) return;

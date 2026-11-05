@@ -2065,3 +2065,33 @@ ninguna tecla, y el valor final llega completo sin truncarse a mitad de tecleo; 
 NO cuchilla, escribir en Largo A sigue reflejando el valor en vivo sobre el Largo B deshabilitado
 (regresión); cambiar la Clasificación a una cuchilla desde el `<select>` sigue habilitando Largo B
 correctamente. Sin errores de consola.
+
+### Al pasar a cuchilla, Largo B ya no hereda el valor de Largo A (2026-11-05)
+
+A pedido del usuario: *"cuando estoy metiendo medidas de cuchillas (en panel y en dintel), no
+arrastremos la primera medida por defecto, pues estas siempre serán en diagonal, por tanto
+siempre serán dos medidas distintas y se vuelve tedioso... toca borrar lo que ya se tiene por
+defecto."*
+
+**Por qué pasaba**: mientras una fila es Panel/Dintel/Antepecho (no cuchilla), Largo B siempre
+"espeja" en vivo lo que se escribe en Largo A (`_sincronizarLargosPanel()`, porque esas piezas
+solo tienen un largo real). Si el usuario digitaba Largo A ANTES de darse cuenta de que la pieza
+era cuchilla, Largo B ya quedaba con ese mismo valor copiado; al cambiar la Clasificación a
+"Panel cuchilla"/"Dintel cuchilla", Largo B se habilitaba pero seguía mostrando el valor
+espejado — como una cuchilla es siempre un corte en diagonal (dos medidas reales SIEMPRE
+distintas), ese valor por defecto nunca servía y había que borrarlo a mano cada vez.
+
+**Corrección**: `_alCambiarClasificacionPanel(i, valorNuevo)` (nueva, es ahora el `onchange` del
+`<select>` de Clasificación, antes inline) — si la fila ENTRA a una clasificación cuchilla
+viniendo de una que no lo era, limpia Largo B a 0/blanco en vez de dejarlo con el espejo viejo;
+Largo A no se toca. Cambiar entre dos cuchillas (Panel cuchilla ↔ Dintel cuchilla) o salir de
+cuchilla de vuelta a Panel/Dintel/Antepecho NO limpia nada — ahí sigue aplicando el espejo de
+siempre, sin cambios.
+
+Verificado con un arnés real — 10 aserciones: escribir Largo A en una fila Panel espeja Largo B
+en vivo; cambiar esa fila a "Panel cuchilla" limpia Largo B a 0 (tanto en memoria como en el
+`<input>` en pantalla, que queda habilitado y vacío) sin tocar Largo A; escribir ahí la medida
+diagonal real la deja distinta de Largo A; cambiar de "Panel cuchilla" a "Dintel cuchilla" NO
+limpia Largo B; volver de cuchilla a "Panel" sí vuelve a espejar Largo B = Largo A (regresión);
+una fila que YA arranca como cuchilla nunca llena Largo B al escribir en Largo A. Sin errores de
+consola.
