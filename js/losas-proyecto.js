@@ -1582,16 +1582,21 @@ function _actualizarFilaProduccion(i) {
   _aplicarFiltrosProgramar('fp');
 }
 
-// Paneles de Cerramiento (2026-10-29) — único punto de entrada que mantiene Largo A/Largo B/
-// Dimensión consistentes entre sí, llamado desde el oninput de Largo A, el oninput de Largo B y
-// el onchange de Clasificación (ver `_filaProduccionHTML()`). Si la clasificación NO es
-// "cuchilla" (Panel/Dintel/Antepecho), Largo B siempre copia a Largo A — no hay dos largos
-// reales que guardar. `dimension` = promedio de los dos, la fórmula exacta del volumen de un
-// trapecio (ancho constante, altura variando linealmente entre los dos largos) — es el único
-// campo que el resto del código (peso, Long. total, filtro "Largo de pieza", resumen por
-// medidas, impresos, Excel) necesita conocer; ningún otro lugar se entera de que hay 2 largos,
-// salvo el cálculo de ocupación de banco/cinta, que a propósito usa el MÁXIMO en vez del
-// promedio (ver `_metrosPorAnchoProgramar()`, más abajo — instrucción explícita del usuario).
+// Paneles de Cerramiento (2026-10-29, corregido 2026-11-05) — único punto de entrada que
+// mantiene Largo A/Largo B/Dimensión consistentes entre sí, llamado desde el oninput de Largo A,
+// el oninput de Largo B y el onchange de Clasificación (ver `_filaProduccionHTML()`). Si la
+// clasificación NO es "cuchilla" (Panel/Dintel/Antepecho), Largo B siempre copia a Largo A — no
+// hay dos largos reales que guardar. `dimension` = el MÁS LARGO de los dos (2026-11-05, a pedido
+// del usuario: "cuando se fabrican con corte a 90 grados y luego se cortan... en producción sí
+// sería el largo y el área por la altura mayor y no por el promedio" — una pieza cuchilla se
+// funde primero como un rectángulo completo al largo mayor, y SOLO DESPUÉS se le hace el corte
+// diagonal; el promedio, usado antes acá, subestimaba el concreto realmente vaciado. Antes de
+// este cambio se usaba el promedio exacto del volumen de un trapecio — correcto si la pieza se
+// fundiera ya con el corte diagonal, que no es el caso real). Es el único campo que el resto del
+// código (peso, Long. total, filtro "Largo de pieza", resumen por medidas, impresos, Excel)
+// necesita conocer; ningún otro lugar se entera de que hay 2 largos, y el cálculo de ocupación de
+// banco/cinta (`_metrosPorAnchoProgramar()`, más abajo) ya no necesita su propio MÁXIMO aparte,
+// porque ahora es exactamente lo mismo que `dimension`.
 // Cambiar la Clasificación a una "cuchilla" (2026-11-05, a pedido del usuario: "estas siempre
 // serán en diagonal, por tanto siempre serán dos medidas distintas... se vuelve tedioso... toca
 // borrar lo que ya se tiene por defecto") — si Largo A ya se había escrito mientras la fila
@@ -1612,7 +1617,7 @@ function _sincronizarLargosPanel(i) {
   const f = _filasLosaActual[i];
   if (!f) return;
   if (!_esClasificacionCuchilla(f.clasificacion)) f.largoB = f.largoA;
-  f.dimension = ((Number(f.largoA) || 0) + (Number(f.largoB) || 0)) / 2;
+  f.dimension = Math.max(Number(f.largoA) || 0, Number(f.largoB) || 0);
   _actualizarFilaProduccion(i);
 }
 
@@ -2122,15 +2127,13 @@ function _configBancoSistema(sistema) {
 function _topeMetrosBanco(cantidadAnchos, cfg) {
   return cantidadAnchos <= 1 ? cfg.metrosUtiles * cfg.numCintas : cfg.metrosUtiles;
 }
-// Metros de ocupación por ancho de lo que se está programando AHORA en el modal — para Paneles,
-// el usuario pidió explícitamente usar el MÁXIMO de los dos largos de cada pieza cuchilla, no el
-// promedio (`dimension`, que sí es correcto para peso/Long. total — ver `_sincronizarLargosPanel()`):
-// "debes hacer los cálculos de ocupación del banco o la cinta con el más largo" — el molde/la
-// cinta reserva espacio físico según el lado más largo de la pieza, sin importar que el otro
-// lado sea más corto.
+// Metros de ocupación por ancho de lo que se está programando AHORA en el modal — el molde/la
+// cinta reserva espacio físico según el lado más largo de cada pieza cuchilla (2026-10-29, a
+// pedido del usuario: "debes hacer los cálculos de ocupación del banco o la cinta con el más
+// largo"). Hasta el 2026-11-05 esto leía el máximo aparte (`dimension` todavía era el promedio
+// para peso/Long. total); ahora `dimension` YA ES ese máximo (ver `_sincronizarLargosPanel()`),
+// así que basta con leerlo directo, igual que en los demás sistemas.
 function _metrosPorAnchoProgramar(prefijo) {
-  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
-  const esPanel = !!l && _esSistemaPanel(l.sistema);
   const porAncho = new Map();
   document.querySelectorAll(`#${prefijo}-filas-body input[data-fila-id]`).forEach(inp => {
     const cantidad = parseFloat(inp.value) || 0;
@@ -2138,8 +2141,7 @@ function _metrosPorAnchoProgramar(prefijo) {
     const f = _filasLosaActual.find(x => x.id === inp.dataset.filaId);
     if (!f) return;
     const ancho = Number(f.ancho) || 0;
-    const largo = esPanel ? Math.max(Number(f.largoA) || 0, Number(f.largoB) || 0) : (Number(f.dimension) || 0);
-    const metros = largo * cantidad;
+    const metros = (Number(f.dimension) || 0) * cantidad;
     porAncho.set(ancho, (porAncho.get(ancho) || 0) + metros);
   });
   return porAncho;
@@ -2547,16 +2549,15 @@ function guardarProgramacionProduccion() {
   // va a guardar) en vez de confiar en lo que se veía en pantalla.
   const cfgBanco = l && _configBancoSistema(l.sistema);
   if (cfgBanco) {
-    const esPanel = _esSistemaPanel(l.sistema);
     const porAncho = new Map();
     lineas.forEach(ln => {
       const f = _filasLosaActual.find(x => x.id === ln.filaId);
       if (!f) return;
       const ancho = Number(f.ancho) || 0;
-      // Ocupación con el largo MÁS LARGO en piezas cuchilla, no el promedio (2026-10-29,
-      // instrucción explícita del usuario — ver nota en `_metrosPorAnchoProgramar()`).
-      const largo = esPanel ? Math.max(Number(f.largoA) || 0, Number(f.largoB) || 0) : (Number(f.dimension) || 0);
-      const metros = largo * ln.cantidadProgramada;
+      // Ocupación con el lado MÁS LARGO en piezas cuchilla (2026-10-29, instrucción explícita del
+      // usuario — ver nota en `_metrosPorAnchoProgramar()`) — `dimension` ya ES ese máximo desde
+      // el 2026-11-05, así que se lee directo, igual que en los demás sistemas.
+      const metros = (Number(f.dimension) || 0) * ln.cantidadProgramada;
       porAncho.set(ancho, (porAncho.get(ancho) || 0) + metros);
     });
     if (porAncho.size > cfgBanco.maxAnchos) {
@@ -2634,9 +2635,10 @@ function _resumenPorMedidasHTML(lineas, l) {
   // "2+1", mismo formato corto que ya se usa en el resto de la pantalla para esos dos campos.
   // Paneles de Cerramiento (2026-10-29) — la clave de agrupación usa Clasificación en vez de
   // Hilos (no aplica), y a diferencia de los demás sistemas, la clave de FILA (dentro de una
-  // tarjeta) incluye `largoA`/`largoB` por separado, no solo `dimension` (el promedio): dos
-  // piezas cuchilla con el mismo promedio pero largos reales distintos (ej. 3.0/3.0 vs 2.5/3.5)
-  // podrían agruparse como si fueran la misma pieza si solo se mirara el promedio, y no lo son.
+  // tarjeta) incluye `largoA`/`largoB` por separado, no solo `dimension` (desde el 2026-11-05 es
+  // el máximo de los dos, ver `_sincronizarLargosPanel()`): dos piezas cuchilla con la misma
+  // dimensión pero largos reales distintos (ej. 3.5/3.5 vs 3.5/2.0, ambas con máximo 3.5)
+  // podrían agruparse como si fueran la misma pieza si solo se mirara `dimension`, y no lo son.
   const grupos = new Map();
   let totalPiezasAll = 0, totalMetrosAll = 0, totalPesoAll = 0;
   lineas.forEach(({ f, cantidad }) => {

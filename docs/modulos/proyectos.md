@@ -2095,3 +2095,40 @@ diagonal real la deja distinta de Largo A; cambiar de "Panel cuchilla" a "Dintel
 limpia Largo B; volver de cuchilla a "Panel" sí vuelve a espejar Largo B = Largo A (regresión);
 una fila que YA arranca como cuchilla nunca llena Largo B al escribir en Largo A. Sin errores de
 consola.
+
+### Cuchillas: Long. total, m² y Peso usan el largo MÁS LARGO, no el promedio (2026-11-05)
+
+A pedido del usuario: *"cuando metemos unidades de panel de cuchilla y dintel de cuchilla, la
+longitud que suma y el área que se calcula, no debería ser el promedio si no con la longitud más
+larga, esto porque cuando se fabrican con corte a 90 grados y luego se cortan, por lo que en
+producción sí sería el largo y el área por la altura mayor y no por el promedio."*
+
+Corrige una decisión tomada el 2026-10-29 que resultó ser físicamente incorrecta: `dimension`
+(Largo A/Largo B de una pieza cuchilla) se calculaba como el PROMEDIO de los dos, razonando que
+era la fórmula exacta del volumen de un trapecio — correcta solo SI la pieza se fundiera ya con
+el corte diagonal de una vez. El usuario aclaró que no es así: una pieza cuchilla se funde
+primero como un rectángulo completo al largo MÁS LARGO (corte recto a 90°), y SOLO DESPUÉS se le
+hace el corte diagonal — el concreto del recorte sí se vació, aunque termine siendo sobrante. El
+promedio subestimaba sistemáticamente cuánto concreto/área se usa realmente en producción.
+
+- **`_sincronizarLargosPanel()`** (`js/losas-proyecto.js`) — `dimension = Math.max(largoA,
+  largoB)` en vez del promedio. Como es el ÚNICO campo que leen Peso (`_pesoFila()`), Long. total,
+  m², el filtro "Largo de pieza", el resumen por medidas, los imprimibles y el Excel, el cambio se
+  propaga automáticamente a los 7 sin tocar nada más en esos lugares — ninguno sabe ni necesita
+  saber que la pieza tiene dos largos.
+- **`_metrosPorAnchoProgramar()`** y la validación dura de `guardarProgramacionProduccion()` (el
+  cálculo de ocupación de banco/cinta) ya usaban el máximo por separado desde el 2026-10-29,
+  porque el molde físico siempre reserva el espacio del lado más largo — con este cambio
+  `dimension` ya ES ese máximo, así que el cálculo aparte quedó redundante y se simplificó para
+  leer `f.dimension` directo, igual que en los demás sistemas.
+- Lo que NO cambia: el resumen por medidas sigue agrupando por `largoA`/`largoB` por separado (no
+  solo por `dimension`) para no confundir dos piezas cuchilla con el mismo máximo pero distinto
+  largo corto (ej. 3.5/3.5 vs 3.5/2.0) — esa distinción seguía siendo necesaria y no tiene que ver
+  con cuál métrica agregada (antes promedio, ahora máximo) se usa para Peso/Long. total/m².
+
+Verificado con un arnés real — 10 aserciones: una fila cuchilla con Largo A=3.5/Largo B=2.0 queda
+con `dimension=3.5` (el máximo, no 2.75 el promedio), y esa misma pieza refleja el máximo en la
+celda Dimensión, en Long. total (14.00 = 3.5×4), en m² (7.00 = 0.5×3.5×4) y en Peso; la fila de
+TOTALES suma correctamente usando ese máximo; una pieza NO cuchilla sigue calculando con su único
+largo real, sin regresión; programar esa misma fila cuchilla sigue topando la ocupación de banco
+con el máximo (14 m), ahora leído directo de `dimension`. Sin errores de consola.
