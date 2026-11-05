@@ -259,3 +259,34 @@ Aditivo de un Diseño de Mezcla; Resultado de ensayo; Cliente/Producto adicional
 Diario) y al informe de laboratorio adjunto (`quitarPdfLaboratorio()` — solo pregunta si de
 verdad hay algo adjunto que perder). Verificado con un arnés real — cada función respeta
 `confirm()=false` (no quita nada) y `confirm()=true` (sí quita), sin errores de consola.
+
+### Bug: el Diseño de Mezcla asignado a un producto no se arrastraba en Ajuste Diario (2026-11-05)
+
+Reportado por el usuario: *"le asigné un diseño de mezcla a un tubo, de 31 MPa plástico. cuando
+abro el ajuste de diseño por humedad, no me está arrastrando el diseño de mezcla asignado."*
+
+**Causa real**: el selector de Producto de Ajuste Diario (`#m-ajuste-producto`) es un `<input>`
+de texto libre con `<datalist>` (no un `<select>`, porque el catálogo tiene demasiados productos)
+— `poblarDatalistProductos()` armaba cada `<option value="${_textoProducto(p)}">` con el código y
+el nombre del producto **sin escapar**. Muchos Tubo llevan el diámetro en pulgadas DENTRO del
+nombre con el símbolo `"` (ej. `Tubo Carretero 36" Clase II Pared B`, ya en el catálogo base) —
+esa comilla cerraba el atributo `value="..."` a mitad de camino, así que la opción real del
+navegador quedaba TRUNCADA justo ahí. Al elegir esa opción, el campo de texto terminaba con el
+nombre incompleto, que ya nunca coincide con `_textoProducto(p)` tal cual lo compara
+`_productoDesdeTextoAjuste()` — el producto "no se encontraba", y `cargarDesdeProducto()` limpiaba
+todos los campos en silencio (sin ningún aviso) en vez de traer su Diseño de Mezcla. Mismo
+problema, mismo motivo, en el datalist de "Producto adicional" (`renderProductosAdicionalesAjuste()`)
+y en el `value` del propio `<input>` de cada producto adicional ya elegido.
+
+**Corrección**: los 3 puntos envuelven el texto con `_esc()` (mismo helper ya usado en el resto
+del archivo para este propósito) antes de ponerlo en un atributo `value="..."` —
+`poblarDatalistProductos()`, el datalist de productos adicionales, y el `value` del `<input>` de
+cada producto adicional ya elegido. El bug no era exclusivo de Tubos ni de este producto puntual:
+cualquier producto con una comilla (`"`) en su nombre quedaba con el mismo problema.
+
+Verificado con un arnés real — 10 aserciones: con un producto Tubo cuyo nombre incluye `"`, la
+opción del datalist ahora trae el texto completo (antes se cortaba en la comilla); al elegirlo,
+`cargarDesdeProducto()` encuentra el producto, NO muestra el alert de "sin diseño asignado", y SÍ
+arrastra el Diseño de Mezcla completo (código, resistencia, tamaño máximo, cemento, agregados);
+un producto sin caracteres especiales sigue funcionando igual que antes (regresión). Sin errores
+de consola.

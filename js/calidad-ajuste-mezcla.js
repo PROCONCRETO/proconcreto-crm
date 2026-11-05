@@ -181,12 +181,12 @@ function renderProductosAdicionalesAjuste() {
       <tbody>
         ${_productosAdicionalesAjuste.map((texto, i) => `
           <tr>
-            <td><input type="text" value="${texto}" list="datalist-productos-adicionales-ajuste" oninput="_productosAdicionalesAjuste[${i}]=this.value" placeholder="Busca por código o nombre..."></td>
+            <td><input type="text" value="${_esc(texto)}" list="datalist-productos-adicionales-ajuste" oninput="_productosAdicionalesAjuste[${i}]=this.value" placeholder="Busca por código o nombre..."></td>
             <td><button class="btn btn-rojo btn-xs" onclick="eliminarProductoAdicionalAjuste(${i})">✕</button></td>
           </tr>`).join('')}
       </tbody>
     </table>
-    <datalist id="datalist-productos-adicionales-ajuste">${compatibles.map(p => `<option value="${_textoProducto(p)}">`).join('')}</datalist>`;
+    <datalist id="datalist-productos-adicionales-ajuste">${compatibles.map(p => `<option value="${_esc(_textoProducto(p))}">`).join('')}</datalist>`;
 }
 
 function agregarProductoAdicionalAjuste() {
@@ -366,7 +366,17 @@ function poblarDatalistProductos(datalistId) {
   const dl = document.getElementById(datalistId);
   if (!dl) return;
   const activos = [...PRODUCTOS].sort((a, b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre));
-  dl.innerHTML = activos.map(p => `<option value="${_textoProducto(p)}">`).join('') + `<option value="${PRODUCTO_NINGUNO_AJUSTE}">`;
+  // `_esc()` en el `value` (2026-11-05, bug real reportado por el usuario: "le asigné un diseño
+  // de mezcla a un tubo... no me está arrastrando el diseño asignado") — faltaba acá, y muchos
+  // Tubo llevan el diámetro en pulgadas DENTRO del nombre con el símbolo " (ej. `Tubo Carretero
+  // 36" Clase II Pared B`). Sin escapar, esa comilla cerraba el atributo `value="..."` a mitad de
+  // camino y el resto del nombre quedaba fuera de la opción — al elegirlo del datalist, el
+  // `<input>` terminaba con el texto TRUNCADO justo ahí, que ya no coincide con
+  // `_textoProducto(p)` en `_productoDesdeTextoAjuste()`: el producto "no se encontraba" y
+  // `cargarDesdeProducto()` limpiaba todo en silencio (sin ningún aviso) en vez de traer su
+  // Diseño de Mezcla — mismo motivo exacto por el que el símbolo " en cualquier nombre de
+  // producto podía romper esto, no solo en Tubos.
+  dl.innerHTML = activos.map(p => `<option value="${_esc(_textoProducto(p))}">`).join('') + `<option value="${PRODUCTO_NINGUNO_AJUSTE}">`;
 }
 
 function _productoDesdeTextoAjuste(texto) {

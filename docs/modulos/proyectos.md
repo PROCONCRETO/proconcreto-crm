@@ -1989,3 +1989,79 @@ módulo (ver las secciones equivalentes en `calidad.md`, `costeo.md`, `cotizador
 
 Verificado con un arnés real — cada función respeta `confirm()=false` (no quita nada) y
 `confirm()=true` (sí quita), sin errores de consola.
+
+### "Duplicar" una Losa/Unidad — copia la Lista de producción completa (2026-11-04)
+
+A pedido del usuario: *"en muchas ocasiones se repiten las losas al ser losas tipo. lo mismo pasa
+con los paneles de casas que son tipo... que copie la lista de elementos y simplemente se
+modifiquen los datos generales de la losa. de igual manera, se podrán modificar las listas por
+pequeñas variaciones... podrá ser editables los campos ya ingresados automáticos"* — mismo botón
+📋 "Duplicar" que ya existe en Costeo de Producto y Diseño de Mezcla, pero con una mecánica
+distinta por cómo está repartida la información de una Losa: ahí "Duplicar" abre el modal de
+edición pre-llenado y espera a que el usuario le dé Guardar, porque el registro completo
+(incluidos sus materiales/filas) vive en un solo modal. En Losas, la Lista de producción NO vive
+en el modal de datos generales (`#modal-losa`) — vive en su propia pantalla — así que
+`duplicarLosa(id)` (`js/losas-proyecto.js`) crea la Losa duplicada de una vez (ya persistida en
+Supabase) y de inmediato abre el modal de datos generales en modo edición sobre esa copia, lista
+para renombrarla o ajustar sistema/espesor.
+
+- **Se copia** (son "datos generales" / "tipo"): nombre (con sufijo " (copia)", para que no
+  queden dos filas idénticas en la lista hasta que se renombre), ubicación, sistema, espesor,
+  densidad, factor de peso de vigueta, y **toda la Lista de producción** (`filas[]`, con `id`
+  nuevo por fila — nunca comparte id con las de origen) tal cual estaba, incluido
+  `bovedilla.tipo` (texto libre, describe el tipo de bovedilla, no un avance).
+- **Se reinicia en cero** (es trabajo físico que todavía no existe para esta copia): `estado`
+  (siempre arranca en "Planeación", sin importar en qué estado estuviera el original),
+  `produccion` de cada fila copiada (así ninguna queda con el candado de "ya fabricado" de
+  `_filaProduccionHTML()` — quedan 100% editables, que es justo lo que permite ajustar "pequeñas
+  variaciones" sin desbloquear nada a mano), `despachos[]`, `bovedilla.cantidadRequerida/
+  produccion/despacho`, `cimientos.cantidadRequerida/produccion/despacho`,
+  `produccionesProgramadas`/`despachosProgramados`, y `creadoPor`/`creadoEn` (quedan del usuario y
+  el momento de la copia, no del original).
+- **No se copia**: plano y memoria de cálculo adjuntos — son archivos puntuales de esa Losa
+  específica, no un dato "de tipo"; si de verdad aplican igual, se vuelven a adjuntar a mano.
+- Botón visible solo en modo Lista (Ingeniería), junto a "✏️" y antes de "🗑️" en
+  `renderLosasProyecto()` — mismo criterio que esos dos (no aplica en las vistas de solo lectura
+  de Producción/Despacho).
+
+Verificado con un arnés real — 24 aserciones en 3 casos: Prelosa con una fila ya fabricada (la
+copia la trae sin esa producción, con id nuevo, y el original queda intacto con su producción
+real); el nombre queda con "(copia)", el estado en "Planeación", sistema/espesor/densidad
+copiados, despachos/programaciones/adjuntos en blanco, persistido en Supabase y el modal de
+edición abierto listo para renombrar; las filas copiadas no muestran el candado 🔒 y sus inputs
+quedan editables; renombrar la copia y darle Guardar conserva sus filas duplicadas (confirma que
+`guardarLosa()` no las pisa al editar por `id`); Vigueta y Bovedilla (`bovedilla.tipo` se copia,
+`cantidadRequerida`/producción/despacho en cero); Panel (`cimientos` en cero). Sin errores de
+consola.
+
+### Bug: el teclado "se enloquecía" al escribir el segundo largo de una pieza cuchilla (2026-11-05)
+
+Reportado por el usuario: *"cuando voy a agregar una lista de paneles, cuando van en cuchilla
+(dintel o panel), cuando voy a ingresar el segundo largo, se enloquece el teclado."*
+
+**Causa real**: `_actualizarFilaProduccion(i)` corre en cada `oninput` de Largo A Y de Largo B
+(ambos llaman `_sincronizarLargosPanel()`, que a su vez la llama) — y, para Paneles, reconstruía
+SIEMPRE la celda de Largo B entera con `innerHTML` (para reflejar si debía quedar habilitada o
+deshabilitada según la Clasificación). El problema: al escribir justo DENTRO de Largo B, cada
+tecla disparaba su propio `oninput`, que destruía con `innerHTML` el mismo `<input>` que el
+usuario tenía con el foco en ese instante y lo reemplazaba por uno nuevo — perdiendo el foco a
+mitad de tecleo, tecla por tecla. El cursor terminaba en el limbo (`document.activeElement` ni
+siquiera quedaba en un campo de texto), así que las teclas siguientes podían disparar lo que
+fuera que hubiera enlazado al teclado a nivel de documento — de ahí la sensación de "se
+enloquece el teclado". Es exactamente el mismo bug que el comentario de esta función ya advertía
+evitar ("un render completo en cada tecla destruye el `<input>`... bug real ya corregido una vez
+acá") — se había vuelto a introducir al agregar Largo B el 2026-10-29.
+
+**Corrección**: antes de reconstruir la celda de Largo B, se compara el `<input>` que hay adentro
+contra `document.activeElement` — si es el mismo (el usuario está escribiendo justo ahí), no se
+toca nada; la reconstrucción real solo hace falta cuando puede haber cambiado si debe estar
+habilitado o no (la Clasificación, elegida en un `<select>` que nunca es ese `<input>`), nunca
+por escribir un número en A o en B. Escribir en Largo A sigue reflejando el espejo en vivo sobre
+el Largo B deshabilitado (ese sí puede reconstruirse sin problema — nunca tiene el foco).
+
+Verificado con un arnés real — 11 aserciones: escribir "3", "3." y "3.5" seguidos en Largo B deja
+el MISMO nodo `<input>` en el DOM en todo momento (nunca se reconstruye), el foco no se pierde en
+ninguna tecla, y el valor final llega completo sin truncarse a mitad de tecleo; con Clasificación
+NO cuchilla, escribir en Largo A sigue reflejando el valor en vivo sobre el Largo B deshabilitado
+(regresión); cambiar la Clasificación a una cuchilla desde el `<select>` sigue habilitando Largo B
+correctamente. Sin errores de consola.

@@ -641,6 +641,7 @@ function renderLosasProyecto() {
         ${esLista
           ? `<button class="btn btn-primario btn-xs" onclick="abrirLosaDetalle('${_escAttr(l.id)}')">📄 Ver lista</button>
              <button class="btn btn-secundario btn-xs" onclick="abrirModalLosa('${_escAttr(l.id)}')">✏️</button>
+             <button class="btn btn-secundario btn-xs" onclick="duplicarLosa('${_escAttr(l.id)}')" title="Duplicar — copia la lista de producción completa">📋 Duplicar</button>
              <button class="btn btn-rojo btn-xs" onclick="eliminarLosa('${_escAttr(l.id)}')">🗑️</button>`
           : `<button class="btn btn-primario btn-xs" onclick="abrirLosaDetalle('${_escAttr(l.id)}')">${_MODO_FLUJO_LOSA === 'despacho' ? '📦 Ver despachos' : '🏗️ Ver producción'}</button>`}
       </td>
@@ -768,6 +769,57 @@ async function guardarLosa() {
     });
   cerrarModal('modal-losa');
   renderLosasProyecto();
+}
+
+// "Duplicar" (2026-11-04, a pedido del usuario: "en muchas ocasiones se repiten las losas al ser
+// losas tipo. lo mismo pasa con los paneles de casas que son tipo... que copie la lista de
+// elementos y simplemente se modifiquen los datos generales de la losa") — mismo botón/ícono que
+// ya existe en Costeo de Producto y Diseño de Mezcla, pero con una mecánica distinta: ahí
+// "Duplicar" abre el modal de edición pre-llenado y espera a que el usuario le dé Guardar (nada
+// se persiste todavía), porque todo el registro (incluidas sus filas/materiales) vive en ESE
+// mismo modal. Acá no se puede: la Lista de producción no vive en el modal de datos generales
+// (`#modal-losa`), vive en su propia pantalla — así que se crea la Losa duplicada de una vez (con
+// su propia copia de `filas[]`, persistida ya mismo en Supabase) y se abre el modal de datos
+// generales YA en modo edición sobre esa copia, lista para renombrarla o ajustar sistema/espesor.
+// Las filas copiadas quedan 100% editables (sin el candado de "ya fabricado", ver
+// `_filaProduccionHTML()`) porque `produccion` se reinicia vacío en cada una — eso es justo lo
+// que permite ajustar "pequeñas variaciones" sin tener que desbloquear nada a mano. Seguimiento
+// de producción/despacho (`despachos`, `bovedilla.cantidadRequerida/produccion/despacho`,
+// `cimientos.cantidadRequerida/produccion/despacho`, programaciones) arranca en cero — es
+// trabajo físico que todavía no existe para esta copia; `bovedilla.tipo` (texto libre, no un
+// conteo) sí se copia, porque describe el tipo de bovedilla, no un avance. Los adjuntos
+// (plano/memoria de cálculo) tampoco se copian — son archivos puntuales, no un dato "de tipo".
+function duplicarLosa(id) {
+  const orig = LOSAS_PROYECTO.find(x => x.id === id);
+  if (!orig) return;
+  const ahora = new Date().toISOString();
+  const filasCopia = (orig.filas || []).map(f => ({ ...f, id: _nuevoIdFila(), produccion: [], actualizadoEn: ahora }));
+  const l = {
+    ...orig,
+    id: String(Date.now()),
+    nombre: `${orig.nombre} (copia)`,
+    estado: 'Planeación',
+    filas: filasCopia,
+    despachos: [],
+    bovedilla: orig.sistema === 'vigueta_bovedilla' ? { tipo: orig.bovedilla?.tipo || '', cantidadRequerida: 0, produccion: [], despacho: [] } : null,
+    cimientos: _esSistemaPanel(orig.sistema) ? { cantidadRequerida: 0, produccion: [], despacho: [] } : null,
+    produccionesProgramadas: [],
+    despachosProgramados: [],
+    planoPath: '', planoNombre: '', memoriaCalculoPath: '', memoriaCalculoNombre: '',
+    creadoPor: (typeof USUARIO_ACTUAL !== 'undefined' ? USUARIO_ACTUAL?.email : '') || '',
+    creadoEn: ahora,
+  };
+  LOSAS_PROYECTO.push(l);
+  sb.from('losas_proyecto').upsert({ id: l.id, datos: l, modificado: ahora }, { onConflict: 'id' })
+    .then(({ error }) => {
+      if (error) {
+        LOSAS_PROYECTO = LOSAS_PROYECTO.filter(x => x.id !== l.id);
+        renderLosasProyecto();
+        alert('No se pudo duplicar: ' + error.message);
+      }
+    });
+  renderLosasProyecto();
+  abrirModalLosa(l.id);
 }
 
 function eliminarLosa(id) {
@@ -1477,7 +1529,17 @@ function _actualizarFilaProduccion(i) {
     const elDim = document.getElementById(`fp-dimension-${i}`);
     if (elDim) elDim.textContent = (Number(f.dimension) || 0).toFixed(2);
     const elLargoB = document.getElementById(`fp-largob-${i}`);
-    if (elLargoB) {
+    // NO reconstruir el <input> de Largo B si es justo el que tiene el foco en este momento
+    // (2026-11-05, reportado por el usuario: "cuando voy a ingresar el segundo largo se
+    // enloquece el teclado") — esta función corre en cada `oninput` de Largo A Y de Largo B
+    // (ambos llaman `_sincronizarLargosPanel()`), así que al escribir en Largo B este bloque se
+    // ejecutaba a mitad de cada tecla y destruía el input que se estaba escribiendo con
+    // `innerHTML`, perdiendo el foco una tecla sí y otra no — el mismo bug que ya se evitó una
+    // vez en esta función (ver el comentario de arriba) y que acá se había vuelto a introducir.
+    // Reconstruir SOLO hace falta cuando puede haber cambiado si está habilitado/deshabilitado
+    // (la Clasificación, elegida en un `<select>` que nunca es este `<input>`) — nunca por
+    // escribir un número en A o en B.
+    if (elLargoB && elLargoB.querySelector('input') !== document.activeElement) {
       const esCuchilla = _esClasificacionCuchilla(f.clasificacion);
       elLargoB.innerHTML = esCuchilla
         ? `<input type="number" step="0.01" value="${f.largoB || ''}" oninput="_filasLosaActual[${i}].largoB=parseFloat(this.value)||0;_sincronizarLargosPanel(${i})" style="width:50px">`
