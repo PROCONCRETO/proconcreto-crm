@@ -1406,7 +1406,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
   // columna de la tabla NO se quita (sigue ahí, solo de solo lectura) para no tener que
   // recalcular el `colspan` de la fila de TOTALES ni de los imprimibles/modales que ya dependen
   // de este mismo número de columnas.
-  return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-clasificacion="${_escAttr(f.clasificacion || '')}" data-fabricado="${fabricado}" data-pend-prod="${pendProd}" data-pend-desp="${pendDesp}" data-disponible="${dispDesp}" data-despachado="${despachado}">
+  return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-clasificacion="${_escAttr(f.clasificacion || '')}" data-observaciones="${_escAttr(f.observaciones || '')}" data-fabricado="${fabricado}" data-pend-prod="${pendProd}" data-pend-desp="${pendDesp}" data-disponible="${dispDesp}" data-despachado="${despachado}">
     <td>${i + 1}</td>
     <td>${txt(f.cuadro, 'cuadro', 48, false, true)}</td>
     <td>${par(f.ejesEntre, 'ejesEntre')}</td>
@@ -1436,7 +1436,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     ${esLista ? '' : (_MODO_FLUJO_LOSA === 'produccion'
       ? `<td style="text-align:right">${(Number(f.cantidad) || 0) - pendProd}</td><td id="fp-pendprod-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProd}</td><td id="fp-pendprodm-${i}" style="text-align:right;font-weight:600;color:${pendProd > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendProdM.toFixed(2)}</td>`
       : `<td id="fp-dispdesp-${i}" style="text-align:right;font-weight:600;color:${dispDesp > 0 ? 'var(--verde)' : 'var(--gris-medio)'}">${dispDesp}</td><td id="fp-penddesp-${i}" style="text-align:right;font-weight:600;color:${pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendDesp}</td><td id="fp-penddespm-${i}" style="text-align:right;font-weight:600;color:${pendDesp > 0 ? 'var(--naranja)' : 'var(--verde)'}">${pendDespM.toFixed(2)}</td>`)}
-    <td>${txt(f.observaciones, 'observaciones', 90)}</td>
+    <td>${txt(f.observaciones, 'observaciones', 90, false, true)}</td>
     <td style="white-space:nowrap;color:var(--gris-medio);font-size:12px">${f.actualizadoEn ? _esc(new Date(f.actualizadoEn).toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })) : '—'}</td>
     <td style="white-space:nowrap">
       ${esLista
@@ -1565,6 +1565,10 @@ function _actualizarFilaProduccion(i) {
     tr.dataset.hilos = f.hilos || 0;
     tr.dataset.dimension = f.dimension || 0;
     tr.dataset.clasificacion = f.clasificacion || '';
+    // Observaciones (2026-11-09, a pedido del usuario: filtro de Observaciones en los listados
+    // generales y en las programaciones) — mismo criterio que Cuadro/Ejes/Ancho: se sincroniza en
+    // vivo mientras se edita la fila, para que el filtro reaccione sin esperar un render completo.
+    tr.dataset.observaciones = f.observaciones || '';
     // Fabricado no cambia por editar esta fila (depende de fila.produccion[], no de lo
     // planeado) — pero pendiente/disponible SÍ dependen de Cantidad, que es la única de las
     // "importantes" que sigue editable incluso ya fabricada (ver candado más arriba).
@@ -2033,10 +2037,10 @@ function abrirModalProgramarProduccion(programacionId) {
       : esPanel
         ? '<th>Clasif.</th><th>Ancho (cm)</th><th>Largo A</th><th>Largo B</th>'
         : '<th>Ancho (cm)</th><th>Hilos</th>'}
-    <th>Dimensión</th><th>Pendiente</th><th>A programar</th>
+    <th>Dimensión</th><th>Observaciones</th><th>Pendiente</th><th>A programar</th>
   </tr>`;
   const tbody = document.getElementById('mpp-filas-body');
-  const colspanVacio = esVigueta ? 10 : esPanel ? 11 : 9;
+  const colspanVacio = esVigueta ? 11 : esPanel ? 12 : 10;
   if (!conPendiente.length) {
     tbody.innerHTML = `<tr><td colspan="${colspanVacio}" style="text-align:center;color:var(--gris-medio);padding:10px">No hay filas con saldo pendiente de producción.</td></tr>`;
   } else {
@@ -2066,13 +2070,14 @@ function abrirModalProgramarProduccion(programacionId) {
         : esPanel
           ? `<td>${_etiquetaClasificacionPanel(f.clasificacion)}</td><td style="text-align:center">${f.ancho || 0}</td><td style="text-align:right">${(Number(f.largoA) || 0).toFixed(2)} m</td><td style="text-align:right">${(Number(f.largoB) || 0).toFixed(2)} m</td>`
           : `<td style="text-align:center">${f.ancho || 0}</td><td style="text-align:center">${f.hilos || 0}</td>`;
-      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-clasificacion="${_escAttr(f.clasificacion || '')}" data-fabricado="${_fabricadoFila(f)}" data-pend-prod="${pend}" data-pend-desp="${_pendienteDespachoFila(f, _despachosLosaActual)}" data-disponible="${_disponibleDespachoFila(f, _despachosLosaActual)}" data-despachado="${_despachadoFila(f.id, _despachosLosaActual)}">
+      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-clasificacion="${_escAttr(f.clasificacion || '')}" data-observaciones="${_escAttr(f.observaciones || '')}" data-fabricado="${_fabricadoFila(f)}" data-pend-prod="${pend}" data-pend-desp="${_pendienteDespachoFila(f, _despachosLosaActual)}" data-disponible="${_disponibleDespachoFila(f, _despachosLosaActual)}" data-despachado="${_despachadoFila(f.id, _despachosLosaActual)}">
         <td><input type="checkbox" class="mpp-chk-fila" onchange="_marcarFilaProgramar(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
         <td>${_esc(f.ejesEntre) || '—'}</td>
         <td>${_esc(f.laterales) || '—'}</td>
         ${colEspecifica}
         <td>${f.dimension || 0} m</td>
+        <td>${_esc(f.observaciones) || '—'}</td>
         <td>${pend}</td>
         <td><input type="number" min="0" max="${pend}" value="${valorInicial}" data-fila-id="${_escAttr(f.id)}" data-pendiente="${pend}" oninput="_actualizarResumenBancosProgramar()" style="width:70px"></td>
       </tr>`;
@@ -2265,6 +2270,13 @@ const TIPOS_FILTRO_PROGRAMAR = [
   // pasa el filtro si su `dimension` coincide con CUALQUIERA de los valores marcados (OR, no
   // AND) — ver `_filaPasaFiltroProgramar()`.
   { id: 'dimension', label: 'Largo de pieza', soloValorUnico: true, multiple: true },
+  // "Observaciones" (2026-11-09, a pedido del usuario: "incluyamos... el filtro de
+  // OBSERVACIONES, donde pueda filtrar de acuerdo a las observaciones que se tengan que vienen
+  // de la lista de producción") — mismo mecanismo `soloValorUnico` que Clasificación (desplegable
+  // de texto con los valores reales que existen en la Losa), sin `sistemas` (el campo existe
+  // igual en los 4 sistemas) ni `soloPrefijos` (disponible en los 3: el cuadro principal de cada
+  // Losa Y ambos modales de Programar, que es justo lo que pidió el usuario).
+  { id: 'observaciones', label: 'Observaciones', soloValorUnico: true },
   // `soloPrefijos` (2026-10-22, a pedido del usuario: "en los modales de programar no
   // deberíamos mostrar solamente lo faltante?... en programación de producción, solo deberíamos
   // mostrar lo pendiente de producción, y en programación de despachos, solo deberíamos mostrar
@@ -2332,7 +2344,13 @@ function _filtroValorAreaHTML(tipo, prefijo) {
   }
   if (t && t.soloValorUnico) {
     const valores = _valoresDisponiblesFiltro(tipo);
-    const opciones = valores.map(v => `<option value="${v}">${tipo === 'clasificacion' ? _etiquetaClasificacionPanel(v) : v}</option>`).join('');
+    // `_escAttr()`/`_esc()` (2026-11-09) — hasta ahora todo tipo `soloValorUnico` era número o
+    // una clave interna fija (ej. "panel_cuchilla"), nunca texto libre con comillas. "Observaciones"
+    // sí puede traer cualquier carácter — sin escapar, una comilla cierra el atributo
+    // `value="..."` a mitad de camino (mismo bug real ya corregido una vez en Ajuste Diario,
+    // `js/calidad-ajuste-mezcla.js`: "no me está arrastrando el diseño de mezcla asignado" por un
+    // nombre de producto con comillas) y la opción queda truncada.
+    const opciones = valores.map(v => `<option value="${_escAttr(String(v))}">${tipo === 'clasificacion' ? _etiquetaClasificacionPanel(v) : _esc(String(v))}</option>`).join('');
     return `<select data-rol="valor" onchange="_aplicarFiltrosProgramar('${prefijo}')" style="width:170px;padding:6px;border:1px solid var(--gris-borde);border-radius:var(--radio);font-size:12px">
       <option value="">Todos</option>${opciones}
     </select>`;
@@ -3474,10 +3492,10 @@ function abrirModalProgramarDespacho(despachoProgramadoId) {
       : esPanel
         ? '<th>Clasif.</th><th>Ancho (cm)</th><th>Largo A</th><th>Largo B</th>'
         : '<th>Ancho (cm)</th><th>Hilos</th>'}
-    <th>Dimensión</th><th>Disponible</th><th>A programar</th>
+    <th>Dimensión</th><th>Observaciones</th><th>Disponible</th><th>A programar</th>
   </tr>`;
   const tbody = document.getElementById('mpd-filas-body');
-  const colspanVacio = esVigueta ? 10 : esPanel ? 11 : 9;
+  const colspanVacio = esVigueta ? 11 : esPanel ? 12 : 10;
   if (!conDisponible.length) {
     tbody.innerHTML = `<tr><td colspan="${colspanVacio}" style="text-align:center;color:var(--gris-medio);padding:10px">No hay piezas disponibles para despacho todavía (nada fabricado pendiente de despachar).</td></tr>`;
   } else {
@@ -3492,13 +3510,14 @@ function abrirModalProgramarDespacho(despachoProgramadoId) {
         : esPanel
           ? `<td>${_etiquetaClasificacionPanel(f.clasificacion)}</td><td style="text-align:center">${f.ancho || 0}</td><td style="text-align:right">${(Number(f.largoA) || 0).toFixed(2)} m</td><td style="text-align:right">${(Number(f.largoB) || 0).toFixed(2)} m</td>`
           : `<td style="text-align:center">${f.ancho || 0}</td><td style="text-align:center">${f.hilos || 0}</td>`;
-      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-clasificacion="${_escAttr(f.clasificacion || '')}" data-fabricado="${_fabricadoFila(f)}" data-pend-prod="${_pendienteProduccionFila(f)}" data-pend-desp="${_pendienteDespachoFila(f, _despachosLosaActual)}" data-disponible="${disp}" data-despachado="${_despachadoFila(f.id, _despachosLosaActual)}">
+      return `<tr data-cuadro="${_escAttr(f.cuadro || '')}" data-eje-num="${_escAttr(f.ejesEntre || '')}" data-eje-alfa="${_escAttr(f.laterales || '')}" data-ancho="${f.ancho || 0}" data-hilos="${f.hilos || 0}" data-dimension="${f.dimension || 0}" data-clasificacion="${_escAttr(f.clasificacion || '')}" data-observaciones="${_escAttr(f.observaciones || '')}" data-fabricado="${_fabricadoFila(f)}" data-pend-prod="${_pendienteProduccionFila(f)}" data-pend-desp="${_pendienteDespachoFila(f, _despachosLosaActual)}" data-disponible="${disp}" data-despachado="${_despachadoFila(f.id, _despachosLosaActual)}">
         <td><input type="checkbox" class="mpd-chk-fila" onchange="_marcarFilaProgramarDespacho(this)"></td>
         <td>${_esc(f.cuadro || '')}</td>
         <td>${_esc(f.ejesEntre) || '—'}</td>
         <td>${_esc(f.laterales) || '—'}</td>
         ${colEspecifica}
         <td>${f.dimension || 0} m</td>
+        <td>${_esc(f.observaciones) || '—'}</td>
         <td>${disp}</td>
         <td><input type="number" min="0" max="${disp}" value="${valorInicial}" data-fila-id="${_escAttr(f.id)}" data-disponible="${disp}" oninput="_actualizarResumenPesoDespacho()" style="width:70px"></td>
       </tr>`;

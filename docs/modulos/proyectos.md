@@ -2132,3 +2132,40 @@ celda Dimensión, en Long. total (14.00 = 3.5×4), en m² (7.00 = 0.5×3.5×4) y
 TOTALES suma correctamente usando ese máximo; una pieza NO cuchilla sigue calculando con su único
 largo real, sin regresión; programar esa misma fila cuchilla sigue topando la ocupación de banco
 con el máximo (14 m), ahora leído directo de `dimension`. Sin errores de consola.
+
+### Columna y filtro de Observaciones en Programar producción/despacho (2026-11-09)
+
+A pedido del usuario: *"en las ventanas de programación tanto de producción como de despachos,
+incluyamos la columna de OBSERVACIONES"*, y *"incluyamos en los listados generales... como
+también en las programaciones de producción y despachos, el filtro de OBSERVACIONES, donde pueda
+filtrar de acuerdo a las observaciones que se tengan que vienen de la lista de producción."*
+
+- **Columna nueva** (solo lectura) en `abrirModalProgramarProduccion()`/`abrirModalProgramarDespacho()`
+  (`js/losas-proyecto.js`), entre Dimensión y Pendiente/Disponible — mismo texto crudo de
+  `f.observaciones` que ya se ve y se edita en la Lista de producción, nunca editable desde acá
+  (esa sigue siendo su única fuente). `colspanVacio` del estado vacío de ambos modales ajustado
+  (+1).
+- **Filtro nuevo** — `{ id: 'observaciones', label: 'Observaciones', soloValorUnico: true }` en
+  `TIPOS_FILTRO_PROGRAMAR`, sin `sistemas` (existe igual en los 4) ni `soloPrefijos` (disponible
+  en los 3: el cuadro principal de cada Losa/Unidad — prefijo `fp` — y ambos modales de Programar
+  — `mpp`/`mpd`), mismo mecanismo exacto que ya usa "Clasificación" (desplegable con los valores
+  reales de `f.observaciones` que existen en la Losa, comparación de texto). Nuevo
+  `data-observaciones` en el `<tr>` de los 3 lugares que ya traían `data-cuadro`/`data-ancho`/etc,
+  sincronizado en vivo al editar Observaciones en la Lista (`_actualizarFilaProduccion()`, ver
+  `txt(f.observaciones, 'observaciones', 90, false, true)` — antes ese último `true` no estaba,
+  así que editar Observaciones no disparaba ningún `oninput` que sincronizara nada).
+- **Bug de paso, corregido en el mismo cambio**: `_filtroValorAreaHTML()` armaba el `<option>` de
+  cualquier filtro `soloValorUnico` con el texto SIN escapar — invisible mientras esos filtros
+  solo fueron números o claves internas fijas (Ancho/Hilos/Largo de pieza/Clasificación), pero
+  Observaciones es texto libre de verdad: una comilla (`"`) en la observación (ej. "Cliente
+  especial 24\" pendiente") rompía el atributo `value="..."` igual que el bug real ya corregido en
+  Ajuste Diario (`docs/modulos/calidad.md`, 2026-11-05) — se corrigió con `_escAttr()`/`_esc()`,
+  sin afectar los demás tipos (escapar un número o una clave interna es un no-op).
+
+Verificado con un arnés real — 15 aserciones: "Observaciones" aparece como opción de filtro;
+`data-observaciones` queda en el `<tr>` de la Lista principal; filtrar por una observación exacta
+deja solo esa fila visible, incluida una con comillas (antes se habría truncado); quitar el
+filtro restaura las 3 filas; editar Observaciones en vivo actualiza el dataset sin re-render
+completo; ambos modales de Programar muestran la columna nueva con el texto correcto (incluida la
+observación con comillas) y el filtro de Observaciones funciona igual ahí; un filtro ya existente
+(Ancho) sigue funcionando sin regresión. Sin errores de consola.
