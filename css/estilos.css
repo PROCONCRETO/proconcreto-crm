@@ -323,7 +323,12 @@
      ver `_traerModalAlFrente()`/el listener de `mousedown` en ese archivo. */
   .modal-overlay { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 200; align-items: center; justify-content: center; }
   .modal-overlay.abierto { display: flex; }
-  .modal { background: white; border-radius: 8px; padding: 24px; width: 480px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: var(--sombra-md); pointer-events: auto; }
+  /* resize:both (2026-11-10, a pedido del usuario: las ventanas con tablas de muchas columnas,
+     como Programar producción/despacho, quedaban apretadas) — agarradera nativa del navegador en
+     la esquina inferior derecha para ampliar o achicar CUALQUIER ventana a gusto, genérico para
+     las ~39 que comparten esta clase, igual que el arrastre de arriba. overflow:auto (en vez de
+     solo overflow-y) porque el resize nativo lo exige en ambos ejes para funcionar siempre. */
+  .modal { background: white; border-radius: 8px; padding: 24px; width: 480px; max-width: 95vw; max-height: 90vh; min-width: 320px; min-height: 160px; overflow: auto; resize: both; box-shadow: var(--sombra-md); pointer-events: auto; }
   .modal-titulo { font-size: 16px; font-weight: 700; color: var(--azul); margin-bottom: 16px; cursor: grab; user-select: none; }
   .modal-acciones { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 

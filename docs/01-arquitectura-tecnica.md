@@ -107,6 +107,39 @@ arrastrar bien abajo topa en `top = altoPantalla - 60`; intentar subirlo por enc
 pantalla sigue topando en `top = 0`; cerrar limpia la posición igual que antes. Sin errores de
 consola.
 
+### Las ventanas también se pueden ampliar/achicar a mano (2026-11-10)
+
+A pedido del usuario — se le había agregado la columna de Observaciones a "Programar
+producción"/"Programar despacho" (ver `docs/modulos/proyectos.md`) y, con ella, la tabla quedó
+apretada en algunos sistemas (hasta 12 columnas en Paneles: Clasif., Ancho, Largo A, Largo B,
+Dimensión, Observaciones...): *"es posible que las ventanas pop-up que nos salen, uno la pueda
+ampliar o achiquitar según el gusto? o ampliamos el ancho de esta?"* — se hicieron las dos cosas
+que planteó, y la primera (redimensionar) se dejó genérica para **todas** las ventanas, no solo
+estas dos: *"hagamos las dos... la primera, para todas las ventanas de este estilo que tenemos
+en el prosuite"*.
+
+- **`css/estilos.css`, `.modal`**: `resize: both` + `overflow: auto` (antes `overflow-y: auto` —
+  el `resize` nativo del navegador exige que ningún eje quede en `visible` para aparecer) +
+  `min-width: 320px`/`min-height: 160px` para que no se pueda achicar al punto de romper el
+  encabezado/los botones. Mismo criterio que el arrastre de 2026-10-30: un solo cambio en la
+  clase compartida alcanza para los ~39 modales de la app, sin tocar ninguno de los `abrirXxx()`.
+  La agarradera queda en la esquina inferior derecha (comportamiento nativo del navegador, el
+  mismo que ya se usa hace años en un `<textarea>`); los topes ya existentes `max-width: 95vw`/
+  `max-height: 90vh` siguen aplicando igual, así que no se puede agrandar una ventana más allá de
+  la pantalla.
+- **`cotizaciones.html`, ancho inicial de "Programar producción"/"Programar despacho"**: de
+  `680px` a `960px` — así no hace falta redimensionar cada vez que se abren, que era el caso de
+  uso puntual que disparó el pedido. El resto de los modales de la app queda con su ancho inicial
+  de siempre; solo gana la posibilidad de redimensionarse si alguien lo necesita.
+
+Verificado con un arnés real: ambas ventanas abren con `960px` de ancho inline; `getComputedStyle`
+confirma `resize: both`/`overflow: auto`/`min-width: 320px`/`min-height: 160px` en ellas Y en un
+tercer modal cualquiera no tocado a mano (`modal-cargar-produccion`, que conserva su ancho
+original de `680px` — confirma que el resize es genérico pero el ancho ampliado es puntual de
+los dos modales pedidos); forzar un tamaño mayor por código (simulando el arrastre de la
+agarradera) lo respeta hasta el tope de `max-width`/`max-height` de pantalla. Sin errores de
+consola.
+
 ## Calculadora en campos numéricos (`js/calculadora-inputs.js`, 2026-08-25)
 
 A pedido del usuario ("donde se escriban datos numéricos, poder hacer operaciones básicas") — cualquier `<input type="number">` de TODA la app admite escribir una operación (`+ - * /`, con paréntesis y precedencia normal) en vez de solo el resultado ya calculado, ej. escribir `1500+320` y que al salir del campo quede `1820`.
