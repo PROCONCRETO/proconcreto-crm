@@ -2169,3 +2169,82 @@ filtro restaura las 3 filas; editar Observaciones en vivo actualiza el dataset s
 completo; ambos modales de Programar muestran la columna nueva con el texto correcto (incluida la
 observación con comillas) y el filtro de Observaciones funciona igual ahí; un filtro ya existente
 (Ancho) sigue funcionando sin regresión. Sin errores de consola.
+
+### Pegar por columna en la Lista de producción (2026-11-10)
+
+A pedido del usuario: *"cuando le doy pegar, a veces es difícil porque no cuadran bien las
+columnas de como se tienen en el archivo base... podemos dejar la opción de copiar también solo
+por columnas?"* — alternativa a `onPasteFilasProduccion()` (el pegado "de siempre", que exige
+pegar TODAS las columnas juntas en el orden fijo de la tabla, y por eso se rompe si el Excel
+base trae las columnas en otro orden o con alguna de más/de menos).
+
+- **`onPasteColumnaFilaProduccion(event, i, campo, tipo)`** (`js/losas-proyecto.js`) — se pega
+  sobre UN campo puntual de una fila ya existente (el `<input>` donde se hizo Ctrl+V), y el valor
+  se reparte hacia abajo fila por fila, igual que "pegar una columna" en Excel, sin tocar ninguna
+  otra columna. Conectado desde los mismos helpers `txt()`/`num()`/`largoNum()` que ya arman cada
+  campo editable de `_filaProduccionHTML()`, así que cubre Cuadro, Ancho, Hilos, Vigueta/Hilos
+  Abajo/Hilos Arriba, Largo A/Largo B y Observaciones de una sola vez, sin tocar columna por
+  columna. **No cubre** Ejes numéricos/alfabéticos (van partidos en 2 cuadros chicos por guion —
+  pegar una columna ahí sería ambiguo) ni Clasificación (es un `<select>`, cuyo evento `paste` no
+  es confiable entre navegadores).
+- Si el pegado trae más de una columna (tabulador de por medio — se copió de más por error), solo
+  se usa la PRIMERA columna de cada línea, en vez de fallar o mezclar columnas.
+- Si faltan filas debajo para recibir todos los valores pegados, se agregan filas nuevas (vacías
+  salvo el campo pegado) al final, en vez de perder los valores que no alcanzaron fila.
+- Respeta el mismo candado de medidas ya fabricadas que `guardarListaProduccion()` — una fila con
+  `fabricado > 0` no cambia su campo bloqueado por esta vía tampoco (se cuenta aparte y se avisa
+  al final, en vez de dejarlo pasar en silencio o fallar a mitad del pegado); Cantidad respeta el
+  mismo piso de lo ya fabricado que `_validarCantidadMinima()`. En Paneles, pegar Largo A/Largo B
+  dispara la misma sincronización que su `oninput` normal (`_sincronizarLargosPanel()`), así que
+  Dimensión queda consistente igual que si se hubiera escrito a mano.
+- El evento `paste` burbujea desde el `<input>` hasta el contenedor de la tabla (que tiene su
+  propio `onpaste` para el pegado de "todas las columnas juntas") — sin `event.stopPropagation()`
+  los dos pegados correrían a la vez sobre el mismo portapapeles, duplicando filas.
+
+Verificado con un arnés real — 15 aserciones en 2 tandas: pegar una columna de Ancho sobre 2 filas
+existentes + 1 línea de más agrega una fila nueva; una fila con producción ya fabricada no cambia
+su Ancho bloqueado; un pegado con tabulador de más solo toma la primera columna (Cuadro); Cantidad
+pegada por debajo de lo fabricado se sube sola al piso; en una pieza cuchilla, pegar Largo A y
+Largo B por separado deja la Dimensión recalculada al máximo de los dos; Observaciones también se
+puede pegar por columna; un evento `paste` real (burbujeable, `ClipboardEvent`/`DataTransfer`)
+disparado sobre el `<input>` de Ancho solo aplica el pegado por columna, sin disparar también el
+pegado de todas las columnas del contenedor (sin filas duplicadas). Sin errores de consola.
+
+### Reordenar Losas/Unidades a mano, con handle de arrastre (2026-11-10)
+
+A pedido del usuario: *"en proyectos, en los listados de losas, demos la opción de poder
+subirlas o bajarlas de acuerdo al orden que necesitemos darle (como lo hacemos con los costeos,
+por ejemplo). adicional a esto... que al subir o bajar... en el orden del listado, se amarra
+este orden para producción y despachos"* — mismo mecanismo EXACTO que ya usan Costeo de
+Producto/Costos de Referencia/Maquinaria y Equipos (`_reordenarPorArrastre()`/
+`_normalizarOrdenLista()`, genéricos en `js/config.js`), aplicado por primera vez a un listado
+que vive DENTRO de un proyecto en particular, no a una lista plana global.
+
+- **Campo `orden` nuevo en la Losa** — `_normalizarOrdenLista(LOSAS_PROYECTO)` lo rellena al
+  cargar/recargar (`js/datos-realtime.js`, `cargarDatosSupabase()`/`recargarLosasProyectoRT()`,
+  mismo patrón que `COSTEO_PRODUCTOS`/`MAQUINARIA_EQUIPOS`/`INSUMOS_COSTOS`); `guardarLosa()` lo
+  preserva al editar una Losa existente (una Losa/Unidad nueva queda sin `orden` todavía, igual
+  que un costeo nuevo, hasta la próxima normalización).
+- **Por qué el reordenamiento opera sobre un SUBCONJUNTO, no sobre `LOSAS_PROYECTO` completo** —
+  a diferencia de Costeo/Maquinaria/Costos de Referencia (listas planas globales),
+  `LOSAS_PROYECTO` mezcla Losas de TODOS los proyectos a la vez. `soltarLosaSobreLosa()` arma
+  `LOSAS_PROYECTO.filter(l => l.proyectoId === _PROYECTO_ACTIVO_ID)` y pasa ESE arreglo filtrado
+  a `_reordenarPorArrastre()` — como el filtro no clona (son los mismos objetos), renumerar
+  `orden` ahí ya actualiza los objetos reales dentro de `LOSAS_PROYECTO`, pero sin tocar ni
+  mezclar el orden de Losas de OTROS proyectos.
+- **"Se amarra para producción y despachos"** — `renderLosasProyecto()` es la ÚNICA función que
+  arma esta tabla en los 3 modos (Lista/Producción/Despacho, alternados por `_MODO_FLUJO_LOSA`),
+  así que un solo `.sort((a,b) => (a.orden ?? 0) - (b.orden ?? 0))` ahí basta para que el orden
+  quede igual en los 3 — no hizo falta tocar nada más. El handle ☰ de arrastre solo se ofrece en
+  modo Lista (Ingeniería decide el orden); Producción/Despacho lo heredan y lo muestran de solo
+  lectura, mismo criterio ya aplicado al resto de esas 2 vistas (nunca tocan lo que define
+  Ingeniería) — la celda del handle sigue presente en los 3 modos (vacía fuera de Lista) para que
+  la tabla no cambie de columnas al cambiar de pestaña.
+
+Verificado con un arnés real — 11 aserciones: el orden inicial respeta `orden` ascendente; el
+handle de arrastre aparece en Lista; arrastrar la última Losa y soltarla sobre la primera deja el
+orden correcto y renumera `orden` 0/1/2 de las 3 Losas del proyecto activo; una Losa de OTRO
+proyecto no se toca (ni su `orden` ni se le manda un upsert de más — solo se persisten las 3
+Losas realmente reordenadas); el mismo orden nuevo se ve igual en modo Producción y en modo
+Despacho, y en ninguno de los 2 aparece el handle de arrastre (solo lectura); el `colspan` del
+estado vacío quedó en 7 (columna nueva del handle incluida). Sin errores de consola.

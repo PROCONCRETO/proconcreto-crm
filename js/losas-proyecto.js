@@ -620,9 +620,15 @@ function volverALosasProyecto() {
 function renderLosasProyecto() {
   const tbody = document.getElementById('tabla-losas-proyecto-body');
   if (!tbody) return;
-  const losas = LOSAS_PROYECTO.filter(l => l.proyectoId === _PROYECTO_ACTIVO_ID);
+  // Orden manual (2026-11-10, a pedido del usuario: "demos la opción de poder subirlas o
+  // bajarlas de acuerdo al orden que necesitemos darle (como lo hacemos con los costeos)...
+  // que al subir o bajar... se amarra este orden para producción y despachos") — un solo
+  // `.sort()` acá, en la única función que arma esta tabla en los 3 modos (Lista/Producción/
+  // Despacho, ver `esLista` más abajo), hace que el orden quede amarrado automáticamente en los
+  // 3 sin tocar nada más — Producción/Despacho ya reusan esta misma función tal cual.
+  const losas = LOSAS_PROYECTO.filter(l => l.proyectoId === _PROYECTO_ACTIVO_ID).sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
   if (!losas.length) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="icono">📋</div><div>No hay losas registradas todavía${_MODO_FLUJO_LOSA === 'lista' ? ' — crea la primera con "+ Nueva Losa".' : ' — Ingeniería todavía no ha cargado una lista de producción.'}</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icono">📋</div><div>No hay losas registradas todavía${_MODO_FLUJO_LOSA === 'lista' ? ' — crea la primera con "+ Nueva Losa".' : ' — Ingeniería todavía no ha cargado una lista de producción.'}</div></td></tr>`;
     return;
   }
   const esLista = _MODO_FLUJO_LOSA === 'lista';
@@ -631,7 +637,13 @@ function renderLosasProyecto() {
     const totalCant = (l.filas || []).reduce((s, f) => s + (Number(f.cantidad) || 0), 0);
     const totalProd = (l.filas || []).reduce((s, f) => s + Math.min(Number(f.cantidad) || 0, (f.produccion || []).reduce((s2, e) => s2 + (Number(e.cantidad) || 0), 0)), 0);
     const col = _COLOR_ESTADO_LOSA[l.estado] || { bg: '#EEE', fg: '#555' };
-    return `<tr>
+    // El handle de arrastre (☰) solo se ofrece en modo Lista (Ingeniería es quien decide el
+    // orden) — Producción/Despacho solo lo HEREDAN y lo muestran, mismo criterio de "solo
+    // lectura" que ya aplica al resto de la fila en esos 2 modos (nunca tocan lo que define
+    // Ingeniería). La celda sigue presente en los 3 modos (vacía fuera de Lista) para que la
+    // tabla no cambie de columnas al cambiar de pestaña.
+    return `<tr ondragover="permitirSoltarLosa(event)" ondragleave="quitarResaltadoSoltarLosa(event)" ondrop="soltarLosaSobreLosa(event,'${_escAttr(l.id)}')">
+      <td style="text-align:center">${esLista ? `<span class="drag-handle" draggable="true" ondragstart="iniciarArrastreLosa(event,'${_escAttr(l.id)}')" ondragend="terminarArrastreLosa(event)" title="Arrastra para reordenar">☰</span>` : ''}</td>
       <td style="font-weight:600">${_esc(l.nombre)}</td>
       <td>${_esc(l.ubicacion) || '—'}</td>
       <td>${sis ? _esc(sis.etiqueta) : '—'}</td>
@@ -647,6 +659,44 @@ function renderLosasProyecto() {
       </td>
     </tr>`;
   }).join('');
+}
+
+// ── Reordenar por arrastre (mismo patrón que Costeo de Producto/Costos de Referencia/
+// Maquinaria, ver js/config.js) — opera sobre el SUBCONJUNTO de Losas/Unidades DEL PROYECTO
+// ACTIVO (`LOSAS_PROYECTO.filter(l => l.proyectoId === _PROYECTO_ACTIVO_ID)`), nunca sobre
+// `LOSAS_PROYECTO` completo: son los mismos objetos (el filtro no clona), así que mutar `orden`
+// ahí ya actualiza el arreglo real, pero sin renumerar ni mezclar Losas de OTROS proyectos. ──
+let _losaArrastradaId = null;
+function iniciarArrastreLosa(event, id) {
+  _losaArrastradaId = id;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', id);
+  event.currentTarget.closest('tr')?.classList.add('fila-arrastrando');
+}
+function terminarArrastreLosa(event) {
+  event.currentTarget.closest('tr')?.classList.remove('fila-arrastrando');
+  _losaArrastradaId = null;
+}
+function permitirSoltarLosa(event) {
+  if (!_losaArrastradaId) return;
+  event.preventDefault();
+  event.currentTarget.classList.add('fila-dragover');
+}
+function quitarResaltadoSoltarLosa(event) {
+  event.currentTarget.classList.remove('fila-dragover');
+}
+function soltarLosaSobreLosa(event, idDestino) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('fila-dragover');
+  if (!_losaArrastradaId) return;
+  const origen = _losaArrastradaId;
+  _losaArrastradaId = null;
+  const losasDelProyecto = LOSAS_PROYECTO.filter(l => l.proyectoId === _PROYECTO_ACTIVO_ID);
+  const resultado = _reordenarPorArrastre(losasDelProyecto, origen, idDestino, x => x.id,
+    l => sb.from('losas_proyecto').upsert({ id: l.id, datos: l, modificado: new Date().toISOString() }, { onConflict: 'id' })
+      .then(({ error }) => { if (error) console.error('Error guardando orden de losa:', error.message); }));
+  renderLosasProyecto();
+  return resultado;
 }
 
 // ── Modal Losa (crear/editar metadata — no la lista de producción, eso vive en su propia
@@ -754,6 +804,11 @@ async function guardarLosa() {
     cimientos: _esSistemaPanel(sistema) ? (existente?.cimientos || { cantidadRequerida: 0, produccion: [], despacho: [] }) : null,
     creadoPor: existente?.creadoPor || (typeof USUARIO_ACTUAL !== 'undefined' ? USUARIO_ACTUAL?.email : '') || '',
     creadoEn: existente?.creadoEn || new Date().toISOString(),
+    // Orden manual (2026-11-10, a pedido del usuario: "demos la opción de poder subirlas o
+    // bajarlas... como lo hacemos con los costeos") — se preserva al editar, igual que
+    // `guardarCosteoProducto()`; una Losa/Unidad NUEVA queda sin `orden` todavía (lo rellena
+    // `_normalizarOrdenLista()` al cargar/recargar, ver js/datos-realtime.js).
+    orden: existente?.orden,
   };
   const idx = LOSAS_PROYECTO.findIndex(x => x.id === l.id);
   const anterior = idx >= 0 ? { ...LOSAS_PROYECTO[idx] } : null;
@@ -1332,7 +1387,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
       return `<input type="text" value="${_escAttr(valor || '')}" disabled title="${TITULO_BLOQUEO}" style="width:${ancho}px;background:var(--gris-fondo);color:var(--gris-medio);cursor:not-allowed">`;
     }
     return esLista
-      ? `<input type="text" value="${_escAttr(valor || '')}" oninput="_filasLosaActual[${i}].${campo}=this.value${sincroniza ? `;_actualizarFilaProduccion(${i})` : ''}" style="width:${ancho}px">`
+      ? `<input type="text" value="${_escAttr(valor || '')}" oninput="_filasLosaActual[${i}].${campo}=this.value${sincroniza ? `;_actualizarFilaProduccion(${i})` : ''}" onpaste="onPasteColumnaFilaProduccion(event,${i},'${campo}','texto')" style="width:${ancho}px">`
       : _esc(valor || '—');
   };
   // Sin el "|| 0" en `value` (2026-10-14, a pedido del usuario: "deja todos los campos sin
@@ -1345,7 +1400,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
       return `<input type="number" value="${valor || 0}" disabled title="${TITULO_BLOQUEO}" style="width:${ancho}px;background:var(--gris-fondo);color:var(--gris-medio);cursor:not-allowed">`;
     }
     return esLista
-      ? `<input type="number" ${campo === 'dimension' ? 'step="0.01"' : ''} value="${valor || ''}" oninput="_filasLosaActual[${i}].${campo}=parseFloat(this.value)||0${recalcula ? `;_actualizarFilaProduccion(${i})` : ''}" ${onchangeExtra ? `onchange="${onchangeExtra}"` : ''} style="width:${ancho}px">`
+      ? `<input type="number" ${campo === 'dimension' ? 'step="0.01"' : ''} value="${valor || ''}" oninput="_filasLosaActual[${i}].${campo}=parseFloat(this.value)||0${recalcula ? `;_actualizarFilaProduccion(${i})` : ''}" ${onchangeExtra ? `onchange="${onchangeExtra}"` : ''} onpaste="onPasteColumnaFilaProduccion(event,${i},'${campo}','numero')" style="width:${ancho}px">`
       : (valor || 0);
   };
   // "Ejes numéricos"/"Ejes alfabéticos" (2026-10-13, a pedido del usuario) — de entrada
@@ -1393,7 +1448,7 @@ function _filaProduccionHTML(f, i, l, esVigueta) {
     if (deshabilitado) {
       return `<input type="number" value="${valor || 0}" disabled title="Se copia automáticamente de Largo A — solo editable si la clasificación es 'cuchilla'" style="width:50px;background:var(--gris-fondo);color:var(--gris-medio);cursor:not-allowed">`;
     }
-    return `<input type="number" step="0.01" value="${valor || ''}" oninput="_filasLosaActual[${i}].${campo}=parseFloat(this.value)||0;_sincronizarLargosPanel(${i})" style="width:50px">`;
+    return `<input type="number" step="0.01" value="${valor || ''}" oninput="_filasLosaActual[${i}].${campo}=parseFloat(this.value)||0;_sincronizarLargosPanel(${i})" onpaste="onPasteColumnaFilaProduccion(event,${i},'${campo}','numero')" style="width:50px">`;
   };
   // Paneles de Cerramiento (2026-10-30, a pedido del usuario: "no tenemos cuadros, pero si
   // tenemos un número para cada panel. con esto podemos cambiar el cuadro por panel y la
@@ -1698,6 +1753,76 @@ function onPasteFilasProduccion(event) {
   _filasLosaActual = _filasLosaActual.concat(filas);
   renderFilasProduccion();
   alert(`Se agregaron ${filas.length} fila(s) pegadas. Revísalas en la tabla y guarda cuando estén correctas.`);
+}
+
+// Pegar una columna puntual (2026-11-10, a pedido del usuario: "cuando le doy pegar, a veces es
+// difícil porque no cuadran bien las columnas de como se tienen en el archivo base... podemos
+// dejar la opción de copiar también solo por columnas?") — alternativa a
+// `onPasteFilasProduccion()` (que exige pegar TODAS las columnas juntas, en el orden fijo de la
+// tabla): acá se pega sobre UN campo puntual de una fila ya existente (el `<input>` donde se hizo
+// Ctrl+V), y el valor se reparte hacia abajo fila por fila, igual que "pegar una columna" en
+// Excel — sin que importe en qué orden vengan las demás columnas del archivo base, porque esta
+// vía no las toca. Conectado desde los mismos helpers `txt()`/`num()`/`largoNum()` que ya arman
+// cada campo editable de `_filaProduccionHTML()`, así que cubre Cuadro, Ancho, Hilos, Vigueta,
+// Hilos Abajo/Arriba, Largo A/B y Observaciones sin tocar cada columna una por una — no cubre
+// Ejes numéricos/alfabéticos (van partidos en 2 cuadros chicos por guion, pegar una columna ahí
+// sería ambiguo) ni Clasificación (es un `<select>`, que no dispara el evento `paste` del
+// navegador de forma confiable).
+function onPasteColumnaFilaProduccion(event, i, campo, tipo) {
+  const texto = (event.clipboardData || window.clipboardData).getData('text');
+  if (!texto) return;
+  const lineas = texto.replace(/\r/g, '').split('\n');
+  while (lineas.length && lineas[lineas.length - 1] === '') lineas.pop(); // último salto de línea sobrante del portapapeles
+  if (!lineas.length) return;
+  event.preventDefault();
+  // El evento `paste` burbujea — sin esto, también dispararía el `onpaste` del contenedor
+  // (`onPasteFilasProduccion()`, el pegado de TODAS las columnas juntas) con el mismo portapapeles,
+  // agregando filas duplicadas además de las que ya rellenó este pegado por columna.
+  event.stopPropagation();
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const esPanel = !!l && _esSistemaPanel(l?.sistema);
+  const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
+  // Mismo candado de medidas ya fabricadas que `guardarListaProduccion()` — una fila con
+  // `fabricado > 0` no cambia su campo bloqueado tampoco por esta vía; se cuenta aparte y se
+  // avisa al final en vez de dejarlo pasar en silencio o reventar a mitad del pegado.
+  const camposBloqueados = esVigueta
+    ? ['dimension', 'tipoVigueta', 'hilosAbajo', 'hilosArriba']
+    : esPanel
+      ? ['dimension', 'ancho', 'clasificacion', 'largoA', 'largoB']
+      : ['dimension', 'ancho', 'hilos'];
+  let omitidas = 0;
+  const filasTocadas = [];
+  lineas.forEach((linea, offset) => {
+    // Si el pegado trae más de una columna (tabulador de por medio — se copió de más por error),
+    // solo se usa la PRIMERA de cada línea, en vez de fallar o mezclar columnas.
+    const valorCrudo = linea.split('\t')[0];
+    const idx = i + offset;
+    // Si faltan filas debajo para recibir todos los valores pegados, se agregan filas nuevas
+    // (vacías salvo el campo pegado) al final, en vez de perder los valores que no alcanzaron fila.
+    while (_filasLosaActual.length <= idx) {
+      _filasLosaActual.push({ id: _nuevoIdFila(), cuadro: '', ejesEntre: '', laterales: '', ancho: 0, hilos: 0, tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0, clasificacion: 'panel', largoA: 0, largoB: 0, dimension: 0, cantidad: esPanel ? 1 : 0, observaciones: '', produccion: [] });
+    }
+    const f = _filasLosaActual[idx];
+    const fabricado = _fabricadoFila(f);
+    if (fabricado > 0 && camposBloqueados.includes(campo)) { omitidas++; return; }
+    if (tipo === 'numero') {
+      let v = _parseFloatEs(valorCrudo);
+      if (campo === 'cantidad' && fabricado > 0 && v < fabricado) v = fabricado;
+      f[campo] = v;
+    } else {
+      f[campo] = (valorCrudo || '').trim();
+    }
+    filasTocadas.push(idx);
+  });
+  // Paneles de Cerramiento: Largo A/Largo B necesitan la misma sincronización que su `oninput`
+  // normal (ver `_sincronizarLargosPanel()`), para que Dimensión quede consistente igual que si
+  // se hubiera escrito a mano.
+  if (esPanel && (campo === 'largoA' || campo === 'largoB')) {
+    filasTocadas.forEach(idx => _sincronizarLargosPanel(idx));
+  }
+  renderFilasProduccion();
+  const avisoOmitidas = omitidas > 0 ? ` (${omitidas} fila(s) no se modificaron porque ya tienen unidades fabricadas)` : '';
+  alert(`Se rellenaron ${filasTocadas.length} fila(s) en esta columna${avisoOmitidas}. Revísalas y guarda cuando estén correctas.`);
 }
 
 // (c) Importar archivo Excel/CSV — reusa SheetJS (ya cargado en la app) y `_normHdr()`

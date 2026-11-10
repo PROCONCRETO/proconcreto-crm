@@ -22,7 +22,7 @@ async function cargarDatosSupabase() {
   PROYECTOS = (proys || []).filter(r => r.datos).map(r => r.datos);
   const { data: losas, error: e19 } = await sb.from('losas_proyecto').select('datos').order('creado', { ascending: true });
   if (e19) console.warn('Tabla losas_proyecto no disponible aún — corre sql/2026-10-11_losas_proyecto.sql en Supabase.');
-  LOSAS_PROYECTO = (losas || []).filter(r => r.datos).map(r => _normalizarLosaProyecto(r.datos));
+  LOSAS_PROYECTO = _normalizarOrdenLista((losas || []).filter(r => r.datos).map(r => _normalizarLosaProyecto(r.datos)));
   if (e3) console.warn('Tabla ordenes_servicio no disponible aún.');
   if (e4) console.warn('Tabla producciones no disponible aún.');
   if (e5) console.warn('Tabla disenos_mezcla no disponible aún.');
@@ -249,7 +249,7 @@ async function recargarProyectosRT() {
 }
 async function recargarLosasProyectoRT() {
   const { data } = await sb.from('losas_proyecto').select('datos').order('creado', { ascending: true });
-  LOSAS_PROYECTO = (data || []).filter(r => r.datos).map(r => _normalizarLosaProyecto(r.datos));
+  LOSAS_PROYECTO = _normalizarOrdenLista((data || []).filter(r => r.datos).map(r => _normalizarLosaProyecto(r.datos)));
   rerenderPantallaActiva();
 }
 
