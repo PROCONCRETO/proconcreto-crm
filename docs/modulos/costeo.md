@@ -673,3 +673,87 @@ Costeo de Producto — Materia Prima, Despiece de Acero, Máquinas, Mano de Obra
 `eliminarManoObraCosteo()`, `eliminarInsumoCosteo()` — con el mismo `confirm()` por delante).
 Verificado con un arnés real — cada función respeta `confirm()=false` (no quita nada) y
 `confirm()=true` (sí quita), sin errores de consola.
+
+### Régimen de IVA, visible en los primeros renglones (2026-11-12)
+
+A pedido del usuario: *"mostremos en los primeros renglones la selección de si es producto que
+genera IVA o si es excluido de IVA, el cual si se arrastra desde el producto se marque el que
+trae, o si es un costeo nuevo se pueda seleccionar si es excluido o no"*. El dato ya existía y ya
+se USABA (`producto.iva`, decide si los insumos se costean con o sin IVA — ver
+`_precioInsumoPorNombre()`/`calcularCosteoProducto()`), pero solo se mostraba muy abajo, dentro
+del resumen final (`notaIva` en `_actualizarResumenCosteo()`) — y al crear un producto nuevo
+desde Costeo (botón "+ Crear producto especial") quedaba fijo en `'NO'` sin preguntar.
+
+- **Sección 1 del modal** (`cotizaciones.html`, justo debajo del campo Producto): dos chips
+  "Genera IVA"/"Excluido de IVA" (`#costeo-iva-chips`, mismo estilo `.tipo-chip` que los chips de
+  tipo de estructura) + una nota debajo (`#costeo-iva-nota`) + un input oculto
+  `#m-costeo-iva-nuevo` que guarda la selección mientras el producto todavía no existe.
+- **Si el producto YA existe** (de línea o especial — se resuelve igual que en todo el resto del
+  módulo, con `_productoDesdeTextoCosteo()`): los chips marcan el que trae ese producto —
+  `producto.iva` sigue siendo el único origen de verdad para ese dato. *(Actualizado el mismo
+  día — ver la sección siguiente: ahora también se puede cambiar desde aquí, no solo desde
+  Catálogo de productos.)*
+- **Si el producto todavía NO existe** (el texto escrito no matchea nada del catálogo, antes de
+  usar "+ Crear producto especial"): los chips quedan habilitados — la selección se guarda en
+  `#m-costeo-iva-nuevo` y `_crearProductoEspecialDesdeCosteo()` la usa para el `iva` del producto
+  nuevo, en vez del `'NO'` que antes quedaba fijo sin preguntar.
+- **`_actualizarChipsIvaCosteo()`** (nueva) centraliza el pintado de los chips/la nota según si
+  hay o no un producto resuelto; se llama desde `_actualizarResumenCosteo()` (así se repinta con
+  cualquier cambio del campo Producto o del tipo de estructura, sin tener que tocar cada llamador
+  por separado) y, además, directo desde `abrirModalCosteoProducto()` — un Costeo nuevo sin tipo
+  de estructura elegido todavía NO dispara `_actualizarResumenCosteo()` (está condicionado a
+  `disponible`, ver `_elegirTipoEstructuraCosteo()`), así que sin esta llamada aparte los chips
+  quedarían vacíos hasta elegir un tipo o tocar el campo Producto.
+- **Duplicar un Costeo** (`duplicarCosteoProducto()`): al vaciar el campo Producto para el
+  producto nuevo, el régimen de IVA queda precargado con el del producto de origen (editable) —
+  mismo criterio que el resto de los datos generales que "Duplicar" ya copia como punto de
+  partida.
+
+Verificado con un arnés real — 15 aserciones: un Costeo nuevo recién abierto muestra "Excluido de
+IVA" seleccionado y editable; un clic en "Genera IVA" sin producto resuelto lo cambia; elegir un
+producto real con `iva:'SI'` bloquea los chips mostrando "Genera IVA" con la nota correcta
+(opacidad reducida confirmada); un clic mientras está bloqueado no cambia nada; elegir un
+producto real con `iva:'NO'` muestra "Excluido de IVA"; vaciar el campo Producto vuelve a dejarlo
+editable; crear un producto especial con "Genera IVA" elegido lo guarda con `iva:'SI'` en el
+catálogo (no el `'NO'` de antes); duplicar un costeo cuyo producto de origen genera IVA precarga
+"Genera IVA" en el producto nuevo, editable. Sin errores de consola.
+
+### Los chips de IVA quedan enlazados con Catálogo, en los dos sentidos (2026-11-12)
+
+A pedido de seguimiento del usuario, el mismo día: *"enlaza los dos puntos para que se pueda
+modificar desde bien sea el producto o del costeo"*. La sección anterior dejaba los chips de
+`#costeo-iva-chips` **bloqueados** (solo lectura) en cuanto el producto ya existía en el catálogo
+— cambiar el régimen de IVA de un producto real solo se podía hacer desde Catálogo de productos.
+Ahora los chips quedan siempre activos; si hay un producto resuelto, el clic escribe directo
+sobre `producto.iva` (el mismo registro que edita el modal de Catálogo, nunca un campo propio del
+Costeo) y lo sube a Supabase — sigue habiendo un solo origen de verdad, ahora con dos puertas de
+entrada para cambiarlo.
+
+- **`_elegirIvaCosteoNuevo(valor)`**: si hay producto resuelto y el valor es distinto al actual,
+  guarda el valor anterior, actualiza `producto.iva` de una, refresca `PRODUCTOS` (el filtro de
+  activos) y `_actualizarResumenCosteo()` (repinta los chips y vuelve a calcular el costeo — el
+  régimen de IVA cambia si los insumos se costean con o sin IVA, ver `_precioInsumoPorNombre()`),
+  y si el modal de Catálogo de productos está abierto detrás (ventanas no bloqueantes), también
+  llama a `renderProductosAdmin()` para que su tabla no quede con el valor viejo. Mismo patrón de
+  escritura optimista + reversión que ya usa `actualizarPrecioProducto()`: si el `upsert` a
+  Supabase falla, vuelve a dejar `producto.iva` en el valor anterior, repinta todo otra vez y
+  avisa con `alert()`. Si el producto todavía no existe, el comportamiento no cambió: el clic solo
+  elige con qué régimen se va a crear.
+- Un clic sobre el valor que el producto YA tiene no dispara ningún `upsert` (no hay nada que
+  guardar).
+- La nota (`#costeo-iva-nota`) ahora dice explícitamente que cambiarlo desde acá también lo
+  actualiza en Catálogo de productos, para que quede claro que están sincronizados y no son dos
+  copias independientes.
+- La dirección contraria (editar `#mp-iva` en el modal de producto de Catálogo y guardar con
+  `guardarProducto()`) ya actualizaba el mismo objeto de `CATALOGO` desde antes de este cambio —
+  no necesitó tocarse; el Costeo lo refleja la próxima vez que repinta sus chips (no hay un
+  listener en vivo entre ventanas, igual que el resto de la app).
+
+Verificado con un arnés real — 16 aserciones: un producto resuelto con `iva:'NO'` muestra el chip
+correcto; clic en "Genera IVA" cambia `producto.iva` a `'SI'`, dispara un único `upsert` con el
+código y el IVA correctos, y el chip activo cambia; un segundo clic sobre el mismo valor no
+dispara un `upsert` de más; forzar que el `upsert` falle y hacer clic en "Excluido de IVA" deja
+`producto.iva` en `'NO'` de inmediato (optimista) y lo revierte a `'SI'` después del error, con el
+chip y el `alert()` reflejando la reversión; un Costeo nuevo sin producto resuelto sigue dejando
+elegir el régimen en el input oculto; crear el producto especial desde ahí lo guarda con el
+régimen elegido. Sin errores de consola.

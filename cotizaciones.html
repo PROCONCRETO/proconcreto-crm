@@ -2575,6 +2575,15 @@
                onblur="_cerrarSugerenciasProductoCosteoDiferido()" onkeydown="_teclaSugerenciasProductoCosteo(event)">
         <div id="costeo-producto-sugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--gris-borde);border-radius:var(--radio);max-height:280px;overflow-y:auto;z-index:60;box-shadow:0 4px 14px rgba(0,0,0,.15);margin-top:2px"></div>
       </div>
+      <div class="form-grupo" style="margin-bottom:10px">
+        <label>Régimen de IVA</label>
+        <div id="costeo-iva-chips" style="display:flex;gap:8px">
+          <div class="tipo-chip" data-iva="SI" onclick="_elegirIvaCosteoNuevo('SI')">Genera IVA</div>
+          <div class="tipo-chip" data-iva="NO" onclick="_elegirIvaCosteoNuevo('NO')">Excluido de IVA</div>
+        </div>
+        <div id="costeo-iva-nota" style="font-size:11px;color:var(--gris-medio);margin-top:4px"></div>
+      </div>
+      <input type="hidden" id="m-costeo-iva-nuevo" value="NO">
       <div id="costeo-tipo-chips" style="display:flex;gap:8px;flex-wrap:wrap">
         <div class="tipo-chip" data-tipo="vibrocompactado" onclick="_elegirTipoEstructuraCosteo('vibrocompactado')">🧱 Vibrocompactado</div>
         <div class="tipo-chip" data-tipo="pretensado" onclick="_elegirTipoEstructuraCosteo('pretensado')">➰ Pretensado</div>
@@ -3498,7 +3507,7 @@
 <script src="js/costeo-mano-obra.js?v=20261104a"></script>
 <script src="js/costeo-maquinaria.js?v=20260920a"></script>
 <script src="js/costeo-referencia.js?v=20260821a"></script>
-<script src="js/costeo-producto.js?v=20261104a"></script>
+<script src="js/costeo-producto.js?v=20261112b"></script>
 <script src="js/calidad-mezclas.js?v=20261104c"></script>
 <script src="js/calidad-estadisticas.js?v=20260809a"></script>
 <script src="js/logistica.js?v=20261104a"></script>

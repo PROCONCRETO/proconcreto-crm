@@ -132,7 +132,8 @@ function _crearProductoEspecialDesdeCosteo() {
   if (!nombre) return;
   const codigo = _generarCodigoEspecial();
   const prod = {
-    codigo, nombre, grupo: '', medidas: '', unidad: 'UD', peso: null, iva: 'NO',
+    codigo, nombre, grupo: '', medidas: '', unidad: 'UD', peso: null,
+    iva: document.getElementById('m-costeo-iva-nuevo')?.value === 'SI' ? 'SI' : 'NO',
     lista: 0, minimo: 0, activo: false, especial: true, disenoMezcla: '',
   };
   CATALOGO.push(prod);
@@ -176,6 +177,54 @@ function _teclaSugerenciasProductoCosteo(ev) {
   } else if (ev.key === 'Escape') {
     box.style.display = 'none';
   }
+}
+
+// Régimen de IVA en los primeros renglones del modal (2026-11-12, a pedido del usuario: "que si
+// se arrastra desde el producto se marque el que trae, o si es un costeo nuevo se pueda
+// seleccionar si es excluido o no"; y el mismo día, a pedido de seguimiento: "enlaza los dos
+// puntos para que se pueda modificar desde bien sea el producto o del costeo") — si el producto
+// elegido ya existe (de línea o especial) los chips muestran lo que ya tiene en el catálogo Y
+// se pueden cambiar desde aquí mismo: el clic escribe directamente sobre `producto.iva` (mismo
+// registro que edita Catálogo de productos, nunca un valor propio del costeo — sigue habiendo un
+// solo origen de verdad, ahora con dos puertas de entrada) y lo sube a Supabase con el mismo
+// patrón de `actualizarPrecioProducto()`. Si el producto todavía no existe, el clic solo elige
+// con qué régimen se va a crear (ver _crearProductoEspecialDesdeCosteo()).
+function _elegirIvaCosteoNuevo(valor) {
+  const producto = _productoDesdeTextoCosteo(document.getElementById('m-costeo-producto')?.value);
+  if (producto) {
+    if (producto.iva === valor) return;
+    const anterior = producto.iva;
+    producto.iva = valor;
+    PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
+    _actualizarResumenCosteo();
+    if (typeof renderProductosAdmin === 'function') renderProductosAdmin(); // por si Catálogo de productos está abierto detrás (ventanas no bloqueantes)
+    _upsertProducto(producto).then(({ error }) => {
+      if (error) {
+        producto.iva = anterior;
+        PRODUCTOS = CATALOGO.filter(x => x.activo !== false);
+        _actualizarResumenCosteo();
+        if (typeof renderProductosAdmin === 'function') renderProductosAdmin();
+        alert('No se pudo guardar el régimen de IVA: ' + error.message);
+      }
+    });
+  } else {
+    document.getElementById('m-costeo-iva-nuevo').value = valor;
+    _actualizarChipsIvaCosteo();
+  }
+}
+
+function _actualizarChipsIvaCosteo() {
+  const wrap = document.getElementById('costeo-iva-chips');
+  const nota = document.getElementById('costeo-iva-nota');
+  if (!wrap || !nota) return;
+  const producto = _productoDesdeTextoCosteo(document.getElementById('m-costeo-producto')?.value);
+  const valorActual = producto ? producto.iva : (document.getElementById('m-costeo-iva-nuevo')?.value || 'NO');
+  wrap.querySelectorAll('.tipo-chip').forEach(chip => {
+    chip.classList.toggle('activo', chip.dataset.iva === valorActual);
+  });
+  nota.innerHTML = producto
+    ? `🧾 ${producto.iva === 'SI' ? '<b>Genera IVA</b>' : '<b>Excluido de IVA</b>'} — viene del producto; cambiarlo aquí también lo actualiza en Catálogo de productos (quedan sincronizados).`
+    : '🧾 El producto todavía no existe — elige con qué régimen de IVA se va a crear.';
 }
 
 // Al elegir/cambiar el producto, si tiene un Diseño de Mezcla asignado en el catálogo
@@ -1781,6 +1830,7 @@ function _calcularCosteoPretensado(c) {
 }
 
 function _actualizarResumenCosteo() {
+  _actualizarChipsIvaCosteo();
   const div = document.getElementById('costeo-resumen');
   if (!div) return;
   _actualizarPreviewDiseno();
@@ -2096,6 +2146,8 @@ function abrirModalCosteoProducto() {
   document.getElementById('m-costeo-producto-codigo-anterior').value = '';
   document.getElementById('modal-costeo-producto-titulo').textContent = '🏗️ Nuevo Costeo de Producto';
   document.getElementById('m-costeo-producto').value = '';
+  document.getElementById('m-costeo-iva-nuevo').value = 'NO';
+  _actualizarChipsIvaCosteo();
   poblarSelectDisenos('m-costeo-diseno');
   document.getElementById('m-costeo-peso-unidad').value = '';
   document.getElementById('m-costeo-ciclos-dia').value = '';
@@ -2191,6 +2243,11 @@ function duplicarCosteoProducto(codigo) {
   const c = COSTEO_PRODUCTOS.find(x => x.productoCodigo === codigo);
   if (!c) return;
   editarCosteoProducto(codigo);
+  // El producto de origen ya no queda resuelto (el campo se vacía abajo), así que el régimen de
+  // IVA se precarga con el que tenía ese producto — punto de partida razonable para el producto
+  // nuevo, igual que el resto de los datos generales que "Duplicar" ya copia.
+  const productoOrigen = _productoDesdeTextoCosteo(document.getElementById('m-costeo-producto').value);
+  document.getElementById('m-costeo-iva-nuevo').value = productoOrigen?.iva === 'SI' ? 'SI' : 'NO';
   document.getElementById('m-costeo-producto-codigo-anterior').value = '';
   document.getElementById('m-costeo-producto').value = '';
   document.getElementById('modal-costeo-producto-titulo').textContent = `🏗️ Nuevo Costeo de Producto (basado en ${c.productoNombre})`;
