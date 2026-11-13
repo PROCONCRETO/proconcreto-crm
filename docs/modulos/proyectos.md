@@ -2248,3 +2248,33 @@ proyecto no se toca (ni su `orden` ni se le manda un upsert de más — solo se 
 Losas realmente reordenadas); el mismo orden nuevo se ve igual en modo Producción y en modo
 Despacho, y en ninguno de los 2 aparece el handle de arrastre (solo lectura); el `colspan` del
 estado vacío quedó en 7 (columna nueva del handle incluida). Sin errores de consola.
+
+### Bug: la fila de TOTALES de Paneles quedaba corrida 2 columnas (2026-11-13)
+
+A pedido del usuario: *"en proyectos, los totales de las listas de paneles, no están alineados
+con las columnas correspondientes, lo que confunde. organiza la alineación de los totales con las
+columnas correspondientes"*.
+
+`_pieTotalesHTML()` (la fila "📐 TOTALES" de Lista/Producción/Despacho, agregada el 2026-10-17)
+calcula el `colspan` de su primera celda contando cuántas columnas hay ANTES de "Cantidad", para
+que el resto de las celdas de total caigan justo debajo de "Cantidad"/"Long. total (m)"/"m²"/
+"Peso (kg)". Esa cuenta solo conocía dos casos — Vigueta (3 columnas propias: Vigueta/Hilos Abajo/
+Hilos Arriba) y "todo lo demás" (2 columnas: Ancho/Hilos, el caso de Prelosa/Placa Alveolar) — y
+Paneles, agregado después (ver "4º sistema" más arriba), en realidad tiene 4 columnas propias
+(Clasificación/Ancho/Largo A/Largo B), no 2. El `colspan` quedaba corto por 2, así que toda la
+fila de totales se recorría 2 columnas a la izquierda: el total de unidades caía debajo de "Largo
+A", el de longitud debajo de "Largo B", etc. — exactamente la confusión que reportó el usuario.
+Los modales de Programar producción/despacho y el resumen por medidas ya tenían esta cuenta bien
+hecha para Paneles (`colspanVacio`/`_cuadroDetalladoTheadHTML()`); solo faltaba actualizar esta
+fila de totales de la Lista/Producción/Despacho de cada Losa.
+
+- **`_pieTotalesHTML()`**: se agrega `const esPanel = _esSistemaPanel(l.sistema);` y el cálculo
+  pasa de `4 + (esVigueta ? 3 : 2) + 1` a `4 + (esVigueta ? 3 : esPanel ? 4 : 2) + 1` — mismo
+  patrón de 3 vías que ya usa el resto del archivo para distinguir Vigueta/Panel/el resto.
+
+Verificado con un arnés real — 9 aserciones, sembrando una Unidad de Paneles con 2 filas (una
+normal, una cuchilla): el total de "Cantidad" (15) cae exactamente debajo de la columna
+"Cantidad" del encabezado (mismo índice de columna, no solo "se ve parecido"); el total de "Long.
+total (m)" (45.00) cae debajo de "Long. total (m)"; el de "m²" y el de "Peso (kg)" igual, cada uno
+debajo de su propia columna; de regresión, una Losa de Prelosa sigue alineando "Cantidad"
+correctamente como antes del cambio. Sin errores de consola.

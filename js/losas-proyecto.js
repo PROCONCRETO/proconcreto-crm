@@ -1149,6 +1149,7 @@ function _toggleFilasProduccion() {
 // siempre, sin badge) o el subconjunto que pasa el filtro (aunque sean 0 filas).
 function _pieTotalesHTML(l) {
   const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const esPanel = _esSistemaPanel(l.sistema);
   const esLista = _MODO_FLUJO_LOSA === 'lista';
   const esProduccion = _MODO_FLUJO_LOSA === 'produccion';
   const esDespacho = _MODO_FLUJO_LOSA === 'despacho';
@@ -1183,9 +1184,9 @@ function _pieTotalesHTML(l) {
       totalFaltanteMetros += pendDesp * dim;
     }
   });
-  // # + Cuadro + Ejes num. + Ejes alfa. = 4, + columnas propias del sistema (3 vigueta / 2
-  // prelosa), + Dimensión (m) = 1.
-  const colspanInicial = 4 + (esVigueta ? 3 : 2) + 1;
+  // # + Cuadro + Ejes num. + Ejes alfa. = 4, + columnas propias del sistema (3 vigueta / 4
+  // panel: Clasificación+Ancho+Largo A+Largo B / 2 prelosa), + Dimensión (m) = 1.
+  const colspanInicial = 4 + (esVigueta ? 3 : esPanel ? 4 : 2) + 1;
   // Observaciones (1) + Última modificación (1, agregada 2026-11-04) + columna de acciones (1) —
   // todo lo que queda DESPUÉS de las columnas de seguimiento, que desde 2026-10-22 ya llevan su
   // propia celda de total (ver arriba) en vez de quedar vacías dentro de este colspan.
