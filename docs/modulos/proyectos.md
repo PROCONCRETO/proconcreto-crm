@@ -2278,3 +2278,56 @@ normal, una cuchilla): el total de "Cantidad" (15) cae exactamente debajo de la 
 total (m)" (45.00) cae debajo de "Long. total (m)"; el de "m²" y el de "Peso (kg)" igual, cada uno
 debajo de su propia columna; de regresión, una Losa de Prelosa sigue alineando "Cantidad"
 correctamente como antes del cambio. Sin errores de consola.
+
+### Bug: pegar el bloque completo en Paneles solo pegaba la primera columna (2026-11-18)
+
+A pedido del usuario: *"en proyectos, al ingresar listas nuevas, no me está funcionando bien la
+opción de pegar por columnas... siempre la pega en la primera columna, y pega debajo de lo que
+haya en la primera columna."*
+
+Dos bugs reales distintos, ambos en el mismo flujo de pegado de una Unidad de Paneles:
+
+1. **`onPasteFilasProduccion()`** (pegar el bloque completo contra el contenedor de la tabla,
+   `_filaProduccionHTML()`/2026-10-18) nunca tuvo una rama para Paneles — solo conocía Vigueta y
+   "todo lo demás" (el orden de columnas de Prelosa: Ancho/Hilos/Dimensión/Cantidad). Al pegar un
+   bloque de Paneles ahí caía en esa rama genérica y mezclaba Clasificación/Ancho/Largo A/Largo B
+   en los campos equivocados.
+2. **El bug que describió el usuario, confirmado con un arnés real simulando el clic +
+   pegado**: `onPasteColumnaFilaProduccion()` (el "pegar por columna" del 2026-11-10) está
+   pensado para pegar UNA sola columna sobre un campo puntual. Si el portapapeles trae más de
+   una columna (tabulador de por medio), se quedaba con la PRIMERA columna de cada línea y
+   descartaba el resto en silencio — pensado originalmente solo como defensa contra "copiar una
+   columna de más por accidente". El reflejo natural al pegar un Excel completo es pararse en la
+   celda superior-izquierda del destino (acá, el campo Cuadro/N° Panel, la primera columna
+   visible) y pegar TODO el bloque de una — exactamente lo que describió el usuario: todo caía
+   en esa primera columna, y hacia abajo según cuántas filas traía el bloque, con el resto de
+   columnas (Clasificación/Ancho/Largo A/Largo B) perdidas.
+
+- **`onPasteFilasProduccion()`**: se agrega la rama de Paneles — Clasificación se resuelve por
+  texto con `_claveClasificacionPanelDesdeTexto()` (nueva, busca por etiqueta sin importar
+  mayúsculas/tildes, 'panel' si no matchea nada), Ancho/Largo A/Largo B se parsean directo,
+  Cantidad siempre queda en 1 (Paneles no trae esa columna — ver nota en
+  `guardarListaProduccion()`), y Dimensión se deriva después con `_sincronizarLargosPanel()` para
+  cada fila nueva, igual que al escribirla a mano.
+- **`onPasteColumnaFilaProduccion()`**: si el pegado trae tabuladores Y arrancó en el campo
+  `cuadro`, ya no se recorta a una sola columna — se delega a la nueva
+  **`_pegarBloqueColumnasAnclado(i, lineas, l)`**, que reparte TODAS las columnas del bloque
+  (mismo criterio por sistema que `onPasteFilasProduccion()`) pero ANCLADAS en la fila donde se
+  pegó — sobre filas existentes desde ahí hacia abajo, agregando filas nuevas al final si no
+  alcanzan, en vez de ir todo al final de la lista sin importar dónde se pegó. Una fila con
+  unidades ya fabricadas no se sobreescribe (mismo candado que el resto de las vías de carga). Un
+  pegado multi-columna que arranca en un campo DISTINTO a Cuadro sigue con el comportamiento
+  histórico (se queda solo con la primera columna) — ese caso es genuinamente ambiguo (no hay un
+  ancla de columna clara) y no es el que reportó el usuario.
+
+Verificado con un arnés real — reproduciendo primero el bug exacto (clic en Cuadro + pegar un
+bloque de 2 filas × varias columnas) y confirmando que SÍ se perdían Ancho/Largo A/Largo B antes
+del cambio; después del cambio, 16 aserciones: el bloque completo pegado sobre Cuadro reparte
+Cuadro/Clasificación/Ancho/Largo A/Largo B en sus campos correctos para las 2 filas, con
+Dimensión derivada bien (promedio para "Panel", máximo para "Dintel cuchilla") y Cantidad en 1;
+el pegado de una sola columna (sin tabuladores) sobre Largo A sigue funcionando igual que antes,
+sin tocar Cuadro; un pegado con 2 columnas sobre un campo distinto a Cuadro sigue tomando solo la
+primera (regresión del comportamiento histórico); el pegado contra el contenedor completo
+(`onPasteFilasProduccion()`) también reparte bien Paneles ahora; de regresión, el mismo bloque
+pegado sobre una Losa de Vigueta sigue repartiendo Tipo de vigueta/Hilos Abajo/Hilos Arriba/
+Dimensión/Cantidad sin cambios. Sin errores de consola.

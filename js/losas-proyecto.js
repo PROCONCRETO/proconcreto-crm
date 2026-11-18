@@ -194,6 +194,15 @@ function _esClasificacionCuchilla(clave) {
 function _etiquetaClasificacionPanel(clave) {
   return CLASIFICACIONES_PANEL.find(c => c.clave === clave)?.etiqueta || clave || '—';
 }
+// Para pegar/importar: el Excel de obra trae la Clasificación como texto ("Panel", "Dintel
+// cuchilla"...), no la clave interna — se resuelve por la etiqueta, sin importar
+// mayúsculas/tildes exactas; si no matchea nada conocido, 'panel' es el valor por defecto más
+// común (igual criterio que el resto de columnas, que no fallan el pegado completo por un dato
+// raro en una sola celda).
+function _claveClasificacionPanelDesdeTexto(texto) {
+  const t = (texto || '').trim().toLowerCase();
+  return CLASIFICACIONES_PANEL.find(c => c.etiqueta.toLowerCase() === t || c.clave === t)?.clave || 'panel';
+}
 // "Losa" → "Unidad" solo en los textos VISIBLES de Paneles (confirmado con el usuario, acotado
 // a propósito) — nombres internos (`LOSAS_PROYECTO`, tabla `losas_proyecto`, `_LOSA_ACTIVA_ID`,
 // `_filasLosaActual`, `abrirLosaDetalle()`, `guardarLosa()`, etc.) NO se tocan. El botón
@@ -1743,15 +1752,28 @@ function onPasteFilasProduccion(event) {
   if (!texto || !texto.trim()) return;
   event.preventDefault();
   const esVigueta = l.sistema === 'vigueta_bovedilla';
+  // Faltaba la rama de Paneles (bug real reportado 2026-11-18) — sin ella, pegar el bloque
+  // completo en una Unidad de Paneles caía en la rama genérica de abajo (pensada para
+  // Prelosa/Placa Alveolar) y mezclaba Clasificación/Ancho/Largo A/Largo B en los campos
+  // equivocados (ancho/hilos/dimensión/cantidad).
+  const esPanel = _esSistemaPanel(l.sistema);
   const filas = texto.split(/\r?\n/).filter(r => r.trim() !== '').map(linea => {
     const cols = linea.split('\t');
     const base = { id: _nuevoIdFila(), cuadro: cols[0] || '', ejesEntre: cols[1] || '', laterales: cols[2] || '', observaciones: '', produccion: [] };
     if (esVigueta) {
       return { ...base, tipoVigueta: cols[3] || '', hilosAbajo: _parseFloatEs(cols[4]), hilosArriba: _parseFloatEs(cols[5]), dimension: _parseFloatEs(cols[6]), cantidad: _parseFloatEs(cols[7]), ancho: 0, hilos: 0 };
     }
+    if (esPanel) {
+      // Dimensión no se pega directo — la deriva `_sincronizarLargosPanel()` justo abajo, igual
+      // que al escribirla a mano. Cantidad siempre 1 (ver guardarListaProduccion(): "la cantidad
+      // sobra porque se hace uno a uno" en Paneles) — no se espera una columna de Cantidad acá.
+      return { ...base, clasificacion: _claveClasificacionPanelDesdeTexto(cols[3]), ancho: _parseFloatEs(cols[4]), largoA: _parseFloatEs(cols[5]), largoB: _parseFloatEs(cols[6]), dimension: 0, cantidad: 1, tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0, hilos: 0 };
+    }
     return { ...base, ancho: _parseFloatEs(cols[3]), hilos: _parseFloatEs(cols[4]), dimension: _parseFloatEs(cols[5]), cantidad: _parseFloatEs(cols[6]), tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0 };
   });
+  const idxPrimeraNueva = _filasLosaActual.length;
   _filasLosaActual = _filasLosaActual.concat(filas);
+  if (esPanel) filas.forEach((_, j) => _sincronizarLargosPanel(idxPrimeraNueva + j));
   renderFilasProduccion();
   alert(`Se agregaron ${filas.length} fila(s) pegadas. Revísalas en la tabla y guarda cuando estén correctas.`);
 }
@@ -1783,6 +1805,20 @@ function onPasteColumnaFilaProduccion(event, i, campo, tipo) {
   const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
   const esPanel = !!l && _esSistemaPanel(l?.sistema);
   const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
+  // Bug real reportado 2026-11-18: "siempre la pega en la primera columna, y pega debajo de lo
+  // que haya en la primera columna" — el reflejo típico al pegar desde Excel es pararse en la
+  // celda superior-izquierda del destino (acá, el campo Cuadro/N° Panel) y pegar el BLOQUE
+  // COMPLETO de columnas de una vez, igual que en una hoja de cálculo. Antes, si el portapapeles
+  // traía más de una columna (tabulador de por medio), este pegado "de una sola columna" se
+  // quedaba solo con la PRIMERA columna de cada línea (pensado originalmente para el caso de
+  // copiar una columna de más por accidente) y descartaba el resto en silencio — exactamente lo
+  // que describió el usuario. Si el pegado es multi-columna Y arrancó en Cuadro (el ancla natural
+  // del bloque completo), se reparte en todas las columnas correspondientes, ancladas en la fila
+  // donde se pegó, en vez de recortarlo a una sola.
+  if (campo === 'cuadro' && lineas.some(ln => ln.includes('\t'))) {
+    _pegarBloqueColumnasAnclado(i, lineas, l);
+    return;
+  }
   // Mismo candado de medidas ya fabricadas que `guardarListaProduccion()` — una fila con
   // `fabricado > 0` no cambia su campo bloqueado tampoco por esta vía; se cuenta aparte y se
   // avisa al final en vez de dejarlo pasar en silencio o reventar a mitad del pegado.
@@ -1824,6 +1860,58 @@ function onPasteColumnaFilaProduccion(event, i, campo, tipo) {
   renderFilasProduccion();
   const avisoOmitidas = omitidas > 0 ? ` (${omitidas} fila(s) no se modificaron porque ya tienen unidades fabricadas)` : '';
   alert(`Se rellenaron ${filasTocadas.length} fila(s) en esta columna${avisoOmitidas}. Revísalas y guarda cuando estén correctas.`);
+}
+
+// Pegado del bloque COMPLETO de columnas, anclado en la fila donde se pegó (2026-11-18) — lo
+// que dispara `onPasteColumnaFilaProduccion()` cuando detecta tabuladores arrancando en Cuadro.
+// Mismo reparto de columnas por sistema que `onPasteFilasProduccion()` (Vigueta/Panel/el resto),
+// pero ESCRIBIENDO sobre las filas existentes desde `i` hacia abajo (agregando filas nuevas al
+// final si no alcanzan, igual que el pegado de una sola columna) en vez de agregar todo al final
+// de la lista sin importar dónde se pegó — así el bloque cae exactamente donde el usuario lo
+// paró, igual que pegar en Excel.
+function _pegarBloqueColumnasAnclado(i, lineas, l) {
+  const esPanel = !!l && _esSistemaPanel(l?.sistema);
+  const esVigueta = !!l && l.sistema === 'vigueta_bovedilla';
+  let omitidas = 0;
+  const filasTocadas = [];
+  lineas.forEach((linea, offset) => {
+    const cols = linea.split('\t');
+    const idx = i + offset;
+    while (_filasLosaActual.length <= idx) {
+      _filasLosaActual.push({ id: _nuevoIdFila(), cuadro: '', ejesEntre: '', laterales: '', ancho: 0, hilos: 0, tipoVigueta: '', hilosAbajo: 0, hilosArriba: 0, clasificacion: 'panel', largoA: 0, largoB: 0, dimension: 0, cantidad: esPanel ? 1 : 0, observaciones: '', produccion: [] });
+    }
+    const f = _filasLosaActual[idx];
+    // Una fila con unidades ya fabricadas no se sobreescribe de un bloque completo — mismo
+    // criterio que el resto de las vías de carga (Pegar una columna/Importar/guardar), que
+    // nunca tocan las medidas de una pieza que ya se empezó a producir.
+    if (_fabricadoFila(f) > 0) { omitidas++; return; }
+    f.cuadro = (cols[0] || '').trim();
+    f.ejesEntre = (cols[1] || '').trim();
+    f.laterales = (cols[2] || '').trim();
+    if (esVigueta) {
+      f.tipoVigueta = (cols[3] || '').trim();
+      f.hilosAbajo = _parseFloatEs(cols[4]);
+      f.hilosArriba = _parseFloatEs(cols[5]);
+      f.dimension = _parseFloatEs(cols[6]);
+      f.cantidad = _parseFloatEs(cols[7]);
+    } else if (esPanel) {
+      f.clasificacion = _claveClasificacionPanelDesdeTexto(cols[3]);
+      f.ancho = _parseFloatEs(cols[4]);
+      f.largoA = _parseFloatEs(cols[5]);
+      f.largoB = _parseFloatEs(cols[6]);
+      f.cantidad = 1;
+    } else {
+      f.ancho = _parseFloatEs(cols[3]);
+      f.hilos = _parseFloatEs(cols[4]);
+      f.dimension = _parseFloatEs(cols[5]);
+      f.cantidad = _parseFloatEs(cols[6]);
+    }
+    filasTocadas.push(idx);
+  });
+  if (esPanel) filasTocadas.forEach(idx => _sincronizarLargosPanel(idx));
+  renderFilasProduccion();
+  const avisoOmitidas = omitidas > 0 ? ` (${omitidas} fila(s) no se modificaron porque ya tienen unidades fabricadas)` : '';
+  alert(`Se rellenaron ${filasTocadas.length} fila(s) con el bloque completo pegado${avisoOmitidas}. Revísalas y guarda cuando estén correctas.`);
 }
 
 // (c) Importar archivo Excel/CSV — reusa SheetJS (ya cargado en la app) y `_normHdr()`
