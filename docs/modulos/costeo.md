@@ -757,3 +757,43 @@ dispara un `upsert` de más; forzar que el `upsert` falle y hacer clic en "Exclu
 chip y el `alert()` reflejando la reversión; un Costeo nuevo sin producto resuelto sigue dejando
 elegir el régimen en el input oculto; crear el producto especial desde ahí lo guarda con el
 régimen elegido. Sin errores de consola.
+
+### Bug real: "Duplicar" costeaba los insumos con el régimen de IVA equivocado (2026-11-18)
+
+A pedido del usuario: *"intenté duplicar el costeo de una prelosa... este producto está marcado
+como generador de IVA. cuando lo dupliqué, el costeo duplicado me está tomando los insumos como
+si fuera excluido de IVA, así esté bien marcado en la parte superior de la ventana donde se
+indica que es generador de IVA."*
+
+Causa raíz: desde que existen los chips de IVA (ver la sección de arriba, 2026-11-12), hay DOS
+lugares distintos que necesitan saber el régimen de IVA del costeo en curso — los chips
+(solo para PINTAR) y el cálculo real de `calcularCosteoProducto()`/`_calcularCosteoReforzado()`/
+`_calcularCosteoPretensado()`/`_calcularCosteoElementoSimple()` (para decidir si los insumos se
+costean con o sin IVA). Los chips sí sabían resolver el caso "el producto todavía no está
+resuelto" cayendo al borrador de `#m-costeo-iva-nuevo` (`_actualizarChipsIvaCosteo()`), pero el
+CÁLCULO nunca se enteró de ese borrador: seguía buscando `CATALOGO.find(p => p.codigo ===
+c.productoCodigo)`, y `duplicarCosteoProducto()` deja el campo Producto vacío a propósito (para
+obligar a elegir/crear uno nuevo) — con el código vacío, esa búsqueda no encuentra nada,
+`productoGeneraIva` caía a `false` sin mirar el borrador, y los insumos se costeaban como
+EXCLUIDO de IVA aunque los chips de arriba, que sí consultaban el borrador, mostraran "Genera
+IVA" correctamente. Mismo hueco en `_productoGeneraIvaCosteoActual()` (el precio en vivo junto a
+cada fila de Insumos/Otras Materias Primas mientras se arma el costeo).
+
+- **`_leerFormularioCosteo()`**: ahora resuelve `ivaRegimen` con el MISMO criterio que los chips
+  (`producto.iva` si el producto ya existe; si no, el borrador de `#m-costeo-iva-nuevo`) y lo
+  deja en el objeto `c` que ya consume todo el resto del cálculo.
+- Las 4 funciones de cálculo (`calcularCosteoProducto()`/`_calcularCosteoReforzado()`/
+  `_calcularCosteoPretensado()`/`_calcularCosteoElementoSimple()`): la búsqueda directa en
+  `CATALOGO` se reemplaza por leer `c.ivaRegimen` directo — ya viene resuelto con el respaldo
+  incluido, un solo lugar decide esto en vez de 4 copias del mismo criterio incompleto.
+- **`_productoGeneraIvaCosteoActual()`** (precio en vivo junto a cada fila mientras se arma el
+  costeo): mismo respaldo agregado directo ahí.
+
+Verificado con un arnés real — 10 aserciones, con un insumo de prueba cuyo precio SIN IVA (100) y
+CON IVA (119) son claramente distinguibles: editar (no duplicar) el costeo de una Prelosa real
+con `iva:'SI'` cuesta el insumo a 100 (SIN IVA, correcto desde antes); **duplicar ese mismo
+costeo** — el bug reportado — ahora también cuesta el insumo a 100 (antes de este cambio habría
+quedado en 119, tratado como excluido, aunque el chip mostrara "Genera IVA"); de regresión, un
+producto EXCLUIDO de IVA (`iva:'NO'`) sigue costeando el mismo insumo a 119 (CON IVA) tanto al
+editar como al duplicar, sin que el cambio afecte el sentido contrario de la regla. Sin errores
+de consola.

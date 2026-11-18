@@ -56,7 +56,10 @@ function _productoDesdeTextoCosteo(texto) {
 // armando un costeo nuevo).
 function _productoGeneraIvaCosteoActual() {
   const p = _productoDesdeTextoCosteo(document.getElementById('m-costeo-producto')?.value);
-  return p?.iva === 'SI';
+  // Mismo respaldo que `_leerFormularioCosteo()`/`_actualizarChipsIvaCosteo()`: si el producto
+  // todavía no existe (ej. recién duplicado), se usa el borrador de los chips en vez de asumir
+  // 'NO' sin mirarlo.
+  return p ? p.iva === 'SI' : document.getElementById('m-costeo-iva-nuevo')?.value === 'SI';
 }
 
 let _sugerenciasProductoCosteo = [];
@@ -1022,10 +1025,20 @@ function _leerFormularioCosteo() {
   // (_actualizarResumenCosteo()) ya sepa si el producto genera IVA o no mientras se arma el
   // costeo, sin esperar a guardar (ver calcularCosteoProducto() → productoGeneraIva).
   const productoEnCurso = _productoDesdeTextoCosteo(document.getElementById('m-costeo-producto').value);
+  // Régimen de IVA para costear los insumos — mismo criterio que ya usa `_actualizarChipsIvaCosteo()`
+  // para PINTAR los chips (el del producto si ya está resuelto; si no, el borrador de
+  // `#m-costeo-iva-nuevo`), pero que el cálculo real no respetaba: antes, mientras el producto
+  // no estaba resuelto (ej. justo después de "Duplicar", que vacía el campo Producto a
+  // propósito), `calcularCosteoProducto()` buscaba `c.productoCodigo` (vacío) en el catálogo, no
+  // encontraba nada y asumía 'NO' sin mirar el borrador — los insumos se costeaban como
+  // EXCLUIDO de IVA aunque los chips de arriba mostraran "Genera IVA" correctamente (bug real
+  // reportado 2026-11-18).
+  const ivaRegimen = productoEnCurso ? productoEnCurso.iva : (document.getElementById('m-costeo-iva-nuevo')?.value || 'NO');
   const tipoEstructura = document.getElementById('m-costeo-tipo').value || 'vibrocompactado';
   return {
     productoCodigo: productoEnCurso ? productoEnCurso.codigo : '',
     productoNombre: productoEnCurso ? productoEnCurso.nombre : '',
+    ivaRegimen,
     tipoEstructura,
     disenoMezclaCodigo: document.getElementById('m-costeo-diseno').value,
     rendimiento: {
@@ -1107,8 +1120,9 @@ function calcularCosteoProducto(c) {
   // IVA. Si es EXCLUIDO de IVA, ese IVA no es descontable → se asume el precio CON IVA (ver
   // _precioInsumoPorNombre()). El campo `iva` ('SI'/'NO') ya existe en el catálogo de
   // productos — se arrastra tal cual, no se vuelve a preguntar en el costeo.
-  const productoCosteo = CATALOGO.find(p => p.codigo === c.productoCodigo);
-  const productoGeneraIva = productoCosteo?.iva === 'SI';
+  // `c.ivaRegimen` ya viene resuelto desde `_leerFormularioCosteo()` con el borrador como
+  // respaldo cuando el producto todavía no existe — ver la nota ahí.
+  const productoGeneraIva = c.ivaRegimen === 'SI';
 
   // Materia Prima — cantidad por unidad = (cantidad por m³ del Diseño × capacidad de la
   // mezcladora) ÷ Unidades/Bache. Cemento/agua/adiciones/aditivos se compran por PESO (se
@@ -1275,8 +1289,9 @@ function _calcularCosteoReforzado(c) {
   const pesoEstimadoKg = volumenUnidadM3 * DENSIDAD_CONCRETO_KG_M3;
   const unidadesDia = r.unidadesDia || 0;
 
-  const productoCosteo = CATALOGO.find(p => p.codigo === c.productoCodigo);
-  const productoGeneraIva = productoCosteo?.iva === 'SI';
+  // `c.ivaRegimen` ya viene resuelto desde `_leerFormularioCosteo()` con el borrador como
+  // respaldo cuando el producto todavía no existe — ver la nota ahí.
+  const productoGeneraIva = c.ivaRegimen === 'SI';
 
   // Materia Prima — cantidad por unidad = cantidad por m³ del Diseño × volumen real de la pieza.
   let materiaPrima = 0;
@@ -1483,8 +1498,9 @@ function _calcularCosteoElementoSimple(c) {
   const pesoEstimadoKg = volumenUnidadM3 * DENSIDAD_CONCRETO_KG_M3;
   const unidadesDia = r.unidadesDia || 0;
 
-  const productoCosteo = CATALOGO.find(p => p.codigo === c.productoCodigo);
-  const productoGeneraIva = productoCosteo?.iva === 'SI';
+  // `c.ivaRegimen` ya viene resuelto desde `_leerFormularioCosteo()` con el borrador como
+  // respaldo cuando el producto todavía no existe — ver la nota ahí.
+  const productoGeneraIva = c.ivaRegimen === 'SI';
 
   // Materia Prima — idéntico a Reforzado: cantidad por unidad = cantidad por m³ del Diseño ×
   // volumen real de la pieza.
@@ -1637,8 +1653,9 @@ function _calcularCosteoPretensado(c) {
   const bancosDiaLinea = r.bancosDiaLinea || 0;
   const unidadesDiaLinea = bancosDiaLinea * metrosLinealesBanco;
 
-  const productoCosteo = CATALOGO.find(p => p.codigo === c.productoCodigo);
-  const productoGeneraIva = productoCosteo?.iva === 'SI';
+  // `c.ivaRegimen` ya viene resuelto desde `_leerFormularioCosteo()` con el borrador como
+  // respaldo cuando el producto todavía no existe — ver la nota ahí.
+  const productoGeneraIva = c.ivaRegimen === 'SI';
 
   // Materia Prima — idéntico criterio que Reforzado: cantidad por ml = cantidad por m³ del
   // Diseño × volumen real de concreto por ml (confirmado exacto contra el Excel).
