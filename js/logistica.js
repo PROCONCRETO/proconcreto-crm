@@ -1581,6 +1581,32 @@ function marcarCumplidoDiligencia(viajeId, diligenciaIndex, estado, nuevaFecha, 
 // productos — todo lo que necesita quien carga los camiones.
 let _progDiaFechaActual = null;
 
+// Peso EN VIVO de una línea de producto de una entrega, contra el catálogo ACTUAL — en vez de
+// confiar en `p.peso` (una foto fija calculada una sola vez, al aplicar la orden a la entrega o
+// al escribir la cantidad a mano, ver aplicarOrdenAEntrega()/_actualizarProductoEntrega()). Bug
+// real reportado (2026-11-24): un producto con peso ya asignado en el catálogo salía en 0.00 ton
+// en el impreso — la foto se congeló en 0 en algún momento anterior (el producto estaba inactivo,
+// el catálogo todavía no tenía el peso puesto, o no había terminado de cargar) y nada la
+// refrescaba después, aunque el catálogo ya estuviera bien. Mismo criterio que ya se usa para la
+// dirección de Google Maps del destino (ver la nota de 2026-08-28 más abajo, en el mismo
+// imprimible): resolver en vivo cada vez que se imprime, en vez de confiar en una foto vieja.
+// Se busca en CATALOGO completo (no solo PRODUCTOS, que excluye los inactivos/ocultos) para que
+// un producto que hoy esté oculto/no-de-línea igual calcule bien el peso de un despacho ya
+// hecho. Si no se encuentra nada, o el catálogo tampoco tiene peso puesto, se cae al valor
+// guardado — mejor un número viejo que dejarlo en blanco.
+function _pesoProductoEntregaVivo(p) {
+  const prodCat = typeof CATALOGO !== 'undefined' ? CATALOGO.find(x => _textoProducto(x) === (p.producto || '').trim()) : null;
+  const pesoUnitario = prodCat ? (Number(prodCat.peso) || 0) : 0;
+  if (!pesoUnitario) return Number(p.peso) || 0;
+  return (Number(p.cantidad) || 0) * pesoUnitario / 1000;
+}
+function _pesoEntregaVivo(e) {
+  return (e.productos || []).reduce((s, p) => s + _pesoProductoEntregaVivo(p), 0);
+}
+function _pesoViajeVivo(v) {
+  return _entregasDeViaje(v).reduce((s, e) => s + _pesoEntregaVivo(e), 0);
+}
+
 function imprimirProgramacionDia(fechaStr) {
   const viajesDia = VIAJES.filter(v => v.fecha === fechaStr && v.estado !== 'Cancelada');
   if (!viajesDia.length) { alert('No hay viajes programados (sin contar cancelados) para esa fecha.'); return; }
@@ -1600,14 +1626,15 @@ function imprimirProgramacionDia(fechaStr) {
   viajesDia.forEach(v => {
     totalEntregas += _entregasDeViaje(v).length;
     totalDiligencias += _diligenciasDeViaje(v).length;
-    totalPeso += Number(v.pesoTotal) || 0;
+    const pesoViaje = _pesoViajeVivo(v);
+    totalPeso += pesoViaje;
     const capacidad = CAPACIDAD_VEHICULO[v.vehiculo];
-    if (capacidad && (Number(v.pesoTotal) || 0) > capacidad) vehiculosAlLimite++;
+    if (capacidad && pesoViaje > capacidad) vehiculosAlLimite++;
   });
 
   const bloques = viajesDia.map((v, idxViaje) => {
     const capacidad = CAPACIDAD_VEHICULO[v.vehiculo];
-    const peso = Number(v.pesoTotal) || 0;
+    const peso = _pesoViajeVivo(v);
     const excedido = capacidad && peso > capacidad;
     const pctBarra = capacidad ? Math.min(Math.round((peso / capacidad) * 100), 100) : 100;
     // Los vehículos propios se guardan como "PLACA / Conductor" (ver leyenda del calendario);
@@ -1627,9 +1654,9 @@ function imprimirProgramacionDia(fechaStr) {
         ? `<div class="pv-contacto"><b>👤 Recibe: ${_esc(e.contactoObraNombre)}</b>${e.contactoObraTelefono ? `<a class="tel pv-tel-link" href="tel:${telHref}">📞 ${_esc(e.contactoObraTelefono)}</a>` : ''}</div>`
         : `<div class="pv-contacto sin-datos">Sin contacto registrado en obra — confirmar con el cliente antes de salir</div>`;
       const productosHTML = (e.productos || []).filter(p => p.producto).map(p =>
-        `<tr><td>${_esc(p.producto)}</td><td class="num">${p.cantidad || 0}</td><td class="num">${(Number(p.peso) || 0).toFixed(2)} ton</td></tr>`
+        `<tr><td>${_esc(p.producto)}</td><td class="num">${p.cantidad || 0}</td><td class="num">${_pesoProductoEntregaVivo(p).toFixed(2)} ton</td></tr>`
       ).join('');
-      const pesoEntrega = (e.productos || []).reduce((s, p) => s + (Number(p.peso) || 0), 0);
+      const pesoEntrega = _pesoEntregaVivo(e);
       // Tag de ubicación: abre Google Maps. Antes se armaba una búsqueda de texto a partir del
       // destino específico/ciudad — el usuario reportó que eso no necesariamente cae en el sitio
       // real ("se está generando con el nombre del proyecto pero este no necesariamente está

@@ -191,3 +191,48 @@ tenían: quitar una Diligencia (`eliminarDiligenciaViaje()`), una Entrega comple
 filas sueltas dentro del modal de Viaje en edición, sin ningún aviso previo. Verificado con un
 arnés real — cada función respeta `confirm()=false` (no quita nada) y `confirm()=true` (sí
 quita), sin errores de consola.
+
+### Bug: el peso de un producto salía en 0.00 ton en el imprimible del día (2026-11-24)
+
+A pedido del usuario, con una captura del imprimible real: *"en el imprimible de las
+programaciones de despachos, este producto me está saliendo con peso cero... revisé el producto
+y el costeo, y tienen peso asignado. revisa que puede estar pasando."*
+
+Causa raíz: el peso de cada línea de producto de una Entrega (`p.peso`) NUNCA se calcula en vivo
+contra el catálogo al imprimir — se calcula UNA SOLA VEZ, como una foto fija, en los dos únicos
+momentos en que se toca esa línea: al aplicar una Orden a la Entrega (`aplicarOrdenAEntrega()`) o
+al escribir/cambiar la cantidad a mano (`_actualizarProductoEntrega()`). Si en ESE momento el
+producto no se encontraba en `PRODUCTOS` (por ejemplo, porque todavía no había terminado de
+cargar, o el producto estaba oculto/inactivo en ese momento puntual), la foto quedó en 0 para
+siempre — nada la vuelve a recalcular después, aunque el catálogo ya tenga el peso bien puesto
+hoy. Es la misma categoría de bug que ya se había corregido para el link de Google Maps del
+destino (ver "📍" más arriba en este archivo, 2026-08-28: *"la foto se quedó vacía para siempre y
+nada la vuelve a refrescar sola"*) — la solución es la misma: resolver EN VIVO cada vez que se
+imprime, en vez de confiar en la foto guardada.
+
+- **`_pesoProductoEntregaVivo(p)`** (nueva, junto a `imprimirProgramacionDia()`): busca el
+  producto en `CATALOGO` completo (no solo `PRODUCTOS`, que excluye los ocultos/inactivos — un
+  despacho ya hecho de un producto que hoy esté oculto igual tiene que calcular bien su peso) por
+  el mismo texto "código — nombre" que ya usa el resto de la app (`_textoProducto()`), y
+  recalcula `cantidad × peso unitario del catálogo`. Si no encuentra el producto, o el catálogo
+  tampoco tiene peso puesto, se cae al valor guardado (`p.peso`) — mejor un número viejo que uno
+  en blanco.
+- **`_pesoEntregaVivo(e)`**/**`_pesoViajeVivo(v)`**: suman lo anterior por Entrega y por Viaje.
+- **`imprimirProgramacionDia()`**: las 5 lecturas de `p.peso`/`v.pesoTotal` dentro del imprimible
+  (resumen del día, barra de carga de cada viaje, tabla de productos de cada Entrega y su Total)
+  pasan a usar estas 3 funciones. Acotado a ESTE imprimible — `v.pesoTotal` sigue
+  guardándose/leyéndose igual que antes en el resto de la app (el formulario de edición del
+  Viaje, el tooltip del calendario), que no fue parte de lo reportado.
+
+Verificado con un arnés real, con el producto REAL del seed de catálogo (`PBBORSAR45` — Bordillo
+Sardinel H-45, `peso:106` en `js/catalogo.js`) y una Entrega con `p.peso:0` guardado (la foto
+vieja congelada en 0, igual que el caso real) — 6 aserciones: el peso del catálogo (106) se
+recupera bien; el peso esperado para 112 unidades (112 × 106 ÷ 1000 = 11.87 ton) aparece completo
+en las 4 lecturas del imprimible (resumen del día, barra de carga del viaje, fila del producto y
+total de la entrega), donde antes las 4 mostraban 0.00/0.0; de regresión, un producto que ya no
+existe en el catálogo sigue cayendo al peso guardado (3.50) en vez de romper o quedar en blanco.
+Sin errores de consola.
+
+**Nota aparte, para el usuario**: con el peso real (11.87 ton) el vehículo GTU668 — que tiene
+11 ton de capacidad — queda SOBRE el límite para esa entrega puntual; antes, al mostrar 0.00 ton,
+el imprimible no alcanzaba a avisar de ese exceso de capacidad.
