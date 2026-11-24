@@ -3202,6 +3202,122 @@ async function descargarPDFProgramacionProduccion() {
   await _descargarPDFConMembrete('pp-preview-content', 'pp-preview-footer', `Programacion_Produccion_${nombreLosa}_${fecha}.pdf`, 'btn-pdf-programacion');
 }
 
+// "🖨️ Formato" en "Producciones registradas" (2026-11-24, a pedido del usuario: "los detalles
+// de lo fabricado o lo despachado, no son tan amigables... hagamos para esto, un PDF igual al
+// imprimible de programación de producción y despacho, con el resumen de lo finalmente
+// producido/despachado") — hasta ahora esa tarjeta solo tenía "👁️ Detalle" (una tabla plana en
+// un modal, sin membrete ni el RESUMEN POR MEDIDAS agrupado — ver la nota junto a
+// `renderProduccionRegistrada()`: de hecho este mismo botón se LLAMÓ "🖨️ Formato" hasta el
+// 2026-10-19 y se renombró a "Detalle" justamente porque en ese momento no generaba ningún PDF).
+// Mismo patrón EXACTO que `imprimirProgramacionProduccionGuardada()`, con 2 diferencias: usa
+// `cantidadReal` (lo que de verdad se fabricó) en vez de `cantidadProgramada`, descartando las
+// líneas todavía sin cargar (`cantidadReal == null`) — esas no son "lo producido" — y el título/
+// las etiquetas dicen "registrada"/"fabricadas" en vez de "programación"/"a programar". No
+// reemplaza "👁️ Detalle" (que se deja igual, por si acaso se sigue usando); esto es una opción
+// nueva, aparte.
+function _htmlProduccionRegistrada(l, p, sis, esVigueta, prog, lineas) {
+  const esPanel = _esSistemaPanel(l.sistema);
+  let totalPiezas = 0;
+  const filas = lineas.map(({ f, cantidad }, n) => {
+    totalPiezas += cantidad;
+    if (esPanel) {
+      return `<tr style="border-bottom:1px solid #EDF2F7">
+        <td style="padding:3px 4px;color:#999">${n + 1}</td>
+        <td style="padding:3px 4px;font-weight:600">${_esc(f.cuadro) || '—'}</td>
+        <td style="padding:3px 4px">${_etiquetaClasificacionPanel(f.clasificacion)}</td>
+        <td style="padding:3px 4px;text-align:center">${f.ancho || 0}</td>
+        <td style="padding:3px 4px;text-align:right">${(Number(f.largoA) || 0).toFixed(2)}</td>
+        <td style="padding:3px 4px;text-align:right">${(Number(f.largoB) || 0).toFixed(2)}</td>
+        <td style="padding:3px 4px;text-align:center;font-weight:700">${cantidad}</td>
+        <td style="padding:3px 4px;min-width:45px"></td>
+      </tr>`;
+    }
+    const hilosTxt = esVigueta ? `${Number(f.hilosAbajo) || 0}+${Number(f.hilosArriba) || 0}` : String(Number(f.hilos) || 0);
+    const colEspecifica = esVigueta
+      ? `<td style="padding:3px 4px">${_esc(f.tipoVigueta) || '—'}</td>`
+      : `<td style="padding:3px 4px;text-align:center">${f.ancho || 0}</td>`;
+    return `<tr style="border-bottom:1px solid #EDF2F7">
+      <td style="padding:3px 4px;color:#999">${n + 1}</td>
+      <td style="padding:3px 4px;font-weight:600">${_esc(f.cuadro) || '—'}</td>
+      ${colEspecifica}
+      <td style="padding:3px 4px;text-align:center">${hilosTxt}</td>
+      <td style="padding:3px 4px;text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>
+      <td style="padding:3px 4px;text-align:center;font-weight:700">${cantidad}</td>
+      <td style="padding:3px 4px;min-width:45px"></td>
+    </tr>`;
+  });
+  const detalleHTML = _cuadroDetalladoDosColsHTML(filas, _cuadroDetalladoTheadHTML(esVigueta, esPanel, false), esPanel);
+  const pendientes = (prog.lineas || []).filter(ln => ln.cantidadReal == null).length;
+  return `
+    <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
+      <span style="font-weight:700">Producción Registrada — ${_esc(l.nombre)}</span>
+      <div style="flex:1"></div>
+      <button onclick="descargarPDFProduccionRegistrada()" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-produccion-registrada">⬇️ Descargar PDF</button>
+      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+    </div>
+    <div class="preview-doc" id="prr-preview-doc">
+      <div class="preview-membrete-header"><img src="membrete-top.jpg" alt=""></div>
+      <div class="preview-content" id="prr-preview-content" style="padding-top:6px">
+        <div style="text-align:center;font-size:12px;font-weight:700;color:#003F7F;letter-spacing:0.03em;margin-bottom:8px">PRODUCCIÓN REGISTRADA</div>
+        <div style="padding-bottom:6px;border-bottom:1px solid #eee;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <div style="font-size:14px;font-weight:700;color:#003F7F">${_esc(l.nombre)}${l.ubicacion ? ' — ' + _esc(l.ubicacion) : ''}</div>
+            <div style="font-size:11px;color:#555">${prog.fecha ? new Date(prog.fecha + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}</div>
+          </div>
+          <div style="font-size:12px;font-weight:600;margin-top:2px">${_esc(p?.nombre) || '—'}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:6px;text-align:center">
+            <div><div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.04em">Sistema</div><div style="font-size:12px;font-weight:700;color:#003F7F;margin-top:2px">${sis ? _esc(sis.etiqueta) : '—'}</div></div>
+            <div><div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.04em">Piezas fabricadas</div><div style="font-size:12px;font-weight:700;color:#003F7F;margin-top:2px">${totalPiezas} piezas en ${lineas.length} fila${lineas.length === 1 ? '' : 's'}</div></div>
+          </div>
+          ${prog.observaciones ? `<div style="margin-top:6px;font-size:10.5px"><b>OBSERVACIONES:</b> ${_esc(prog.observaciones)}</div>` : ''}
+          ${pendientes > 0 ? `<div style="margin-top:6px;font-size:10px;color:var(--naranja)">⚠️ Quedan ${pendientes} fila(s) de esta programación sin cargar todavía — no se incluyen en este resumen.</div>` : ''}
+        </div>
+        ${_resumenPorMedidasHTML(lineas, l)}
+        ${detalleHTML}
+        <div class="preview-firma" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Reportado por</div>
+          <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Verificado en planta</div>
+        </div>
+      </div>
+      <div class="preview-membrete-footer" id="prr-preview-footer">
+        <div class="pf-arco"></div>
+        <div class="pf-datos">
+          <div class="pf-col"><span class="pf-icon">📞</span><span>+57 314 620 1650<br>+57 311 408 2285</span></div>
+          <div class="pf-col"><span class="pf-icon">🏠</span><span>Autopista del Café Km2<br>Vía Chinchiná – Santa Rosa</span></div>
+          <div class="pf-col"><span class="pf-icon">🌐</span><span>www.proconcreto.com.co</span></div>
+        </div>
+      </div>
+    </div>`;
+}
+function imprimirProduccionRegistrada(id) {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  if (!l) return;
+  const prog = _programacionesLosaActual.find(x => x.id === id);
+  if (!prog) return;
+  const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
+  const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
+  const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const lineas = [];
+  (prog.lineas || []).forEach(ln => {
+    const cantidad = Number(ln.cantidadReal) || 0;
+    if (ln.cantidadReal == null || cantidad <= 0) return;
+    const f = _filasLosaActual.find(x => x.id === ln.filaId);
+    if (f) lineas.push({ f, cantidad });
+  });
+  if (!lineas.length) { alert('Esta producción todavía no tiene ninguna línea cargada para imprimir.'); return; }
+  _fechaProgramacionImpresa = prog.fecha || new Date().toISOString().split('T')[0];
+  document.getElementById('contenido-preview').innerHTML = _htmlProduccionRegistrada(l, p, sis, esVigueta, prog, lineas);
+  document.getElementById('vista-previa').style.display = 'block';
+  document.querySelectorAll('.pantalla').forEach(p2 => p2.classList.remove('activa'));
+  window.scrollTo(0, 0);
+}
+async function descargarPDFProduccionRegistrada() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const fecha = (_fechaProgramacionImpresa || new Date().toISOString().split('T')[0]).replace(/-/g, '_');
+  const nombreLosa = (l?.nombre || 'losa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '_');
+  await _descargarPDFConMembrete('prr-preview-content', 'prr-preview-footer', `Produccion_Registrada_${nombreLosa}_${fecha}.pdf`, 'btn-pdf-produccion-registrada');
+}
+
 // "Cargar producción" — elige una programación y, frente a cada "teórico programado", deja
 // digitar lo que realmente se produjo. Una línea ya cargada (`cantidadReal != null`) sigue
 // siendo editable (2026-10-16, a pedido del usuario: "permitamos que se puedan también editar
@@ -3376,6 +3492,7 @@ function renderProduccionRegistrada() {
       <td>${_esc(p.observaciones) || '—'}</td>
       <td>
         <div class="flex-gap">
+          <button class="btn btn-secundario btn-xs" onclick="imprimirProduccionRegistrada('${_escAttr(p.id)}')">🖨️ Formato</button>
           <button class="btn btn-secundario btn-xs" onclick="verDetalleProduccionRegistrada('${_escAttr(p.id)}')">👁️ Detalle</button>
           <button class="btn btn-primario btn-xs" onclick="editarProduccionRegistrada('${_escAttr(p.id)}')">✏️ Editar</button>
           <button class="btn btn-rojo btn-xs" onclick="eliminarProduccionRegistrada('${_escAttr(p.id)}')">🗑️</button>
@@ -4004,6 +4121,122 @@ async function descargarPDFProgramacionDespacho() {
   await _descargarPDFConMembrete('pd-prog-preview-content', 'pd-prog-preview-footer', `Programacion_Despacho_${nombreLosa}_${fecha}.pdf`, 'btn-pdf-programacion-despacho');
 }
 
+// "🖨️ Formato" en "Despachos registrados" (2026-11-24) — ver la nota completa junto a
+// `_htmlProduccionRegistrada()`, mismo pedido del usuario, mismo patrón exacto, ahora del lado
+// de Despacho: usa `cantidadReal` en vez de `cantidadProgramada`, descartando líneas sin cargar,
+// y agrega la Remisión (el dato que de verdad identifica un despacho ya hecho, que la
+// programación todavía no tiene) bien visible junto a Sistema/Piezas/Vehículo. Mismo criterio de
+// Peso por fila que ya tenía `_htmlProgramacionDespacho()` — a Despacho sí le sirve para repartir
+// la carga entre viajes.
+function _htmlDespachoRegistrado(l, p, sis, esVigueta, prog, lineas) {
+  const esPanel = _esSistemaPanel(l.sistema);
+  let totalPiezas = 0, totalPeso = 0;
+  const filas = lineas.map(({ f, cantidad }, n) => {
+    const peso = _pesoFila({ ...f, cantidad }, l);
+    totalPiezas += cantidad;
+    totalPeso += peso;
+    if (esPanel) {
+      return `<tr style="border-bottom:1px solid #EDF2F7">
+        <td style="padding:3px 4px;color:#999">${n + 1}</td>
+        <td style="padding:3px 4px;font-weight:600">${_esc(f.cuadro) || '—'}</td>
+        <td style="padding:3px 4px">${_etiquetaClasificacionPanel(f.clasificacion)}</td>
+        <td style="padding:3px 4px;text-align:center">${f.ancho || 0}</td>
+        <td style="padding:3px 4px;text-align:right">${(Number(f.largoA) || 0).toFixed(2)}</td>
+        <td style="padding:3px 4px;text-align:right">${(Number(f.largoB) || 0).toFixed(2)}</td>
+        <td style="padding:3px 4px;text-align:center;font-weight:700">${cantidad}</td>
+        <td style="padding:3px 4px;text-align:right">${peso.toFixed(1)}</td>
+        <td style="padding:3px 4px;min-width:45px"></td>
+      </tr>`;
+    }
+    const hilosTxt = esVigueta ? `${Number(f.hilosAbajo) || 0}+${Number(f.hilosArriba) || 0}` : String(Number(f.hilos) || 0);
+    const colEspecifica = esVigueta
+      ? `<td style="padding:3px 4px">${_esc(f.tipoVigueta) || '—'}</td>`
+      : `<td style="padding:3px 4px;text-align:center">${f.ancho || 0}</td>`;
+    return `<tr style="border-bottom:1px solid #EDF2F7">
+      <td style="padding:3px 4px;color:#999">${n + 1}</td>
+      <td style="padding:3px 4px;font-weight:600">${_esc(f.cuadro) || '—'}</td>
+      ${colEspecifica}
+      <td style="padding:3px 4px;text-align:center">${hilosTxt}</td>
+      <td style="padding:3px 4px;text-align:right">${(Number(f.dimension) || 0).toFixed(2)}</td>
+      <td style="padding:3px 4px;text-align:center;font-weight:700">${cantidad}</td>
+      <td style="padding:3px 4px;text-align:right">${peso.toFixed(1)}</td>
+      <td style="padding:3px 4px;min-width:45px"></td>
+    </tr>`;
+  });
+  const detalleHTML = _cuadroDetalladoDosColsHTML(filas, _cuadroDetalladoTheadHTML(esVigueta, esPanel, true), esPanel);
+  const pendientes = (prog.lineas || []).filter(ln => ln.cantidadReal == null).length;
+  return `
+    <div class="no-print" style="background:#1C2333;color:white;padding:12px 24px;display:flex;align-items:center;gap:16px">
+      <span style="font-weight:700">Despacho Registrado — ${_esc(l.nombre)}</span>
+      <div style="flex:1"></div>
+      <button onclick="descargarPDFDespachoRegistrado()" style="background:#1976D2;color:white;border:none;padding:8px 18px;border-radius:5px;cursor:pointer;font-weight:700" id="btn-pdf-despacho-registrado">⬇️ Descargar PDF</button>
+      <button onclick="document.getElementById('vista-previa').style.display='none';document.getElementById('pantalla-losa-detalle').classList.add('activa')" style="background:#555;color:white;border:none;padding:8px 14px;border-radius:5px;cursor:pointer">← Volver</button>
+    </div>
+    <div class="preview-doc" id="pdr-preview-doc">
+      <div class="preview-membrete-header"><img src="membrete-top.jpg" alt=""></div>
+      <div class="preview-content" id="pdr-preview-content" style="padding-top:6px">
+        <div style="text-align:center;font-size:12px;font-weight:700;color:#003F7F;letter-spacing:0.03em;margin-bottom:8px">DESPACHO REGISTRADO</div>
+        <div style="padding-bottom:6px;border-bottom:1px solid #eee;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <div style="font-size:14px;font-weight:700;color:#003F7F">${_esc(l.nombre)}${l.ubicacion ? ' — ' + _esc(l.ubicacion) : ''}</div>
+            <div style="font-size:11px;color:#555">${prog.fecha ? new Date(prog.fecha + 'T12:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}</div>
+          </div>
+          <div style="font-size:12px;font-weight:600;margin-top:2px">${_esc(p?.nombre) || '—'}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;margin-top:6px;text-align:center">
+            <div><div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.04em">Sistema</div><div style="font-size:12px;font-weight:700;color:#003F7F;margin-top:2px">${sis ? _esc(sis.etiqueta) : '—'}</div></div>
+            <div><div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.04em">Piezas despachadas</div><div style="font-size:12px;font-weight:700;color:#003F7F;margin-top:2px">${totalPiezas} piezas en ${lineas.length} fila${lineas.length === 1 ? '' : 's'}</div></div>
+            <div><div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.04em">Vehículo (${(totalPeso / 1000).toFixed(2)} ton)</div><div style="font-size:12px;font-weight:700;color:#003F7F;margin-top:2px">${_esc(prog.vehiculo) || '—'}</div></div>
+            <div><div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.04em">Remisión</div><div style="font-size:12px;font-weight:700;color:#003F7F;margin-top:2px">${_esc(prog.remision) || '—'}</div></div>
+          </div>
+          ${prog.observaciones ? `<div style="margin-top:6px;font-size:10.5px"><b>OBSERVACIONES:</b> ${_esc(prog.observaciones)}</div>` : ''}
+          ${pendientes > 0 ? `<div style="margin-top:6px;font-size:10px;color:var(--naranja)">⚠️ Quedan ${pendientes} fila(s) de esta programación sin cargar todavía — no se incluyen en este resumen.</div>` : ''}
+        </div>
+        ${_resumenPorMedidasHTML(lineas, l)}
+        ${detalleHTML}
+        <div class="preview-firma" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Despachado por</div>
+          <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">Recibido por</div>
+        </div>
+      </div>
+      <div class="preview-membrete-footer" id="pdr-preview-footer">
+        <div class="pf-arco"></div>
+        <div class="pf-datos">
+          <div class="pf-col"><span class="pf-icon">📞</span><span>+57 314 620 1650<br>+57 311 408 2285</span></div>
+          <div class="pf-col"><span class="pf-icon">🏠</span><span>Autopista del Café Km2<br>Vía Chinchiná – Santa Rosa</span></div>
+          <div class="pf-col"><span class="pf-icon">🌐</span><span>www.proconcreto.com.co</span></div>
+        </div>
+      </div>
+    </div>`;
+}
+function imprimirDespachoRegistrado(id) {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  if (!l) return;
+  const prog = _despachosProgramadosLosaActual.find(x => x.id === id);
+  if (!prog) return;
+  const p = PROYECTOS.find(x => x.id === _PROYECTO_ACTIVO_ID);
+  const sis = SISTEMAS_ENTREPISO.find(s => s.clave === l.sistema);
+  const esVigueta = l.sistema === 'vigueta_bovedilla';
+  const lineas = [];
+  (prog.lineas || []).forEach(ln => {
+    const cantidad = Number(ln.cantidadReal) || 0;
+    if (ln.cantidadReal == null || cantidad <= 0) return;
+    const f = _filasLosaActual.find(x => x.id === ln.filaId);
+    if (f) lineas.push({ f, cantidad });
+  });
+  if (!lineas.length) { alert('Este despacho todavía no tiene ninguna línea cargada para imprimir.'); return; }
+  _fechaProgramacionImpresa = prog.fecha || new Date().toISOString().split('T')[0];
+  document.getElementById('contenido-preview').innerHTML = _htmlDespachoRegistrado(l, p, sis, esVigueta, prog, lineas);
+  document.getElementById('vista-previa').style.display = 'block';
+  document.querySelectorAll('.pantalla').forEach(p2 => p2.classList.remove('activa'));
+  window.scrollTo(0, 0);
+}
+async function descargarPDFDespachoRegistrado() {
+  const l = LOSAS_PROYECTO.find(x => x.id === _LOSA_ACTIVA_ID);
+  const fecha = (_fechaProgramacionImpresa || new Date().toISOString().split('T')[0]).replace(/-/g, '_');
+  const nombreLosa = (l?.nombre || 'losa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '_');
+  await _descargarPDFConMembrete('pdr-preview-content', 'pdr-preview-footer', `Despacho_Registrado_${nombreLosa}_${fecha}.pdf`, 'btn-pdf-despacho-registrado');
+}
+
 // "Cargar despacho" — mismo patrón que "Cargar producción" (línea ya cargada sigue siendo
 // editable, para poder corregir errores), más la remisión real del camión, que producción no
 // necesita. Al guardar, reconstruye por completo la entrada de esta programación en el libro
@@ -4166,6 +4399,7 @@ function renderDespachosRegistrados() {
       <td>${_esc(p.observaciones) || '—'}</td>
       <td>
         <div class="flex-gap">
+          <button class="btn btn-secundario btn-xs" onclick="imprimirDespachoRegistrado('${_escAttr(p.id)}')">🖨️ Formato</button>
           <button class="btn btn-secundario btn-xs" onclick="verDetalleDespachoRegistrado('${_escAttr(p.id)}')">👁️ Detalle</button>
           <button class="btn btn-primario btn-xs" onclick="editarDespachoRegistrado('${_escAttr(p.id)}')">✏️ Editar</button>
           <button class="btn btn-rojo btn-xs" onclick="eliminarDespachoRegistrado('${_escAttr(p.id)}')">🗑️</button>

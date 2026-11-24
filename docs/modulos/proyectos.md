@@ -2331,3 +2331,54 @@ primera (regresión del comportamiento histórico); el pegado contra el contened
 (`onPasteFilasProduccion()`) también reparte bien Paneles ahora; de regresión, el mismo bloque
 pegado sobre una Losa de Vigueta sigue repartiendo Tipo de vigueta/Hilos Abajo/Hilos Arriba/
 Dimensión/Cantidad sin cambios. Sin errores de consola.
+
+### PDF de "Producción/Despacho Registrado" — lo FINALMENTE fabricado/despachado (2026-11-24)
+
+A pedido del usuario, con una captura de las tarjetas "Despachos programados"/"Despachos
+registrados": *"los detalles de lo fabricado o lo despachado, no son tan amigables. hagamos para
+esto, un PDF igual al imprimible de programación de producción y despacho, con el resumen de lo
+finalmente producido/despachado"*.
+
+Hasta ahora "Producciones registradas"/"Despachos registrados" solo ofrecían "👁️ Detalle" — una
+tabla plana en un modal (Cuadro/Ancho/Hilos/Largo/Programado/Real), sin membrete ni el RESUMEN
+POR MEDIDAS agrupado que sí tiene el imprimible de "Programar producción/despacho". De hecho ese
+mismo botón se LLAMÓ "🖨️ Formato" hasta el 2026-10-19 y se renombró a "Detalle" justamente porque
+en ese momento no generaba ningún PDF (ver la nota junto a `renderProduccionRegistrada()`) — esto
+construye el PDF que en ese momento no existía.
+
+- **`_htmlProduccionRegistrada(l, p, sis, esVigueta, prog, lineas)`**/**`_htmlDespachoRegistrado(...)`**
+  (nuevas, junto a `descargarPDFProgramacionProduccion()`/`descargarPDFProgramacionDespacho()`):
+  copian CASI literal el HTML de `_htmlProgramacionProduccion()`/`_htmlProgramacionDespacho()`
+  (mismo membrete, mismo `_resumenPorMedidasHTML()`, mismo cuadro detallado en 2 columnas, misma
+  mecánica de "Descargar PDF"/"← Volver") — las diferencias: título "PRODUCCIÓN REGISTRADA"/
+  "DESPACHO REGISTRADO" en vez de "PROGRAMACIÓN DE...", "Piezas fabricadas"/"Piezas despachadas"
+  en vez de "Piezas a programar", y firmas "Reportado por"/"Verificado en planta" (Producción) o
+  "Despachado por"/"Recibido por" (Despacho) en vez de "Programado por"/"Recibido en planta"/
+  "Cargado por" — todas más propias de un registro de algo YA HECHO que de un plan. El Despacho
+  Registrado agrega una 4ª casilla **Remisión** junto a Sistema/Piezas/Vehículo (el dato que de
+  verdad identifica un despacho ya hecho, que la programación todavía no tiene).
+- **La diferencia que de verdad importa**: `lineas` se arma con `cantidadReal` (lo que de verdad
+  se cargó) en vez de `cantidadProgramada`, y descarta las líneas con `cantidadReal == null`
+  (todavía sin cargar) — esas no son "lo producido/despachado". Si quedan líneas de la
+  programación sin cargar, se avisa con una nota naranja ("⚠️ Quedan N fila(s)... no se incluyen
+  en este resumen") en vez de dejarlo en silencio.
+- **`imprimirProduccionRegistrada(id)`**/**`imprimirDespachoRegistrado(id)`**: mismo patrón que
+  `imprimirProgramacionProduccionGuardada()`/`imprimirProgramacionDespachoGuardada()`, con un
+  `alert()` si la programación todavía no tiene NINGUNA línea cargada (nada que imprimir).
+- **`descargarPDFProduccionRegistrada()`**/**`descargarPDFDespachoRegistrado()`**: mismo
+  `_descargarPDFConMembrete()` de siempre, con sus propios ids de contenedor (`prr-`/`pdr-` en
+  vez de `pp-`/`pd-prog-`) para no chocar con los PDFs de "programación" si ambos se generan en
+  la misma sesión.
+- **Botón nuevo** "🖨️ Formato" agregado a las columnas de ACCIONES de "Producciones registradas"
+  y "Despachos registrados" (`renderProduccionRegistrada()`/`renderDespachosRegistrados()`), al
+  lado de "👁️ Detalle" — no lo reemplaza, por si se sigue usando.
+
+Verificado con un arnés real — 19 aserciones: una programación con una fila ya cargada (8 de 10
+piezas) y otra todavía pendiente genera un PDF que muestra "PRODUCCIÓN REGISTRADA", el tile
+"Piezas fabricadas", la fila cargada con su cantidad REAL (8, no el 10 programado), la fila
+pendiente NO aparece, y la nota de "Quedan 1 fila(s)... sin cargar" sí aparece; firmas y los ids
+de botón/contenedor correctos; el botón "🖨️ Formato" aparece en la tarjeta con el `onclick`
+correcto. Mismas aserciones del lado de Despacho, más Remisión ("7905") y Vehículo visibles, el
+tile "Piezas despachadas" y el peso por fila presente, firmas "Despachado por"/"Recibido por". De
+regresión: una programación sin NINGUNA línea cargada muestra la alerta en vez de imprimir vacío.
+Sin errores de consola.

@@ -1590,12 +1590,31 @@ let _progDiaFechaActual = null;
 // refrescaba después, aunque el catálogo ya estuviera bien. Mismo criterio que ya se usa para la
 // dirección de Google Maps del destino (ver la nota de 2026-08-28 más abajo, en el mismo
 // imprimible): resolver en vivo cada vez que se imprime, en vez de confiar en una foto vieja.
+//
+// Corrección (2026-11-25, el mismo bug seguía apareciendo tras el primer intento): `p.producto`
+// guarda el texto "código — nombre" tal como estaba el día que se cargó esa línea
+// (`_claveItemOrden()`), y el PRIMER intento buscaba ese texto COMPLETO en el catálogo — pero el
+// NOMBRE de un producto se puede renombrar en cualquier momento desde Catálogo (ej. para
+// normalizar may/min o agregarle las medidas, como ya tiene la mayoría del catálogo real) sin
+// que eso cambie su identidad. En cuanto el nombre cambia, ese texto completo deja de matchear
+// con nada del catálogo actual, y la búsqueda caía siempre al valor guardado (0) — el mismo
+// síntoma, por una causa más sutil que la primera. El CÓDIGO (antes del primer " — ") es el
+// identificador estable de verdad (solo cambia por el flujo explícito de "renombrar" un producto
+// oculto, un caso aparte) — buscar por código en vez de por el texto completo hace que un
+// producto renombrado DESPUÉS de crear la entrega siga resolviendo bien su peso. Si el texto no
+// trae " — " (líneas viejas sin código, ver `_claveItemOrden()`), se cae al match por texto
+// completo de antes.
 // Se busca en CATALOGO completo (no solo PRODUCTOS, que excluye los inactivos/ocultos) para que
 // un producto que hoy esté oculto/no-de-línea igual calcule bien el peso de un despacho ya
 // hecho. Si no se encuentra nada, o el catálogo tampoco tiene peso puesto, se cae al valor
 // guardado — mejor un número viejo que dejarlo en blanco.
 function _pesoProductoEntregaVivo(p) {
-  const prodCat = typeof CATALOGO !== 'undefined' ? CATALOGO.find(x => _textoProducto(x) === (p.producto || '').trim()) : null;
+  const texto = (p.producto || '').trim();
+  const idxSep = texto.indexOf(' — ');
+  const codigo = idxSep >= 0 ? texto.slice(0, idxSep).trim() : '';
+  const prodCat = typeof CATALOGO === 'undefined' ? null
+    : codigo ? CATALOGO.find(x => x.codigo === codigo)
+    : CATALOGO.find(x => _textoProducto(x) === texto);
   const pesoUnitario = prodCat ? (Number(prodCat.peso) || 0) : 0;
   if (!pesoUnitario) return Number(p.peso) || 0;
   return (Number(p.cantidad) || 0) * pesoUnitario / 1000;

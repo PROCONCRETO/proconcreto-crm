@@ -236,3 +236,37 @@ Sin errores de consola.
 **Nota aparte, para el usuario**: con el peso real (11.87 ton) el vehículo GTU668 — que tiene
 11 ton de capacidad — queda SOBRE el límite para esa entrega puntual; antes, al mostrar 0.00 ton,
 el imprimible no alcanzaba a avisar de ese exceso de capacidad.
+
+### El mismo bug seguía apareciendo: buscar por el texto completo no alcanzaba (2026-11-25)
+
+El usuario mandó un PDF real generado DESPUÉS del cambio anterior: el Bordillo Sardinel H-45
+(`PBBORSAR45`) seguía en 0.00 ton — *"sigue apareciendo el bordillo con peso en ceros..."*.
+
+Causa raíz, más sutil que la primera: `_pesoProductoEntregaVivo()` buscaba el producto por el
+texto COMPLETO "código — nombre" (`_textoProducto(x) === p.producto`). `p.producto` guarda ese
+texto tal como estaba el día que se cargó la línea (`_claveItemOrden()`) — una FOTO del nombre de
+ese momento, no solo del peso. El PDF real delató la causa: todos los demás productos reales se
+ven en MAYÚSCULAS con las medidas incluidas en el nombre ("BLOQUE BASE EN CEMENTO ESTRUCTURAL
+a=12 b=40 h=20 cm ( 8 Mpa)"), menos el Bordillo, que seguía en "Bordillo Sardinel H-45" — el
+nombre del producto se renombró en el catálogo (normalización de estilo) en algún momento DESPUÉS
+de crear esta entrega, con el mismo código de siempre. El texto completo guardado ya no matcheaba
+con nada del catálogo actual, así que la búsqueda seguía cayendo al peso guardado (0) — mismo
+síntoma que antes, una causa distinta y más fácil de que vuelva a pasar (cualquier renombre de un
+producto, no solo uno que estuvo inactivo o sin cargar).
+
+- **`_pesoProductoEntregaVivo(p)`**: ahora separa el CÓDIGO del texto guardado (lo que viene antes
+  del primer " — ") y busca por código en el catálogo, no por el texto completo — el código es el
+  identificador estable de un producto (solo cambia por el flujo explícito de "renombrar" un
+  producto oculto a uno de línea, un caso aparte), mientras que el nombre se puede editar en
+  cualquier momento desde Catálogo sin que eso cambie qué producto es. Si el texto guardado no
+  trae " — " (líneas viejas sin código, ver `_claveItemOrden()`), se sigue cayendo al match por
+  texto completo de antes — no se pierde esa cobertura.
+
+Verificado con un arnés real, reproduciendo el escenario exacto: el producto real del seed
+(`PBBORSAR45`, `peso:106`) se renombra en el catálogo a `'BORDILLO SARDINEL H-45 a=15 b=80 h=45
+cm'` (mismo código, estilo real de mayúsculas+medidas) DESPUÉS de crear la entrega con el nombre
+viejo guardado — las 3 lecturas del imprimible (fila del producto, total de la entrega, barra de
+carga del viaje) ahora sí muestran 11.87 ton, en vez de seguir en 0.00 tras el renombre. De
+regresión: un producto que ya no existe ni por código sigue cayendo al peso guardado (3.50); una
+línea vieja sin código (texto plano, sin " — ") sigue resolviendo por el match de texto completo
+de antes (1.20). Sin errores de consola.
