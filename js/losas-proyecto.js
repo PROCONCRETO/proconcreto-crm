@@ -3449,11 +3449,67 @@ function editarProgramacionProduccion(id) {
 function eliminarProgramacionProduccion(id) {
   const p = _programacionesLosaActual.find(x => x.id === id);
   if (!p) return;
+  // Candado defensivo (2026-11-25, bug real reportado: un proyecto tenía avance real de
+  // producción en la tabla principal, pero NINGUNA de las dos tarjetas (ni "programadas" ni
+  // "registradas") mostraba nada) — esta función siempre asumió que una programación sin
+  // NINGUNA línea cargada nunca llega a verse acá (la tarjeta "Producciones programadas" ya la
+  // filtra así), así que nunca tocaba `fila.produccion[]` al borrar. Si por cualquier motivo
+  // (ej. una pestaña con el render desactualizado) se intenta borrar desde acá una programación
+  // que SÍ tiene algo cargado, usar el borrado correcto de "Producciones registradas" (que sí
+  // revierte el crédito en `fila.produccion[]`) en vez de dejar producción ya fabricada sin
+  // ninguna programación que la respalde — ver `repararProduccionHuerfana()` para recuperar un
+  // caso que ya haya quedado así.
+  if ((p.lineas || []).some(l => l.cantidadReal != null)) { eliminarProduccionRegistrada(id); return; }
   const fechaTxt = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : 'sin fecha';
   if (!confirm(`¿Eliminar la programación de producción del ${fechaTxt}? Todavía no tiene nada cargado, así que no afecta ningún pendiente.`)) return;
   _programacionesLosaActual = _programacionesLosaActual.filter(x => x.id !== id);
   _guardarLosaActual();
   renderProduccionProgramada();
+}
+
+// Recuperación defensiva (2026-11-25) — si `fila.produccion[]` quedó con cantidades fabricadas
+// sin que exista ninguna programación en `_programacionesLosaActual` que las respalde (ej. se
+// borró esa programación desde "Producciones programadas" en vez de "Producciones registradas"
+// antes de que existiera el candado de `eliminarProgramacionProduccion()`, perdiendo el registro
+// pero no el crédito ya fabricado), reconstruye una programación nueva por cada
+// `programacionId` huérfano encontrado (agrupando por fecha si el crédito no traía ningún
+// `programacionId`) y reasigna ese id a las entradas de `fila.produccion[]` correspondientes,
+// para que queden consistentes de ahí en adelante. NO cambia ninguna cantidad fabricada — solo
+// reconstruye el registro que faltaba. Botón "🔧" agregado al estado vacío de "Producciones
+// registradas" (ver `renderProduccionRegistrada()`), para que el usuario lo encuentre justo
+// donde lo necesita, sin tener que saber que existe de antemano.
+function repararProduccionHuerfana() {
+  const idsConocidos = new Set(_programacionesLosaActual.map(p => p.id));
+  const grupos = {};
+  _filasLosaActual.forEach(f => {
+    (f.produccion || []).forEach(e => {
+      if (e.programacionId && idsConocidos.has(e.programacionId)) return; // sana, ya tiene su programación
+      const clave = e.programacionId || ('sinid__' + (e.fecha || 'sinfecha'));
+      if (!grupos[clave]) grupos[clave] = { fecha: e.fecha || '', cantidades: {} };
+      grupos[clave].cantidades[f.id] = (grupos[clave].cantidades[f.id] || 0) + (Number(e.cantidad) || 0);
+    });
+  });
+  const claves = Object.keys(grupos);
+  if (!claves.length) { alert('No se encontró producción sin registrar — todo el avance ya tiene su programación correspondiente.'); return; }
+  const totalFilas = claves.reduce((s, k) => s + Object.keys(grupos[k].cantidades).length, 0);
+  if (!confirm(`Se encontró producción fabricada sin programación asociada: ${claves.length} registro(s), ${totalFilas} fila(s) en total. ¿Reconstruir "Producción Registrada" para que vuelvan a aparecer? Esto NO cambia ninguna cantidad ya fabricada, solo recupera el registro que faltaba.`)) return;
+  claves.forEach((clave, i) => {
+    const g = grupos[clave];
+    const nuevoId = String(Date.now()) + '_' + i;
+    const lineas = Object.keys(g.cantidades).map(filaId => ({ filaId, cantidadProgramada: g.cantidades[filaId], cantidadReal: g.cantidades[filaId] }));
+    _programacionesLosaActual.push({ id: nuevoId, fecha: g.fecha, observaciones: 'Recuperada automáticamente — producción ya fabricada que había quedado sin ninguna programación asociada.', lineas });
+    _filasLosaActual.forEach(f => {
+      (f.produccion || []).forEach(e => {
+        const claveEntrada = (e.programacionId && idsConocidos.has(e.programacionId)) ? null : (e.programacionId || ('sinid__' + (e.fecha || 'sinfecha')));
+        if (claveEntrada === clave) e.programacionId = nuevoId;
+      });
+    });
+  });
+  _guardarLosaActual();
+  renderProduccionProgramada();
+  renderProduccionRegistrada();
+  renderFilasProduccion();
+  alert(`Se recuperaron ${claves.length} registro(s) de producción.`);
 }
 
 // "Producciones registradas" — mismo espíritu que "📦 Despachos registrados", pero del lado de
@@ -3479,7 +3535,7 @@ function renderProduccionRegistrada() {
   if (!tbody) return;
   const conCarga = _programacionesLosaActual.filter(p => (p.lineas || []).some(l => l.cantidadReal != null));
   if (!conCarga.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--gris-medio);padding:10px">No hay producción cargada todavía.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--gris-medio);padding:10px">No hay producción cargada todavía. <button type="button" class="btn btn-secundario btn-xs" onclick="repararProduccionHuerfana()" title="Si la tabla de arriba muestra piezas fabricadas pero acá no aparece nada, puede haberse perdido el registro sin perder el avance — esto lo reconstruye">🔧 ¿Hay avance sin registrar?</button></td></tr>`;
     return;
   }
   tbody.innerHTML = conCarga.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(p => {
@@ -4362,11 +4418,42 @@ function editarProgramacionDespacho(id) {
 function eliminarProgramacionDespacho(id) {
   const p = _despachosProgramadosLosaActual.find(x => x.id === id);
   if (!p) return;
+  // Candado defensivo (2026-11-25) — mismo criterio exacto que `eliminarProgramacionProduccion()`,
+  // ver esa nota: si se intenta borrar desde acá una programación que YA tiene algo cargado, usar
+  // el borrado correcto de "Despachos registrados" (que sí revierte el crédito en
+  // `_despachosLosaActual`) en vez de dejar un despacho ya cargado sin ninguna programación que
+  // lo respalde.
+  if ((p.lineas || []).some(l => l.cantidadReal != null)) { eliminarDespachoRegistrado(id); return; }
   const fechaTxt = p.fecha ? new Date(p.fecha + 'T12:00').toLocaleDateString('es-CO') : 'sin fecha';
   if (!confirm(`¿Eliminar la programación de despacho del ${fechaTxt}? Todavía no tiene nada cargado, así que no afecta ningún pendiente.`)) return;
   _despachosProgramadosLosaActual = _despachosProgramadosLosaActual.filter(x => x.id !== id);
   _guardarLosaActual();
   renderDespachoProgramado();
+}
+
+// Recuperación defensiva (2026-11-25) — mismo criterio exacto que `repararProduccionHuerfana()`,
+// ver esa nota, del lado de Despacho: si `_despachosLosaActual` (el libro real, por remisión)
+// tiene una entrada cuyo `despachoProgramadoId` ya no existe en `_despachosProgramadosLosaActual`
+// (la programación que la respaldaba se borró por el camino equivocado), la reconstruye — acá
+// es más simple que en Producción porque la entrada del libro real YA trae todo lo necesario
+// (remisión, fecha, líneas) para armar de vuelta su "Despacho Registrado", reutilizando el mismo
+// `despachoProgramadoId` como `id` de la programación reconstruida (así vuelve a matchear sin
+// tener que tocar `_despachosLosaActual` para nada).
+function repararDespachoHuerfano() {
+  const idsConocidos = new Set(_despachosProgramadosLosaActual.map(p => p.id));
+  const huerfanos = _despachosLosaActual.filter(d => !idsConocidos.has(d.despachoProgramadoId));
+  if (!huerfanos.length) { alert('No se encontró despacho sin registrar — todo el avance ya tiene su programación correspondiente.'); return; }
+  const totalFilas = huerfanos.reduce((s, d) => s + (d.lineas || []).length, 0);
+  if (!confirm(`Se encontró despacho cargado sin programación asociada: ${huerfanos.length} registro(s), ${totalFilas} fila(s) en total. ¿Reconstruir "Despacho Registrado" para que vuelvan a aparecer? Esto NO cambia ninguna cantidad ya despachada, solo recupera el registro que faltaba.`)) return;
+  huerfanos.forEach(d => {
+    const lineas = (d.lineas || []).map(l => ({ filaId: l.filaId, cantidadProgramada: l.cantidad, cantidadReal: l.cantidad }));
+    _despachosProgramadosLosaActual.push({ id: d.despachoProgramadoId, fecha: d.fecha || '', observaciones: d.observaciones || '', vehiculo: '', remision: d.remision || '', lineas });
+  });
+  _guardarLosaActual();
+  renderDespachoProgramado();
+  renderDespachosRegistrados();
+  renderFilasProduccion();
+  alert(`Se recuperaron ${huerfanos.length} registro(s) de despacho.`);
 }
 
 // "Despachos registrados" — misma lógica EXACTA que "🏗️ Producciones registradas" de
@@ -4385,7 +4472,7 @@ function renderDespachosRegistrados() {
   if (!tbody) return;
   const conCarga = _despachosProgramadosLosaActual.filter(p => (p.lineas || []).some(l => l.cantidadReal != null));
   if (!conCarga.length) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gris-medio);padding:10px">No hay despachos cargados todavía.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--gris-medio);padding:10px">No hay despachos cargados todavía. <button type="button" class="btn btn-secundario btn-xs" onclick="repararDespachoHuerfano()" title="Si la tabla de arriba muestra piezas despachadas pero acá no aparece nada, puede haberse perdido el registro sin perder el avance — esto lo reconstruye">🔧 ¿Hay avance sin registrar?</button></td></tr>`;
     return;
   }
   tbody.innerHTML = conCarga.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(p => {

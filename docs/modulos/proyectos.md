@@ -2382,3 +2382,56 @@ correcto. Mismas aserciones del lado de Despacho, más Remisión ("7905") y Veh�
 tile "Piezas despachadas" y el peso por fila presente, firmas "Despachado por"/"Recibido por". De
 regresión: una programación sin NINGUNA línea cargada muestra la alerta en vez de imprimir vacío.
 Sin errores de consola.
+
+### Bug: avance real de producción sin registro en "Producciones registradas" (2026-11-25)
+
+A pedido del usuario, con una captura de un proyecto real de Paneles: *"en este proyecto, tenemos
+un avance en producción pero no me aparece el registro en producciones registradas... mira que
+puede estar pasando."* La tabla principal mostraba 11 unidades fabricadas (de 81) en la fila de
+TOTALES, pero TANTO "Producciones programadas" COMO "Producciones registradas" decían "no hay
+nada todavía" — las dos tarjetas vacías a la vez, con avance real en la tabla.
+
+Causa raíz: "Unidades fabricadas" en TOTALES se calcula sumando `fila.produccion[]` directo
+(`_fabricadoFila()`), mientras que las dos tarjetas listan `_programacionesLosaActual` — dos
+fuentes DISTINTAS que en el flujo normal siempre quedan sincronizadas entre sí (toda entrada de
+`fila.produccion[]` lleva un `programacionId` que apunta a una programación real, puesto único y
+exclusivamente por `guardarCargaProduccion()`). Pero `eliminarProgramacionProduccion()` (el
+"🗑️ Borrar" de la tarjeta "Producciones PROGRAMADAS") nunca tocaba `fila.produccion[]` —
+confiaba ciegamente en que una programación sin NADA cargado nunca llega a mostrarse ahí (la
+tarjeta ya la filtra así), así que asumía que borrarla ahí nunca podía afectar producción ya
+fabricada. Si por cualquier motivo esa separación se rompe aunque sea una vez — ej. una pestaña
+con el render desactualizado tras cargar producción en otra — se puede terminar borrando desde
+ese botón una programación que YA tenía cantidades cargadas, perdiendo el REGISTRO (la
+programación) pero no el CRÉDITO (`fila.produccion[]` queda intacto, huérfano, sin que ninguna
+programación lo respalde) — exactamente el síntoma reportado. Mismo riesgo exacto, espejado, del
+lado de Despacho (`eliminarProgramacionDespacho()`/`_despachosLosaActual`).
+
+- **Candado agregado** en `eliminarProgramacionProduccion()`/`eliminarProgramacionDespacho()`: si
+  la programación que se intenta borrar desde "programada" SÍ tiene alguna línea con
+  `cantidadReal != null`, ya no se borra en seco — se delega a
+  `eliminarProduccionRegistrada()`/`eliminarDespachoRegistrado()` (el borrado correcto, que sí
+  revierte el crédito), cerrando la puerta por la que se pudo perder el registro sin perder el
+  avance.
+- **`repararProduccionHuerfana()`**/**`repararDespachoHuerfano()`** (nuevas, recuperación para
+  cuando esto ya pasó): buscan crédito sin programación que lo respalde — en Producción,
+  agrupando `fila.produccion[]` por `programacionId` huérfano (o por fecha, si ni eso tenía) y
+  reconstruyendo una programación nueva por grupo, reasignando ese id a las entradas afectadas;
+  en Despacho, más simple, porque `_despachosLosaActual` (el libro real por remisión) ya trae
+  todo lo necesario (remisión, fecha, líneas) — solo hace falta reconstruir la programación con
+  el MISMO `despachoProgramadoId` como `id`, sin tocar el libro real para nada. Ninguna de las
+  dos cambia ninguna cantidad ya fabricada/despachada — solo reconstruyen el registro que
+  faltaba. Botón "🔧 ¿Hay avance sin registrar?" agregado al estado vacío de "Producciones
+  registradas"/"Despachos registrados" (`renderProduccionRegistrada()`/
+  `renderDespachosRegistrados()`), justo donde el usuario lo necesita.
+
+Verificado con un arnés real — Producción (13 aserciones): sembrando 2 filas con
+`fila.produccion[]` cargado (6 y 5 unidades, `programacionId` huérfano) y
+`_programacionesLosaActual` vacío, reproduce el síntoma exacto (TOTALES=11 fabricadas, tarjeta
+vacía con el botón de recuperación visible); `repararProduccionHuerfana()` reconstruye una
+programación con las 2 líneas y 11 piezas en total, reasigna el `programacionId`, y la tarjeta ya
+muestra la fila; correrlo de nuevo no encuentra nada (no-op); borrar desde "programada" una
+programación con `cantidadReal` ya cargado dispara el `confirm()` de "producción registrada" (no
+el de "programada"), la borra de verdad y revierte el crédito de esa fila. Despacho (11
+aserciones): mismo patrón con `_despachosLosaActual` huérfano (remisión 9999, 7 unidades) y
+`_despachosProgramadosLosaActual` vacío — la recuperación reutiliza el mismo id, la remisión
+vuelve a aparecer en la tarjeta, y el candado de borrado funciona igual. Sin errores de consola.
